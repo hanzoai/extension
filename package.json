@@ -1,0 +1,183 @@
+{
+	"name": "hanzoai",
+	"displayName": "Hanzo AI Context Manager",
+	"description": "AI-powered project manager that analyzes codebases, maintains specifications, and tracks changes. Seamlessly integrates with VS Code to provide intelligent project insights and documentation.",
+	"version": "1.5.4",
+	"publisher": "Hanzo Industries Inc",
+	"private": false,
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/hanzoai/extension.git"
+	},
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"keywords": [
+		"productivity",
+		"AI",
+		"IDE",
+		"project management",
+		"context management",
+		"change tracking",
+		"knowledge base",
+		"documentation",
+		"specification",
+		"analysis"
+	],
+	"icon": "images/icon.png",
+	"galleryBanner": {
+		"color": "#C80000",
+		"theme": "dark"
+	},
+	"activationEvents": [
+		"onStartupFinished",
+		"onCommand:hanzo.openManager",
+		"onCommand:hanzo.openWelcomeGuide",
+		"onCommand:hanzo.reanalyzeProject",
+		"onCommand:hanzo.triggerReminder",
+		"onCommand:hanzo.login",
+		"onCommand:hanzo.logout",
+		"onCommand:hanzo.debug.authState",
+		"onCommand:hanzo.debug.clearAuth",
+		"onCommand:hanzo.checkMetrics",
+		"onCommand:hanzo.resetMetrics"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "hanzo.openManager",
+				"title": "Hanzo: Open Project Manager"
+			},
+			{
+				"command": "hanzo.openWelcomeGuide",
+				"title": "Hanzo: View Getting Started Guide"
+			},
+			{
+				"command": "hanzo.reanalyzeProject",
+				"title": "Hanzo: Analyze Project",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "hanzo.triggerReminder",
+				"title": "Hanzo: Show Reminder",
+				"icon": "$(bell)"
+			},
+			{
+				"command": "hanzo.checkMetrics",
+				"title": "Hanzo Debug: Check Impact Metrics",
+				"icon": "$(graph)"
+			},
+			{
+				"command": "hanzo.resetMetrics",
+				"title": "Hanzo Debug: Reset Impact Metrics",
+				"icon": "$(trash)"
+			},
+			{
+				"command": "hanzo.login",
+				"title": "Hanzo: Login"
+			},
+			{
+				"command": "hanzo.logout",
+				"title": "Hanzo: Logout"
+			},
+			{
+				"command": "hanzo.debug.authState",
+				"title": "Hanzo Debug: Check Auth State",
+				"enablement": "isDevelopment"
+			},
+			{
+				"command": "hanzo.debug.clearAuth",
+				"title": "Hanzo Debug: Clear Auth Data",
+				"enablement": "isDevelopment"
+			}
+		],
+		"configuration": {
+			"title": "Hanzo AI Context Manager",
+			"properties": {
+				"hanzo.ide": {
+					"type": "string",
+					"enum": [
+						"cursor",
+						"copilot",
+						"continue",
+						"codium"
+					],
+					"enumDescriptions": [
+						"Using Cursor IDE (.cursorrules)",
+						"Using GitHub Copilot (.github/copilot-instructions.md)",
+						"Using Continue (.continuerules)",
+						"Using Codium (.windsurfrules)"
+					],
+					"default": "cursor",
+					"description": "Select which IDE to generate rules for"
+				}
+			}
+		},
+		"menus": {
+			"editor/title": [
+				{
+					"command": "hanzo.reanalyzeProject",
+					"group": "navigation",
+					"when": "resourceScheme != extension"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./",
+		"pretest": "npm run compile && npm run lint",
+		"lint": "eslint .",
+		"test": "node ./out/test/runTest.js",
+		"test:pm": "cross-env MOCHA_TEST_FILE=\"ProjectManager Test Suite\" node ./out/test/runTest.js",
+		"test:auth": "cross-env MOCHA_TEST_FILE=\"Auth and API Test Suite\" node ./out/test/runTest.js",
+		"test:file-collection": "cross-env MOCHA_TEST_FILE=\"FileCollectionService Test Suite\" node ./out/test/runTest.js",
+		"package": "vsce package",
+		"publish": "npx vsce publish && ovsx publish",
+		"dev": "cross-env VSCODE_ENV=development npm run watch",
+		"start:prod": "cross-env VSCODE_ENV=production npm run watch"
+	},
+	"devDependencies": {
+		"@types/mocha": "^10.0.10",
+		"@types/node": "^16.18.34",
+		"@types/vscode": "^1.85.0",
+		"@typescript-eslint/eslint-plugin": "^6.7.0",
+		"@typescript-eslint/parser": "^6.7.0",
+		"@vscode/test-electron": "^2.3.8",
+		"@vscode/vsce": "^2.24.0",
+		"cross-env": "^7.0.3",
+		"eslint": "^8.26.0",
+		"glob": "^10.3.10",
+		"mocha": "^11.0.1",
+		"typescript": "^5.2.2"
+	},
+	"dependencies": {
+		"@supabase/supabase-js": "^2.48.1",
+		"@types/lodash": "^4.14.202",
+		"axios": "^1.6.2",
+		"ignore": "^7.0.3",
+		"lodash": "^4.17.21",
+		"minimatch": "^10.0.1",
+		"node-fetch": "^3.3.2"
+	},
+	"__metadata": {
+		"id": "fd0ca99f-75f0-4318-af8c-660c5e883c16",
+		"publisherId": "c3a25647-333f-4954-a3a7-a5487b656f72",
+		"publisherDisplayName": "hanzo-ai",
+		"targetPlatform": "undefined",
+		"isApplicationScoped": false,
+		"isPreReleaseVersion": false,
+		"hasPreReleaseVersion": false,
+		"installedTimestamp": 1743812550788,
+		"pinned": false,
+		"preRelease": false,
+		"source": "gallery",
+		"size": 15245886
+	}
+}
