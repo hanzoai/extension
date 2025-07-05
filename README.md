@@ -1,9 +1,9 @@
-# Hanzo AI
+# Dev - Meta AI Development Platform 🚀
 
-[![VS Code Extension CI/CD](https://github.com/hanzoai/extension/workflows/VS%20Code%20Extension%20CI%2FCD/badge.svg)](https://github.com/hanzoai/extension/actions/workflows/vscode-extension.yml)
-[![JetBrains Plugin CI/CD](https://github.com/hanzoai/extension/workflows/JetBrains%20Plugin%20CI%2FCD/badge.svg)](https://github.com/hanzoai/extension/actions/workflows/jetbrains-plugin.yml)
+[![VS Code Extension CI/CD](https://github.com/hanzoai/dev/workflows/VS%20Code%20Extension%20CI%2FCD/badge.svg)](https://github.com/hanzoai/dev/actions/workflows/vscode-extension.yml)
+[![JetBrains Plugin CI/CD](https://github.com/hanzoai/dev/workflows/JetBrains%20Plugin%20CI%2FCD/badge.svg)](https://github.com/hanzoai/dev/actions/workflows/jetbrains-plugin.yml)
 
-The ultimate toolkit for AI engineers. 
+The ultimate meta AI development platform. Manage and run ALL AI tools (Claude, Codex, Gemini, OpenHands, Aider) in one unified interface with authentication, API management, and parallel execution. 
 
 ## What You Get
 
@@ -16,76 +16,144 @@ The ultimate toolkit for AI engineers.
 - **Browser Automation** - Built-in Playwright for web tasks
 - **Team Collaboration** - Shared context and credits
 
-## Quick Start
+## 🚀 Quick Start - Get Running in 2 Minutes
 
 ```bash
-# VS Code / Cursor / Windsurf
-Install hanzoai-*.vsix
+# Clone and setup
+git clone https://github.com/hanzoai/dev.git
+cd dev
+make setup
 
-# Claude Code
-Drag hanzoai-*.dxt
+# Login to Hanzo AI (opens browser)
+make login
+# OR use existing API key
+export HANZO_API_KEY=hzo_... # from iam.hanzo.ai
 
-# JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.)
-Install hanzo-ai-plugin.zip via Settings → Plugins → Install from Disk
+# You're ready! Run any AI tool:
+dev run claude "implement a REST API"
+dev run aider "fix the failing tests" --auto-commit
+dev run openhands "analyze this codebase" --worktree
+```
 
-# Terminal / Neovim
+## 📦 Installation Options
+
+### Option 1: CLI Tool (@hanzo/dev) - Recommended for Quick Start
+```bash
+# Install globally
+npm install -g @hanzo/dev
+
+# Login with your Hanzo account
+dev login
+
+# Initialize in your project
+dev init
+```
+
+### Option 2: VS Code Extension (Hanzo AI)
+```bash
+# Install from marketplace
+code --install-extension hanzo-ai.hanzo-ai
+
+# Or install .vsix locally
+code --install-extension hanzo-ai-*.vsix
+```
+
+### Option 3: MCP Server (@hanzo/mcp)
+```bash
+# For Claude Desktop
 npx @hanzo/mcp@latest
 ```
 
-## Use It
+## 🎯 Core Features
 
+### 🔐 Unified Authentication & API Management
 ```bash
-# Login to Hanzo AI
-@hanzo login  # Opens iam.hanzo.ai in browser
+# Login once, use everywhere
+dev login
 
-# Or set API key directly
-export HANZO_API_KEY=hzo_...  # from iam.hanzo.ai
-
-# Talk to any model
-@hanzo agent --model o3-pro solve this algorithm
-@hanzo agent --model claude-4 review my code
-
-# Activate legendary modes
-@hanzo mode carmack    # Optimize like a game engine
-@hanzo mode norvig     # AI implementation mastery
-
-# Control browsers
-@hanzo browser navigate https://example.com
-@hanzo browser screenshot
-
-# Search everything
-@hanzo search "auth flow"
-
-# Symbol search across projects
-@hanzo symbols "class UserController"
-@hanzo symbols "function authenticate"
-
-# Install any MCP server
-@hanzo mcp --action install --package @modelcontextprotocol/server-github
-@hanzo mcp --action call --tool github_search --args '{"query": "MCP"}'
+# All your API keys are synced and encrypted locally
+# - OpenAI/Codex API keys
+# - Anthropic/Claude API keys  
+# - Google/Gemini API keys
+# - Auto-passthrough to all tools
 ```
 
-## Development
-
-### VS Code Extension
+### 🤖 Run Any AI Tool
 ```bash
+# Claude - Advanced reasoning and coding
+dev run claude "refactor this authentication system"
+
+# Aider - Git-aware pair programming
+dev run aider "add test coverage" --auto-commit
+
+# OpenHands - Autonomous software engineering
+dev run openhands "implement user management" --worktree
+
+# Codex - Code generation
+dev run codex "generate a REST API client"
+
+# Gemini - Multimodal AI
+dev run gemini "analyze this architecture diagram"
+```
+
+### ⚡ Async Long-Running Tasks
+```bash
+# Start task in background (auto-quits after 5min idle)
+dev run claude "migrate database to PostgreSQL" --async
+# Output: Job ID: abc123...
+
+# Check status
+dev status abc123
+
+# Keep alive and send more instructions
+dev input abc123 "also add connection pooling"
+```
+
+### 🌳 Parallel Development with Git Worktrees
+```bash
+# Spawn multiple AI agents working in parallel
+dev run claude "implement auth" --worktree
+dev run aider "add tests" --worktree  
+dev run openhands "write docs" --worktree
+
+# Each runs in its own branch and directory
+dev worktree list
+```
+
+### 🔄 Compare AI Tools
+```bash
+# See how different AIs approach the same problem
+dev compare "optimize this database query"
+
+# Output shows results from all tools side-by-side
+```
+
+## 🛠️ Local Development
+
+```bash
+# Quick setup with Make
+make setup    # Install everything
+make dev      # Start dev mode
+make test     # Run tests
+
+# Manual setup
 npm install
-npm run compile
-npm test
-vsce package  # Build VSIX
+cd packages/dev && npm install && npm link
+cd packages/mcp && npm install
+
+# Run locally
+dev --help
 ```
 
-### JetBrains Plugin
+### Build from Source
 ```bash
-cd jetbrains-plugin
-./gradlew build
-# Or with Docker:
-./build-plugin-simple.sh
-```
+# Build everything
+make build
 
-### Claude Code Extension
-```bash
-npm run build:dxt
+# Or individually:
+npm run compile           # VS Code extension
+cd packages/dev && npm run build  # CLI tool
+cd packages/mcp && npm run build  # MCP server
 ```
 
 ## CI/CD
@@ -95,10 +163,18 @@ All extensions are automatically built and tested on push:
 - JetBrains plugin tests run on Java 17
 - Releases are created automatically for tagged versions
 
-## Links
+## 🏗️ Architecture
+
+- **Dev CLI** (`@hanzo/dev`) - Command-line interface for all AI tools
+- **Hanzo AI Extension** - VS Code/JetBrains integration  
+- **MCP Server** (`@hanzo/mcp`) - Model Context Protocol tools
+- **Platform Sync** - Universal context and bi-directional file sync
+- **Async Wrapper** - Long-running task management with idle detection
+
+## 🔗 Links
 
 🚀 **[Login to Hanzo AI](https://iam.hanzo.ai)** | 🌐 **[Hanzo AI](https://hanzo.ai)** | 📖 **[Docs](https://docs.hanzo.ai)** | 💬 **[Discord](https://discord.gg/hanzoai)**
 
 ---
 
-Built for engineers who ship.
+Built with ❤️ for engineers who ship fast.
