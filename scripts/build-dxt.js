@@ -10,7 +10,9 @@ console.log('Building Hanzo MCP Desktop Extension (.dxt)...\n');
 const rootDir = path.join(__dirname, '..');
 const dxtDir = path.join(rootDir, 'dxt');
 const distDir = path.join(rootDir, 'dist');
-const outputFile = path.join(distDir, 'hanzo-ai.dxt');
+const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+const version = packageJson.version;
+const outputFile = path.join(distDir, `hanzoai-${version}.dxt`);
 
 // Ensure dist directory exists
 if (!fs.existsSync(distDir)) {
@@ -120,19 +122,18 @@ console.log('\\nFor more information: https://github.com/hanzoai/extension');
 
 archive.append(installScript, { name: 'install.js', mode: 0o755 });
 
-// Add icon if it exists
-const iconPath = path.join(dxtDir, 'icon.png');
+// Add icon
+console.log('Adding icon...');
+const iconPath = path.join(__dirname, '..', 'images', 'icon.png');
 if (fs.existsSync(iconPath)) {
-    console.log('Adding icon...');
     archive.file(iconPath, { name: 'icon.png' });
 } else {
-    // Create a simple icon if none exists
-    console.log('Creating default icon...');
-    const defaultIcon = Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-        'base64'
-    );
-    archive.append(defaultIcon, { name: 'icon.png' });
+    console.error('Warning: icon.png not found at', iconPath);
+    // Fallback to DXT directory icon if available
+    const dxtIconPath = path.join(dxtDir, 'icon.png');
+    if (fs.existsSync(dxtIconPath)) {
+        archive.file(dxtIconPath, { name: 'icon.png' });
+    }
 }
 
 // Add README

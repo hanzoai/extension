@@ -7,6 +7,7 @@ import { HanzoMetricsService } from './services/HanzoMetricsService';
 import { MCPServer } from './mcp/server';
 import { getConfig } from './config';
 import { getWebviewContent } from './webview/content';
+import { HanzoChatParticipant } from './chat/hanzo-chat-participant';
 
 let projectManager: ProjectManager | undefined;
 let authManager: AuthManager | undefined;
@@ -14,6 +15,7 @@ let reminderService: ReminderService | undefined;
 let statusBar: StatusBarService | undefined;
 let metricsService: HanzoMetricsService | undefined;
 let mcpServer: MCPServer | undefined;
+let chatParticipant: HanzoChatParticipant | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Hanzo AI Extension is now active!');
@@ -29,6 +31,16 @@ export async function activate(context: vscode.ExtensionContext) {
     if (config.mcp.enabled) {
         mcpServer = new MCPServer(context);
         await mcpServer.initialize();
+    }
+    
+    // Initialize VS Code Chat Participant
+    try {
+        chatParticipant = new HanzoChatParticipant(context);
+        const participant = await chatParticipant.initialize();
+        context.subscriptions.push(participant);
+        console.log('Hanzo Chat Participant registered successfully');
+    } catch (error) {
+        console.error('Failed to register chat participant:', error);
     }
 
     // Register commands
