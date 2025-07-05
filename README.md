@@ -4,11 +4,12 @@ The ultimate toolkit for AI engineers.
 
 ## What You Get
 
-- **200+ LLMs** - Every model from OpenRouter/LiteLLM in one API
+- **200+ LLMs via [Hanzo AI](https://hanzo.ai)** - Every model in one unified API
 - **4000+ MCP Servers** - Install ANY MCP server with one command
+- **Symbol Search** - Find classes, functions, variables across all projects
 - **Universal MCP Proxy** - Auto-install via npm/uvx and proxy all calls  
 - **45+ Legendary Modes** - Code like Carmack, think like Norvig
-- **Unlimited Memory** - Vector/graph/relational search across all projects
+- **Unlimited Memory** - Vector/graph/relational/symbol search
 - **Browser Automation** - Built-in Playwright for web tasks
 - **Team Collaboration** - Shared context and credits
 
@@ -28,7 +29,10 @@ npx @hanzo/mcp@latest
 ## Use It
 
 ```bash
-# Get your API key
+# Login to Hanzo AI
+@hanzo login  # Opens iam.hanzo.ai in browser
+
+# Or set API key directly
 export HANZO_API_KEY=hzo_...  # from iam.hanzo.ai
 
 # Talk to any model
@@ -46,6 +50,10 @@ export HANZO_API_KEY=hzo_...  # from iam.hanzo.ai
 # Search everything
 @hanzo search "auth flow"
 
+# Symbol search across projects
+@hanzo symbols "class UserController"
+@hanzo symbols "function authenticate"
+
 # Install any MCP server
 @hanzo mcp --action install --package @modelcontextprotocol/server-github
 @hanzo mcp --action call --tool github_search --args '{"query": "MCP"}'
@@ -53,7 +61,7 @@ export HANZO_API_KEY=hzo_...  # from iam.hanzo.ai
 
 ## Links
 
-🚀 **[Get Started](https://iam.hanzo.ai)** | 📖 **[Docs](https://docs.hanzo.ai)** | 💬 **[Discord](https://discord.gg/hanzoai)**
+🚀 **[Login to Hanzo AI](https://iam.hanzo.ai)** | 🌐 **[Hanzo AI](https://hanzo.ai)** | 📖 **[Docs](https://docs.hanzo.ai)** | 💬 **[Discord](https://discord.gg/hanzoai)**
 
 ---
 
