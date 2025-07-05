@@ -45,23 +45,10 @@ const StatusBarService_1 = require("./StatusBarService");
 const AnalysisService_1 = require("./AnalysisService");
 const manager_1 = require("../auth/manager");
 class ReminderService {
-    context;
-    static CHANGE_THRESHOLD = 200;
-    static COOLDOWN_HOURS = 24; // Changed from COOLDOWN_MINUTES to COOLDOWN_HOURS
-    static FORCE_SHOW_HOURS = 24; // how many hours to wait before showing the reminder again
-    static CHECK_INTERVAL_HOURS = 24; // Changed from minutes to hours
-    static INITIAL_REMINDER_MINUTES = 5; // Changed from 15 to 5 minutes for faster testing
-    lastNotificationTime = 0;
-    lastCommitSha = '';
-    disposables = [];
-    gitAPI;
-    ignoreFilter;
-    checkInterval; // Using definite assignment assertion
-    initialReminderTimeout; // For the 15-minute initial reminder
-    statusBar;
-    analysisService;
-    authManager;
     constructor(context) {
+        this.lastNotificationTime = 0;
+        this.lastCommitSha = '';
+        this.disposables = [];
         this.context = context;
         this.ignoreFilter = (0, ignore_1.default)().add(ignored_patterns_1.DEFAULT_IGNORED_PATTERNS);
         this.statusBar = StatusBarService_1.StatusBarService.getInstance();
@@ -183,10 +170,11 @@ class ReminderService {
         await this.showNonLoggedInReminder();
     }
     shouldTrackFile(filePath) {
+        if (!filePath)
+            return false;
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders)
             return false;
-        const workspaceRoot = workspaceFolders[0].uri.fsPath;
         const relativePath = vscode.workspace.asRelativePath(filePath);
         return !this.ignoreFilter.ignores(relativePath);
     }
@@ -198,7 +186,7 @@ class ReminderService {
                 await gitExtension.activate();
                 this.gitAPI = gitExtension.exports.getAPI(1);
             }
-            if (this.gitAPI?.repositories?.length > 0) {
+            if (this.gitAPI && this.gitAPI.repositories && this.gitAPI.repositories.length > 0) {
                 console.info('[Hanzo] Git repository found, initializing Git tracking');
                 this.initGitTracking();
             }
@@ -330,9 +318,9 @@ class ReminderService {
             console.info('[Hanzo] Starting analysis...');
             await this.analysisService.analyze();
             // Update state after successful analysis
-            if (this.gitAPI?.repositories?.length > 0) {
+            if (this.gitAPI && this.gitAPI.repositories && this.gitAPI.repositories.length > 0) {
                 const repo = this.gitAPI.repositories[0];
-                const commit = repo.state.HEAD?.commit;
+                const commit = repo?.state?.HEAD?.commit;
                 console.info('[Hanzo] Updating last analyzed commit:', commit);
                 await this.context.globalState.update('lastAnalyzedCommit', commit);
             }
@@ -358,4 +346,9 @@ class ReminderService {
     }
 }
 exports.ReminderService = ReminderService;
+ReminderService.CHANGE_THRESHOLD = 200;
+ReminderService.COOLDOWN_HOURS = 24; // Changed from COOLDOWN_MINUTES to COOLDOWN_HOURS
+ReminderService.FORCE_SHOW_HOURS = 24; // how many hours to wait before showing the reminder again
+ReminderService.CHECK_INTERVAL_HOURS = 24; // Changed from minutes to hours
+ReminderService.INITIAL_REMINDER_MINUTES = 5; // Changed from 15 to 5 minutes for faster testing
 //# sourceMappingURL=ReminderService.js.map

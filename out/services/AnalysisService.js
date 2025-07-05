@@ -35,13 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AnalysisService = void 0;
 const vscode = __importStar(require("vscode"));
-const extension_1 = require("../extension");
 const StatusBarService_1 = require("./StatusBarService");
 class AnalysisService {
-    context;
-    static instance;
-    statusBar;
-    projectManager;
     constructor(context) {
         this.context = context;
         this.statusBar = StatusBarService_1.StatusBarService.getInstance();
@@ -53,9 +48,6 @@ class AnalysisService {
         return AnalysisService.instance;
     }
     ensureProjectManager() {
-        if (!this.projectManager) {
-            this.projectManager = new extension_1.ProjectManager(undefined, this.context);
-        }
         return this.projectManager;
     }
     setProjectManager(manager) {
@@ -64,7 +56,11 @@ class AnalysisService {
     async analyze(details) {
         try {
             const manager = this.ensureProjectManager();
-            await manager.handleProjectOperation(details);
+            if (!manager) {
+                throw new Error('Project manager not initialized');
+            }
+            // Call analyze method instead of handleProjectOperation
+            await manager.analyzeProject();
         }
         catch (error) {
             console.error('[Hanzo] Analysis failed:', error);

@@ -3,7 +3,7 @@
 	"displayName": "Hanzo AI Context Manager",
 	"description": "AI-powered project manager that analyzes codebases, maintains specifications, and tracks changes. Seamlessly integrates with VS Code to provide intelligent project insights and documentation.",
 	"version": "1.5.4",
-	"publisher": "Hanzo Industries Inc",
+	"publisher": "hanzo-ai",
 	"private": false,
 	"license": "MIT",
 	"repository": {
@@ -115,6 +115,69 @@
 					],
 					"default": "cursor",
 					"description": "Select which IDE to generate rules for"
+				},
+				"hanzo.mcp.enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "Enable Model Context Protocol (MCP) server integration"
+				},
+				"hanzo.mcp.transport": {
+					"type": "string",
+					"enum": [
+						"stdio",
+						"tcp"
+					],
+					"default": "stdio",
+					"description": "Transport method for MCP server communication"
+				},
+				"hanzo.mcp.port": {
+					"type": "number",
+					"default": 3000,
+					"description": "Port for MCP server when using TCP transport"
+				},
+				"hanzo.mcp.allowedPaths": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"description": "Paths that MCP tools are allowed to access"
+				},
+				"hanzo.mcp.disableWriteTools": {
+					"type": "boolean",
+					"default": false,
+					"description": "Disable all write operations in MCP tools"
+				},
+				"hanzo.mcp.disableSearchTools": {
+					"type": "boolean",
+					"default": false,
+					"description": "Disable all search operations in MCP tools"
+				},
+				"hanzo.mcp.enabledTools": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"description": "List of explicitly enabled MCP tools"
+				},
+				"hanzo.mcp.disabledTools": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"description": "List of explicitly disabled MCP tools"
+				},
+				"hanzo.api.endpoint": {
+					"type": "string",
+					"default": "https://api.hanzo.ai/ext/v1",
+					"description": "API endpoint for Hanzo services"
+				},
+				"hanzo.debug": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enable debug logging"
 				}
 			}
 		},
@@ -129,7 +192,7 @@
 		}
 	},
 	"scripts": {
-		"vscode:prepublish": "npm run compile",
+		"vscode:prepublish": "node scripts/compile-main.js && npm run build:mcp",
 		"compile": "tsc -p ./",
 		"watch": "tsc -watch -p ./",
 		"pretest": "npm run compile && npm run lint",
@@ -138,33 +201,61 @@
 		"test:pm": "cross-env MOCHA_TEST_FILE=\"ProjectManager Test Suite\" node ./out/test/runTest.js",
 		"test:auth": "cross-env MOCHA_TEST_FILE=\"Auth and API Test Suite\" node ./out/test/runTest.js",
 		"test:file-collection": "cross-env MOCHA_TEST_FILE=\"FileCollectionService Test Suite\" node ./out/test/runTest.js",
-		"package": "vsce package",
-		"publish": "npx vsce publish && ovsx publish",
+		"test:mcp": "cross-env MOCHA_TEST_FILE=\"MCP.*Tool Test Suite\" node ./out/test/runTest.js",
+		"build:mcp": "node scripts/build-mcp-standalone.js",
+		"build:claude-desktop": "npm run build:mcp && node scripts/build-claude-desktop.js",
+		"build": "npm run compile && npm run build:mcp && npm run build:claude-desktop",
+		"build:dxt": "node scripts/build-dxt.js",
+		"build:all": "node scripts/build-all-platforms.js",
+		"package": "npm run build:all && vsce package",
+		"package:claude": "npm run build:claude-desktop",
+		"package:dxt": "npm run build:dxt",
+		"publish": "npm run package && npx vsce publish && ovsx publish",
+		"publish:npm": "npm run build:claude-desktop && cd dist/claude-desktop && npm publish",
 		"dev": "cross-env VSCODE_ENV=development npm run watch",
+		"dev:mcp": "cross-env MCP_TRANSPORT=stdio node ./out/mcp-server-standalone.js",
 		"start:prod": "cross-env VSCODE_ENV=production npm run watch"
 	},
 	"devDependencies": {
+		"@types/better-sqlite3": "^7.6.13",
+		"@types/lodash": "^4.17.16",
+		"@types/minimatch": "^5.1.2",
 		"@types/mocha": "^10.0.10",
-		"@types/node": "^16.18.34",
+		"@types/node": "^16.18.126",
+		"@types/sinon": "^17.0.4",
+		"@types/sinonjs__fake-timers": "^8.1.5",
 		"@types/vscode": "^1.85.0",
+		"@types/ws": "^8.18.1",
 		"@typescript-eslint/eslint-plugin": "^6.7.0",
-		"@typescript-eslint/parser": "^6.7.0",
+		"@typescript-eslint/parser": "^6.21.0",
 		"@vscode/test-electron": "^2.3.8",
 		"@vscode/vsce": "^2.24.0",
+		"archiver": "^7.0.1",
+		"better-sqlite3": "^12.2.0",
 		"cross-env": "^7.0.3",
+		"esbuild": "^0.19.12",
 		"eslint": "^8.26.0",
 		"glob": "^10.3.10",
 		"mocha": "^11.0.1",
+		"sinon": "^21.0.0",
 		"typescript": "^5.2.2"
 	},
 	"dependencies": {
+		"@lancedb/lancedb": "^0.21.0",
+		"@modelcontextprotocol/sdk": "^1.14.0",
 		"@supabase/supabase-js": "^2.48.1",
-		"@types/lodash": "^4.14.202",
+		"@types/node-fetch": "^2.6.12",
+		"@typescript-eslint/typescript-estree": "^8.35.1",
 		"axios": "^1.6.2",
 		"ignore": "^7.0.3",
 		"lodash": "^4.17.21",
 		"minimatch": "^10.0.1",
-		"node-fetch": "^3.3.2"
+		"node-fetch": "^3.3.2",
+		"rxdb": "^16.15.0",
+		"rxjs": "^7.8.2",
+		"tree-sitter": "^0.21.1",
+		"tree-sitter-javascript": "^0.23.1",
+		"tree-sitter-typescript": "^0.23.2"
 	},
 	"__metadata": {
 		"id": "fd0ca99f-75f0-4318-af8c-660c5e883c16",
