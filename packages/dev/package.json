@@ -1,0 +1,58 @@
+{
+  "name": "@hanzo/dev",
+  "version": "1.0.0",
+  "description": "Hanzo Dev - Meta AI development CLI that manages and runs all LLMs and CLI tools",
+  "main": "dist/index.js",
+  "bin": {
+    "dev": "./dist/cli/dev.js",
+    "hanzo-dev": "./dist/cli/dev.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "llm",
+    "cli",
+    "claude",
+    "openai",
+    "gemini",
+    "aider",
+    "openhands",
+    "development",
+    "tools"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "inquirer": "^9.2.12",
+    "ora": "^7.0.1",
+    "uuid": "^9.0.1",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^20.10.5",
+    "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.5.10",
+    "jest": "^29.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/dev.git",
+    "directory": "packages/dev"
+  },
+  "homepage": "https://hanzo.ai",
+  "bugs": {
+    "url": "https://github.com/hanzoai/dev/issues"
+  }
+}
