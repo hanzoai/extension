@@ -1,0 +1,11 @@
+FROM gradle:8.5-jdk17
+
+WORKDIR /app
+
+# Copy the project files
+COPY . .
+
+# Build the plugin
+RUN gradle build --no-daemon
+
+# The build output will be in build/distributions/

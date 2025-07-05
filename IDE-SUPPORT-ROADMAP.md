@@ -6,6 +6,7 @@
 - ✅ **Windsurf** (VS Code compatible)
 - ✅ **Claude Code** (via .dxt file)
 - ✅ **Terminal/Neovim** (via npx @hanzo/mcp)
+- ✅ **JetBrains IDEs** (IntelliJ, PyCharm, WebStorm, GoLand, etc.) - Plugin available!
 
 ## Top Priority IDEs for Support
 
@@ -95,10 +96,12 @@
 
 ## Implementation Strategy
 
-### Phase 1: JetBrains Platform (Q1)
+### Phase 1: JetBrains Platform (✅ COMPLETED)
 - Single plugin for all JetBrains IDEs
 - Estimated 15M+ potential users
 - Java/Kotlin implementation
+- **Status**: Plugin built and ready for distribution
+- **Features**: 200+ models, MCP support, symbol search, chat interface
 
 ### Phase 2: Terminal Editors (Q1-Q2)
 - Neovim LSP integration
