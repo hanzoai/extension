@@ -32,6 +32,7 @@ import { createBrowserTools } from './browser';
 import { createMCPUniversalProxyTools } from './mcp-universal-proxy';
 import { createHanzoPlatformMCPTools, registerUnixAliasTools } from './hanzo-platform-mcp';
 import { createUnifiedReadTool, createUnifiedProjectAnalyzeTool, createUnixAliasTool, getCanonicalToolName } from './unified-tools';
+import { DevToolManager, createDevTools } from './dev-tool';
 // import { createASTAnalyzerTool } from './ast-analyzer';
 // import { createTreeSitterAnalyzerTool } from './treesitter-analyzer';
 
@@ -41,11 +42,13 @@ export class MCPTools {
     private enabledTools: Set<string> = new Set();
     private batchTools: BatchTools;
     private aiTools: AITools;
+    private devToolManager: DevToolManager;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
         this.batchTools = new BatchTools(context);
         this.aiTools = new AITools(context);
+        this.devToolManager = new DevToolManager();
         this.loadEnabledTools();
     }
 
@@ -115,6 +118,9 @@ export class MCPTools {
             // Batch operations
             ...this.batchTools.getTools(),
             
+            // Dev tools for agent spawning
+            ...createDevTools(this.devToolManager),
+            
             // Dynamic Unix aliases
             ...registerUnixAliasTools(this.context)
             // createASTAnalyzerTool(this.context),
@@ -180,7 +186,9 @@ export class MCPTools {
                 // MCP
                 'mcp',
                 // Browser
-                'browser', 'browser_close'
+                'browser', 'browser_close',
+                // Dev tools
+                'dev_spawn', 'dev_list', 'dev_status', 'dev_stop', 'dev_merge', 'dev_batch'
             ]);
         } else {
             this.enabledTools = new Set(enabled);
