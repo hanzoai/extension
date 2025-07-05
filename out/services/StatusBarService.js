@@ -37,9 +37,6 @@ exports.StatusBarService = void 0;
 const vscode = __importStar(require("vscode"));
 const textContent_1 = require("../utils/textContent");
 class StatusBarService {
-    static instance;
-    statusBarItem;
-    metricsService;
     constructor() {
         console.log('[Hanzo StatusBar] Creating new status bar item');
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);

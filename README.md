@@ -10,7 +10,9 @@ Hanzo seamlessly manages context, tracks changes, and organizes knowledge across
 - **Vector Search**: Find relevant code and documentation using semantic similarity
 - **Symbolic Search**: Discover code elements through structure and relationships
 - **Extended Thinking**: Leverage advanced reasoning for complex development tasks
-- **MCP Server Integration**: Connect to Meta Model Control Protocol servers for enhanced capabilities
+- **MCP Server Integration**: Full Model Context Protocol implementation with 65+ tools
+- **Claude Desktop Support**: Use all Hanzo tools directly in Claude Desktop
+- **Multi-Platform**: Works with VS Code, Cursor, Windsurf, and Claude Desktop
 - **Automatic Documentation**: Generate comprehensive documentation from existing code
 - **Project Analysis**: Create detailed SPEC.md files through codebase analysis
 
@@ -33,6 +35,58 @@ The extension will:
 - **Knowledge Management**: Track changes and maintain history across your development lifecycle
 - **Rules-Based Assistance**: Define custom rules for code generation and recommendations
 - **Integration with LLMs**: Connect with various large language models for diverse capabilities
+- **MCP Tools**: File operations, search, shell commands, Git integration, and more
+- **Task Management**: Built-in todo system for tracking development tasks
+- **Agent Delegation**: Dispatch complex tasks to specialized sub-agents
+
+## MCP (Model Context Protocol) Support
+
+Hanzo includes a complete MCP server implementation, providing powerful tools for AI assistants:
+
+### Quick Start with Claude Desktop
+
+```bash
+# Build and install for Claude Desktop
+npm run build:claude-desktop
+./dist/claude-desktop/install.sh  # Mac/Linux
+# or
+./dist/claude-desktop/install.bat  # Windows
+```
+
+### Build Options
+
+```bash
+# Development
+npm run dev                    # Watch mode development build
+npm run compile               # One-time TypeScript compilation
+
+# Production builds
+npm run build                 # Standard VS Code extension build
+npm run build:claude-desktop  # Claude Desktop MCP server build
+npm run build:dxt            # Desktop Extension (DXT) build
+npm run build:all            # Build all targets
+
+# Testing
+npm test                      # Run all tests
+npm run test:unit            # Unit tests only
+npm run test:integration     # Integration tests only
+
+# Packaging
+npm run package              # Create .vsix package
+npm run package:dxt          # Create .dxt package for Claude Code
+```
+
+### Available MCP Tools
+
+- **File System**: read, write, edit, multi_edit, directory_tree, find_files, content_replace, diff, watch
+- **Search**: grep, search, symbols, git_search, grep_ast, batch_search, unified_search
+- **Shell**: run_command, bash, run_background, processes, pkill, logs, npx, uvx, open
+- **Development**: todo (unified), think, critic, notebook support
+- **AI/Agent**: dispatch_agent, llm, consensus, agent, mode (development personalities)
+- **Utility**: batch (atomic operations), web_fetch, rules, config
+- **MCP**: mcp (manage arbitrary MCP servers)
+
+See [MCP-README.md](./MCP-README.md) for complete documentation.
 
 ## Debugging
 
