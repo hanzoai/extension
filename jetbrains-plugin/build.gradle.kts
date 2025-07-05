@@ -22,6 +22,11 @@ repositories {
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.10.1")
+    
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+    testImplementation("org.mockito:mockito-core:5.8.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+    testImplementation(kotlin("test"))
 }
 
 kotlin {
@@ -98,5 +103,9 @@ tasks {
     runPluginVerifier {
         ideVersions = properties("pluginVerifierIdeVersions").map { it.split(',').map(String::trim).filter(String::isNotEmpty) }
         failureLevel = RunPluginVerifierTask.FailureLevel.ALL
+    }
+    
+    test {
+        useJUnitPlatform()
     }
 }
