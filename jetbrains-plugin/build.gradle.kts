@@ -10,8 +10,6 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "1.9.21"
     id("org.jetbrains.intellij") version "1.16.1"
     id("org.jetbrains.changelog") version "2.2.0"
-    id("org.jetbrains.qodana") version "2023.3.0"
-    id("org.jetbrains.kotlinx.kover") version "0.7.5"
 }
 
 group = properties("pluginGroup").get()
@@ -24,8 +22,6 @@ repositories {
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.10.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.7.3")
 }
 
 kotlin {
