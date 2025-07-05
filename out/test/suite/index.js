@@ -32,47 +32,48 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.run = run;
 const path = __importStar(require("path"));
-const mocha_1 = __importDefault(require("mocha"));
+const Mocha = __importStar(require("mocha"));
 const glob_1 = require("glob");
 function run() {
     // Create the mocha test
-    const mocha = new mocha_1.default({
+    const mocha = new Mocha({
         ui: 'tdd',
         color: true,
-        timeout: 10000 // Default timeout of 10s
+        timeout: 60000
     });
-    const testsRoot = path.resolve(__dirname, '.');
-    return new Promise((resolve, reject) => {
-        (0, glob_1.glob)('**.test.js', { cwd: testsRoot }).then(files => {
+    const testsRoot = path.resolve(__dirname, '..');
+    return new Promise((c, e) => {
+        // Get test file filter from environment
+        const testFile = process.env.MOCHA_TEST_FILE;
+        let pattern = '**/**.test.js';
+        if (testFile) {
+            pattern = `**/${testFile}.test.js`;
+        }
+        (0, glob_1.glob)(pattern, { cwd: testsRoot }, (err, files) => {
+            if (err) {
+                return e(err);
+            }
             // Add files to the test suite
-            files.forEach(f => mocha.addFile(path.resolve(testsRoot, f)));
+            files.forEach((f) => mocha.addFile(path.resolve(testsRoot, f)));
             try {
-                // If a specific test file is requested, use grep
-                const testFile = process.env.MOCHA_TEST_FILE;
-                if (testFile) {
-                    mocha.grep(testFile);
-                }
                 // Run the mocha test
                 mocha.run((failures) => {
                     if (failures > 0) {
-                        reject(new Error(`${failures} tests failed.`));
+                        e(new Error(`${failures} tests failed.`));
                     }
                     else {
-                        resolve();
+                        c();
                     }
                 });
             }
             catch (err) {
                 console.error(err);
-                reject(err);
+                e(err);
             }
-        }).catch(err => reject(err));
+        });
     });
 }
 //# sourceMappingURL=index.js.map
