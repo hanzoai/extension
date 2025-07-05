@@ -1,14 +1,14 @@
 {
-	"name": "hanzoai",
-	"displayName": "Hanzo AI Context Manager",
-	"description": "The ultimate toolkit for AI engineers. Access 200+ LLMs (OpenRouter/LiteLLM compatible), 4000+ MCP servers, and powerful development tools. Features unified API, shared context, intelligent routing, and VS Code native integration.",
+	"name": "hanzo-ai",
+	"displayName": "Hanzo AI",
+	"description": "The ultimate meta AI development platform. Manage and run all LLMs and CLI tools (Claude, Codex, Gemini, OpenHands, Aider) in one unified interface. Features MCP integration, async execution, git worktrees, and universal context sync.",
 	"version": "1.5.4",
 	"publisher": "hanzo-ai",
 	"private": false,
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/hanzoai/extension.git"
+		"url": "https://github.com/hanzoai/dev.git"
 	},
 	"engines": {
 		"vscode": "^1.85.0"
