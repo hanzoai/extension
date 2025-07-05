@@ -1,0 +1,121 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>ai.hanzo.intellij</id>
+    <name>Hanzo AI</name>
+    <vendor email="support@hanzo.ai" url="https://hanzo.ai">Hanzo AI</vendor>
+
+    <description><![CDATA[
+    <h2>Hanzo AI for JetBrains IDEs</h2>
+    
+    <p>Access 200+ AI models directly in your IDE with Hanzo AI's unified platform. This plugin provides seamless integration with Hanzo's AI infrastructure, bringing powerful AI capabilities to your development workflow.</p>
+    
+    <h3>Key Features:</h3>
+    <ul>
+        <li><b>200+ LLM Models:</b> Access models from OpenAI, Anthropic, Google, Meta, and more through a single interface</li>
+        <li><b>Model Context Protocol (MCP):</b> Enhanced AI capabilities with file operations, search, and code analysis</li>
+        <li><b>Symbol Search:</b> AI-powered symbol search across your entire project</li>
+        <li><b>Smart Chat Interface:</b> Interactive AI assistant in a dedicated tool window</li>
+        <li><b>Secure Authentication:</b> Login with your Hanzo AI account for personalized access</li>
+        <li><b>Multi-IDE Support:</b> Works with IntelliJ IDEA, PyCharm, WebStorm, GoLand, and other JetBrains IDEs</li>
+    </ul>
+    
+    <h3>Getting Started:</h3>
+    <ol>
+        <li>Install the plugin from JetBrains Marketplace</li>
+        <li>Open the Hanzo AI tool window (View → Tool Windows → Hanzo AI)</li>
+        <li>Login with your Hanzo AI account</li>
+        <li>Start chatting with AI or use the symbol search feature</li>
+    </ol>
+    
+    <p>Visit <a href="https://hanzo.ai">hanzo.ai</a> to create an account and learn more about our AI platform.</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+    <h3>0.1.0 - Initial Release</h3>
+    <ul>
+        <li>Basic authentication with Hanzo AI</li>
+        <li>Chat interface with 200+ LLM models</li>
+        <li>Symbol search functionality</li>
+        <li>MCP server integration</li>
+        <li>Tool window UI</li>
+    </ul>
+    ]]></change-notes>
+
+    <!-- Product and plugin compatibility requirements -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends optional="true" config-file="plugin-java.xml">com.intellij.modules.java</depends>
+    <depends optional="true" config-file="plugin-python.xml">com.intellij.modules.python</depends>
+    <depends optional="true" config-file="plugin-go.xml">org.jetbrains.plugins.go</depends>
+    <depends optional="true" config-file="plugin-javascript.xml">JavaScript</depends>
+
+    <resource-bundle>messages.HanzoBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Tool Window -->
+        <toolWindow id="Hanzo AI"
+                    icon="/icons/hanzo.svg"
+                    anchor="right"
+                    factoryClass="ai.hanzo.plugin.toolwindow.HanzoToolWindowFactory"/>
+
+        <!-- Services -->
+        <applicationService serviceImplementation="ai.hanzo.plugin.services.HanzoAuthService"/>
+        <applicationService serviceImplementation="ai.hanzo.plugin.services.HanzoMCPService"/>
+        <applicationService serviceImplementation="ai.hanzo.plugin.settings.HanzoSettings"/>
+        <projectService serviceImplementation="ai.hanzo.plugin.services.HanzoProjectService"/>
+
+        <!-- Settings -->
+        <applicationConfigurable 
+                parentId="tools"
+                instance="ai.hanzo.plugin.settings.HanzoSettingsConfigurable"
+                id="ai.hanzo.settings"
+                displayName="Hanzo AI"/>
+        
+        <!-- Notifications -->
+        <notificationGroup id="Hanzo AI Notifications"
+                          displayType="BALLOON"
+                          key="notification.group.hanzo"/>
+    </extensions>
+
+    <actions>
+        <!-- Main Action Group -->
+        <group id="HanzoAI.MainGroup" text="Hanzo AI" popup="true">
+            <add-to-group group-id="MainMenu" anchor="before" relative-to-action="HelpMenu"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </group>
+
+        <!-- Symbol Search Action -->
+        <action id="HanzoAI.SymbolSearch"
+                class="ai.hanzo.plugin.actions.HanzoSymbolSearchAction"
+                text="Search Symbols with AI"
+                description="Search for symbols using Hanzo AI"
+                icon="/icons/search.svg">
+            <add-to-group group-id="HanzoAI.MainGroup"/>
+            <add-to-group group-id="SearchEverywhereActions"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift H"/>
+        </action>
+
+        <!-- Agent Action -->
+        <action id="HanzoAI.Agent"
+                class="ai.hanzo.plugin.actions.HanzoAgentAction"
+                text="Ask Hanzo AI"
+                description="Ask Hanzo AI about selected code"
+                icon="/icons/hanzo.svg">
+            <add-to-group group-id="HanzoAI.MainGroup"/>
+            <add-to-group group-id="EditorPopupMenu"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt H"/>
+        </action>
+
+        <!-- Login/Logout Action -->
+        <action id="HanzoAI.Auth"
+                class="ai.hanzo.plugin.actions.HanzoAuthAction"
+                text="Login to Hanzo AI"
+                description="Login or logout from Hanzo AI">
+            <add-to-group group-id="HanzoAI.MainGroup"/>
+        </action>
+    </actions>
+
+    <applicationListeners>
+        <listener class="ai.hanzo.plugin.listeners.HanzoProjectManagerListener"
+                  topic="com.intellij.openapi.project.ProjectManagerListener"/>
+    </applicationListeners>
+</idea-plugin>

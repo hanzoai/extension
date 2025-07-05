@@ -1,21 +1,21 @@
 # Hanzo AI: The Ultimate Toolkit for AI Engineers
 
-Hanzo AI is the ultimate toolkit for AI engineers, providing unified access to every AI model and tool you need. With support for 200+ LLMs from OpenRouter and LiteLLM compatibility, plus 4000+ MCP servers, Hanzo AI supercharges your development workflow with shared context, intelligent search, and seamless model switching.
+[Hanzo AI](https://hanzo.ai) is the ultimate toolkit for AI engineers, providing unified access to 200+ LLMs through one powerful platform. With built-in symbol search, 4000+ MCP servers, and intelligent routing, Hanzo AI supercharges your development workflow with shared context across all AI providers, documents, and codebases.
 
 ## Getting Started with Hanzo AI
 
-1. **Create Account**: Visit [iam.hanzo.ai](https://iam.hanzo.ai) to create your account
-2. **Get API Key**: After login, obtain your personal API key
-3. **Add Credits**: Ensure you have credits in your account
-4. **Configure**: Set `HANZO_API_KEY` environment variable or VS Code setting
+1. **Login**: Use `@hanzo login` or visit [iam.hanzo.ai](https://iam.hanzo.ai)
+2. **Get API Key**: Automatically configured after login via our cloud
+3. **Add Credits**: Purchase credits for access to 200+ models
+4. **Start Building**: Access all models through one unified API
 
 ## Why Hanzo AI is the Ultimate AI Engineering Toolkit
 
-### 🚀 Complete Model Coverage
-- **OpenRouter Compatible**: Access every model available on OpenRouter
-- **LiteLLM Compatible**: Full compatibility with LiteLLM's model catalog
-- **200+ Models**: From O3-Pro and Claude 4 to DeepSeek V3 and Llama 3.1 405B
-- **Latest Models**: Always up-to-date with the newest releases
+### 🚀 Complete Model Coverage via Hanzo AI
+- **200+ Models**: All major AI models through [Hanzo AI](https://hanzo.ai)
+- **Latest Models**: O3-Pro, Claude 4, GPT-4o, DeepSeek V3, Llama 3.1 405B
+- **One API**: No need to manage multiple provider accounts
+- **Smart Routing**: Automatically selects the best model for your task
 
 ### 🔧 Engineering-First Features
 - **Unified API**: Single endpoint for all AI providers - no more juggling API keys
