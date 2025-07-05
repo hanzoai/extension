@@ -1,5 +1,8 @@
 # Hanzo AI
 
+[![VS Code Extension CI/CD](https://github.com/hanzoai/extension/workflows/VS%20Code%20Extension%20CI%2FCD/badge.svg)](https://github.com/hanzoai/extension/actions/workflows/vscode-extension.yml)
+[![JetBrains Plugin CI/CD](https://github.com/hanzoai/extension/workflows/JetBrains%20Plugin%20CI%2FCD/badge.svg)](https://github.com/hanzoai/extension/actions/workflows/jetbrains-plugin.yml)
+
 The ultimate toolkit for AI engineers. 
 
 ## What You Get
@@ -61,6 +64,36 @@ export HANZO_API_KEY=hzo_...  # from iam.hanzo.ai
 @hanzo mcp --action install --package @modelcontextprotocol/server-github
 @hanzo mcp --action call --tool github_search --args '{"query": "MCP"}'
 ```
+
+## Development
+
+### VS Code Extension
+```bash
+npm install
+npm run compile
+npm test
+vsce package  # Build VSIX
+```
+
+### JetBrains Plugin
+```bash
+cd jetbrains-plugin
+./gradlew build
+# Or with Docker:
+./build-plugin-simple.sh
+```
+
+### Claude Code Extension
+```bash
+npm run build:dxt
+```
+
+## CI/CD
+
+All extensions are automatically built and tested on push:
+- VS Code extension tests run on Node.js 18
+- JetBrains plugin tests run on Java 17
+- Releases are created automatically for tagged versions
 
 ## Links
 
