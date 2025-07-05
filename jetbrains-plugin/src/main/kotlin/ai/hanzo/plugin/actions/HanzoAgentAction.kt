@@ -157,7 +157,6 @@ class HanzoAgentAction : AnAction() {
             // Selected code preview
             val codeArea = JBTextArea(selectedCode)
             codeArea.isEditable = false
-            codeArea.font = editor.font
             val codeScroll = JBScrollPane(codeArea)
             codeScroll.preferredSize = Dimension(600, 200)
             codeScroll.border = BorderFactory.createTitledBorder("Selected Code")
@@ -197,7 +196,6 @@ class HanzoAgentAction : AnAction() {
             responseArea.isEditable = false
             responseArea.lineWrap = true
             responseArea.wrapStyleWord = true
-            responseArea.font = editor.font
             
             val scrollPane = JBScrollPane(responseArea)
             scrollPane.border = JBUI.Borders.empty(10)
