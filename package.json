@@ -263,6 +263,8 @@
 		"test:auth": "cross-env MOCHA_TEST_FILE=\"Auth and API Test Suite\" node ./out/test/runTest.js",
 		"test:file-collection": "cross-env MOCHA_TEST_FILE=\"FileCollectionService Test Suite\" node ./out/test/runTest.js",
 		"test:mcp": "cross-env MOCHA_TEST_FILE=\"MCP.*Tool Test Suite\" node ./out/test/runTest.js",
+		"test:mcp-proxy": "cross-env MOCHA_TEST_FILE=\"MCP.*Proxy Test\" node ./out/test/runTest.js",
+		"test:mcp-integration": "cross-env MOCHA_TEST_FILE=\"MCP Proxy Integration\" node ./out/test/runTest.js",
 		"test:coverage": "c8 npm test",
 		"build:mcp": "node scripts/build-mcp-standalone.js",
 		"build:claude-desktop": "npm run build:mcp && node scripts/build-claude-desktop.js",
