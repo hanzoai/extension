@@ -369,7 +369,7 @@ async function analyzeDependencies(projectPath: string, projectType: string): Pr
                     const requirements = await fs.readFile(
                         path.join(projectPath, 'requirements.txt'), 'utf-8'
                     );
-                    const lines = requirements.split('\n').filter(l => l && !l.startsWith('#'));
+                    const lines = requirements.split('\n').filter((l: string) => l && !l.startsWith('#'));
                     return `- Dependencies: ${lines.length} packages`;
                 } catch {
                     return '- Dependencies: Unable to analyze';
