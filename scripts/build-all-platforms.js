@@ -11,22 +11,28 @@ const PLATFORMS = {
     outputDir: 'out',
     package: false
   },
-  'claude-desktop': {
-    name: 'Claude Desktop MCP',
-    buildCmd: 'npm run build:claude-desktop',
-    outputDir: 'dist/claude-desktop',
-    package: false // Already packaged by build script
-  },
   'dxt': {
     name: 'Claude Code DXT',
     buildCmd: 'npm run build:dxt',
     outputDir: 'dist/dxt',
     package: false // Already packaged by build script
   },
-  'mcp-standalone': {
-    name: 'MCP Standalone',
-    buildCmd: 'npm run build:mcp',
-    outputDir: 'dist/mcp-standalone',
+  'mcp-npm': {
+    name: 'MCP NPM Package',
+    buildCmd: 'node scripts/build-mcp-npm.js',
+    outputDir: 'dist/npm',
+    package: false
+  },
+  'cursor': {
+    name: 'Cursor IDE Extension',
+    buildCmd: 'npm run build:cursor',
+    outputDir: 'dist/cursor',
+    package: true
+  },
+  'windsurf': {
+    name: 'Windsurf Extension',
+    buildCmd: 'npm run build:windsurf',
+    outputDir: 'dist/windsurf',
     package: true
   }
 };
@@ -47,6 +53,14 @@ async function buildAllPlatforms() {
     console.log(`   Output: ${config.outputDir}`);
     
     try {
+      // Skip if build command doesn't exist yet
+      if (platform === 'cursor' || platform === 'windsurf') {
+        if (!fs.existsSync(`scripts/build-${platform}.js`)) {
+          console.log(`   ⏭️  Skipped (build script not implemented yet)`);
+          continue;
+        }
+      }
+      
       // Run build command
       console.log(`   Running: ${config.buildCmd}`);
       execSync(config.buildCmd, { stdio: 'inherit' });
@@ -75,6 +89,18 @@ async function buildAllPlatforms() {
           success: true,
           path: config.outputDir
         });
+      } else if (platform === 'dxt') {
+        // DXT outputs to dist/ directly
+        const dxtFile = 'dist/hanzo-ai.dxt';
+        if (fs.existsSync(dxtFile)) {
+          const stats = fs.statSync(dxtFile);
+          console.log(`   ✅ Success! Created ${dxtFile} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+          results.push({
+            platform,
+            success: true,
+            path: dxtFile
+          });
+        }
       } else {
         throw new Error('Output directory not created');
       }
@@ -99,7 +125,9 @@ async function buildAllPlatforms() {
     if (vsixFiles.length > 0) {
       const vsixFile = vsixFiles[0];
       const targetPath = path.join('dist', vsixFile);
-      fs.renameSync(vsixFile, targetPath);
+      if (fs.existsSync(vsixFile)) {
+        fs.renameSync(vsixFile, targetPath);
+      }
       console.log(`   ✅ Created: ${targetPath}`);
     }
   } catch (error) {
@@ -121,6 +149,10 @@ async function buildAllPlatforms() {
   listDistFiles('dist', '   ');
   
   console.log('\n✨ Build complete!');
+  console.log('\n📦 Installation methods:');
+  console.log('   Claude Code: Drag dist/hanzoai-*.dxt into Claude Code');
+  console.log('   Claude Desktop/Code: npx @hanzo/mcp@latest');
+  console.log('   VS Code: Install dist/hanzoai-*.vsix');
 }
 
 function createZipArchive(sourceDir, outputPath) {
@@ -146,7 +178,7 @@ function listDistFiles(dir, prefix = '') {
     
     if (stats.isDirectory()) {
       console.log(`${prefix}📁 ${item}/`);
-      if (item !== 'node_modules') {
+      if (item !== 'node_modules' && items.length < 20) {
         listDistFiles(fullPath, prefix + '   ');
       }
     } else {

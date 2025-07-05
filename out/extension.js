@@ -44,12 +44,14 @@ const HanzoMetricsService_1 = require("./services/HanzoMetricsService");
 const server_1 = require("./mcp/server");
 const config_1 = require("./config");
 const content_1 = require("./webview/content");
+const hanzo_chat_participant_1 = require("./chat/hanzo-chat-participant");
 let projectManager;
 let authManager;
 let reminderService;
 let statusBar;
 let metricsService;
 let mcpServer;
+let chatParticipant;
 async function activate(context) {
     console.log('Hanzo AI Extension is now active!');
     // Initialize services
@@ -62,6 +64,16 @@ async function activate(context) {
     if (config.mcp.enabled) {
         mcpServer = new server_1.MCPServer(context);
         await mcpServer.initialize();
+    }
+    // Initialize VS Code Chat Participant
+    try {
+        chatParticipant = new hanzo_chat_participant_1.HanzoChatParticipant(context);
+        const participant = await chatParticipant.initialize();
+        context.subscriptions.push(participant);
+        console.log('Hanzo Chat Participant registered successfully');
+    }
+    catch (error) {
+        console.error('Failed to register chat participant:', error);
     }
     // Register commands
     const disposables = [
