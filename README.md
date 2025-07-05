@@ -22,6 +22,9 @@ Install hanzoai-*.vsix
 # Claude Code
 Drag hanzoai-*.dxt
 
+# JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.)
+Install hanzo-ai-plugin.zip via Settings → Plugins → Install from Disk
+
 # Terminal / Neovim
 npx @hanzo/mcp@latest
 ```

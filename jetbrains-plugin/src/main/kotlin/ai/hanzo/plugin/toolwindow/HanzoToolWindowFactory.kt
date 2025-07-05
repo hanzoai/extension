@@ -15,16 +15,6 @@ class HanzoToolWindowFactory : ToolWindowFactory {
         val chatPanel = HanzoChatPanel(project)
         val chatContent = contentFactory.createContent(chatPanel.getComponent(), "Chat", false)
         toolWindow.contentManager.addContent(chatContent)
-        
-        // Create MCP server panel
-        val mcpPanel = HanzoMCPPanel(project)
-        val mcpContent = contentFactory.createContent(mcpPanel.getComponent(), "MCP Servers", false)
-        toolWindow.contentManager.addContent(mcpContent)
-        
-        // Create settings panel
-        val settingsPanel = HanzoSettingsPanel(project)
-        val settingsContent = contentFactory.createContent(settingsPanel.getComponent(), "Settings", false)
-        toolWindow.contentManager.addContent(settingsContent)
     }
     
     override fun shouldBeAvailable(project: Project): Boolean = true
