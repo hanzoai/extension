@@ -1,7 +1,7 @@
 {
 	"name": "hanzoai",
 	"displayName": "Hanzo AI Context Manager",
-	"description": "AI-powered project manager that analyzes codebases, maintains specifications, and tracks changes. Seamlessly integrates with VS Code to provide intelligent project insights and documentation.",
+	"description": "The ultimate toolkit for AI engineers. Access 200+ LLMs (OpenRouter/LiteLLM compatible), 4000+ MCP servers, and powerful development tools. Features unified API, shared context, intelligent routing, and VS Code native integration.",
 	"version": "1.5.4",
 	"publisher": "hanzo-ai",
 	"private": false,
@@ -48,6 +48,14 @@
 	],
 	"main": "./out/extension.js",
 	"contributes": {
+		"chatParticipants": [
+			{
+				"id": "hanzo",
+				"name": "Hanzo",
+				"description": "Ultimate AI engineering toolkit: 200+ LLMs, 4000+ MCP servers, 53+ dev tools",
+				"isSticky": true
+			}
+		],
 		"commands": [
 			{
 				"command": "hanzo.openManager",
@@ -178,6 +186,59 @@
 					"type": "boolean",
 					"default": false,
 					"description": "Enable debug logging"
+				},
+				"hanzo.llm.provider": {
+					"type": "string",
+					"enum": [
+						"hanzo",
+						"lmstudio",
+						"ollama",
+						"openai",
+						"anthropic"
+					],
+					"default": "hanzo",
+					"description": "LLM provider to use for AI features"
+				},
+				"hanzo.llm.hanzo.apiKey": {
+					"type": "string",
+					"description": "API key for Hanzo AI Gateway"
+				},
+				"hanzo.llm.lmstudio.endpoint": {
+					"type": "string",
+					"default": "http://localhost:1234/v1",
+					"description": "LM Studio API endpoint"
+				},
+				"hanzo.llm.lmstudio.model": {
+					"type": "string",
+					"description": "Model to use in LM Studio"
+				},
+				"hanzo.llm.ollama.endpoint": {
+					"type": "string",
+					"default": "http://localhost:11434",
+					"description": "Ollama API endpoint"
+				},
+				"hanzo.llm.ollama.model": {
+					"type": "string",
+					"default": "llama2",
+					"description": "Model to use in Ollama"
+				},
+				"hanzo.llm.openai.apiKey": {
+					"type": "string",
+					"description": "OpenAI API key"
+				},
+				"hanzo.llm.openai.model": {
+					"type": "string",
+					"default": "gpt-4",
+					"description": "OpenAI model to use"
+				},
+				"hanzo.llm.anthropic.apiKey": {
+					"type": "string",
+					"description": "Anthropic API key"
+				},
+				"hanzo.llm.anthropic.model": {
+					"type": "string",
+					"default": "claude-3-opus-20240229",
+					"description": "Anthropic model to use"
 				}
 			}
 		},
@@ -202,10 +263,14 @@
 		"test:auth": "cross-env MOCHA_TEST_FILE=\"Auth and API Test Suite\" node ./out/test/runTest.js",
 		"test:file-collection": "cross-env MOCHA_TEST_FILE=\"FileCollectionService Test Suite\" node ./out/test/runTest.js",
 		"test:mcp": "cross-env MOCHA_TEST_FILE=\"MCP.*Tool Test Suite\" node ./out/test/runTest.js",
+		"test:coverage": "c8 npm test",
 		"build:mcp": "node scripts/build-mcp-standalone.js",
 		"build:claude-desktop": "npm run build:mcp && node scripts/build-claude-desktop.js",
-		"build": "npm run compile && npm run build:mcp && npm run build:claude-desktop",
+		"build": "node scripts/compile-main.js && npm run build:mcp",
 		"build:dxt": "node scripts/build-dxt.js",
+		"build:npm": "node scripts/build-mcp-npm.js",
+		"build:cursor": "node scripts/build-cursor.js",
+		"build:windsurf": "node scripts/build-windsurf.js",
 		"build:all": "node scripts/build-all-platforms.js",
 		"package": "npm run build:all && vsce package",
 		"package:claude": "npm run build:claude-desktop",
@@ -232,6 +297,7 @@
 		"@vscode/vsce": "^2.24.0",
 		"archiver": "^7.0.1",
 		"better-sqlite3": "^12.2.0",
+		"c8": "^10.1.3",
 		"cross-env": "^7.0.3",
 		"esbuild": "^0.19.12",
 		"eslint": "^8.26.0",

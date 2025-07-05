@@ -259,8 +259,8 @@ export class BashTools {
         // Execute command
         return new Promise((resolve, reject) => {
             const proc = cp.exec(command, {
-                cwd: session.cwd,
-                env: session.env,
+                cwd: session?.cwd || process.cwd(),
+                env: session?.env || process.env,
                 timeout,
                 maxBuffer: 10 * 1024 * 1024 // 10MB
             }, (error, stdout, stderr) => {

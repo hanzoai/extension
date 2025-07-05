@@ -28,6 +28,7 @@ import { BatchTools } from './batch';
 import { AITools } from './ai-tools';
 import { createModeTool } from './mode';
 import { createMCPRunnerTools } from './mcp-runner';
+import { createBrowserTools } from './browser';
 // import { createASTAnalyzerTool } from './ast-analyzer';
 // import { createTreeSitterAnalyzerTool } from './treesitter-analyzer';
 
@@ -80,7 +81,8 @@ export class MCPTools {
             createWebFetchTool(this.context),
             createZenTool(this.context),
             createModeTool(this.context),
-            ...createMCPRunnerTools(this.context)
+            ...createMCPRunnerTools(this.context),
+            ...createBrowserTools(this.context)
             // createASTAnalyzerTool(this.context),
             // createTreeSitterAnalyzerTool(this.context)
         ];
@@ -142,7 +144,9 @@ export class MCPTools {
                 // Utility
                 'batch', 'web_fetch', 'batch_search',
                 // MCP
-                'mcp'
+                'mcp',
+                // Browser
+                'browser', 'browser_close'
             ]);
         } else {
             this.enabledTools = new Set(enabled);
@@ -221,7 +225,7 @@ export class MCPTools {
                 filesystem: this.countToolsInCategory(['read', 'write', 'edit', 'multi_edit', 'directory_tree']),
                 search: this.countToolsInCategory(['grep', 'search', 'symbols', 'find_files']),
                 shell: this.countToolsInCategory(['run_command', 'bash', 'open']),
-                ai: this.countToolsInCategory(['dispatch_agent', 'llm', 'consensus']),
+                ai: this.countToolsInCategory(['agent', 'llm', 'consensus']),
                 development: this.countToolsInCategory(['todo_read', 'todo_write', 'notebook_read', 'notebook_edit'])
             }
         };
