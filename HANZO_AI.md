@@ -22,6 +22,7 @@ Hanzo AI is the ultimate toolkit for AI engineers, providing unified access to e
 - **Smart Routing**: Automatic failover and load balancing across providers
 - **Shared Context**: Maintain conversation context across model switches
 - **4000+ MCP Servers**: Access specialized tools for every use case
+- **Universal MCP Proxy**: Install ANY MCP server with `@hanzo mcp --action install`
 - **Performance Monitoring**: Track latency, costs, and usage patterns
 - **Team Collaboration**: Share API keys, context, and credits with your team
 

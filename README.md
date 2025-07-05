@@ -5,7 +5,8 @@ The ultimate toolkit for AI engineers.
 ## What You Get
 
 - **200+ LLMs** - Every model from OpenRouter/LiteLLM in one API
-- **4000+ MCP Servers** - Access specialized tools instantly  
+- **4000+ MCP Servers** - Install ANY MCP server with one command
+- **Universal MCP Proxy** - Auto-install via npm/uvx and proxy all calls  
 - **45+ Legendary Modes** - Code like Carmack, think like Norvig
 - **Unlimited Memory** - Vector/graph/relational search across all projects
 - **Browser Automation** - Built-in Playwright for web tasks
@@ -44,6 +45,10 @@ export HANZO_API_KEY=hzo_...  # from iam.hanzo.ai
 
 # Search everything
 @hanzo search "auth flow"
+
+# Install any MCP server
+@hanzo mcp --action install --package @modelcontextprotocol/server-github
+@hanzo mcp --action call --tool github_search --args '{"query": "MCP"}'
 ```
 
 ## Links
