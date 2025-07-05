@@ -29,6 +29,9 @@ import { AITools } from './ai-tools';
 import { createModeTool } from './mode';
 import { createMCPRunnerTools } from './mcp-runner';
 import { createBrowserTools } from './browser';
+import { createMCPUniversalProxyTools } from './mcp-universal-proxy';
+import { createHanzoPlatformMCPTools, registerUnixAliasTools } from './hanzo-platform-mcp';
+import { createUnifiedReadTool, createUnifiedProjectAnalyzeTool, createUnixAliasTool, getCanonicalToolName } from './unified-tools';
 // import { createASTAnalyzerTool } from './ast-analyzer';
 // import { createTreeSitterAnalyzerTool } from './treesitter-analyzer';
 
@@ -52,37 +55,68 @@ export class MCPTools {
         // Register tool handlers for batch tool
         const toolHandlers = new Map<string, (args: any) => Promise<any>>();
         
-        // Create all tools
+        // Create all tools - unified without duplicates
         const allTools = [
-            ...createFileSystemTools(this.context),
+            // File System (unified)
+            createUnifiedReadTool(this.context),  // Replaces read from filesystem
+            ...createFileSystemTools(this.context).filter(t => t.name !== 'read'),
+            
+            // Shell & Process
             ...createShellTools(this.context),
-            ...createSearchTools(this.context),
-            ...createJupyterTools(this.context),
-            ...createAgentTools(this.context),
-            ...createTodoTools(this.context),
-            ...createEditorTools(this.context),
-            ...createDatabaseTools(this.context),
-            ...createLLMTools(this.context),
-            ...createVectorTools(this.context),
-            ...createMCPManagementTools(this.context),
-            ...createSystemTools(this.context),
-            ...createPaletteTools(this.context),
             ...createBashTools(this.context),
-            ...createGitSearchTools(this.context),
-            ...this.batchTools.getTools(),
-            ...this.aiTools.getTools(),
             createProcessTool(this.context),
-            createConfigTool(this.context),
-            createRulesTool(this.context),
+            
+            // Search (unified)
+            ...createSearchTools(this.context),
+            ...createGitSearchTools(this.context),
+            createUnifiedSearchTool(this.context),
+            
+            // Development Tools
+            ...createJupyterTools(this.context),
+            ...createEditorTools(this.context),
+            createUnifiedProjectAnalyzeTool(this.context),
+            
+            // AI & Agents
+            ...createAgentTools(this.context),
+            ...this.aiTools.getTools(),
             createThinkTool(this.context),
             createCriticTool(this.context),
-            createUnifiedTodoTool(this.context),
-            createUnifiedSearchTool(this.context),
-            createWebFetchTool(this.context),
             createZenTool(this.context),
-            createModeTool(this.context),
+            
+            // Task Management
+            ...createTodoTools(this.context),
+            createUnifiedTodoTool(this.context),
+            
+            // Database & Storage
+            ...createDatabaseTools(this.context),
+            ...createVectorTools(this.context),
+            
+            // LLM & Platform
+            ...createLLMTools(this.context),
+            ...createHanzoPlatformMCPTools(this.context),
+            
+            // MCP Management
+            ...createMCPManagementTools(this.context),
             ...createMCPRunnerTools(this.context),
-            ...createBrowserTools(this.context)
+            ...createMCPUniversalProxyTools(this.context),
+            
+            // Browser & Web
+            ...createBrowserTools(this.context),
+            createWebFetchTool(this.context),
+            
+            // Configuration & System
+            ...createSystemTools(this.context),
+            ...createPaletteTools(this.context),
+            createConfigTool(this.context),
+            createRulesTool(this.context),
+            createModeTool(this.context),
+            createUnixAliasTool(this.context),
+            
+            // Batch operations
+            ...this.batchTools.getTools(),
+            
+            // Dynamic Unix aliases
+            ...registerUnixAliasTools(this.context)
             // createASTAnalyzerTool(this.context),
             // createTreeSitterAnalyzerTool(this.context)
         ];

@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 interface BrowserAction {
-    action: 'navigate' | 'screenshot' | 'click' | 'type' | 'extract' | 'wait' | 'evaluate';
+    action: 'navigate' | 'screenshot' | 'click' | 'type' | 'extract' | 'wait' | 'evaluate' | 'install';
     url?: string;
     selector?: string;
     text?: string;
