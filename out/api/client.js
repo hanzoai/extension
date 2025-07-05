@@ -47,9 +47,8 @@ const MAX_BODY_SIZE_PER_REQUEST = 4 * 1024 * 1024; // 4MB in bytes
 // Global timeout constant (5 minutes)
 const GLOBAL_REQUEST_TIMEOUT = 300000; // 300 seconds
 class ApiClient {
-    authManager;
-    config = (0, config_1.getConfig)();
     constructor(context) {
+        this.config = (0, config_1.getConfig)();
         this.authManager = manager_1.AuthManager.getInstance(context);
     }
     async makeAuthenticatedRequest(endpoint, data, options = {}) {
@@ -108,7 +107,7 @@ class ApiClient {
                         'Accept': 'application/json'
                     };
                     const response = await axios_1.default.post(`${this.config.apiUrl}${endpoint}`, body, {
-                        headers,
+                        headers: headers,
                         httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
                         timeout: GLOBAL_REQUEST_TIMEOUT
                     });
@@ -152,7 +151,7 @@ class ApiClient {
                     'Accept': 'application/json'
                 };
                 const response = await axios_1.default.post(`${this.config.apiUrl}${endpoint}`, body, {
-                    headers,
+                    headers: headers,
                     httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
                     timeout: GLOBAL_REQUEST_TIMEOUT
                 });
@@ -237,7 +236,7 @@ class ApiClient {
             const chunkJsonBody = JSON.stringify(chunkData);
             console.info(`[Hanzo] Sending chunk ${chunkIndex + 1}/${totalChunks}, size: ${(chunkJsonBody.length / (1024 * 1024)).toFixed(2)} MB`);
             const headers = {
-                'Authorization': token ? `Bearer ${token}` : undefined,
+                'Authorization': token ? `Bearer ${token}` : '',
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'X-Chunk-Index': chunkIndex.toString(),
@@ -423,7 +422,7 @@ class ApiClient {
             const compressedSize = Buffer.from(compressedChunkBody, 'base64').length;
             console.info(`[Hanzo] Compressed chunk size: ${(compressedSize / (1024 * 1024)).toFixed(2)} MB`);
             const headers = {
-                'Authorization': token ? `Bearer ${token}` : undefined,
+                'Authorization': token ? `Bearer ${token}` : '',
                 'Content-Type': 'application/gzip',
                 'Content-Encoding': 'gzip',
                 'Accept': 'application/json',

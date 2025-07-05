@@ -38,26 +38,18 @@ const test_electron_1 = require("@vscode/test-electron");
 async function main() {
     try {
         // The folder containing the Extension Manifest package.json
-        // Passed to `--extensionDevelopmentPath`
         const extensionDevelopmentPath = path.resolve(__dirname, '../../');
-        // The path to test runner
-        // Passed to --extensionTestsPath
+        // The path to the extension test script
         const extensionTestsPath = path.resolve(__dirname, './suite/index');
-        // Get the test file from command line args
-        const testFile = process.argv[2];
-        // Set test file as environment variable
-        process.env.MOCHA_TEST_FILE = testFile || '';
-        console.log('Running tests for:', testFile);
         // Download VS Code, unzip it and run the integration test
         await (0, test_electron_1.runTests)({
             extensionDevelopmentPath,
             extensionTestsPath,
-            // Don't disable extensions so our extension can be activated
-            launchArgs: []
+            launchArgs: ['--disable-extensions']
         });
     }
     catch (err) {
-        console.error('Failed to run tests:', err);
+        console.error('Failed to run tests');
         process.exit(1);
     }
 }

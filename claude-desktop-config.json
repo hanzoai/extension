@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "hanzo": {
+      "command": "node",
+      "args": [
+        "/path/to/hanzo/extension/dist/mcp-server.js"
+      ],
+      "env": {
+        "HANZO_WORKSPACE": "/path/to/your/workspace"
+      }
+    }
+  }
+}

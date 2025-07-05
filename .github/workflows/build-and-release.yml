@@ -1,0 +1,228 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Install global tools
+      run: |
+        npm install -g @vscode/vsce
+        npm install -g @anthropic-ai/dxt
+
+    - name: Compile TypeScript
+      run: npm run compile
+
+    - name: Build MCP Server
+      run: npm run build:mcp
+
+    - name: Build Claude Desktop Package
+      run: npm run build:claude-desktop
+
+    - name: Build DXT Extension
+      run: |
+        cd dxt
+        dxt pack
+        mv dxt.dxt ../dist/hanzo-ai.dxt
+        cd ..
+
+    - name: Build VS Code Extension
+      run: |
+        vsce package --no-dependencies
+        mv *.vsix dist/
+
+    - name: List build artifacts
+      run: ls -la dist/
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: |
+          dist/hanzo-ai.dxt
+          dist/*.vsix
+          dist/mcp-server.js
+          dist/claude-desktop/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+        path: dist/
+
+    - name: Get version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          # Hanzo AI Extension v${{ steps.get_version.outputs.VERSION }}
+
+          ## Installation Methods
+
+          ### VS Code Extension
+          - Download: `hanzoai-${{ steps.get_version.outputs.VERSION }}.vsix`
+          - Install: `code --install-extension hanzoai-${{ steps.get_version.outputs.VERSION }}.vsix`
+          - Or search "Hanzo AI Context Manager" in VS Code Marketplace
+
+          ### Claude Code Desktop Extension
+          - Download: `hanzo-ai.dxt`
+          - Install: Drag and drop into Claude Code
+
+          ### Claude Desktop via NPM
+          ```bash
+          npx @hanzo/mcp@latest
+          ```
+
+          ### Standalone MCP Server
+          - Download: `mcp-server.js`
+          - Run: `node mcp-server.js`
+
+          ## What's New
+          See [CHANGELOG.md](https://github.com/hanzoai/extension/blob/main/CHANGELOG.md) for details.
+
+          ## Documentation
+          - [Installation Guide](https://github.com/hanzoai/extension/blob/main/docs/MCP_INSTALLATION.md)
+          - [Build Guide](https://github.com/hanzoai/extension/blob/main/docs/BUILD.md)
+          - [Vim Integration](https://github.com/hanzoai/extension/blob/main/docs/VIM_INTEGRATION.md)
+        draft: false
+        prerelease: false
+
+    - name: Upload VS Code Extension
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/hanzoai-${{ steps.get_version.outputs.VERSION }}.vsix
+        asset_name: hanzoai-${{ steps.get_version.outputs.VERSION }}.vsix
+        asset_content_type: application/zip
+
+    - name: Upload DXT Extension
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/hanzo-ai.dxt
+        asset_name: hanzo-ai-${{ steps.get_version.outputs.VERSION }}.dxt
+        asset_content_type: application/zip
+
+    - name: Upload MCP Server
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/mcp-server.js
+        asset_name: mcp-server-${{ steps.get_version.outputs.VERSION }}.js
+        asset_content_type: application/javascript
+
+    - name: Create NPM Package Archive
+      run: |
+        cd dist/claude-desktop
+        tar -czf ../hanzo-mcp-npm-${{ steps.get_version.outputs.VERSION }}.tar.gz .
+        cd ../..
+
+    - name: Upload NPM Package Archive
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/hanzo-mcp-npm-${{ steps.get_version.outputs.VERSION }}.tar.gz
+        asset_name: hanzo-mcp-npm-${{ steps.get_version.outputs.VERSION }}.tar.gz
+        asset_content_type: application/gzip
+
+  publish-npm:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+        path: dist/
+
+    - name: Publish to NPM
+      run: |
+        cd dist/claude-desktop
+        npm publish --access public
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-vscode:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+        path: dist/
+
+    - name: Publish to VS Code Marketplace
+      run: |
+        npx vsce publish -p ${{ secrets.VSCE_PAT }}
+
+    - name: Publish to Open VSX
+      run: |
+        npx ovsx publish dist/*.vsix -p ${{ secrets.OVSX_PAT }}

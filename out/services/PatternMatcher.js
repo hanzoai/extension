@@ -1,10 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.PatternMatcher = void 0;
 const minimatch_1 = require("minimatch");
 const config_1 = require("../constants/config");
 class PatternMatcher {
-    patterns = [];
-    constructor() { }
+    constructor() {
+        this.patterns = [];
+    }
     addPattern(pattern, source = '') {
         pattern = pattern.trim();
         if (!pattern || pattern.startsWith('#')) {
@@ -84,4 +86,5 @@ class PatternMatcher {
         this.patterns = [];
     }
 }
+exports.PatternMatcher = PatternMatcher;
 //# sourceMappingURL=PatternMatcher.js.map

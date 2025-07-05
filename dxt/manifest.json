@@ -1,0 +1,326 @@
+{
+  "dxt_version": "0.1",
+  "name": "hanzo-ai",
+  "display_name": "Hanzo AI",
+  "version": "1.5.4",
+  "description": "Powerful development tools and AI assistance for Claude. Features file operations, search, shell commands, git integration, and more.",
+  "long_description": "# Hanzo AI Extension\n\nPowerful development tools and AI assistance for Claude, built on the Model Context Protocol (MCP).\n\n## Features\n\n- **File Operations**: read, write, edit, multi_edit, directory_tree, find_files\n- **Search & Analysis**: grep, search, ast (code symbols), git_search\n- **Shell & System**: run_command, bash, open\n- **Development**: todo (task management), think, critic\n- **Database**: sql queries and schemas, vector store operations\n- **Jupyter**: notebook reading, editing, and execution\n- **Configuration**: rules management for different IDEs\n- **Web**: fetch and analyze web content\n\n## Authentication\n\nBy default, Hanzo AI requires authentication with your Hanzo account to access cloud features like SQL databases and vector stores. You can run in anonymous mode by setting the `anonymous` option to true in settings for local-only features.\n\n## Configuration\n\nAll settings can be configured through the extension settings UI or environment variables. Set your workspace directory, enable/disable specific tools, and configure security settings.",
+  "author": {
+    "name": "Hanzo Industries Inc",
+    "email": "support@hanzo.ai",
+    "url": "https://hanzo.ai"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git"
+  },
+  "homepage": "https://github.com/hanzoai/extension",
+  "documentation": "https://github.com/hanzoai/extension/blob/main/docs/MCP_INSTALLATION.md",
+  "support": "https://github.com/hanzoai/extension/issues",
+  "icon": "icon.png",
+  "keywords": ["mcp", "development", "tools", "ai", "hanzo"],
+  "server": {
+    "type": "node",
+    "entry_point": "server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server.js"],
+      "env": {
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  },
+  "user_config": {
+    "workspace": {
+      "title": "Workspace Directory",
+      "description": "Default workspace directory for file operations",
+      "type": "string",
+      "default": "~",
+      "env": "HANZO_WORKSPACE"
+    },
+    "anonymous": {
+      "title": "Anonymous Mode",
+      "description": "Run in anonymous mode without authentication (limited features)",
+      "type": "boolean",
+      "default": false,
+      "env": "HANZO_ANONYMOUS"
+    },
+    "disabledTools": {
+      "title": "Disabled Tools",
+      "description": "Comma-separated list of tools to disable",
+      "type": "string",
+      "default": "",
+      "env": "HANZO_MCP_DISABLED_TOOLS"
+    },
+    "allowedPaths": {
+      "title": "Allowed Paths",
+      "description": "Comma-separated list of allowed paths for file operations",
+      "type": "string",
+      "default": "",
+      "env": "HANZO_MCP_ALLOWED_PATHS"
+    },
+    "disableWriteTools": {
+      "title": "Disable Write Tools",
+      "description": "Disable all write operations for safety",
+      "type": "boolean",
+      "default": false,
+      "env": "HANZO_MCP_DISABLE_WRITE_TOOLS"
+    },
+    "disableSearchTools": {
+      "title": "Disable Search Tools",
+      "description": "Disable all search operations",
+      "type": "boolean",
+      "default": false,
+      "env": "HANZO_MCP_DISABLE_SEARCH_TOOLS"
+    }
+  },
+  "tools": [
+    {
+      "name": "read",
+      "description": "Read the contents of a file",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the file to read"
+          }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "write",
+      "description": "Write content to a file",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the file to write"
+          },
+          "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+          }
+        },
+        "required": ["path", "content"]
+      }
+    },
+    {
+      "name": "edit",
+      "description": "Edit specific parts of a file",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the file to edit"
+          },
+          "old_string": {
+            "type": "string",
+            "description": "String to replace"
+          },
+          "new_string": {
+            "type": "string",
+            "description": "Replacement string"
+          }
+        },
+        "required": ["path", "old_string", "new_string"]
+      }
+    },
+    {
+      "name": "multi_edit",
+      "description": "Make multiple edits to a file in one operation"
+    },
+    {
+      "name": "directory_tree",
+      "description": "Display directory structure as a tree"
+    },
+    {
+      "name": "find_files",
+      "description": "Search for files by name pattern"
+    },
+    {
+      "name": "grep",
+      "description": "Search file contents with regex"
+    },
+    {
+      "name": "search",
+      "description": "Full-text search across codebase"
+    },
+    {
+      "name": "ast", 
+      "description": "Find code symbols using Abstract Syntax Tree (functions, classes, methods, etc.)"
+    },
+    {
+      "name": "git_search",
+      "description": "Search git history and commits"
+    },
+    {
+      "name": "run_command",
+      "description": "Execute shell commands"
+    },
+    {
+      "name": "bash",
+      "description": "Run bash commands"
+    },
+    {
+      "name": "open",
+      "description": "Open files/URLs in default application"
+    },
+    {
+      "name": "todo",
+      "description": "Read and manage project todo list",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["read", "add", "update", "remove", "complete"],
+            "description": "Action to perform on todo list"
+          },
+          "id": {
+            "type": "string",
+            "description": "Todo item ID (for update/remove/complete)"
+          },
+          "content": {
+            "type": "string", 
+            "description": "Todo content (for add/update)"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Priority level"
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "think",
+      "description": "AI reasoning and planning"
+    },
+    {
+      "name": "critic",
+      "description": "Code review and suggestions"
+    },
+    {
+      "name": "sql",
+      "description": "Execute SQL queries and view database schemas (requires authentication)",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["query", "schema", "tables"],
+            "description": "Database action to perform"
+          },
+          "query": {
+            "type": "string",
+            "description": "SQL query to execute (for query action)"
+          },
+          "table": {
+            "type": "string",
+            "description": "Table name (for schema action)"
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "vector_store",
+      "description": "Vector database operations (requires authentication)",
+      "schema": {
+        "type": "object", 
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["insert", "query", "delete"],
+            "description": "Vector store action"
+          },
+          "text": {
+            "type": "string",
+            "description": "Text to insert or search"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Metadata for insert operation"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Number of results to return"
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "notebook",
+      "description": "Read, edit, and execute Jupyter notebook cells",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["read", "edit", "run", "create"],
+            "description": "Notebook action to perform"
+          },
+          "path": {
+            "type": "string",
+            "description": "Path to notebook file"
+          },
+          "cell_id": {
+            "type": "string",
+            "description": "Cell ID for edit/run actions"
+          },
+          "content": {
+            "type": "string",
+            "description": "New cell content for edit/create"
+          },
+          "cell_type": {
+            "type": "string",
+            "enum": ["code", "markdown"],
+            "description": "Type of cell to create"
+          }
+        },
+        "required": ["action", "path"]
+      }
+    },
+    {
+      "name": "rules",
+      "description": "Read and update project rules/configuration",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["read", "update", "reset"],
+            "description": "Rules action to perform"
+          },
+          "ide": {
+            "type": "string",
+            "enum": ["cursor", "copilot", "continue", "codium"],
+            "description": "IDE to configure rules for"
+          },
+          "content": {
+            "type": "string",
+            "description": "New rules content for update action"
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "web_fetch",
+      "description": "Fetch and analyze web content"
+    }
+  ],
+  "compatibility": {
+    "dxt_version": "0.1",
+    "runtime": {
+      "node": ">=16.0.0"
+    }
+  }
+}

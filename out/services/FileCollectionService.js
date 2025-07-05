@@ -55,10 +55,6 @@ const formatSize = (size) => {
         `${sizeInMB.toFixed(2)} MB`;
 };
 class FileCollectionService {
-    workspaceRoot;
-    ignoreFilter;
-    directorySizes;
-    ignoreReasons;
     constructor(workspaceRoot) {
         this.workspaceRoot = workspaceRoot;
         this.ignoreFilter = (0, ignore_1.default)().add(ignored_patterns_1.DEFAULT_IGNORED_PATTERNS);

@@ -42,11 +42,8 @@ const crypto = __importStar(require("crypto"));
 const axios_1 = __importDefault(require("axios"));
 const config_1 = require("../config");
 class AuthManager {
-    context;
-    static instance;
-    pollingInterval;
-    config = (0, config_1.getConfig)();
     constructor(context) {
+        this.config = (0, config_1.getConfig)();
         this.context = context;
     }
     static getInstance(context) {
