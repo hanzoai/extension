@@ -259,6 +259,7 @@
 		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint .",
 		"test": "node ./out/test/runTest.js",
+		"test:simple": "node test-simple.js",
 		"test:pm": "cross-env MOCHA_TEST_FILE=\"ProjectManager Test Suite\" node ./out/test/runTest.js",
 		"test:auth": "cross-env MOCHA_TEST_FILE=\"Auth and API Test Suite\" node ./out/test/runTest.js",
 		"test:file-collection": "cross-env MOCHA_TEST_FILE=\"FileCollectionService Test Suite\" node ./out/test/runTest.js",
