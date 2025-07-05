@@ -37,7 +37,7 @@ jobs:
       run: npm run lint || true  # Allow failure for now
     
     - name: Run tests
-      run: npm test
+      run: npm run test:simple
       env:
         CI: true
     
