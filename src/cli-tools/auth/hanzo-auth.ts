@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+import fetch from "node-fetch";import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync, spawn } from 'child_process';

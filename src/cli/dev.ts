@@ -11,6 +11,7 @@ import { DevLauncher } from '../cli-tools/platform/dev-launcher';
 import { CLIToolManager } from '../cli-tools/cli-tool-manager';
 import { AsyncToolWrapper } from '../cli-tools/platform/async-tool-wrapper';
 import { HanzoAuth } from '../cli-tools/auth/hanzo-auth';
+import { MultiAgentOrchestrator } from '../cli-tools/orchestration/multi-agent-orchestrator';
 
 const program = new Command();
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf-8'));
@@ -20,8 +21,9 @@ program
     .description('Dev - Meta AI development tool that manages and runs all LLMs and CLI tools')
     .version(packageJson.version);
 
-// Global auth instance
+// Global instances
 const auth = new HanzoAuth();
+const orchestrator = new MultiAgentOrchestrator();
 
 // Login command
 program
@@ -225,6 +227,133 @@ program
         }
     });
 
+// Workflow command - run predefined workflows
+program
+    .command('workflow <name> [task...]')
+    .description('Run a predefined AI workflow (code-review, implement-feature, optimize, debug)')
+    .option('-d, --directory <dir>', 'Working directory')
+    .option('--list', 'List available workflows')
+    .action(async (name, taskParts, options) => {
+        if (options.list || name === 'list') {
+            const workflows = orchestrator.getWorkflows();
+            console.log(chalk.bold('Available Workflows:\n'));
+            for (const workflow of workflows) {
+                console.log(chalk.cyan(`${workflow.name}`) + ` - ${workflow.description}`);
+                console.log(chalk.gray(`  Steps: ${workflow.steps.map(s => s.name).join(' → ')}\n`));
+            }
+            return;
+        }
+        
+        const task = taskParts.join(' ');
+        const spinner = ora(`Running ${name} workflow...`).start();
+        
+        try {
+            await orchestrator.initialize();
+            const result = await orchestrator.runWorkflow(name, task, {
+                directory: options.directory
+            });
+            
+            spinner.succeed(`Workflow ${name} completed!`);
+            console.log('\n' + result);
+        } catch (error) {
+            spinner.fail(`Workflow failed: ${error.message}`);
+            process.exit(1);
+        }
+    });
+
+// Review command - intelligent code review
+program
+    .command('review [files...]')
+    .description('Run AI code review with multiple agents')
+    .option('-t, --type <type>', 'Review type: quick, standard, deep', 'standard')
+    .action(async (files, options) => {
+        const spinner = ora('Starting code review...').start();
+        
+        try {
+            await orchestrator.initialize();
+            
+            // Read files or use git diff
+            let codeToReview = '';
+            if (files.length > 0) {
+                for (const file of files) {
+                    if (fs.existsSync(file)) {
+                        codeToReview += `\n\n### ${file}\n\n${fs.readFileSync(file, 'utf-8')}`;
+                    }
+                }
+            } else {
+                // Use git diff
+                try {
+                    codeToReview = execSync('git diff --cached', { encoding: 'utf-8' });
+                    if (!codeToReview) {
+                        codeToReview = execSync('git diff', { encoding: 'utf-8' });
+                    }
+                } catch {
+                    spinner.fail('No files specified and no git changes found');
+                    return;
+                }
+            }
+            
+            const result = await orchestrator.runWorkflow('code-review', codeToReview);
+            spinner.succeed('Code review completed!');
+            console.log('\n' + result);
+        } catch (error) {
+            spinner.fail(`Review failed: ${error.message}`);
+            process.exit(1);
+        }
+    });
+
+// Multi command - run custom multi-agent tasks
+program
+    .command('multi <task>')
+    .description('Run a task with multiple AI agents in parallel')
+    .option('--coder <tool>', 'Tool for coding (claude, codex, aider, openhands)')
+    .option('--reviewer <tool>', 'Tool for review (gemini, claude)')
+    .option('--critic <tool>', 'Tool for critique (codex, gemini)')
+    .option('--local <model>', 'Use local LLM with specified model')
+    .action(async (task, options) => {
+        const spinner = ora('Running multi-agent task...').start();
+        
+        try {
+            await orchestrator.initialize();
+            
+            const agents = [];
+            if (options.coder) {
+                agents.push({ role: 'coder', tool: options.coder });
+            }
+            if (options.reviewer) {
+                agents.push({ role: 'reviewer', tool: options.reviewer });
+            }
+            if (options.critic) {
+                agents.push({ role: 'critic', tool: options.critic });
+            }
+            if (options.local) {
+                agents.push({ role: 'coder', tool: 'local-llm', model: options.local });
+            }
+            
+            if (agents.length === 0) {
+                // Default agents
+                agents.push(
+                    { role: 'coder', tool: 'claude' },
+                    { role: 'reviewer', tool: 'gemini' },
+                    { role: 'critic', tool: 'codex' }
+                );
+            }
+            
+            const results = await orchestrator.runCustomAgents(task, agents);
+            spinner.succeed('Multi-agent task completed!');
+            
+            console.log(chalk.bold('\nResults from each agent:\n'));
+            for (const [agent, output] of results) {
+                console.log(chalk.cyan(`${agent}:`));
+                console.log(output);
+                console.log(chalk.gray('\n' + '-'.repeat(80) + '\n'));
+            }
+        } catch (error) {
+            spinner.fail(`Multi-agent task failed: ${error.message}`);
+            process.exit(1);
+        }
+    });
+
 // Compare command - run multiple tools and compare results
 program
     .command('compare <task>')
@@ -249,7 +378,7 @@ program
             console.log(chalk.bold('\nComparison Results:'));
             console.log(chalk.gray('='.repeat(80)));
             
-            for (const [tool, result of results) {
+            for (const [tool, result] of results) {
                 console.log(chalk.bold.blue(`\n${tool.toUpperCase()}:`));
                 if (result.error) {
                     console.log(chalk.red(`Error: ${result.error}`));
