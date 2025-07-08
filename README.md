@@ -33,6 +33,10 @@ export HANZO_API_KEY=hzo_... # from iam.hanzo.ai
 dev run claude "implement a REST API"
 dev run aider "fix the failing tests" --auto-commit
 dev run openhands "analyze this codebase" --worktree
+
+# Multi-agent workflows
+dev workflow code-review  # Review your changes
+dev multi "optimize this function" --coder claude --reviewer gemini
 ```
 
 ## 📦 Installation Options
@@ -128,6 +132,37 @@ dev compare "optimize this database query"
 # Output shows results from all tools side-by-side
 ```
 
+### 🤝 Multi-Agent Workflows
+```bash
+# Code Review with Multiple Perspectives
+dev review  # Reviews current git changes
+dev review src/api.js src/auth.js  # Review specific files
+
+# Run Predefined Workflows
+dev workflow code-review "review this PR #123"
+dev workflow implement-feature "add user authentication"
+dev workflow optimize "improve database query performance"
+dev workflow debug "fix memory leak in production"
+
+# Custom Multi-Agent Tasks
+dev multi "design a REST API" --coder claude --reviewer gemini --critic codex
+
+# Use Local LLMs (Ollama, LM Studio, etc)
+dev multi "refactor this code" --local llama3 --reviewer gemini
+```
+
+### 🏠 Local LLM Support
+```bash
+# Auto-detects local LLMs (Ollama, LocalAI, etc)
+dev run local-llm "explain this code" --model llama3
+
+# Configure custom endpoints
+dev config local-llm --add my-server http://localhost:8080
+
+# Mix local and cloud models
+dev multi "implement feature" --coder local:codellama --reviewer claude
+```
+
 ## 🛠️ Local Development
 
 ```bash
@@ -166,10 +201,23 @@ All extensions are automatically built and tested on push:
 ## 🏗️ Architecture
 
 - **Dev CLI** (`@hanzo/dev`) - Command-line interface for all AI tools
+- **Multi-Agent Orchestrator** - Intelligent task routing and parallel execution
+- **Local LLM Manager** - Seamless integration with Ollama, LocalAI, etc
 - **Hanzo AI Extension** - VS Code/JetBrains integration  
 - **MCP Server** (`@hanzo/mcp`) - Model Context Protocol tools
 - **Platform Sync** - Universal context and bi-directional file sync
 - **Async Wrapper** - Long-running task management with idle detection
+
+## 🧠 Intelligent Agent Assignment
+
+Dev automatically assigns the right AI tool for each role:
+
+- **Claude** - Architecture, complex reasoning, code review synthesis
+- **Gemini** - Code review, documentation, multimodal tasks
+- **Codex** - Code generation, optimization, critiques
+- **Aider** - Git-aware coding, automated commits
+- **OpenHands** - Autonomous feature implementation
+- **Local LLMs** - Privacy-sensitive tasks, rapid iteration
 
 ## 🔗 Links
 
