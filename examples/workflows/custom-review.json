@@ -1,0 +1,72 @@
+{
+  "name": "custom-review",
+  "description": "Custom code review workflow with security focus",
+  "steps": [
+    {
+      "name": "security-scan",
+      "agents": [
+        {
+          "role": "critic",
+          "tool": "claude",
+          "model": "claude-3-opus",
+          "temperature": 0.2,
+          "systemPrompt": "You are a security expert. Identify potential security vulnerabilities, including: SQL injection, XSS, CSRF, authentication bypasses, data exposure, and insecure dependencies."
+        },
+        {
+          "role": "critic",
+          "tool": "local-llm",
+          "model": "codellama",
+          "temperature": 0.1,
+          "systemPrompt": "Focus on code quality issues: race conditions, memory leaks, null pointer exceptions, and error handling."
+        }
+      ],
+      "parallel": true,
+      "combineStrategy": "merge"
+    },
+    {
+      "name": "performance-review",
+      "agents": [
+        {
+          "role": "optimizer",
+          "tool": "gemini",
+          "model": "gemini-pro",
+          "temperature": 0.3,
+          "systemPrompt": "Analyze performance bottlenecks and suggest optimizations for: time complexity, space complexity, database queries, and caching strategies."
+        }
+      ],
+      "parallel": false
+    },
+    {
+      "name": "best-practices",
+      "agents": [
+        {
+          "role": "reviewer",
+          "tool": "codex",
+          "temperature": 0.4,
+          "systemPrompt": "Review against best practices: SOLID principles, design patterns, code maintainability, and testing coverage."
+        },
+        {
+          "role": "documenter",
+          "tool": "gemini",
+          "temperature": 0.5,
+          "systemPrompt": "Identify missing or inadequate documentation. Suggest improvements for: API docs, inline comments, README updates, and architectural decisions."
+        }
+      ],
+      "parallel": true,
+      "combineStrategy": "sequential"
+    },
+    {
+      "name": "synthesis",
+      "agents": [
+        {
+          "role": "reviewer",
+          "tool": "claude",
+          "model": "claude-3-opus",
+          "temperature": 0.3,
+          "systemPrompt": "Synthesize all review feedback into a prioritized action plan. Group issues by: Critical (security/bugs), Important (performance/quality), and Nice-to-have (style/docs)."
+        }
+      ],
+      "parallel": false
+    }
+  ]
+}
