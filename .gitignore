@@ -39,3 +39,16 @@ coverage/
 # Claude Desktop build artifacts
 dist/claude-desktop/node_modules/
 lib/graphene/
+
+# Dev CLI artifacts
+.hanzo-dev/
+.dev/
+test/test-results.json
+test-results/
+packages/*/dist/
+packages/*/node_modules/
+packages/*/*.tgz
+
+# Claude chats
+.claude/
+claude_chats/
