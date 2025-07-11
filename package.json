@@ -282,7 +282,10 @@
 		"publish:npm": "npm run build:claude-desktop && cd dist/claude-desktop && npm publish",
 		"dev": "cross-env VSCODE_ENV=development npm run watch",
 		"dev:mcp": "cross-env MCP_TRANSPORT=stdio node ./out/mcp-server-standalone.js",
-		"start:prod": "cross-env VSCODE_ENV=production npm run watch"
+		"start:prod": "cross-env VSCODE_ENV=production npm run watch",
+		"preview": "npx serve . -p 3000",
+		"deploy": "vercel --prod",
+		"deploy:preview": "vercel"
 	},
 	"devDependencies": {
 		"@types/better-sqlite3": "^7.6.13",
