@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dev - Ship 100X Faster with Parallel AI Agents</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            padding: 20px 0;
+            position: fixed;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            border-bottom: 1px solid #222;
+        }
+        
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #ff0080, #7928ca);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .hero {
+            padding: 150px 0 100px;
+            text-align: center;
+            background: radial-gradient(circle at center, #1a0033 0%, #000 100%);
+        }
+        
+        h1 {
+            font-size: 72px;
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff, #888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.1;
+        }
+        
+        .subtitle {
+            font-size: 24px;
+            color: #888;
+            margin-bottom: 40px;
+        }
+        
+        .cta-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 60px;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: none;
+            font-size: 16px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #ff0080, #7928ca);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 0, 128, 0.3);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid #333;
+        }
+        
+        .btn-secondary:hover {
+            border-color: #666;
+            background: #111;
+        }
+        
+        .demo-terminal {
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 60px auto;
+            max-width: 800px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        
+        .terminal-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+        
+        .terminal-content {
+            color: #0f0;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        
+        .terminal-prompt { color: #888; }
+        .terminal-command { color: #fff; }
+        .terminal-output { color: #0ff; margin-left: 20px; }
+        
+        .features {
+            padding: 100px 0;
+            background: #050505;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+            margin-top: 60px;
+        }
+        
+        .feature-card {
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 40px;
+            transition: all 0.3s;
+        }
+        
+        .feature-card:hover {
+            border-color: #7928ca;
+            transform: translateY(-5px);
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .feature-title {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+        
+        .feature-desc {
+            color: #888;
+            line-height: 1.8;
+        }
+        
+        .comparison {
+            padding: 100px 0;
+            background: #000;
+        }
+        
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 60px;
+        }
+        
+        .comparison-col {
+            padding: 40px;
+            border-radius: 12px;
+        }
+        
+        .col-old {
+            background: #1a0a0a;
+            border: 1px solid #331111;
+        }
+        
+        .col-new {
+            background: #0a1a0a;
+            border: 1px solid #113311;
+        }
+        
+        .comparison-title {
+            font-size: 28px;
+            margin-bottom: 30px;
+        }
+        
+        .comparison-item {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .icon-x { color: #ff4444; font-size: 24px; }
+        .icon-check { color: #44ff44; font-size: 24px; }
+        
+        .pricing {
+            padding: 100px 0;
+            background: #050505;
+            text-align: center;
+        }
+        
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-top: 60px;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .pricing-card {
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 40px;
+            position: relative;
+            transition: all 0.3s;
+        }
+        
+        .pricing-card.featured {
+            border-color: #7928ca;
+            transform: scale(1.05);
+        }
+        
+        .pricing-card:hover {
+            border-color: #7928ca;
+        }
+        
+        .pricing-label {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #ff0080, #7928ca);
+            padding: 5px 20px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .price {
+            font-size: 48px;
+            font-weight: 900;
+            margin: 20px 0;
+        }
+        
+        .price-unit {
+            font-size: 18px;
+            color: #888;
+        }
+        
+        .pricing-features {
+            list-style: none;
+            margin: 30px 0;
+            text-align: left;
+        }
+        
+        .pricing-features li {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title {
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .section-subtitle {
+            font-size: 20px;
+            color: #888;
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        footer {
+            padding: 40px 0;
+            background: #000;
+            border-top: 1px solid #222;
+            text-align: center;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            h1 { font-size: 48px; }
+            .comparison-grid { grid-template-columns: 1fr; }
+            .cta-group { flex-direction: column; width: 100%; padding: 0 20px; }
+            .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">Dev</div>
+            <div>
+                <a href="https://cloud.hanzo.ai/login" class="btn btn-secondary">Login</a>
+            </div>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>Ship 100X Faster<br>with Parallel AI Agents</h1>
+            <p class="subtitle">Multiple AIs working simultaneously. Zero context loss. Instant results.</p>
+            
+            <div class="cta-group">
+                <button class="btn btn-primary" onclick="subscribe()">Start Free Trial</button>
+                <a href="https://github.com/hanzoai/extension" class="btn btn-secondary">View on GitHub</a>
+            </div>
+            
+            <div class="demo-terminal">
+                <div class="terminal-header">
+                    <div class="terminal-dot dot-red"></div>
+                    <div class="terminal-dot dot-yellow"></div>
+                    <div class="terminal-dot dot-green"></div>
+                </div>
+                <div class="terminal-content">
+                    <div><span class="terminal-prompt">$</span> <span class="terminal-command">dev enhance "add user authentication with JWT"</span></div>
+                    <div class="terminal-output">✓ Analyzing codebase patterns...</div>
+                    <div class="terminal-output">✓ Spawning 5 parallel agents:</div>
+                    <div class="terminal-output">  → Agent 1: Updating user model</div>
+                    <div class="terminal-output">  → Agent 2: Creating auth middleware</div>
+                    <div class="terminal-output">  → Agent 3: Adding API endpoints</div>
+                    <div class="terminal-output">  → Agent 4: Writing test suite</div>
+                    <div class="terminal-output">  → Agent 5: Updating documentation</div>
+                    <div class="terminal-output">✓ Consensus validation complete</div>
+                    <div class="terminal-output">✓ PR ready for review in 47 seconds</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">Parallel Intelligence at Scale</h2>
+            <p class="section-subtitle">Stop waiting for sequential responses. Let multiple AIs work simultaneously.</p>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3 class="feature-title">Parallel Execution</h3>
+                    <p class="feature-desc">5+ AIs working simultaneously on different parts of your codebase. No more waiting for sequential responses.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🧠</div>
+                    <h3 class="feature-title">Unified Memory</h3>
+                    <p class="feature-desc">Your entire codebase indexed and available to every AI. No more context loss or repeated explanations.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">✅</div>
+                    <h3 class="feature-title">Consensus Validation</h3>
+                    <p class="feature-desc">Multiple AIs verify each change before you see it. Only real, working code makes it through.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3 class="feature-title">Git Worktrees</h3>
+                    <p class="feature-desc">Each AI works in its own branch. Merge when ready. No conflicts, no confusion.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3 class="feature-title">200+ AI Models</h3>
+                    <p class="feature-desc">Access Claude, GPT-4, Gemini, Codex, and 200+ models through Hanzo AI's unified gateway.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🔧</div>
+                    <h3 class="feature-title">4000+ MCP Tools</h3>
+                    <p class="feature-desc">Install any MCP server with one command. File ops, search, browser automation, and more.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="comparison">
+        <div class="container">
+            <h2 class="section-title">The Difference is Speed</h2>
+            
+            <div class="comparison-grid">
+                <div class="comparison-col col-old">
+                    <h3 class="comparison-title">❌ Traditional AI Tools</h3>
+                    <div class="comparison-item">
+                        <span class="icon-x">✗</span>
+                        <span>Sequential queries - wait for each response</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon-x">✗</span>
+                        <span>8-32K token limits - constant context loss</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon-x">✗</span>
+                        <span>Hallucinates imports and components</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon-x">✗</span>
+                        <span>Single AI perspective - more errors</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon-x">✗</span>
+                        <span>Manual context switching between files</span>
+                    </div>
+                </div>
+                
+                <div class="comparison-col col-new">
+                    <h3 class="comparison-title">✅ Dev Platform</h3>
+                    <div class="comparison-item">
+                        <span class="icon-check">✓</span>
+                        <span>Parallel execution - instant results</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon-check">✓</span>
+                        <span>Entire codebase indexed - zero context loss</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon-check">✓</span>
+                        <span>Verified imports - only real components</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon-check">✓</span>
+                        <span>Multi-AI consensus - higher accuracy</span>
+                    </div>
+                    <div class="comparison-item">
+                        <span class="icon-check">✓</span>
+                        <span>Automatic cross-file coordination</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pricing">
+        <div class="container">
+            <h2 class="section-title">Simple, Transparent Pricing</h2>
+            <p class="section-subtitle">Start free. Scale as you grow.</p>
+            
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Free</h3>
+                    <div class="price">$0<span class="price-unit">/month</span></div>
+                    <ul class="pricing-features">
+                        <li><span class="icon-check">✓</span> 100 AI queries/month</li>
+                        <li><span class="icon-check">✓</span> 2 parallel agents</li>
+                        <li><span class="icon-check">✓</span> Basic models (GPT-3.5, Claude Instant)</li>
+                        <li><span class="icon-check">✓</span> Community support</li>
+                    </ul>
+                    <button class="btn btn-secondary" style="width: 100%;" onclick="subscribe('free')">Start Free</button>
+                </div>
+                
+                <div class="pricing-card featured">
+                    <span class="pricing-label">MOST POPULAR</span>
+                    <h3>Pro</h3>
+                    <div class="price">$49<span class="price-unit">/month</span></div>
+                    <ul class="pricing-features">
+                        <li><span class="icon-check">✓</span> Unlimited AI queries</li>
+                        <li><span class="icon-check">✓</span> 10 parallel agents</li>
+                        <li><span class="icon-check">✓</span> All 200+ models</li>
+                        <li><span class="icon-check">✓</span> Priority support</li>
+                        <li><span class="icon-check">✓</span> Git worktrees</li>
+                        <li><span class="icon-check">✓</span> Custom workflows</li>
+                    </ul>
+                    <button class="btn btn-primary" style="width: 100%;" onclick="subscribe('pro')">Start Pro Trial</button>
+                </div>
+                
+                <div class="pricing-card">
+                    <h3>Team</h3>
+                    <div class="price">$199<span class="price-unit">/month</span></div>
+                    <ul class="pricing-features">
+                        <li><span class="icon-check">✓</span> Everything in Pro</li>
+                        <li><span class="icon-check">✓</span> Unlimited parallel agents</li>
+                        <li><span class="icon-check">✓</span> Team collaboration</li>
+                        <li><span class="icon-check">✓</span> Private cloud deployment</li>
+                        <li><span class="icon-check">✓</span> SLA guarantee</li>
+                        <li><span class="icon-check">✓</span> Dedicated support</li>
+                    </ul>
+                    <button class="btn btn-secondary" style="width: 100%;" onclick="subscribe('team')">Contact Sales</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 Hanzo AI. Ship faster than ever.</p>
+        </div>
+    </footer>
+
+    <script>
+        function subscribe(plan = 'pro') {
+            // Redirect to cloud.hanzo.ai with plan parameter
+            window.location.href = `https://cloud.hanzo.ai/signup?plan=${plan}&product=dev`;
+        }
+        
+        // Add smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+        
+        // Terminal animation
+        const terminalLines = document.querySelectorAll('.terminal-output');
+        terminalLines.forEach((line, index) => {
+            line.style.opacity = '0';
+            setTimeout(() => {
+                line.style.opacity = '1';
+                line.style.transition = 'opacity 0.3s';
+            }, 500 + (index * 200));
+        });
+    </script>
+</body>
+</html>
