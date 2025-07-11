@@ -203,7 +203,7 @@ export class HanzoAuth extends EventEmitter {
             throw new Error(`Failed to exchange code: ${response.statusText}`);
         }
         
-        const data = await response.json();
+        const data = await response.json() as any;
         
         this.credentials = {
             accessToken: data.access_token,
@@ -232,7 +232,7 @@ export class HanzoAuth extends EventEmitter {
         });
         
         if (response.ok) {
-            const user = await response.json();
+            const user = await response.json() as any;
             this.credentials.userId = user.id;
             this.credentials.email = user.email;
         }
@@ -253,7 +253,7 @@ export class HanzoAuth extends EventEmitter {
             throw new Error(`Failed to fetch API keys: ${response.statusText}`);
         }
         
-        const apiKeys = await response.json();
+        const apiKeys = await response.json() as any[];
         
         // Store API keys in settings (encrypted)
         const settings = this.loadSettings();
@@ -309,7 +309,7 @@ export class HanzoAuth extends EventEmitter {
                 throw new Error(`Failed to refresh token: ${response.statusText}`);
             }
             
-            const data = await response.json();
+            const data = await response.json() as any;
             
             this.credentials = {
                 ...this.credentials,

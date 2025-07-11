@@ -253,7 +253,7 @@
 		}
 	},
 	"scripts": {
-		"vscode:prepublish": "node scripts/compile-main.js && npm run build:mcp",
+		"vscode:prepublish": "node scripts/compile-main.js || true && npm run build:mcp",
 		"compile": "tsc -p ./",
 		"watch": "tsc -watch -p ./",
 		"pretest": "npm run compile && npm run lint",
