@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hanzo - AI Development Platform for Every Device</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #ff0080;
+            --secondary: #7928ca;
+            --dark: #000;
+            --darker: #0a0a0a;
+            --gray: #888;
+            --light-gray: #ccc;
+            --border: #222;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--dark);
+            color: #fff;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            padding: 20px 0;
+            position: fixed;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(20px);
+            z-index: 1000;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: var(--light-gray);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: #fff;
+        }
+        
+        .hero {
+            padding: 120px 0 80px;
+            text-align: center;
+            background: radial-gradient(circle at 50% 0%, #1a0033 0%, var(--dark) 50%);
+        }
+        
+        h1 {
+            font-size: 64px;
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff, var(--gray));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.1;
+        }
+        
+        .subtitle {
+            font-size: 24px;
+            color: var(--gray);
+            margin-bottom: 50px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 80px 0;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .download-card {
+            background: var(--darker);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .download-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            transform: scaleX(0);
+            transition: transform 0.3s;
+        }
+        
+        .download-card:hover {
+            transform: translateY(-5px);
+            border-color: #444;
+        }
+        
+        .download-card:hover::before {
+            transform: scaleX(1);
+        }
+        
+        .download-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            display: block;
+        }
+        
+        .download-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .download-desc {
+            color: var(--gray);
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .download-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: none;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 0, 128, 0.3);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 1px solid #333;
+        }
+        
+        .btn-secondary:hover {
+            border-color: #666;
+            background: #111;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+        
+        .platform-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #111;
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--gray);
+            margin-bottom: 15px;
+        }
+        
+        .feature-section {
+            padding: 80px 0;
+            background: #050505;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-top: 50px;
+        }
+        
+        .feature {
+            text-align: center;
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            display: block;
+        }
+        
+        .feature-title {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .feature-desc {
+            color: var(--gray);
+            font-size: 14px;
+        }
+        
+        .quickstart {
+            padding: 80px 0;
+            background: var(--dark);
+        }
+        
+        .quickstart-content {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .code-block {
+            background: var(--darker);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 14px;
+            text-align: left;
+            position: relative;
+            overflow-x: auto;
+        }
+        
+        .code-block::before {
+            content: attr(data-lang);
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 12px;
+            color: #666;
+            font-family: -apple-system, sans-serif;
+        }
+        
+        .code-comment {
+            color: #666;
+        }
+        
+        .code-string {
+            color: #0ff;
+        }
+        
+        .section-title {
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .section-subtitle {
+            font-size: 20px;
+            color: var(--gray);
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto 50px;
+        }
+        
+        footer {
+            padding: 60px 0 40px;
+            background: var(--dark);
+            border-top: 1px solid var(--border);
+        }
+        
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+        
+        .footer-section h4 {
+            margin-bottom: 20px;
+            color: #fff;
+        }
+        
+        .footer-links {
+            list-style: none;
+        }
+        
+        .footer-links li {
+            margin-bottom: 10px;
+        }
+        
+        .footer-links a {
+            color: var(--gray);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .footer-links a:hover {
+            color: #fff;
+        }
+        
+        .footer-bottom {
+            text-align: center;
+            color: #666;
+            padding-top: 40px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .coming-soon {
+            display: inline-block;
+            padding: 2px 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-size: 11px;
+            margin-left: 5px;
+            color: var(--gray);
+        }
+        
+        @media (max-width: 768px) {
+            h1 { font-size: 48px; }
+            .nav-links { display: none; }
+            .download-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">Hanzo</div>
+            <div class="nav-links">
+                <a href="https://docs.hanzo.ai">Docs</a>
+                <a href="https://github.com/hanzoai">GitHub</a>
+                <a href="https://cloud.hanzo.ai/login" class="btn btn-secondary btn-small">Login</a>
+            </div>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>AI Development<br>Everywhere You Code</h1>
+            <p class="subtitle">Access Hanzo's parallel AI agents from desktop, mobile, browser, IDE, or command line. One platform, endless possibilities.</p>
+        </div>
+    </section>
+
+    <section class="downloads">
+        <div class="container">
+            <div class="download-grid">
+                <!-- Desktop App -->
+                <div class="download-card">
+                    <span class="download-icon">🖥️</span>
+                    <h3 class="download-title">Desktop App</h3>
+                    <span class="platform-badge">Windows • macOS • Linux</span>
+                    <p class="download-desc">Native desktop experience with full system integration</p>
+                    <div class="download-buttons">
+                        <a href="https://github.com/hanzoai/desktop/releases/latest/download/hanzo-macos.dmg" class="btn btn-primary">
+                            <span>🍎</span> Download for macOS
+                        </a>
+                        <a href="https://github.com/hanzoai/desktop/releases/latest/download/hanzo-windows.exe" class="btn btn-secondary">
+                            <span>🪟</span> Windows
+                        </a>
+                        <a href="https://github.com/hanzoai/desktop/releases/latest/download/hanzo-linux.AppImage" class="btn btn-secondary">
+                            <span>🐧</span> Linux
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Mobile Apps -->
+                <div class="download-card">
+                    <span class="download-icon">📱</span>
+                    <h3 class="download-title">Mobile Apps</h3>
+                    <span class="platform-badge">iOS • Android</span>
+                    <p class="download-desc">AI assistance on the go with mobile optimization</p>
+                    <div class="download-buttons">
+                        <a href="https://apps.apple.com/app/hanzo-ai" class="btn btn-primary">
+                            <span>📱</span> App Store
+                        </a>
+                        <a href="https://play.google.com/store/apps/details?id=ai.hanzo.app" class="btn btn-secondary">
+                            <span>🤖</span> Google Play
+                        </a>
+                        <a href="https://hanzo.ai/mobile" class="btn btn-secondary">
+                            <span>🌐</span> Web App
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Browser Extension -->
+                <div class="download-card">
+                    <span class="download-icon">🌐</span>
+                    <h3 class="download-title">Browser Extension</h3>
+                    <span class="platform-badge">Chrome • Firefox • Edge • Safari</span>
+                    <p class="download-desc">AI assistance while browsing and researching</p>
+                    <div class="download-buttons">
+                        <a href="https://chrome.google.com/webstore/detail/hanzo-ai" class="btn btn-primary">
+                            <span>🔵</span> Chrome Web Store
+                        </a>
+                        <a href="https://addons.mozilla.org/addon/hanzo-ai" class="btn btn-secondary">
+                            <span>🦊</span> Firefox
+                        </a>
+                        <a href="https://microsoftedge.microsoft.com/addons/detail/hanzo-ai" class="btn btn-secondary">
+                            <span>🔷</span> Edge
+                        </a>
+                    </div>
+                </div>
+
+                <!-- VS Code Extension -->
+                <div class="download-card">
+                    <span class="download-icon">💻</span>
+                    <h3 class="download-title">VS Code Extension</h3>
+                    <span class="platform-badge">Visual Studio Code</span>
+                    <p class="download-desc">Deep IDE integration with IntelliSense support</p>
+                    <div class="download-buttons">
+                        <a href="vscode:extension/hanzo-ai.hanzo-ai" class="btn btn-primary">
+                            <span>⚡</span> Install in VS Code
+                        </a>
+                        <a href="https://marketplace.visualstudio.com/items?itemName=hanzo-ai.hanzo-ai" class="btn btn-secondary">
+                            <span>🛍️</span> Marketplace
+                        </a>
+                        <a href="https://github.com/hanzoai/extension/releases/latest/download/hanzo-ai.vsix" class="btn btn-secondary">
+                            <span>📦</span> Download VSIX
+                        </a>
+                    </div>
+                </div>
+
+                <!-- JetBrains Plugin -->
+                <div class="download-card">
+                    <span class="download-icon">🧩</span>
+                    <h3 class="download-title">JetBrains Plugin</h3>
+                    <span class="platform-badge">IntelliJ • PyCharm • WebStorm</span>
+                    <p class="download-desc">Full JetBrains IDE integration</p>
+                    <div class="download-buttons">
+                        <a href="https://plugins.jetbrains.com/plugin/12345-hanzo-ai" class="btn btn-primary">
+                            <span>🔌</span> Install Plugin
+                        </a>
+                        <a href="https://github.com/hanzoai/extension/releases/latest/download/hanzo-jetbrains.zip" class="btn btn-secondary">
+                            <span>📦</span> Download ZIP
+                        </a>
+                    </div>
+                </div>
+
+                <!-- CLI Tool -->
+                <div class="download-card">
+                    <span class="download-icon">⌨️</span>
+                    <h3 class="download-title">Dev CLI</h3>
+                    <span class="platform-badge">Terminal • Command Line</span>
+                    <p class="download-desc">Powerful CLI for automation and scripting</p>
+                    <div class="download-buttons">
+                        <button class="btn btn-primary" onclick="copyCommand('npm install -g @hanzo/dev')">
+                            <span>📋</span> npm install -g @hanzo/dev
+                        </button>
+                        <button class="btn btn-secondary" onclick="copyCommand('brew install hanzo-dev')">
+                            <span>🍺</span> brew install
+                        </button>
+                        <a href="https://github.com/hanzoai/extension#cli" class="btn btn-secondary">
+                            <span>📚</span> CLI Docs
+                        </a>
+                    </div>
+                </div>
+
+                <!-- MCP Server -->
+                <div class="download-card">
+                    <span class="download-icon">🔧</span>
+                    <h3 class="download-title">MCP Server</h3>
+                    <span class="platform-badge">Model Context Protocol</span>
+                    <p class="download-desc">Use with Claude Desktop and MCP-compatible tools</p>
+                    <div class="download-buttons">
+                        <button class="btn btn-primary" onclick="copyCommand('npm install -g @hanzo/mcp')">
+                            <span>📋</span> npm install -g @hanzo/mcp
+                        </button>
+                        <button class="btn btn-secondary" onclick="copyCommand('npx @hanzo/mcp configure')">
+                            <span>⚙️</span> Configure
+                        </button>
+                        <a href="https://docs.hanzo.ai/mcp" class="btn btn-secondary">
+                            <span>📚</span> MCP Docs
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Cloud Platform -->
+                <div class="download-card">
+                    <span class="download-icon">☁️</span>
+                    <h3 class="download-title">Cloud Platform</h3>
+                    <span class="platform-badge">Web • API • Teams</span>
+                    <p class="download-desc">Web-based access with team collaboration</p>
+                    <div class="download-buttons">
+                        <a href="https://cloud.hanzo.ai" class="btn btn-primary">
+                            <span>🚀</span> Launch Cloud App
+                        </a>
+                        <a href="https://cloud.hanzo.ai/signup" class="btn btn-secondary">
+                            <span>✨</span> Start Free Trial
+                        </a>
+                        <a href="https://docs.hanzo.ai/api" class="btn btn-secondary">
+                            <span>🔌</span> API Docs
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Additional Platforms -->
+                <div class="download-card">
+                    <span class="download-icon">✨</span>
+                    <h3 class="download-title">More Platforms</h3>
+                    <span class="platform-badge">Coming Soon</span>
+                    <p class="download-desc">Expanding to more platforms</p>
+                    <div class="download-buttons">
+                        <button class="btn btn-secondary" disabled>
+                            <span>📝</span> Cursor <span class="coming-soon">Soon</span>
+                        </button>
+                        <button class="btn btn-secondary" disabled>
+                            <span>🌊</span> Windsurf <span class="coming-soon">Soon</span>
+                        </button>
+                        <button class="btn btn-secondary" disabled>
+                            <span>✏️</span> Sublime <span class="coming-soon">Soon</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="quickstart">
+        <div class="container">
+            <div class="quickstart-content">
+                <h2 class="section-title">Quick Start in 30 Seconds</h2>
+                <p class="section-subtitle">Choose your preferred method and start shipping faster</p>
+                
+                <div class="code-block" data-lang="bash">
+                    <span class="code-comment"># Option 1: CLI (Recommended)</span>
+                    npm install -g @hanzo/dev
+                    dev login
+                    dev enhance <span class="code-string">"add user authentication"</span>
+                    
+                    <span class="code-comment"># Option 2: MCP Server for Claude Desktop</span>
+                    npm install -g @hanzo/mcp
+                    npx @hanzo/mcp configure
+                    
+                    <span class="code-comment"># Option 3: Cloud Platform</span>
+                    <span class="code-comment"># Visit cloud.hanzo.ai and sign up</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="feature-section">
+        <div class="container">
+            <h2 class="section-title">One Platform, Every Device</h2>
+            <p class="section-subtitle">Access the same powerful AI capabilities anywhere you work</p>
+            
+            <div class="feature-grid">
+                <div class="feature">
+                    <span class="feature-icon">⚡</span>
+                    <h3 class="feature-title">Parallel AI Agents</h3>
+                    <p class="feature-desc">Run 100+ AI agents simultaneously for instant results</p>
+                </div>
+                
+                <div class="feature">
+                    <span class="feature-icon">🧠</span>
+                    <h3 class="feature-title">Unified Memory</h3>
+                    <p class="feature-desc">Your entire codebase indexed and accessible</p>
+                </div>
+                
+                <div class="feature">
+                    <span class="feature-icon">🔄</span>
+                    <h3 class="feature-title">Cross-Device Sync</h3>
+                    <p class="feature-desc">Seamless experience across all your devices</p>
+                </div>
+                
+                <div class="feature">
+                    <span class="feature-icon">🤖</span>
+                    <h3 class="feature-title">200+ AI Models</h3>
+                    <p class="feature-desc">Access every major AI model through one interface</p>
+                </div>
+                
+                <div class="feature">
+                    <span class="feature-icon">🔧</span>
+                    <h3 class="feature-title">4000+ MCP Tools</h3>
+                    <p class="feature-desc">File ops, search, browser automation, and more</p>
+                </div>
+                
+                <div class="feature">
+                    <span class="feature-icon">👥</span>
+                    <h3 class="feature-title">Team Collaboration</h3>
+                    <p class="feature-desc">Share context and work together efficiently</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Products</h4>
+                    <ul class="footer-links">
+                        <li><a href="https://github.com/hanzoai/desktop">Desktop App</a></li>
+                        <li><a href="https://hanzo.ai/mobile">Mobile Apps</a></li>
+                        <li><a href="https://marketplace.visualstudio.com/items?itemName=hanzo-ai.hanzo-ai">VS Code Extension</a></li>
+                        <li><a href="https://cloud.hanzo.ai">Cloud Platform</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Developers</h4>
+                    <ul class="footer-links">
+                        <li><a href="https://docs.hanzo.ai">Documentation</a></li>
+                        <li><a href="https://docs.hanzo.ai/api">API Reference</a></li>
+                        <li><a href="https://github.com/hanzoai">GitHub</a></li>
+                        <li><a href="https://status.hanzo.ai">Status</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Company</h4>
+                    <ul class="footer-links">
+                        <li><a href="https://hanzo.ai/about">About</a></li>
+                        <li><a href="https://hanzo.ai/blog">Blog</a></li>
+                        <li><a href="https://hanzo.ai/careers">Careers</a></li>
+                        <li><a href="https://hanzo.ai/contact">Contact</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Support</h4>
+                    <ul class="footer-links">
+                        <li><a href="https://discord.gg/hanzoai">Discord Community</a></li>
+                        <li><a href="https://github.com/hanzoai/extension/issues">Report Issues</a></li>
+                        <li><a href="https://docs.hanzo.ai/faq">FAQ</a></li>
+                        <li><a href="mailto:support@hanzo.ai">Email Support</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 Hanzo AI. Ship faster on every platform.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function copyCommand(command) {
+            navigator.clipboard.writeText(command).then(() => {
+                const btn = event.target.closest('.btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span>✅</span> Copied!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+        
+        // Add smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+        
+        // Add animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -100px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+        
+        document.querySelectorAll('.download-card, .feature').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            el.style.transition = 'opacity 0.6s, transform 0.6s';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
