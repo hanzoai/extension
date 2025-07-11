@@ -1,0 +1,53 @@
+name: Deploy Landing Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'landing.html'
+      - 'hanzo-app.html'
+      - '.github/workflows/deploy-landing.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Vercel CLI
+        run: npm install -g vercel
+      
+      - name: Prepare deployment directory
+        run: |
+          mkdir -p deploy
+          cp hanzo-app.html deploy/index.html
+          cp landing.html deploy/dev.html
+          
+          # Create vercel.json
+          cat > deploy/vercel.json << EOF
+          {
+            "rewrites": [
+              { "source": "/dev", "destination": "/dev.html" },
+              { "source": "/", "destination": "/index.html" }
+            ],
+            "headers": [
+              {
+                "source": "/(.*)",
+                "headers": [
+                  { "key": "X-Content-Type-Options", "value": "nosniff" },
+                  { "key": "X-Frame-Options", "value": "DENY" },
+                  { "key": "X-XSS-Protection", "value": "1; mode=block" }
+                ]
+              }
+            ]
+          }
+          EOF
+      
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          cd deploy
+          vercel --prod --token $VERCEL_TOKEN

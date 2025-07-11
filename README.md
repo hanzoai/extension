@@ -266,9 +266,34 @@ Dev automatically assigns the right AI tool for each role:
 - **Git worktree support** for conflict-free development
 - **Framework-aware** code generation
 
+## 🌐 Landing Pages
+
+### hanzo.app - Download Hub
+Access Hanzo from any platform:
+- **Desktop Apps**: Windows, macOS, Linux
+- **Mobile Apps**: iOS, Android
+- **Browser Extensions**: Chrome, Firefox, Edge, Safari  
+- **IDE Extensions**: VS Code, JetBrains
+- **CLI Tools**: Dev CLI, MCP Server
+- **Cloud Platform**: cloud.hanzo.ai
+
+Visit [hanzo.app](https://hanzo.app) to download.
+
+### Local Preview
+```bash
+npm run preview
+# Visit http://localhost:3000
+```
+
+### Deployment
+```bash
+npm run deploy         # Deploy to production
+npm run deploy:preview # Deploy preview
+```
+
 ## 🔗 Links
 
-🚀 **[Login to Hanzo AI](https://iam.hanzo.ai)** | 🌐 **[Hanzo AI](https://hanzo.ai)** | 📖 **[Docs](https://docs.hanzo.ai)** | 💬 **[Discord](https://discord.gg/hanzoai)**
+🚀 **[Login to Hanzo AI](https://iam.hanzo.ai)** | 🌐 **[Hanzo AI](https://hanzo.ai)** | 📖 **[Docs](https://docs.hanzo.ai)** | 💬 **[Discord](https://discord.gg/hanzoai)** | 📱 **[Download Apps](https://hanzo.app)**
 
 ---
 
