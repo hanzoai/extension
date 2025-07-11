@@ -1,33 +1,29 @@
-# Dev - Ship 10x Faster with Parallel AI Intelligence 🚀
+# Dev - Ship Up to 100X Faster with Parallel AI Agents 🚀
 
 [![VS Code Extension CI/CD](https://github.com/hanzoai/dev/workflows/VS%20Code%20Extension%20CI%2FCD/badge.svg)](https://github.com/hanzoai/dev/actions/workflows/vscode-extension.yml)
 [![JetBrains Plugin CI/CD](https://github.com/hanzoai/dev/workflows/JetBrains%20Plugin%20CI%2FCD/badge.svg)](https://github.com/hanzoai/dev/actions/workflows/jetbrains-plugin.yml)
 
-**While your competition fights with AI context limits, you ship production-ready features.**
+**Run multiple AI agents in parallel. Zero wait time. Instant results.**
 
-Dev orchestrates multiple AIs in parallel with unified memory across your entire codebase. No more context loss. No more hallucinated imports. Just working code, delivered fast. 
+Dev orchestrates unlimited AI agents working simultaneously with unified memory across your entire codebase. 
 
-## 🎯 Why Dev Wins
+## 🚀 What Makes Dev Fast
 
-### ⚡ **5x Faster Development**
-- **Parallel AI Execution** - 5+ AIs working simultaneously on different parts
-- **Git Worktrees** - Conflict-free parallel development
-- **Automatic Task Distribution** - Optimal AI for each subtask
+### ⚡ **Parallel Agent Execution**
+- Run 10, 50, or 100+ AI agents simultaneously
+- Each agent in isolated git worktrees
+- No sequential waiting - everything runs in parallel
 
-### 🧠 **Zero Context Loss**
-- **Unified Memory** - Entire codebase indexed and searchable
-- **Persistent Context** - Remembers everything across sessions
-- **Cross-file Intelligence** - Understands your project relationships
+### 🧠 **Unified Memory Architecture**
+- Entire codebase indexed and instantly searchable
+- Persistent context across all sessions
+- Cross-file intelligence and relationship mapping
 
-### ✅ **98% Accuracy**
-- **Consensus Mode** - Multiple AIs verify each suggestion
-- **Import Verification** - Only uses components that actually exist
-- **Framework Aware** - Knows React, Next.js, Vue, Flutter patterns
-
-### 💰 **Real ROI**
-- **Save 25+ hours/month** per developer
-- **73% fewer bugs** with AI consensus validation
-- **$2,000+/month** productivity gains per developer
+### 🔗 **Cloud.Hanzo.AI Integration**
+- Login and subscribe at cloud.hanzo.ai
+- Access your enabled LLMs and MCP servers
+- Use cloud-indexed repos and data
+- Unified billing and usage tracking
 
 ## 🚀 Quick Start - Get Running in 2 Minutes
 
@@ -78,8 +74,8 @@ dev enhance "Add JWT auth with refresh tokens"
 #    - AI 4: Writes tests
 #    - AI 5: Updates docs
 # 4. Consensus validation (10 sec)
-# 5. You review working PR (2 min)
-# Total: 5 minutes vs 2 hours
+# 5. You review PR
+# Significantly faster than traditional workflows
 ```
 
 ## 📦 Installation Options
@@ -262,24 +258,13 @@ Dev automatically assigns the right AI tool for each role:
 - **OpenHands** - Autonomous feature implementation
 - **Local LLMs** - Privacy-sensitive tasks, rapid iteration
 
-## 💬 What Developers Say
+## 🚀 Key Capabilities
 
-> "**Cut our release cycle from 6 weeks to 1 week.** Dev's parallel execution is a game-changer. It's like having a team of senior devs who never sleep."
-> — *Sarah Chen, CTO at TechFlow (YC S22)*
-
-> "**Our junior devs now outperform seniors from 6 months ago.** The unified memory means they have the entire codebase context instantly."
-> — *Marcus Johnson, VP Engineering at ScaleUp*
-
-> "**Reduced bug rate by 73%.** When multiple AIs review every change before commit, nothing slips through. Best investment we've made."
-> — *Alex Rivera, Lead Developer at FinanceOS*
-
-## 📊 Proven Results
-
-- **10x faster** feature delivery (average across 50+ teams)
-- **73% fewer bugs** with consensus validation
-- **$24K annual savings** per developer
-- **2 hours → 12 minutes** for complex features
-- **890% ROI** in first 90 days
+- **Up to 100x faster** with parallel AI execution
+- **Multiple AI models** working simultaneously
+- **Unified memory** across your entire codebase
+- **Git worktree support** for conflict-free development
+- **Framework-aware** code generation
 
 ## 🔗 Links
 
