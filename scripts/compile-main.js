@@ -3,9 +3,12 @@ const fs = require('fs');
 
 console.log('Compiling main source files (excluding tests)...');
 
+// Use CI config if in CI environment
+const baseConfig = process.env.CI ? "./tsconfig.ci.json" : "./tsconfig.json";
+
 // Create a temporary tsconfig that excludes tests
 const tempConfig = {
-    extends: "./tsconfig.json",
+    extends: baseConfig,
     exclude: [
         "node_modules",
         ".vscode-test",
