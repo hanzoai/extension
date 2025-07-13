@@ -267,6 +267,9 @@
 		"test:mcp-proxy": "cross-env MOCHA_TEST_FILE=\"MCP.*Proxy Test\" node ./out/test/runTest.js",
 		"test:mcp-integration": "cross-env MOCHA_TEST_FILE=\"MCP Proxy Integration\" node ./out/test/runTest.js",
 		"test:coverage": "c8 npm test",
+		"test:vitest": "vitest",
+		"test:vitest:coverage": "vitest --coverage",
+		"test:vitest:run": "vitest run --coverage",
 		"build:mcp": "node scripts/build-mcp-standalone.js",
 		"build:claude-desktop": "npm run build:mcp && node scripts/build-claude-desktop.js",
 		"build": "node scripts/compile-main.js && npm run build:mcp",
@@ -303,6 +306,7 @@
 		"@types/ws": "^8.18.1",
 		"@typescript-eslint/eslint-plugin": "^6.7.0",
 		"@typescript-eslint/parser": "^6.21.0",
+		"@vitest/coverage-v8": "^0.34.6",
 		"@vscode/test-electron": "^2.3.8",
 		"@vscode/vsce": "^2.24.0",
 		"archiver": "^7.0.1",
@@ -315,7 +319,8 @@
 		"mocha": "^11.0.1",
 		"node-fetch": "^3.3.2",
 		"sinon": "^21.0.0",
-		"typescript": "^5.2.2"
+		"typescript": "^5.2.2",
+		"vitest": "^0.34.6"
 	},
 	"dependencies": {
 		"@lancedb/lancedb": "^0.21.0",
