@@ -37,26 +37,35 @@
         }
         
         .logo {
-            font-size: 24px;
-            font-weight: bold;
-            background: linear-gradient(135deg, #ff0080, #7928ca);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logo img {
+            height: 28px;
+            width: auto;
+            filter: invert(1);
+        }
+        
+        .logo-text {
+            font-size: 20px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: -0.5px;
         }
         
         .hero {
             padding: 150px 0 100px;
             text-align: center;
-            background: radial-gradient(circle at center, #1a0033 0%, #000 100%);
+            background: radial-gradient(circle at center, #111 0%, #000 70%);
         }
         
         h1 {
             font-size: 72px;
             font-weight: 900;
             margin-bottom: 20px;
-            background: linear-gradient(135deg, #fff, #888);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #fff;
             line-height: 1.1;
         }
         
@@ -85,13 +94,15 @@
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #ff0080, #7928ca);
-            color: white;
+            background: #fff;
+            color: #000;
+            font-weight: 700;
         }
         
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(255, 0, 128, 0.3);
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
+            background: #f0f0f0;
         }
         
         .btn-secondary {
@@ -128,19 +139,19 @@
             border-radius: 50%;
         }
         
-        .dot-red { background: #ff5f56; }
-        .dot-yellow { background: #ffbd2e; }
-        .dot-green { background: #27c93f; }
+        .dot-red { background: #666; }
+        .dot-yellow { background: #888; }
+        .dot-green { background: #aaa; }
         
         .terminal-content {
-            color: #0f0;
+            color: #fff;
             font-size: 14px;
             line-height: 1.8;
         }
         
-        .terminal-prompt { color: #888; }
+        .terminal-prompt { color: #666; }
         .terminal-command { color: #fff; }
-        .terminal-output { color: #0ff; margin-left: 20px; }
+        .terminal-output { color: #aaa; margin-left: 20px; }
         
         .features {
             padding: 100px 0;
@@ -264,7 +275,8 @@
             top: -15px;
             left: 50%;
             transform: translateX(-50%);
-            background: linear-gradient(135deg, #ff0080, #7928ca);
+            background: #fff;
+            color: #000;
             padding: 5px 20px;
             border-radius: 20px;
             font-size: 12px;
@@ -328,7 +340,10 @@
 <body>
     <header>
         <nav class="container">
-            <div class="logo">Dev</div>
+            <div class="logo">
+                <img src="https://hanzo.ai/logo.svg" alt="Hanzo Logo" />
+                <span class="logo-text">Dev</span>
+            </div>
             <div>
                 <a href="https://cloud.hanzo.ai/login" class="btn btn-secondary">Login</a>
             </div>

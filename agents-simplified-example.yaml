@@ -1,0 +1,103 @@
+version: 1
+swarm:
+  name: "Simplified Agent Network"
+  main: "coordinator"
+  
+  # Shared MCP servers available to ALL agents
+  shared_mcps:
+    github:
+      enabled: true
+      token: "${GITHUB_TOKEN}"  # From environment
+    linear:
+      enabled: true
+      apiKey: "${LINEAR_API_KEY}"
+    slack:
+      enabled: true
+      token: "${SLACK_TOKEN}"
+    playwright:
+      enabled: true
+      headless: true
+    custom:
+      - name: "postgres"
+        type: "stdio"
+        command: "npx"
+        args: ["-y", "@modelcontextprotocol/server-postgres"]
+        env:
+          DATABASE_URL: "${DATABASE_URL}"
+  
+  instances:
+    coordinator:
+      description: "Main coordinator using Hanzo Zen"
+      directory: "."
+      model: "zen"
+      expose_as_mcp: true
+      mcp_port: 30000
+      prompt: |
+        # Coordinator
+        
+        You coordinate work between agents. Each agent is available as a single tool.
+        Just call them by name with your request. They can recursively call others.
+        
+        You also have access to:
+        - GitHub MCP for issues, PRs, code
+        - Linear MCP for project management
+        - Slack MCP for team communication
+        - Playwright MCP for web automation
+        - All standard Hanzo tools (read_file, write_file, search, bash)
+        
+        Example: To ask the developer something, use the "developer" tool with your request.
+    
+    architect:
+      description: "System architect"
+      directory: "./architecture"
+      model: "opus"
+      expose_as_mcp: true
+      mcp_port: 30001
+      prompt: |
+        # Architect
+        
+        You design systems. You can call other agents by name.
+        All shared MCP tools are available to you.
+    
+    developer:
+      description: "Implementation specialist"
+      directory: "./src"
+      model: "sonnet"
+      expose_as_mcp: true
+      mcp_port: 30002
+      prompt: |
+        # Developer
+        
+        You implement code. You can call other agents for help.
+        Use GitHub MCP to manage code, Linear for tasks, etc.
+    
+    reviewer:
+      description: "Code reviewer"
+      directory: "."
+      model: "haiku"
+      expose_as_mcp: true
+      mcp_port: 30003
+      prompt: |
+        # Reviewer
+        
+        You review code and provide feedback.
+        Call other agents as needed. Use all available MCP tools.
+  
+  networks:
+    all:
+      name: "All Agents"
+      agents: ["coordinator", "architect", "developer", "reviewer"]
+      mcp_enabled: true
+      description: "Every agent sees every other agent as a single tool"
+
+# Usage:
+# 1. Set environment variables for tokens:
+#    export GITHUB_TOKEN="your-token"
+#    export LINEAR_API_KEY="your-key"
+#    export SLACK_TOKEN="your-token"
+#
+# 2. Run a task:
+#    dev swarm run "create GitHub issue for new feature" --peer
+#
+# The coordinator will have tools: architect, developer, reviewer, github, linear, slack, playwright, read_file, write_file, search, bash
+# Each agent can call any other agent recursively by name

@@ -1,0 +1,111 @@
+version: 1
+swarm:
+  name: "Agent Chat Demo"
+  main: "coordinator"
+  instances:
+    coordinator:
+      description: "Coordinator that gathers information from all team members"
+      directory: "."
+      model: "opus"
+      expose_as_mcp: true
+      connect_to_agents: ["analyst", "developer", "tester"]
+      vibe: true
+      prompt: |
+        # Coordinator Agent
+        
+        You coordinate information gathering and decision making.
+        
+        When given a task:
+        1. First check the status of all team members
+        2. Ask relevant questions to gather information
+        3. Have conversations to clarify requirements
+        4. Synthesize responses into a cohesive plan
+        
+        Use these MCP tools actively:
+        - get_[agent]_status to check availability
+        - ask_[agent] for specific information
+        - chat_with_[agent] for discussions
+        - request_[agent]_expertise for deep knowledge
+        
+        Always engage in dialogue before making decisions.
+      allowed_tools: ["Read", "chat_with_*", "ask_*", "get_*_status", "request_*_expertise"]
+    
+    analyst:
+      description: "Business analyst who understands requirements and constraints"
+      directory: "./docs"
+      model: "sonnet"
+      expose_as_mcp: true
+      connect_to_agents: ["coordinator", "developer", "tester"]
+      prompt: |
+        # Business Analyst
+        
+        You analyze requirements and provide business context.
+        
+        When asked:
+        - Provide clear requirement definitions
+        - Explain business constraints
+        - Suggest user stories
+        - Clarify acceptance criteria
+        
+        Be conversational and ask clarifying questions.
+      allowed_tools: ["Read", "Write", "chat_with_*", "ask_*"]
+    
+    developer:
+      description: "Senior developer who implements solutions"
+      directory: "./src"
+      model: "sonnet"
+      expose_as_mcp: true
+      connect_to_agents: ["coordinator", "analyst", "tester"]
+      prompt: |
+        # Senior Developer
+        
+        You implement technical solutions.
+        
+        When engaged:
+        - Discuss technical feasibility
+        - Suggest implementation approaches
+        - Estimate effort and complexity
+        - Identify technical risks
+        
+        Chat with analyst for requirements clarification.
+        Coordinate with tester for testability.
+      allowed_tools: ["Read", "Edit", "Write", "Bash", "chat_with_*", "ask_*"]
+    
+    tester:
+      description: "QA engineer ensuring quality and test coverage"
+      directory: "./tests"
+      model: "haiku"
+      expose_as_mcp: true
+      connect_to_agents: ["coordinator", "analyst", "developer"]
+      prompt: |
+        # QA Engineer
+        
+        You ensure quality through testing.
+        
+        In conversations:
+        - Suggest test scenarios
+        - Identify edge cases
+        - Recommend testing approaches
+        - Point out potential issues
+        
+        Ask developer about implementation details.
+        Clarify requirements with analyst.
+      allowed_tools: ["Read", "Edit", "Write", "Bash", "chat_with_*", "ask_*"]
+  
+  networks:
+    all_connected:
+      name: "Fully Connected Team"
+      agents: ["coordinator", "analyst", "developer", "tester"]
+      mcp_enabled: true
+      shared_tools: ["Read"]
+
+# Example task to demonstrate chat capabilities:
+# dev swarm run "Plan a user authentication feature" -c agent-chat-demo.yaml
+#
+# The coordinator will:
+# 1. Check status of all team members
+# 2. Ask analyst about requirements
+# 3. Chat with developer about implementation
+# 4. Discuss testing strategy with tester
+# 5. Have follow-up conversations as needed
+# 6. Synthesize everything into a plan

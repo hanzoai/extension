@@ -8,12 +8,12 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         :root {
-            --primary: #ff0080;
-            --secondary: #7928ca;
+            --primary: #fff;
+            --secondary: #fff;
             --dark: #000;
             --darker: #0a0a0a;
-            --gray: #888;
-            --light-gray: #ccc;
+            --gray: #666;
+            --light-gray: #aaa;
             --border: #222;
         }
         
@@ -48,11 +48,22 @@
         }
         
         .logo {
-            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logo img {
+            height: 32px;
+            width: auto;
+            filter: invert(1);
+        }
+        
+        .logo-text {
+            font-size: 24px;
             font-weight: 900;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #fff;
+            letter-spacing: -0.5px;
         }
         
         .nav-links {
@@ -74,16 +85,14 @@
         .hero {
             padding: 120px 0 80px;
             text-align: center;
-            background: radial-gradient(circle at 50% 0%, #1a0033 0%, var(--dark) 50%);
+            background: radial-gradient(circle at 50% 0%, #111 0%, var(--dark) 70%);
         }
         
         h1 {
             font-size: 64px;
             font-weight: 900;
             margin-bottom: 20px;
-            background: linear-gradient(135deg, #fff, var(--gray));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #fff;
             line-height: 1.1;
         }
         
@@ -123,8 +132,8 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 3px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            height: 1px;
+            background: #fff;
             transform: scaleX(0);
             transition: transform 0.3s;
         }
@@ -178,13 +187,15 @@
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
+            background: #fff;
+            color: #000;
+            font-weight: 700;
         }
         
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(255, 0, 128, 0.3);
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
+            background: #f0f0f0;
         }
         
         .btn-secondary {
@@ -260,13 +271,16 @@
             background: var(--darker);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 25px;
-            margin: 30px 0;
+            padding: 30px;
+            margin: 40px auto;
             font-family: 'Monaco', 'Consolas', monospace;
             font-size: 14px;
             text-align: left;
             position: relative;
             overflow-x: auto;
+            line-height: 1.6;
+            color: #fff;
+            max-width: 600px;
         }
         
         .code-block::before {
@@ -284,7 +298,7 @@
         }
         
         .code-string {
-            color: #0ff;
+            color: #ccc;
         }
         
         .section-title {
@@ -364,7 +378,10 @@
 <body>
     <header>
         <nav class="container">
-            <div class="logo">Hanzo</div>
+            <div class="logo">
+                <img src="https://hanzo.ai/logo.svg" alt="Hanzo Logo" />
+                <span class="logo-text">Hanzo</span>
+            </div>
             <div class="nav-links">
                 <a href="https://docs.hanzo.ai">Docs</a>
                 <a href="https://github.com/hanzoai">GitHub</a>
@@ -376,7 +393,7 @@
     <section class="hero">
         <div class="container">
             <h1>AI Development<br>Everywhere You Code</h1>
-            <p class="subtitle">Access Hanzo's parallel AI agents from desktop, mobile, browser, IDE, or command line. One platform, endless possibilities.</p>
+            <p class="subtitle">Access Hanzo's parallel AI agents from desktop, mobile, browser, IDE, or command line. Powered by Hanzo Zen for cost-effective local orchestration.</p>
         </div>
     </section>
 
@@ -561,16 +578,16 @@
                 <p class="section-subtitle">Choose your preferred method and start shipping faster</p>
                 
                 <div class="code-block" data-lang="bash">
-                    <span class="code-comment"># Option 1: CLI (Recommended)</span>
-                    npm install -g @hanzo/dev
-                    dev login
-                    dev enhance <span class="code-string">"add user authentication"</span>
-                    
-                    <span class="code-comment"># Option 2: MCP Server for Claude Desktop</span>
-                    npm install -g @hanzo/mcp
-                    npx @hanzo/mcp configure
-                    
-                    <span class="code-comment"># Option 3: Cloud Platform</span>
+                    <span class="code-comment"># Option 1: CLI (Recommended)</span><br>
+                    npm install -g @hanzo/dev<br>
+                    dev login<br>
+                    dev enhance <span class="code-string">"add user authentication"</span><br>
+                    <br>
+                    <span class="code-comment"># Option 2: MCP Server for Claude Desktop</span><br>
+                    npm install -g @hanzo/mcp<br>
+                    npx @hanzo/mcp configure<br>
+                    <br>
+                    <span class="code-comment"># Option 3: Cloud Platform</span><br>
                     <span class="code-comment"># Visit cloud.hanzo.ai and sign up</span>
                 </div>
             </div>
@@ -614,9 +631,61 @@
                 </div>
                 
                 <div class="feature">
+                    <span class="feature-icon">💰</span>
+                    <h3 class="feature-title">Hanzo Zen Local AI</h3>
+                    <p class="feature-desc">Cost-effective local MoE model for orchestration. Run on laptop or mobile.</p>
+                </div>
+                
+                <div class="feature">
+                    <span class="feature-icon">🌐</span>
+                    <h3 class="feature-title">Peer Agent Networks</h3>
+                    <p class="feature-desc">All agents can recursively call each other with full MCP support</p>
+                </div>
+                
+                <div class="feature">
                     <span class="feature-icon">👥</span>
                     <h3 class="feature-title">Team Collaboration</h3>
                     <p class="feature-desc">Share context and work together efficiently</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="feature-section" style="background: var(--darker);">
+        <div class="container">
+            <h2 class="section-title">Cost-Effective AI Orchestration</h2>
+            <p class="section-subtitle">Hanzo Zen: Local MoE model for intelligent agent coordination</p>
+            
+            <div style="max-width: 800px; margin: 50px auto; text-align: center;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-top: 40px;">
+                    <div style="padding: 30px; background: var(--dark); border-radius: 12px; border: 1px solid var(--border);">
+                        <h3 style="font-size: 48px; margin-bottom: 10px; color: #fff;">90%</h3>
+                        <p style="color: var(--gray);">Cost reduction using local Zen for orchestration</p>
+                    </div>
+                    <div style="padding: 30px; background: var(--dark); border-radius: 12px; border: 1px solid var(--border);">
+                        <h3 style="font-size: 48px; margin-bottom: 10px; color: #fff;">∞</h3>
+                        <p style="color: var(--gray);">Recursive agent calls with full MCP support</p>
+                    </div>
+                    <div style="padding: 30px; background: var(--dark); border-radius: 12px; border: 1px solid var(--border);">
+                        <h3 style="font-size: 48px; margin-bottom: 10px; color: #fff;">1B-1T</h3>
+                        <p style="color: var(--gray);">Scalable from edge to exascale deployment</p>
+                    </div>
+                </div>
+                
+                <div class="code-block" data-lang="yaml" style="margin-top: 40px;">
+                    <span class="code-comment"># Peer network with Hanzo Zen orchestration</span><br>
+                    swarm:<br>
+                    &nbsp;&nbsp;network_type: peer<br>
+                    &nbsp;&nbsp;local_llm:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;model: hanzo-zen<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;endpoint: http://localhost:8080<br>
+                    &nbsp;&nbsp;instances:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;orchestrator:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;model: zen <span class="code-comment"># Local, cost-effective</span><br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connect_to_agents: [architect, developer, reviewer]<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;architect:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;model: opus <span class="code-comment"># API-based for complex tasks</span><br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expose_as_mcp: true
                 </div>
             </div>
         </div>
