@@ -531,6 +531,307 @@ program
             })
     );
 
+// Swarm command - manage agent swarms
+program
+    .command('swarm')
+    .description('Manage AI agent swarms for complex multi-agent workflows')
+    .addCommand(
+        new Command('init')
+            .description('Initialize a new agent swarm configuration')
+            .option('-p, --path <path>', 'Path for the configuration file', '.hanzo/agents.yaml')
+            .option('--peer-network', 'Initialize as peer network with Hanzo Zen main loop')
+            .action(async (options) => {
+                const spinner = ora('Initializing agent swarm configuration...').start();
+                
+                try {
+                    const { AgentSwarmManager } = await import('../cli-tools/config/agent-swarm-config');
+                    
+                    if (options.peerNetwork) {
+                        // Create peer network configuration
+                        await AgentSwarmManager.initPeerNetworkConfig(options.path);
+                        spinner.succeed('Peer network configuration initialized with Hanzo Zen!');
+                        console.log(chalk.cyan('Using Hanzo Zen for cost-effective local orchestration'));
+                    } else {
+                        await AgentSwarmManager.initConfig(options.path);
+                        spinner.succeed('Agent swarm configuration initialized!');
+                    }
+                    
+                    console.log(chalk.gray(`Edit the configuration file to customize your agent swarm.`));
+                } catch (error) {
+                    spinner.fail(`Failed to initialize: ${error.message}`);
+                    process.exit(1);
+                }
+            })
+    )
+    .addCommand(
+        new Command('run <task>')
+            .description('Run a task with the configured agent swarm')
+            .option('-c, --config <path>', 'Path to agent configuration file')
+            .option('--peer', 'Run as peer network with Hanzo Zen orchestration')
+            .option('--critic', 'Include critic analysis in results')
+            .option('--local-llm <endpoint>', 'Local LLM endpoint', 'http://localhost:8080')
+            .action(async (task, options) => {
+                const spinner = ora('Starting agent swarm...').start();
+                
+                try {
+                    if (options.peer) {
+                        // Use peer network with local Hanzo Zen
+                        const { PeerAgentNetwork } = await import('../cli-tools/orchestration/peer-agent-network');
+                        
+                        const network = new PeerAgentNetwork({
+                            mainLoopLLM: {
+                                model: 'hanzo-zen',
+                                endpoint: options.localLlm
+                            },
+                            enableRecursiveCalls: true,
+                            maxRecursionDepth: 10,
+                            costOptimization: true
+                        });
+                        
+                        await network.initialize();
+                        spinner.succeed('Peer network initialized with Hanzo Zen');
+                        
+                        console.log(chalk.cyan('\n🌐 Executing with peer network...'));
+                        console.log(chalk.gray('Using local Hanzo Zen for orchestration (cost-optimized)'));
+                        
+                        const results = await network.executeTask(task, {
+                            requireCritic: options.critic
+                        });
+                        
+                        console.log(chalk.bold('\n📊 Peer Network Results:\n'));
+                        console.log(JSON.stringify(results, null, 2));
+                        
+                        await network.shutdown();
+                    } else {
+                        // Traditional swarm orchestration
+                        const { SwarmOrchestrator } = await import('../cli-tools/orchestration/swarm-orchestrator');
+                        const orchestrator = new SwarmOrchestrator();
+                        
+                        // Initialize with custom config path if provided
+                        if (options.config) {
+                            const { AgentSwarmManager } = await import('../cli-tools/config/agent-swarm-config');
+                            const manager = new AgentSwarmManager(options.config);
+                            await manager.loadConfig();
+                        }
+                        
+                        await orchestrator.initialize();
+                        spinner.succeed('Agent swarm initialized');
+                        
+                        console.log(chalk.cyan('\nExecuting task with agent swarm...'));
+                        const results = await orchestrator.executeTask(task);
+                        
+                        console.log(chalk.bold('\n📊 Swarm Results:\n'));
+                        for (const result of results) {
+                            console.log(chalk.cyan(`🤖 ${result.agentName}:`));
+                            if (result.error) {
+                                console.log(chalk.red(`   ❌ Error: ${result.error}`));
+                            } else {
+                                console.log(`   ✅ Completed in ${result.duration}ms`);
+                                console.log(chalk.gray(`   ${result.result.substring(0, 200)}...`));
+                            }
+                            console.log();
+                        }
+                        
+                        await orchestrator.shutdown();
+                    }
+                } catch (error) {
+                    spinner.fail(`Execution failed: ${error.message}`);
+                    process.exit(1);
+                }
+            })
+    )
+    .addCommand(
+        new Command('status')
+            .description('Show status of the current agent swarm')
+            .option('-c, --config <path>', 'Path to agent configuration file')
+            .action(async (options) => {
+                try {
+                    const { SwarmOrchestrator } = await import('../cli-tools/orchestration/swarm-orchestrator');
+                    const orchestrator = new SwarmOrchestrator();
+                    
+                    if (options.config) {
+                        const { AgentSwarmManager } = await import('../cli-tools/config/agent-swarm-config');
+                        const manager = new AgentSwarmManager(options.config);
+                        await manager.loadConfig();
+                    }
+                    
+                    await orchestrator.initialize();
+                    const status = orchestrator.getStatus();
+                    
+                    console.log(chalk.bold('🐝 Agent Swarm Status\n'));
+                    
+                    // Show agents
+                    console.log(chalk.cyan('Agents:'));
+                    for (const [name, agent] of Object.entries(status.agents)) {
+                        const statusColor = agent.status === 'active' ? chalk.green : chalk.gray;
+                        console.log(`  ${statusColor('●')} ${name} - ${agent.model} (${agent.directory})`);
+                    }
+                    
+                    // Show MCP servers
+                    if (Object.keys(status.mcpServers).length > 0) {
+                        console.log(chalk.cyan('\nMCP Servers:'));
+                        for (const [key, server] of Object.entries(status.mcpServers)) {
+                            const statusColor = server.status === 'running' ? chalk.green : chalk.red;
+                            console.log(`  ${statusColor('●')} ${key} - ${server.config.command}`);
+                        }
+                    }
+                    
+                    // Show recent results
+                    if (status.results.length > 0) {
+                        console.log(chalk.cyan('\nRecent Results:'));
+                        for (const result of status.results) {
+                            const icon = result.error ? '❌' : '✅';
+                            console.log(`  ${icon} ${result.agentName} - ${result.duration}ms`);
+                        }
+                    }
+                    
+                    await orchestrator.shutdown();
+                } catch (error) {
+                    console.error(chalk.red(`Error checking status: ${error.message}`));
+                    process.exit(1);
+                }
+            })
+    )
+    .addCommand(
+        new Command('network <networkName> [task]')
+            .description('Run a task with agents in a specific network')
+            .option('-c, --config <path>', 'Path to agent configuration file')
+            .action(async (networkName, task, options) => {
+                const spinner = ora('Starting network agents...').start();
+                
+                try {
+                    const { SwarmOrchestrator } = await import('../cli-tools/orchestration/swarm-orchestrator');
+                    const { AgentSwarmManager } = await import('../cli-tools/config/agent-swarm-config');
+                    
+                    const manager = new AgentSwarmManager(options.config);
+                    await manager.loadConfig();
+                    
+                    const network = manager.getNetwork(networkName);
+                    if (!network) {
+                        spinner.fail(`Network '${networkName}' not found`);
+                        return;
+                    }
+                    
+                    spinner.succeed(`Network '${networkName}' loaded`);
+                    console.log(chalk.cyan(`\nAgents in network: ${network.agents.join(', ')}`));
+                    
+                    if (task) {
+                        const orchestrator = new SwarmOrchestrator();
+                        await orchestrator.initialize();
+                        
+                        console.log(chalk.cyan('\nExecuting task with network agents...'));
+                        
+                        // Execute task with first agent in network as main
+                        const mainAgent = network.agents[0];
+                        const results = await orchestrator.executeTask(task);
+                        
+                        console.log(chalk.bold('\n📊 Network Results:\n'));
+                        for (const result of results) {
+                            if (network.agents.includes(result.agentName)) {
+                                console.log(chalk.cyan(`🤖 ${result.agentName}:`));
+                                if (result.error) {
+                                    console.log(chalk.red(`   ❌ Error: ${result.error}`));
+                                } else {
+                                    console.log(`   ✅ Completed in ${result.duration}ms`);
+                                    console.log(chalk.gray(`   ${result.result.substring(0, 200)}...`));
+                                }
+                                console.log();
+                            }
+                        }
+                        
+                        await orchestrator.shutdown();
+                    } else {
+                        console.log(chalk.gray('\nProvide a task to execute with this network'));
+                    }
+                } catch (error) {
+                    spinner.fail(`Network operation failed: ${error.message}`);
+                    process.exit(1);
+                }
+            })
+    )
+    .addCommand(
+        new Command('chat')
+            .description('Start an interactive chat session between agents')
+            .option('-c, --config <path>', 'Path to agent configuration file')
+            .option('-f, --from <agent>', 'Agent to chat from', 'project_manager')
+            .option('-t, --to <agent>', 'Agent to chat with')
+            .action(async (options) => {
+                try {
+                    const { SwarmOrchestrator } = await import('../cli-tools/orchestration/swarm-orchestrator');
+                    const { AgentSwarmManager } = await import('../cli-tools/config/agent-swarm-config');
+                    
+                    const manager = new AgentSwarmManager(options.config);
+                    await manager.loadConfig();
+                    
+                    const fromAgent = manager.getAgent(options.from);
+                    const toAgent = options.to ? manager.getAgent(options.to) : null;
+                    
+                    if (!fromAgent) {
+                        console.error(chalk.red(`Agent '${options.from}' not found`));
+                        return;
+                    }
+                    
+                    console.log(chalk.bold('🗨️  Agent Chat Session\n'));
+                    console.log(chalk.cyan(`Chatting as: ${options.from}`));
+                    
+                    if (toAgent) {
+                        console.log(chalk.cyan(`Chatting with: ${options.to}`));
+                    } else {
+                        console.log(chalk.gray('Type "@agent_name message" to chat with a specific agent'));
+                    }
+                    
+                    console.log(chalk.gray('Type "exit" to end the session\n'));
+                    
+                    const orchestrator = new SwarmOrchestrator();
+                    await orchestrator.initialize();
+                    
+                    // Interactive chat loop
+                    while (true) {
+                        const { message } = await inquirer.prompt([{
+                            type: 'input',
+                            name: 'message',
+                            message: `${options.from}>`,
+                        }]);
+                        
+                        if (message.toLowerCase() === 'exit') {
+                            break;
+                        }
+                        
+                        // Parse @mentions
+                        const mentionMatch = message.match(/^@(\w+)\s+(.+)/);
+                        const targetAgent = mentionMatch ? mentionMatch[1] : options.to;
+                        const actualMessage = mentionMatch ? mentionMatch[2] : message;
+                        
+                        if (!targetAgent) {
+                            console.log(chalk.yellow('Please specify a target agent with @agent_name or use -t flag'));
+                            continue;
+                        }
+                        
+                        const spinner = ora(`${options.from} is thinking...`).start();
+                        
+                        try {
+                            // Simulate the from agent using MCP to chat with target
+                            const prompt = `You need to send this message to ${targetAgent}: "${actualMessage}"\n\n` +
+                                         `Use the chat_with_${targetAgent} tool to send the message and get a response.`;
+                            
+                            const result = await orchestrator.executeAgentTask(options.from, prompt);
+                            
+                            spinner.stop();
+                            console.log(chalk.green(`\n${targetAgent}> ${result}\n`));
+                        } catch (error) {
+                            spinner.fail(`Chat failed: ${error.message}`);
+                        }
+                    }
+                    
+                    await orchestrator.shutdown();
+                    console.log(chalk.gray('\nChat session ended'));
+                } catch (error) {
+                    console.error(chalk.red(`Error: ${error.message}`));
+                    process.exit(1);
+                }
+            })
+    );
+
 // Interactive mode
 program
     .command('interactive')

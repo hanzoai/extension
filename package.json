@@ -290,6 +290,7 @@
 	"devDependencies": {
 		"@types/better-sqlite3": "^7.6.13",
 		"@types/inquirer": "^9.0.8",
+		"@types/js-yaml": "^4.0.5",
 		"@types/lodash": "^4.17.16",
 		"@types/minimatch": "^5.1.2",
 		"@types/mocha": "^10.0.10",
@@ -323,6 +324,7 @@
 		"@typescript-eslint/typescript-estree": "^8.35.1",
 		"axios": "^1.6.2",
 		"ignore": "^7.0.3",
+		"js-yaml": "^4.1.0",
 		"lodash": "^4.17.21",
 		"minimatch": "^10.0.1",
 		"rxdb": "^16.15.0",
