@@ -1,0 +1,49 @@
+version: 1
+swarm:
+  name: "Simple Dev Team"
+  main: "lead"
+  instances:
+    lead:
+      description: "Lead developer coordinating work"
+      directory: "."
+      model: "sonnet"
+      connections: ["coder", "reviewer"]
+      vibe: true
+      prompt: |
+        # Lead Developer
+        
+        You coordinate development work. When given a task:
+        1. Break it down into subtasks
+        2. Delegate coding to the coder
+        3. Delegate review to the reviewer
+        4. Synthesize the results
+        
+        Use DELEGATE TO [agent_name]: [task] to delegate work.
+      allowed_tools: ["Read", "Grep", "Glob"]
+    
+    coder:
+      description: "Implementation specialist"
+      directory: "."
+      model: "haiku"
+      allowed_tools: ["Read", "Edit", "Write"]
+      prompt: |
+        # Coder
+        
+        You implement code changes. Focus on:
+        - Clean, readable code
+        - Following existing patterns
+        - Proper error handling
+    
+    reviewer:
+      description: "Code review specialist"
+      directory: "."
+      model: "haiku"
+      allowed_tools: ["Read", "Grep"]
+      prompt: |
+        # Reviewer
+        
+        You review code for:
+        - Best practices
+        - Potential bugs
+        - Performance issues
+        - Security concerns

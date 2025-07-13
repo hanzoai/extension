@@ -1,0 +1,153 @@
+version: 1
+swarm:
+  name: "Recursive MCP Network"
+  main: "orchestrator"
+  instances:
+    orchestrator:
+      description: "Main orchestrator that coordinates all agents"
+      directory: "."
+      model: "opus"
+      connections: ["analyzer", "builder", "reviewer", "deployer"]
+      vibe: true
+      expose_as_mcp: true
+      mcp_port: 9000
+      connect_to_agents: ["analyzer", "builder", "reviewer", "deployer"]
+      prompt: |
+        # Orchestrator Agent
+        
+        You are the main orchestrator with direct MCP access to all agents.
+        You can both delegate tasks and directly query agents via MCP.
+        
+        Your team:
+        - analyzer: Code analysis and architecture decisions
+        - builder: Implementation and code generation
+        - reviewer: Code review and quality assurance
+        - deployer: Deployment and infrastructure
+        
+        Use DELEGATE TO [agent]: [task] for complex tasks.
+        Use MCP calls for quick queries and status updates.
+      allowed_tools: ["Read", "Grep", "Glob"]
+      mcps:
+        - name: "filesystem"
+          type: "stdio"
+          command: "npx"
+          args: ["-y", "@modelcontextprotocol/server-filesystem"]
+          env:
+            ALLOWED_DIRECTORIES: "."
+    
+    analyzer:
+      description: "Code analyzer with access to builder and reviewer"
+      directory: "./src"
+      model: "sonnet"
+      expose_as_mcp: true
+      mcp_port: 9001
+      connect_to_agents: ["builder", "reviewer"]
+      allowed_tools: ["Read", "Grep", "Glob"]
+      prompt: |
+        # Code Analyzer
+        
+        You analyze code structure and make architectural decisions.
+        You have MCP access to:
+        - builder: For implementation questions
+        - reviewer: For quality checks
+        
+        Focus on:
+        - Code structure analysis
+        - Design pattern identification
+        - Architecture improvements
+        - Performance bottlenecks
+    
+    builder:
+      description: "Code builder with access to reviewer and deployer"
+      directory: "./src"
+      model: "sonnet"
+      expose_as_mcp: true
+      mcp_port: 9002
+      connect_to_agents: ["reviewer", "deployer"]
+      allowed_tools: ["Read", "Edit", "Write", "Bash"]
+      prompt: |
+        # Code Builder
+        
+        You implement code based on requirements.
+        You have MCP access to:
+        - reviewer: For immediate feedback
+        - deployer: For deployment readiness checks
+        
+        Focus on:
+        - Clean implementation
+        - Following patterns
+        - Test coverage
+        - Documentation
+    
+    reviewer:
+      description: "Code reviewer with access to all other agents"
+      directory: "."
+      model: "haiku"
+      expose_as_mcp: true
+      mcp_port: 9003
+      connect_to_agents: ["orchestrator", "analyzer", "builder", "deployer"]
+      allowed_tools: ["Read", "Grep"]
+      prompt: |
+        # Code Reviewer
+        
+        You review all code changes and provide feedback.
+        You have MCP access to all agents for comprehensive reviews.
+        
+        Check for:
+        - Code quality
+        - Security issues
+        - Performance problems
+        - Best practices
+    
+    deployer:
+      description: "Deployment specialist with access to builder and reviewer"
+      directory: "./infrastructure"
+      model: "haiku"
+      expose_as_mcp: true
+      mcp_port: 9004
+      connect_to_agents: ["builder", "reviewer"]
+      allowed_tools: ["Read", "Edit", "Write", "Bash"]
+      prompt: |
+        # Deployment Specialist
+        
+        You handle deployment and infrastructure.
+        You have MCP access to:
+        - builder: For build artifacts
+        - reviewer: For deployment approval
+        
+        Handle:
+        - CI/CD pipelines
+        - Docker containers
+        - Cloud deployments
+        - Infrastructure as code
+  
+  networks:
+    full_mesh:
+      name: "Full Mesh Network"
+      agents: ["orchestrator", "analyzer", "builder", "reviewer", "deployer"]
+      mcp_enabled: true
+      shared_tools: ["Read", "Grep"]
+      shared_mcps:
+        - name: "github"
+          type: "stdio"
+          command: "npx"
+          args: ["-y", "@modelcontextprotocol/server-github"]
+          env:
+            GITHUB_TOKEN: "${GITHUB_TOKEN}"
+    
+    development:
+      name: "Development Network"
+      agents: ["analyzer", "builder", "reviewer"]
+      mcp_enabled: true
+      shared_tools: ["Read", "Edit", "Write"]
+    
+    operations:
+      name: "Operations Network"
+      agents: ["builder", "reviewer", "deployer"]
+      mcp_enabled: true
+      shared_tools: ["Bash"]
+      shared_mcps:
+        - name: "kubernetes"
+          type: "stdio"
+          command: "kubectl"
+          args: ["proxy", "--port=8080"]

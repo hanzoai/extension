@@ -1,0 +1,203 @@
+version: 1
+swarm:
+  name: "Cost-Optimized Peer Network"
+  main: "orchestrator"
+  network_type: "peer"
+  
+  # Local LLM configuration for cost-effective orchestration
+  local_llm:
+    model: "hanzo-zen"
+    endpoint: "http://localhost:8080"
+    description: "Hanzo Zen MoE - Runs locally on laptop/mobile for main orchestration loop"
+    
+  instances:
+    # Main orchestrator using local Hanzo Zen (FREE)
+    orchestrator:
+      description: "Main orchestrator using local Hanzo Zen for cost efficiency"
+      directory: "."
+      model: "zen"  # Local model
+      expose_as_mcp: true
+      mcp_port: 20000
+      connect_to_agents: ["architect", "developer", "reviewer", "tester", "deployer", "critic"]
+      vibe: true
+      prompt: |
+        # Main Orchestrator (Hanzo Zen - Local)
+        
+        You are the cost-optimized orchestrator running on local Hanzo Zen.
+        Your primary goal is to minimize API costs while maximizing effectiveness.
+        
+        ## Cost Optimization Rules:
+        1. Use yourself (local inference) for all planning and coordination
+        2. Only delegate to API-based agents for complex tasks requiring their expertise
+        3. Batch similar requests to minimize total API calls
+        4. Use recursive calls strategically - prefer gathering info first
+        
+        ## Available Agents (All exposed as MCP tools):
+        Every agent can communicate with every other agent. Tools available:
+        - chat_with_[agent] - Conversational discussions
+        - ask_[agent] - Quick questions (cheaper)
+        - delegate_to_[agent] - Task delegation
+        - get_[agent]_status - Status checks (often local)
+        - request_[agent]_expertise - Deep knowledge
+        - collaborate_with_[agent] - Joint work sessions
+        
+        ## Network Architecture:
+        This is a fully connected peer network. All agents see all other agents.
+        You can orchestrate complex workflows with recursive agent calls.
+        
+        Always explain your cost optimization strategy when executing tasks.
+      allowed_tools: ["*"]  # Access to all tools and agents
+    
+    # System architect using Claude Opus (EXPENSIVE - use sparingly)
+    architect:
+      description: "System architect for complex design decisions"
+      directory: "./architecture"
+      model: "opus"  # Most expensive, highest quality
+      expose_as_mcp: true
+      mcp_port: 20001
+      connect_to_agents: ["orchestrator", "developer", "reviewer", "tester", "deployer", "critic"]
+      prompt: |
+        # System Architect (Claude Opus)
+        
+        You make critical architectural decisions. You are expensive to run.
+        Be concise but thorough. You can consult other agents for information.
+        
+        Available peers: All other agents via MCP tools.
+      allowed_tools: ["Read", "Write", "Edit", "Grep", "chat_with_*", "ask_*", "delegate_to_*"]
+    
+    # Developer using Claude Sonnet (MODERATE cost)
+    developer:
+      description: "Senior developer for implementation"
+      directory: "./src"
+      model: "sonnet"  # Good balance of cost/quality
+      expose_as_mcp: true
+      mcp_port: 20002
+      connect_to_agents: ["orchestrator", "architect", "reviewer", "tester", "deployer", "critic"]
+      prompt: |
+        # Senior Developer (Claude Sonnet)
+        
+        You implement solutions efficiently. Balance quality with token usage.
+        Consult architect for design questions via ask_architect.
+        Chat with reviewer for immediate feedback via chat_with_reviewer.
+      allowed_tools: ["Read", "Write", "Edit", "Bash", "Grep", "chat_with_*", "ask_*", "delegate_to_*"]
+    
+    # Code reviewer using GPT-4 (MODERATE cost)
+    reviewer:
+      description: "Code reviewer for quality assurance"
+      directory: "."
+      model: "gpt-4"  # Different provider for diversity
+      expose_as_mcp: true
+      mcp_port: 20003
+      connect_to_agents: ["orchestrator", "architect", "developer", "tester", "deployer", "critic"]
+      prompt: |
+        # Code Reviewer (GPT-4)
+        
+        Review code for quality, security, and best practices.
+        You can ask developer for clarifications.
+        Coordinate with tester on coverage.
+      allowed_tools: ["Read", "Grep", "chat_with_*", "ask_*"]
+    
+    # Tester using Claude Haiku (CHEAP)
+    tester:
+      description: "QA engineer for testing"
+      directory: "./tests"
+      model: "haiku"  # Cheapest Claude model
+      expose_as_mcp: true
+      mcp_port: 20004
+      connect_to_agents: ["orchestrator", "architect", "developer", "reviewer", "deployer", "critic"]
+      prompt: |
+        # QA Engineer (Claude Haiku)
+        
+        You write and run tests efficiently. You are cost-effective.
+        Coordinate with developer and reviewer as needed.
+      allowed_tools: ["Read", "Write", "Edit", "Bash", "chat_with_*", "ask_*"]
+    
+    # Deployer using local Hanzo Zen (FREE)
+    deployer:
+      description: "DevOps engineer for deployment"
+      directory: "./deploy"
+      model: "zen"  # Local model for routine tasks
+      expose_as_mcp: true
+      mcp_port: 20005
+      connect_to_agents: ["orchestrator", "architect", "developer", "reviewer", "tester", "critic"]
+      prompt: |
+        # DevOps Engineer (Hanzo Zen - Local)
+        
+        You handle deployment and infrastructure tasks locally.
+        Only escalate to API-based agents for complex issues.
+      allowed_tools: ["Read", "Write", "Edit", "Bash", "chat_with_*", "ask_*"]
+    
+    # Final critic using Claude Opus (EXPENSIVE - final check only)
+    critic:
+      description: "Final critic for comprehensive analysis"
+      directory: "."
+      model: "opus"
+      expose_as_mcp: true
+      mcp_port: 20006
+      connect_to_agents: ["orchestrator", "architect", "developer", "reviewer", "tester", "deployer"]
+      prompt: |
+        # Final Critic (Claude Opus)
+        
+        Provide final critical analysis of completed work.
+        You are expensive - be thorough but concise.
+        Review all agent outputs critically.
+      allowed_tools: ["Read", "Grep", "chat_with_*", "ask_*", "request_*_expertise"]
+  
+  networks:
+    # Full mesh network - all agents connected
+    full_mesh:
+      name: "Complete Peer Network"
+      agents: ["orchestrator", "architect", "developer", "reviewer", "tester", "deployer", "critic"]
+      mcp_enabled: true
+      description: "Every agent can directly communicate with every other agent"
+    
+    # Local agents network (FREE tier)
+    local_only:
+      name: "Cost-Free Local Network"
+      agents: ["orchestrator", "deployer"]
+      mcp_enabled: true
+      shared_tools: ["Read", "Write", "Bash"]
+      description: "Only local Hanzo Zen agents for zero API costs"
+    
+    # Core development network
+    core_dev:
+      name: "Core Development Team"
+      agents: ["developer", "reviewer", "tester"]
+      mcp_enabled: true
+      shared_tools: ["Read", "Edit", "Grep"]
+      shared_mcps:
+        - name: "project-search"
+          type: "stdio"
+          command: "npx"
+          args: ["-y", "@modelcontextprotocol/server-everything"]
+    
+    # Expensive agents network (use sparingly)
+    premium:
+      name: "Premium Agents"
+      agents: ["architect", "critic"]
+      mcp_enabled: true
+      description: "High-cost agents for critical decisions only"
+
+# Usage Examples:
+#
+# 1. Initialize peer network:
+#    dev swarm init --peer-network
+#
+# 2. Run with cost optimization:
+#    dev swarm run "implement user authentication" --peer --critic
+#
+# 3. Run using only local agents (FREE):
+#    dev swarm network local_only "analyze codebase structure"
+#
+# 4. Interactive agent chat:
+#    dev swarm chat -f orchestrator -t developer
+#
+# Cost Breakdown:
+# - Hanzo Zen (orchestrator, deployer): $0 (local)
+# - Claude Haiku (tester): ~$0.25 per 1M tokens
+# - Claude Sonnet (developer): ~$3 per 1M tokens  
+# - GPT-4 (reviewer): ~$10 per 1M tokens
+# - Claude Opus (architect, critic): ~$15 per 1M tokens
+#
+# The orchestrator minimizes costs by using local inference for
+# coordination and only calling expensive agents when necessary.
