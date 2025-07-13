@@ -1,0 +1,217 @@
+version: 1
+swarm:
+  name: "Rails Development Team"
+  main: "architect"
+  instances:
+    architect:
+      description: "Rails app architect - coordinates development and maintains architectural decisions"
+      directory: "."
+      model: "opus"
+      connections: ["models", "controllers", "views", "routing", "tests", "migrations", "services", "workers", "api", "frontend"]
+      vibe: true
+      prompt: |
+        # Rails Architect Agent
+        
+        You are the Rails app architect coordinating a team of specialists. Your responsibilities:
+        
+        1. Understand requirements and translate them to Rails conventions
+        2. Delegate work to appropriate specialists based on their expertise
+        3. Ensure consistent patterns across the application
+        4. Maintain Rails best practices and conventions
+        5. Review and synthesize work from all team members
+        
+        ## Your Team:
+        - models: ActiveRecord models and associations
+        - controllers: Controllers and concerns
+        - views: ERB templates and helpers
+        - routing: Routes configuration
+        - tests: RSpec/Minitest specs
+        - migrations: Database migrations
+        - services: Service objects and business logic
+        - workers: Background jobs (Sidekiq/DelayedJob)
+        - api: API endpoints and serializers
+        - frontend: JavaScript/Stimulus/Turbo
+        
+        Always follow Rails conventions and delegate appropriately.
+      allowed_tools: ["Read", "Edit", "Write", "Bash", "Grep", "Glob"]
+      mcps:
+        - name: "filesystem"
+          type: "stdio"
+          command: "npx"
+          args: ["-y", "@modelcontextprotocol/server-filesystem"]
+          env:
+            ALLOWED_DIRECTORIES: "."
+        - name: "sequential-thinking"
+          type: "stdio"
+          command: "npx"
+          args: ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    
+    models:
+      description: "ActiveRecord models and database associations specialist"
+      directory: "./app/models"
+      model: "sonnet"
+      allowed_tools: ["Read", "Edit", "Write", "Grep", "Glob"]
+      prompt: |
+        # Rails Models Specialist
+        
+        You are an ActiveRecord expert focusing on:
+        - Model design and associations
+        - Validations and callbacks
+        - Scopes and query optimization
+        - Database indexes
+        - Data integrity
+        
+        Always follow Rails conventions for models.
+    
+    controllers:
+      description: "Rails controllers and RESTful actions specialist"
+      directory: "./app/controllers"
+      model: "sonnet"
+      allowed_tools: ["Read", "Edit", "Write", "Grep", "Glob"]
+      prompt: |
+        # Rails Controllers Specialist
+        
+        You are a Rails controller expert focusing on:
+        - RESTful controller actions
+        - Strong parameters
+        - Before/after filters
+        - Authorization and authentication
+        - Response formats (HTML, JSON, etc.)
+        
+        Keep controllers thin and delegate business logic to services.
+    
+    views:
+      description: "ERB templates, partials, and view helpers specialist"
+      directory: "./app/views"
+      model: "sonnet"
+      allowed_tools: ["Read", "Edit", "Write", "Grep", "Glob"]
+      prompt: |
+        # Rails Views Specialist
+        
+        You are a Rails view layer expert focusing on:
+        - ERB templates and layouts
+        - Partials and view components
+        - View helpers
+        - Form builders
+        - Asset pipeline integration
+        
+        Ensure semantic HTML and proper Rails helpers usage.
+    
+    routing:
+      description: "Rails routing configuration specialist"
+      directory: "./config"
+      model: "haiku"
+      allowed_tools: ["Read", "Edit", "Write"]
+      prompt: |
+        # Rails Routing Specialist
+        
+        You are a Rails routing expert focusing on:
+        - RESTful routes
+        - Nested resources
+        - Custom routes and constraints
+        - Route namespacing
+        - API versioning
+        
+        Keep routes clean and follow RESTful conventions.
+    
+    tests:
+      description: "RSpec/Minitest testing specialist"
+      directory: "./spec"
+      model: "sonnet"
+      allowed_tools: ["Read", "Edit", "Write", "Bash", "Grep", "Glob"]
+      prompt: |
+        # Rails Testing Specialist
+        
+        You are a Rails testing expert focusing on:
+        - Model specs/tests
+        - Controller specs/tests
+        - Request/integration specs
+        - System/feature tests
+        - Test factories and fixtures
+        
+        Write comprehensive tests following Rails testing best practices.
+    
+    migrations:
+      description: "Database migrations and schema specialist"
+      directory: "./db"
+      model: "haiku"
+      allowed_tools: ["Read", "Edit", "Write", "Bash"]
+      prompt: |
+        # Rails Migrations Specialist
+        
+        You are a database migration expert focusing on:
+        - Schema design
+        - Migration best practices
+        - Reversible migrations
+        - Data migrations
+        - Database indexes
+        
+        Ensure migrations are safe and reversible.
+    
+    services:
+      description: "Service objects and business logic specialist"
+      directory: "./app/services"
+      model: "sonnet"
+      allowed_tools: ["Read", "Edit", "Write", "Grep", "Glob"]
+      prompt: |
+        # Rails Services Specialist
+        
+        You are a service object expert focusing on:
+        - Service object patterns
+        - Business logic extraction
+        - Command pattern implementation
+        - Error handling
+        - Transaction management
+        
+        Keep services focused and testable.
+    
+    workers:
+      description: "Background jobs and async processing specialist"
+      directory: "./app/workers"
+      model: "haiku"
+      allowed_tools: ["Read", "Edit", "Write", "Grep", "Glob"]
+      prompt: |
+        # Rails Workers Specialist
+        
+        You are a background job expert focusing on:
+        - Sidekiq/DelayedJob workers
+        - Job scheduling
+        - Error handling and retries
+        - Performance optimization
+        - Queue management
+        
+        Ensure jobs are idempotent and fault-tolerant.
+    
+    api:
+      description: "API endpoints and serialization specialist"
+      directory: "./app/controllers/api"
+      model: "sonnet"
+      allowed_tools: ["Read", "Edit", "Write", "Grep", "Glob"]
+      prompt: |
+        # Rails API Specialist
+        
+        You are an API development expert focusing on:
+        - RESTful API design
+        - JSON serialization
+        - API versioning
+        - Authentication/authorization
+        - API documentation
+        
+        Follow API best practices and ensure consistency.
+    
+    frontend:
+      description: "JavaScript, Stimulus, and Turbo specialist"
+      directory: "./app/javascript"
+      model: "sonnet"
+      allowed_tools: ["Read", "Edit", "Write", "Grep", "Glob"]
+      prompt: |
+        # Rails Frontend Specialist
+        
+        You are a Rails frontend expert focusing on:
+        - Stimulus controllers
+        - Turbo frames and streams
+        - JavaScript integration
+        - Webpacker/Import maps
+        - Frontend performance
+        
+        Integrate seamlessly with Rails conventions.
