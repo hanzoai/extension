@@ -278,6 +278,7 @@
 		"build:cursor": "node scripts/build-cursor.js",
 		"build:windsurf": "node scripts/build-windsurf.js",
 		"build:all": "node scripts/build-all-platforms.js",
+		"build:browser-extension": "node src/browser-extension/build.js",
 		"package": "npm run build:all && vsce package",
 		"package:claude": "npm run build:claude-desktop",
 		"package:dxt": "npm run build:dxt",

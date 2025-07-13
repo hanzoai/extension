@@ -1,0 +1,41 @@
+{
+  "name": "@hanzoai/browser-devtools",
+  "version": "1.0.0",
+  "description": "Browser extension for click-to-code navigation with MCP integration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "hanzo-browser-server": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc && node build.js",
+    "prepublishOnly": "npm run build",
+    "start": "node dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "extension/"
+  ],
+  "keywords": [
+    "mcp",
+    "browser",
+    "devtools",
+    "source-maps",
+    "react",
+    "vue",
+    "developer-tools"
+  ],
+  "dependencies": {
+    "ws": "^8.18.0",
+    "commander": "^11.0.0",
+    "chalk": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.0.0",
+    "esbuild": "^0.25.0"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

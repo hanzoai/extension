@@ -5,6 +5,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { MCPClient } from './client';
 import { MCPTools } from './tools';
 import { getConfig } from '../config';
+import { BrowserExtensionServer } from '../mcp-tools/browser-extension-server';
 
 export class MCPServer {
     private context: vscode.ExtensionContext;
@@ -12,6 +13,7 @@ export class MCPServer {
     private client?: MCPClient;
     private tools: MCPTools;
     private config = getConfig();
+    private browserExtensionServer?: BrowserExtensionServer;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
@@ -23,6 +25,11 @@ export class MCPServer {
         
         // Initialize tools
         await this.tools.initialize();
+        
+        // Start browser extension server if enabled
+        if (this.config.browserExtension?.enabled !== false) {
+            await this.startBrowserExtensionServer();
+        }
         
         // Check if running as Claude Desktop extension
         if (this.isClaudeDesktopExtension()) {
@@ -126,8 +133,71 @@ export class MCPServer {
         return this.client.executeCommand(command, args);
     }
 
+    private async startBrowserExtensionServer() {
+        try {
+            const port = this.config.browserExtension?.port || 3001;
+            const projectRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath || process.cwd();
+            
+            this.browserExtensionServer = new BrowserExtensionServer(port, projectRoot);
+            
+            // Handle element selection events
+            this.browserExtensionServer.on('elementSelected', async (data) => {
+                console.log('[MCPServer] Element selected:', data);
+                
+                // Open file in editor
+                const doc = await vscode.workspace.openTextDocument(data.file);
+                const editor = await vscode.window.showTextDocument(doc);
+                
+                // Jump to line
+                const position = new vscode.Position(data.line - 1, data.column || 0);
+                editor.selection = new vscode.Selection(position, position);
+                editor.revealRange(new vscode.Range(position, position));
+                
+                // Show notification
+                vscode.window.showInformationMessage(
+                    `Navigated to ${path.basename(data.file)}:${data.line} (${data.framework || 'unknown'} component)`
+                );
+            });
+            
+            console.log(`[MCPServer] Browser extension server started on port ${port}`);
+            
+            // Show notification with instructions
+            const action = await vscode.window.showInformationMessage(
+                'Browser extension server running. Alt+click elements in your browser to navigate to source.',
+                'Install Extension'
+            );
+            
+            if (action === 'Install Extension') {
+                await this.installBrowserExtension();
+            }
+        } catch (error) {
+            console.error('[MCPServer] Failed to start browser extension server:', error);
+        }
+    }
+
+    private async installBrowserExtension() {
+        // Build the extension
+        const terminal = vscode.window.createTerminal('Install Browser Extension');
+        terminal.sendText('npm run build:browser-extension');
+        terminal.show();
+        
+        // Show instructions
+        vscode.window.showInformationMessage(
+            'Browser extension built. Load it via chrome://extensions/ → Developer mode → Load unpacked → Select dist/browser-extension/',
+            'Open Chrome Extensions'
+        ).then(action => {
+            if (action === 'Open Chrome Extensions') {
+                vscode.env.openExternal(vscode.Uri.parse('chrome://extensions/'));
+            }
+        });
+    }
+
     shutdown() {
         console.log('[MCPServer] Shutting down');
+        
+        if (this.browserExtensionServer) {
+            this.browserExtensionServer.close();
+        }
         
         if (this.client) {
             this.client.disconnect();
