@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { BrowserExtensionServer } from '../../mcp-tools/browser-extension-server';
 import WebSocket from 'ws';
 import * as path from 'path';
+import * as fs from 'fs';
 
 describe('Claude Code Browser Extension Integration', () => {
   let server: BrowserExtensionServer;
@@ -106,16 +107,24 @@ describe('Claude Code Browser Extension Integration', () => {
   
   describe('Fallback to data-hanzo-id', () => {
     it('should handle elements without source-map data', async () => {
+      // Create the .hanzo directory and id-map.json for test
+      const hanzoDir = path.join(process.cwd(), '.hanzo');
+      const mapFile = path.join(hanzoDir, 'id-map.json');
+      
+      if (!fs.existsSync(hanzoDir)) {
+        fs.mkdirSync(hanzoDir, { recursive: true });
+      }
+      
+      // Write test id map
+      fs.writeFileSync(mapFile, JSON.stringify({
+        'hanzo-abc123': {
+          file: path.join(process.cwd(), 'src/legacy/OldComponent.js'),
+          line: 55
+        }
+      }));
+      
       const elementSelected = new Promise((resolve) => {
-        server.on('elementSelected', (data) => {
-          // Mock the ID lookup
-          if (data.fallbackId === 'hanzo-abc123') {
-            resolve({
-              file: path.join(process.cwd(), 'src/legacy/OldComponent.js'),
-              line: 55
-            });
-          }
-        });
+        server.once('elementSelected', resolve);
       });
       
       ws.send(JSON.stringify({
@@ -131,6 +140,11 @@ describe('Claude Code Browser Extension Integration', () => {
         file: expect.stringContaining('OldComponent.js'),
         line: 55
       });
+      
+      // Cleanup
+      if (fs.existsSync(mapFile)) {
+        fs.unlinkSync(mapFile);
+      }
     });
   });
   
@@ -145,7 +159,7 @@ describe('Claude Code Browser Extension Integration', () => {
             file: data.file,
             line: data.line,
             column: data.column,
-            reason: `User clicked ${data.framework || 'HTML'} element at ${data.domPath}`
+            reason: `User clicked ${data.framework ? data.framework.charAt(0).toUpperCase() + data.framework.slice(1) : 'HTML'} element at ${data.domPath}`
           }
         });
       });

@@ -8,7 +8,7 @@
     "hanzo-dev": "./dist/cli/dev.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "esbuild src/cli/dev.ts --bundle --platform=node --target=node16 --outfile=dist/cli/dev.js --external:vscode --external:inquirer --banner:js='#!/usr/bin/env node' && chmod +x dist/cli/dev.js",
     "dev": "tsc --watch",
     "test": "jest",
     "prepublishOnly": "npm run build"
