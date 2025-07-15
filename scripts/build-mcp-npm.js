@@ -34,6 +34,10 @@ const packageJson = {
     scripts: {
         start: 'node server.js'
     },
+    dependencies: {
+        '@modelcontextprotocol/sdk': '^1.0.0',
+        'zod': '^3.22.0'
+    },
     keywords: [
         'mcp',
         'model-context-protocol',
@@ -126,7 +130,7 @@ if (command === 'install' || (!command && !args.includes('--help')) || args.incl
         // Add Hanzo MCP
         config.mcpServers['hanzo-mcp'] = {
             command: 'node',
-            args: [path.join(__dirname, 'server.js')],
+            args: [path.join(__dirname, 'server.js'), '--anon'],
             env: {}
         };
         
@@ -157,15 +161,19 @@ if (command === 'install' || (!command && !args.includes('--help')) || args.incl
     }
     
 } else if (command === 'start') {
-    // Start the MCP server directly
-    const server = spawn('node', [path.join(__dirname, 'server.js')], {
+    // Start the MCP server directly (default to anonymous mode)
+    const serverArgs = [path.join(__dirname, 'server.js')];
+    if (!args.includes('--auth')) {
+        serverArgs.push('--anon');
+    }
+    // Execute synchronously to pass through stdio properly
+    require('child_process').execFileSync('node', serverArgs, {
         stdio: 'inherit'
     });
     
-    server.on('error', (err) => {
-        console.error('Failed to start server:', err);
-        process.exit(1);
-    });
+} else if (args.length === 0 || args[0] === '--anon' || args[0] === 'start') {
+    // When called without arguments or with start/--anon (as MCP server), run directly
+    require(path.join(__dirname, 'server.js'));
     
 } else {
     console.log('Hanzo MCP - Model Context Protocol Server');
@@ -209,6 +217,8 @@ Add to your \`claude_desktop_config.json\`:
   }
 }
 \`\`\`
+
+Note: By default, the server runs in anonymous mode. To use with authentication, add \`--auth\` flag.
 
 ### Claude Code
 

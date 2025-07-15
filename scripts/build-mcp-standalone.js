@@ -36,7 +36,15 @@ const mockVscode = {
         showInformationMessage: console.log,
         visibleTextEditors: [],
         createWebviewPanel: () => null,
-        showTextDocument: () => null
+        showTextDocument: () => null,
+        createOutputChannel: (name) => ({
+            appendLine: (text) => console.log(\`[\${name}] \${text}\`),
+            append: (text) => process.stdout.write(text),
+            clear: () => {},
+            dispose: () => {},
+            hide: () => {},
+            show: () => {}
+        })
     },
     env: {
         openExternal: async (uri) => {
@@ -125,14 +133,14 @@ async function build() {
             }
         });
         
-        // Also build to dist folder for npm package
+        // Build the fixed version for npm package
         await esbuild.build({
-            entryPoints: ['src/mcp-server-standalone-auth.ts'],
+            entryPoints: ['src/mcp-server-fixed.ts'],
             bundle: true,
             platform: 'node',
             target: 'node18',
             outfile: 'dist/mcp-server.js',
-            external: [],
+            external: ['@modelcontextprotocol/sdk', 'zod'],
             loader: { '.ts': 'ts' },
             plugins: [{
                 name: 'vscode-mock',

@@ -1,20 +1,20 @@
 {
-  "name": "@hanzoai/browser-devtools",
+  "name": "@hanzo/browser-extension",
   "version": "1.0.0",
   "description": "Browser extension for click-to-code navigation with MCP integration",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "cli.js",
   "bin": {
-    "hanzo-browser-server": "./dist/cli.js"
+    "hanzo-browser-server": "./cli.js"
   },
   "scripts": {
-    "build": "tsc && node build.js",
-    "prepublishOnly": "npm run build",
-    "start": "node dist/cli.js"
+    "start": "node cli.js"
   },
   "files": [
-    "dist/",
-    "extension/"
+    "cli.js",
+    "browser-extension-server.js",
+    "content-script.js",
+    "manifest.json",
+    "README.md"
   ],
   "keywords": [
     "mcp",
