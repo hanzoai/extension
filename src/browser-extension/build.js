@@ -8,8 +8,11 @@ const { execSync } = require('child_process');
 async function build() {
   console.log('Building browser extension...');
   
-  // Ensure dist directory exists
+  // Ensure dist directories exist
   fs.mkdirSync('dist/browser-extension', { recursive: true });
+  fs.mkdirSync('dist/browser-extension/chrome', { recursive: true });
+  fs.mkdirSync('dist/browser-extension/firefox', { recursive: true });
+  fs.mkdirSync('dist/browser-extension/safari', { recursive: true });
   
   // Build content script
   await esbuild.build({
@@ -17,8 +20,39 @@ async function build() {
     bundle: true,
     outfile: 'dist/browser-extension/content-script.js',
     platform: 'browser',
-    target: 'chrome90',
+    target: ['chrome90', 'firefox91', 'safari14'],
     sourcemap: 'inline'
+  });
+  
+  // Build background script with WebGPU support
+  await esbuild.build({
+    entryPoints: ['src/browser-extension/background.ts'],
+    bundle: true,
+    outfile: 'dist/browser-extension/background.js',
+    platform: 'browser',
+    target: ['chrome90', 'firefox91', 'safari14'],
+    format: 'esm',
+    external: ['chrome', 'browser']
+  });
+  
+  // Build WebGPU AI module
+  await esbuild.build({
+    entryPoints: ['src/browser-extension/webgpu-ai.ts'],
+    bundle: true,
+    outfile: 'dist/browser-extension/webgpu-ai.js',
+    platform: 'browser',
+    target: 'es2020',
+    format: 'esm'
+  });
+  
+  // Build browser control module
+  await esbuild.build({
+    entryPoints: ['src/browser-extension/browser-control.ts'],
+    bundle: true,
+    outfile: 'dist/browser-extension/browser-control.js',
+    platform: 'browser',
+    target: 'es2020',
+    format: 'esm'
   });
   
   // Build CLI and server (for npm package)
@@ -43,11 +77,58 @@ async function build() {
   console.log('Building TypeScript declarations...');
   execSync('cd src/browser-extension && npx tsc', { stdio: 'inherit' });
   
-  // Copy manifest
+  // Copy manifests for different browsers
   fs.copyFileSync(
     'src/browser-extension/manifest.json',
     'dist/browser-extension/manifest.json'
   );
+  
+  // Chrome version
+  fs.copyFileSync(
+    'src/browser-extension/manifest.json',
+    'dist/browser-extension/chrome/manifest.json'
+  );
+  
+  // Firefox version
+  fs.copyFileSync(
+    'src/browser-extension/manifest-firefox.json',
+    'dist/browser-extension/firefox/manifest.json'
+  );
+  
+  // Safari needs special handling - create stub
+  fs.writeFileSync('dist/browser-extension/safari/Info.plist', `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>Hanzo AI Dev Assistant</string>
+    <key>CFBundleIdentifier</key>
+    <string>ai.hanzo.browser-extension</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.Safari.web-extension</string>
+        <key>NSExtensionPrincipalClass</key>
+        <string>SafariWebExtensionHandler</string>
+    </dict>
+</dict>
+</plist>`);
+  
+  // Copy common files to each browser directory
+  ['chrome', 'firefox', 'safari'].forEach(browser => {
+    fs.copyFileSync(
+      'dist/browser-extension/content-script.js',
+      `dist/browser-extension/${browser}/content-script.js`
+    );
+    fs.copyFileSync(
+      'dist/browser-extension/background.js',
+      `dist/browser-extension/${browser}/background.js`
+    );
+  });
   
   // Copy package.json for npm
   const pkg = JSON.parse(fs.readFileSync('src/browser-extension/package.json', 'utf8'));
