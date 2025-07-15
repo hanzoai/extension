@@ -2,14 +2,18 @@
   "manifest_version": 3,
   "name": "Hanzo AI Dev Assistant",
   "version": "1.0.0",
-  "description": "Click-to-code navigation with source-map support",
+  "description": "Click-to-code navigation with WebGPU AI and browser control",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "tabs",
+    "webNavigation",
+    "scripting"
   ],
   "host_permissions": [
     "http://localhost/*",
-    "https://localhost/*"
+    "https://localhost/*",
+    "<all_urls>"
   ],
   "content_scripts": [
     {
@@ -18,6 +22,10 @@
       "run_at": "document_idle"
     }
   ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -25,5 +33,11 @@
       "48": "icon48.png",
       "128": "icon128.png"
     }
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["ai-worker.js", "models/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

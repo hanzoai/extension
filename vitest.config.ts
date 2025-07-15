@@ -10,7 +10,9 @@ export default defineConfig({
       reporter: ['text', 'json', 'html', 'lcov'],
       include: [
         'src/cli-tools/**/*.ts',
-        'src/cli/**/*.ts'
+        'src/cli/**/*.ts',
+        'src/browser-extension/**/*.ts',
+        'src/mcp-tools/**/*.ts'
       ],
       exclude: [
         '**/*.test.ts',
