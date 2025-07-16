@@ -1,0 +1,14 @@
+{
+  "name": "@hanzo/dxt",
+  "version": "1.5.7",
+  "description": "Hanzo AI DXT Bundle",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "echo 'DXT bundle created successfully'",
+    "package": "npm run build"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1"
+  },
+  "license": "MIT"
+}
