@@ -176,6 +176,20 @@ export class FunctionCallingSystem {
     this.tools.set(tool.name, tool);
   }
 
+  registerFunction(
+    name: string, 
+    handler: (args: any) => Promise<any>,
+    description: string,
+    parameters: any
+  ): void {
+    this.registerTool({
+      name,
+      description,
+      parameters,
+      handler
+    });
+  }
+
   async registerMCPServer(name: string, session: MCPSession): Promise<void> {
     this.mcpSessions.set(name, session);
     

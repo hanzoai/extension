@@ -31,11 +31,13 @@ export interface AgentMessage {
 }
 
 export class ConfigurableAgentLoop extends EventEmitter {
-  private config: AgentLoopConfig;
+  public config: AgentLoopConfig;
   private functionCalling: FunctionCallingSystem;
   private mcpClient: MCPClient;
   private messages: AgentMessage[] = [];
   private iterations: number = 0;
+  private context: any = {};
+  private customTools: Map<string, any> = new Map();
 
   constructor(config: AgentLoopConfig) {
     super();
@@ -548,5 +550,94 @@ Always use tools to accomplish tasks. Think step by step.`;
   // Update configuration
   updateConfig(updates: Partial<AgentLoopConfig>): void {
     this.config = { ...this.config, ...updates };
+  }
+
+  // Add custom tool
+  addTool(tool: {
+    name: string;
+    description: string;
+    parameters: any;
+    execute: (params: any) => Promise<any>;
+  }): void {
+    this.customTools.set(tool.name, tool);
+    this.functionCalling.registerFunction(
+      tool.name,
+      tool.execute,
+      tool.description,
+      tool.parameters
+    );
+  }
+
+  // Get conversation messages
+  getMessages(): AgentMessage[] {
+    return [...this.messages];
+  }
+
+  // Get current context
+  getContext(): any {
+    return { ...this.context };
+  }
+
+  // Load session data
+  loadSession(messages: AgentMessage[], context: any): void {
+    this.messages = [...messages];
+    this.context = { ...context };
+  }
+
+  // Process a user message
+  async processMessage(content: string): Promise<string> {
+    // Add user message
+    const userMessage: AgentMessage = {
+      role: 'user',
+      content
+    };
+    this.messages.push(userMessage);
+
+    // Process through agent loop
+    try {
+      const response = await this.executeIteration();
+      return response.content;
+    } catch (error) {
+      console.error(chalk.red(`Error processing message: ${error}`));
+      throw error;
+    }
+  }
+
+  // Execute one iteration of the agent loop
+  private async executeIteration(): Promise<AgentMessage> {
+    this.iterations++;
+    
+    // Call appropriate LLM
+    let response: AgentMessage;
+    switch (this.config.provider.type) {
+      case 'anthropic':
+        response = await this.callAnthropic();
+        break;
+      case 'openai':
+        response = await this.callOpenAI();
+        break;
+      case 'hanzo-app':
+        response = await this.callHanzoApp();
+        break;
+      case 'local':
+      default:
+        response = await this.callLocalLLM();
+        break;
+    }
+
+    // Execute any tool calls
+    if (response.toolCalls && response.toolCalls.length > 0) {
+      const toolResults = await this.executeToolCalls(response.toolCalls);
+      response.toolResults = toolResults;
+      
+      // Add tool results as a message
+      this.messages.push({
+        role: 'tool',
+        content: JSON.stringify(toolResults),
+        toolResults
+      });
+    }
+
+    return response;
   }
 }

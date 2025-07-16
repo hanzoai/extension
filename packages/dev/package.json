@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/dev",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Hanzo Dev - Meta AI development CLI that manages and runs all LLMs and CLI tools",
   "main": "dist/index.js",
   "bin": {
