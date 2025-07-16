@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { glob } from 'glob';
+import { glob, globSync } from 'glob';
 import chalk from 'chalk';
 import ora from 'ora';
 import { spawn, ChildProcess } from 'child_process';
@@ -88,9 +88,9 @@ export class SwarmRunner extends EventEmitter {
   }
 
   private async findFiles(): Promise<string[]> {
-    return new Promise((resolve, reject) => {
+    try {
       const options = {
-        cwd: this.options.cwd,
+        cwd: this.options.cwd || process.cwd(),
         nodir: true,
         ignore: [
           '**/node_modules/**',
@@ -98,35 +98,31 @@ export class SwarmRunner extends EventEmitter {
           '**/dist/**',
           '**/build/**',
           '**/*.min.js',
-          '**/*.map'
-        ]
+          '**/*.map',
+          '**/.swarm-tmp/**'
+        ],
+        absolute: false
       };
 
-      // Add timeout to prevent hanging
-      const timeout = setTimeout(() => {
-        reject(new Error('File search timed out'));
-      }, 30000);
-
       const pattern = this.options.pattern || '**/*';
-      console.log(chalk.gray(`Searching with pattern: ${pattern} in ${options.cwd || process.cwd()}`));
+      console.log(chalk.gray(`Searching with pattern: ${pattern} in ${options.cwd}`));
       
-      glob(pattern, options, (err, files) => {
-        clearTimeout(timeout);
-        if (err) {
-          console.error(chalk.red('Glob error:'), err);
-          reject(err);
-        } else {
-          console.log(chalk.gray(`Found ${files.length} total files`));
-          // Filter to only editable files
-          const editableFiles = files.filter(file => {
-            const ext = path.extname(file);
-            return ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.h', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r', '.m', '.mm', '.md', '.txt', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.conf', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd'].includes(ext);
-          });
-          console.log(chalk.gray(`Filtered to ${editableFiles.length} editable files`));
-          resolve(editableFiles);
-        }
+      // Use sync version for reliability
+      const files = globSync(pattern, options);
+      console.log(chalk.gray(`Found ${files.length} total files`));
+      
+      // Filter to only editable files
+      const editableFiles = files.filter(file => {
+        const ext = path.extname(file);
+        return ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.h', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r', '.m', '.mm', '.md', '.txt', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.conf', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd'].includes(ext);
       });
-    });
+      
+      console.log(chalk.gray(`Filtered to ${editableFiles.length} editable files`));
+      return editableFiles;
+    } catch (error) {
+      console.error(chalk.red('Error finding files:'), error);
+      return [];
+    }
   }
 
   private async processFiles(): Promise<void> {

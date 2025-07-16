@@ -16,6 +16,7 @@ import { PeerAgentNetwork } from '../lib/peer-agent-network';
 import { BenchmarkRunner, BenchmarkConfig } from '../lib/benchmark-runner';
 import { ConfigurableAgentLoop, LLMProvider } from '../lib/agent-loop';
 import { SwarmRunner, SwarmOptions } from '../lib/swarm-runner';
+import { InteractiveAgent } from '../lib/interactive-agent';
 
 const program = new Command();
 
@@ -888,59 +889,33 @@ async function runSwarmMode(options: any): Promise<void> {
 // Default action
 program
   .action(async (options) => {
-    // Check if swarm mode is requested
-    if (options.swarm) {
-      await runSwarmMode(options);
-      return;
+    // Determine provider
+    let providerType: 'claude' | 'openai' | 'gemini' | 'grok' | 'local' = 'claude';
+    if (options.openai) providerType = 'openai';
+    else if (options.gemini) providerType = 'gemini';
+    else if (options.grok) providerType = 'grok';
+    else if (options.local) providerType = 'local';
+
+    // Get provider config
+    const providers = ConfigurableAgentLoop.getAvailableProviders();
+    const provider = providers.find(p => p.type === providerType);
+
+    if (!provider) {
+      console.error(chalk.red(`Provider '${providerType}' not configured`));
+      process.exit(1);
     }
 
-    // Check if a specific provider is requested
-    if (options.claude || options.openai || options.gemini || options.grok || options.local) {
-      let provider = 'claude';
-      if (options.claude) provider = 'claude';
-      else if (options.openai) provider = 'openai';
-      else if (options.gemini) provider = 'gemini';
-      else if (options.grok) provider = 'grok';
-      else if (options.local) provider = 'local';
+    // Create interactive agent with swarm support if requested
+    const agent = new InteractiveAgent(provider, options.swarm ? parseInt(options.swarm) : undefined);
 
-      // Map provider to tool name
-      const toolMap: Record<string, string> = {
-        claude: 'claude',
-        openai: 'codex',
-        gemini: 'gemini',
-        grok: 'grok',
-        local: 'hanzo-dev'
-      };
-
-      const toolName = toolMap[provider];
-      if (toolName && TOOLS[toolName as keyof typeof TOOLS]) {
-        console.log(chalk.gray(`Launching ${TOOLS[toolName as keyof typeof TOOLS].name}...`));
-        runTool(toolName, options.prompt ? [options.prompt] : ['.']);
-        return;
-      }
-    }
-
-    const defaultTool = await getDefaultTool();
-    if (defaultTool && process.argv.length === 2) {
-      console.log(chalk.gray(`Auto-launching ${TOOLS[defaultTool as keyof typeof TOOLS].name}...`));
-      runTool(defaultTool, ['.']);
+    // If prompt provided, run it
+    if (options.prompt) {
+      await agent.start(options.prompt);
     } else {
-      interactiveMode();
+      // No prompt - start interactive mode
+      await agent.start();
     }
   });
 
 // Parse arguments
 program.parse();
-
-// If no arguments, run interactive mode
-if (process.argv.length === 2) {
-  (async () => {
-    const defaultTool = await getDefaultTool();
-    if (defaultTool) {
-      console.log(chalk.gray(`Auto-launching ${TOOLS[defaultTool as keyof typeof TOOLS].name}...`));
-      runTool(defaultTool, ['.']);
-    } else {
-      interactiveMode();
-    }
-  })();
-}
