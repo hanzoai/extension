@@ -45,6 +45,7 @@ export class SwarmRunner extends EventEmitter {
 
     try {
       // Find files to process
+      spinner.text = `Searching for files in ${this.options.cwd || process.cwd()}...`;
       this.fileQueue = await this.findFiles();
       spinner.succeed(`Found ${this.fileQueue.length} files to process`);
 
@@ -101,15 +102,27 @@ export class SwarmRunner extends EventEmitter {
         ]
       };
 
-      glob(this.options.pattern || '**/*', options, (err, files) => {
+      // Add timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        reject(new Error('File search timed out'));
+      }, 30000);
+
+      const pattern = this.options.pattern || '**/*';
+      console.log(chalk.gray(`Searching with pattern: ${pattern} in ${options.cwd || process.cwd()}`));
+      
+      glob(pattern, options, (err, files) => {
+        clearTimeout(timeout);
         if (err) {
+          console.error(chalk.red('Glob error:'), err);
           reject(err);
         } else {
+          console.log(chalk.gray(`Found ${files.length} total files`));
           // Filter to only editable files
           const editableFiles = files.filter(file => {
             const ext = path.extname(file);
             return ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.h', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r', '.m', '.mm', '.md', '.txt', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.conf', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd'].includes(ext);
           });
+          console.log(chalk.gray(`Filtered to ${editableFiles.length} editable files`));
           resolve(editableFiles);
         }
       });
@@ -168,8 +181,7 @@ export class SwarmRunner extends EventEmitter {
           GROK_API_KEY: process.env.GROK_API_KEY,
           // Auto-accept edits for non-interactive mode
           CLAUDE_CODE_PERMISSION_MODE: 'acceptEdits'
-        },
-        shell: true
+        }
       });
 
       agent.process = child;
@@ -308,8 +320,7 @@ export class SwarmRunner extends EventEmitter {
     try {
       const testResult = await new Promise<boolean>((resolve) => {
         const child = spawn('claude', ['-p', 'test', '--max-turns', '1'], {
-          env: process.env,
-          shell: true
+          env: process.env
         });
 
         let hasError = false;
@@ -356,7 +367,6 @@ export class SwarmRunner extends EventEmitter {
               ...process.env,
               ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY
             },
-            shell: true,
             stdio: 'inherit'
           });
 
