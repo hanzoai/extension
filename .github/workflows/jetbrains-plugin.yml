@@ -4,12 +4,12 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'jetbrains-plugin/**'
+      - 'pkg/jetbrains/**'
       - '.github/workflows/jetbrains-plugin.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'jetbrains-plugin/**'
+      - 'pkg/jetbrains/**'
       - '.github/workflows/jetbrains-plugin.yml'
 
 jobs:
@@ -30,11 +30,11 @@ jobs:
       uses: gradle/gradle-build-action@v2
     
     - name: Run tests
-      working-directory: ./jetbrains-plugin
+      working-directory: ./pkg/jetbrains
       run: ./gradlew test
     
     - name: Run detekt
-      working-directory: ./jetbrains-plugin
+      working-directory: ./pkg/jetbrains
       run: ./gradlew detekt || true  # Allow failure for now
     
     - name: Upload test results
@@ -42,7 +42,7 @@ jobs:
       if: always()
       with:
         name: test-results
-        path: jetbrains-plugin/build/test-results/test/
+        path: pkg/jetbrains/build/test-results/test/
 
   build:
     name: Build JetBrains Plugin
@@ -62,18 +62,18 @@ jobs:
       uses: gradle/gradle-build-action@v2
     
     - name: Build plugin
-      working-directory: ./jetbrains-plugin
+      working-directory: ./pkg/jetbrains
       run: ./gradlew buildPlugin -x buildSearchableOptions
     
     - name: Verify plugin
-      working-directory: ./jetbrains-plugin
+      working-directory: ./pkg/jetbrains
       run: ./gradlew verifyPlugin
     
     - name: Upload plugin artifact
       uses: actions/upload-artifact@v4
       with:
         name: hanzo-ai-jetbrains-plugin
-        path: jetbrains-plugin/build/distributions/*.zip
+        path: pkg/jetbrains/build/distributions/*.zip
 
   release:
     name: Release JetBrains Plugin
