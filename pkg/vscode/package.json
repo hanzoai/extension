@@ -1,0 +1,359 @@
+{
+	"name": "@hanzo/vscode",
+	"displayName": "Hanzo AI",
+	"description": "The ultimate meta AI development platform. Manage and run all LLMs and CLI tools (Claude, Codex, Gemini, OpenHands, Aider) in one unified interface. Features MCP integration, async execution, git worktrees, and universal context sync.",
+	"version": "1.5.7",
+	"publisher": "hanzo-ai",
+	"private": false,
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/hanzoai/dev.git"
+	},
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"keywords": [
+		"productivity",
+		"AI",
+		"IDE",
+		"project management",
+		"context management",
+		"change tracking",
+		"knowledge base",
+		"documentation",
+		"specification",
+		"analysis"
+	],
+	"icon": "images/icon.png",
+	"galleryBanner": {
+		"color": "#C80000",
+		"theme": "dark"
+	},
+	"activationEvents": [
+		"onStartupFinished",
+		"onCommand:hanzo.openManager",
+		"onCommand:hanzo.openWelcomeGuide",
+		"onCommand:hanzo.reanalyzeProject",
+		"onCommand:hanzo.triggerReminder",
+		"onCommand:hanzo.login",
+		"onCommand:hanzo.logout",
+		"onCommand:hanzo.debug.authState",
+		"onCommand:hanzo.debug.clearAuth",
+		"onCommand:hanzo.checkMetrics",
+		"onCommand:hanzo.resetMetrics"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"chatParticipants": [
+			{
+				"id": "hanzo",
+				"name": "Hanzo",
+				"description": "Ultimate AI engineering toolkit: 200+ LLMs, 4000+ MCP servers, 53+ dev tools",
+				"isSticky": true
+			}
+		],
+		"commands": [
+			{
+				"command": "hanzo.openManager",
+				"title": "Hanzo: Open Project Manager"
+			},
+			{
+				"command": "hanzo.openWelcomeGuide",
+				"title": "Hanzo: View Getting Started Guide"
+			},
+			{
+				"command": "hanzo.reanalyzeProject",
+				"title": "Hanzo: Analyze Project",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "hanzo.triggerReminder",
+				"title": "Hanzo: Show Reminder",
+				"icon": "$(bell)"
+			},
+			{
+				"command": "hanzo.checkMetrics",
+				"title": "Hanzo Debug: Check Impact Metrics",
+				"icon": "$(graph)"
+			},
+			{
+				"command": "hanzo.resetMetrics",
+				"title": "Hanzo Debug: Reset Impact Metrics",
+				"icon": "$(trash)"
+			},
+			{
+				"command": "hanzo.login",
+				"title": "Hanzo: Login"
+			},
+			{
+				"command": "hanzo.logout",
+				"title": "Hanzo: Logout"
+			},
+			{
+				"command": "hanzo.debug.authState",
+				"title": "Hanzo Debug: Check Auth State",
+				"enablement": "isDevelopment"
+			},
+			{
+				"command": "hanzo.debug.clearAuth",
+				"title": "Hanzo Debug: Clear Auth Data",
+				"enablement": "isDevelopment"
+			}
+		],
+		"configuration": {
+			"title": "Hanzo AI Context Manager",
+			"properties": {
+				"hanzo.ide": {
+					"type": "string",
+					"enum": [
+						"cursor",
+						"copilot",
+						"continue",
+						"codium"
+					],
+					"enumDescriptions": [
+						"Using Cursor IDE (.cursorrules)",
+						"Using GitHub Copilot (.github/copilot-instructions.md)",
+						"Using Continue (.continuerules)",
+						"Using Codium (.windsurfrules)"
+					],
+					"default": "cursor",
+					"description": "Select which IDE to generate rules for"
+				},
+				"hanzo.mcp.enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "Enable Model Context Protocol (MCP) server integration"
+				},
+				"hanzo.mcp.transport": {
+					"type": "string",
+					"enum": [
+						"stdio",
+						"tcp"
+					],
+					"default": "stdio",
+					"description": "Transport method for MCP server communication"
+				},
+				"hanzo.mcp.port": {
+					"type": "number",
+					"default": 3000,
+					"description": "Port for MCP server when using TCP transport"
+				},
+				"hanzo.mcp.allowedPaths": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"description": "Paths that MCP tools are allowed to access"
+				},
+				"hanzo.mcp.disableWriteTools": {
+					"type": "boolean",
+					"default": false,
+					"description": "Disable all write operations in MCP tools"
+				},
+				"hanzo.mcp.disableSearchTools": {
+					"type": "boolean",
+					"default": false,
+					"description": "Disable all search operations in MCP tools"
+				},
+				"hanzo.mcp.enabledTools": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"description": "List of explicitly enabled MCP tools"
+				},
+				"hanzo.mcp.disabledTools": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"description": "List of explicitly disabled MCP tools"
+				},
+				"hanzo.api.endpoint": {
+					"type": "string",
+					"default": "https://api.hanzo.ai/ext/v1",
+					"description": "API endpoint for Hanzo services"
+				},
+				"hanzo.debug": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enable debug logging"
+				},
+				"hanzo.llm.provider": {
+					"type": "string",
+					"enum": [
+						"hanzo",
+						"lmstudio",
+						"ollama",
+						"openai",
+						"anthropic"
+					],
+					"default": "hanzo",
+					"description": "LLM provider to use for AI features"
+				},
+				"hanzo.llm.hanzo.apiKey": {
+					"type": "string",
+					"description": "API key for Hanzo AI Gateway"
+				},
+				"hanzo.llm.lmstudio.endpoint": {
+					"type": "string",
+					"default": "http://localhost:1234/v1",
+					"description": "LM Studio API endpoint"
+				},
+				"hanzo.llm.lmstudio.model": {
+					"type": "string",
+					"description": "Model to use in LM Studio"
+				},
+				"hanzo.llm.ollama.endpoint": {
+					"type": "string",
+					"default": "http://localhost:11434",
+					"description": "Ollama API endpoint"
+				},
+				"hanzo.llm.ollama.model": {
+					"type": "string",
+					"default": "llama2",
+					"description": "Model to use in Ollama"
+				},
+				"hanzo.llm.openai.apiKey": {
+					"type": "string",
+					"description": "OpenAI API key"
+				},
+				"hanzo.llm.openai.model": {
+					"type": "string",
+					"default": "gpt-4",
+					"description": "OpenAI model to use"
+				},
+				"hanzo.llm.anthropic.apiKey": {
+					"type": "string",
+					"description": "Anthropic API key"
+				},
+				"hanzo.llm.anthropic.model": {
+					"type": "string",
+					"default": "claude-3-opus-20240229",
+					"description": "Anthropic model to use"
+				}
+			}
+		},
+		"menus": {
+			"editor/title": [
+				{
+					"command": "hanzo.reanalyzeProject",
+					"group": "navigation",
+					"when": "resourceScheme != extension"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "node scripts/compile-main.js || true && npm run build:mcp",
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./",
+		"pretest": "npm run compile && npm run lint",
+		"lint": "eslint .",
+		"test": "node ./out/test/runTest.js",
+		"test:simple": "node test-simple.js",
+		"test:pm": "cross-env MOCHA_TEST_FILE=\"ProjectManager Test Suite\" node ./out/test/runTest.js",
+		"test:auth": "cross-env MOCHA_TEST_FILE=\"Auth and API Test Suite\" node ./out/test/runTest.js",
+		"test:file-collection": "cross-env MOCHA_TEST_FILE=\"FileCollectionService Test Suite\" node ./out/test/runTest.js",
+		"test:mcp": "cross-env MOCHA_TEST_FILE=\"MCP.*Tool Test Suite\" node ./out/test/runTest.js",
+		"test:mcp-proxy": "cross-env MOCHA_TEST_FILE=\"MCP.*Proxy Test\" node ./out/test/runTest.js",
+		"test:mcp-integration": "cross-env MOCHA_TEST_FILE=\"MCP Proxy Integration\" node ./out/test/runTest.js",
+		"test:coverage": "c8 npm test",
+		"test:vitest": "vitest",
+		"test:vitest:coverage": "vitest --coverage",
+		"test:vitest:run": "vitest run --coverage",
+		"build:mcp": "node scripts/build-mcp-standalone.js",
+		"build:claude-desktop": "npm run build:mcp && node scripts/build-claude-desktop.js",
+		"build": "tsc -p ./",
+		"build:dxt": "node scripts/build-dxt.js",
+		"build:npm": "node scripts/build-mcp-npm.js",
+		"build:cursor": "node scripts/build-cursor.js",
+		"build:windsurf": "node scripts/build-windsurf.js",
+		"build:all": "node scripts/build-all-platforms.js",
+		"build:browser-extension": "node src/browser-extension/build.js",
+		"package": "npm run build:all && vsce package",
+		"package:claude": "npm run build:claude-desktop",
+		"package:dxt": "npm run build:dxt",
+		"publish": "npm run package && npx vsce publish && ovsx publish",
+		"publish:npm": "npm run build:claude-desktop && cd dist/claude-desktop && npm publish",
+		"dev": "cross-env VSCODE_ENV=development npm run watch",
+		"dev:mcp": "cross-env MCP_TRANSPORT=stdio node ./out/mcp-server-standalone.js",
+		"start:prod": "cross-env VSCODE_ENV=production npm run watch",
+		"preview": "npx serve . -p 3000",
+		"deploy": "vercel --prod",
+		"deploy:preview": "vercel"
+	},
+	"devDependencies": {
+		"@types/better-sqlite3": "^7.6.13",
+		"@types/inquirer": "^9.0.8",
+		"@types/js-yaml": "^4.0.5",
+		"@types/jsdom": "^21.1.7",
+		"@types/lodash": "^4.17.16",
+		"@types/minimatch": "^5.1.2",
+		"@types/mocha": "^10.0.10",
+		"@types/node": "^16.18.126",
+		"@types/node-fetch": "^2.6.12",
+		"@types/sinon": "^17.0.4",
+		"@types/sinonjs__fake-timers": "^8.1.5",
+		"@types/uuid": "^10.0.0",
+		"@types/vscode": "^1.85.0",
+		"@types/ws": "^8.18.1",
+		"@typescript-eslint/eslint-plugin": "^6.7.0",
+		"@typescript-eslint/parser": "^6.21.0",
+		"@vitest/coverage-v8": "^0.34.6",
+		"@vscode/test-cli": "^0.0.11",
+		"@vscode/test-electron": "^2.5.2",
+		"@vscode/vsce": "^2.24.0",
+		"archiver": "^7.0.1",
+		"better-sqlite3": "^12.2.0",
+		"c8": "^10.1.3",
+		"cross-env": "^7.0.3",
+		"esbuild": "^0.25.6",
+		"eslint": "^8.26.0",
+		"glob": "^10.3.10",
+		"jsdom": "^26.1.0",
+		"mocha": "^11.0.1",
+		"node-fetch": "^3.3.2",
+		"sinon": "^21.0.0",
+		"typescript": "^5.2.2",
+		"vitest": "^0.34.6"
+	},
+	"dependencies": {
+		"@lancedb/lancedb": "^0.21.0",
+		"@modelcontextprotocol/sdk": "^1.14.0",
+		"@supabase/supabase-js": "^2.48.1",
+		"@typescript-eslint/typescript-estree": "^8.35.1",
+		"axios": "^1.6.2",
+		"ignore": "^7.0.3",
+		"js-yaml": "^4.1.0",
+		"lodash": "^4.17.21",
+		"minimatch": "^10.0.1",
+		"rxdb": "^16.15.0",
+		"rxjs": "^7.8.2",
+		"tree-sitter": "^0.21.1",
+		"tree-sitter-javascript": "^0.23.1",
+		"tree-sitter-typescript": "^0.23.2"
+	},
+	"__metadata": {
+		"id": "fd0ca99f-75f0-4318-af8c-660c5e883c16",
+		"publisherId": "c3a25647-333f-4954-a3a7-a5487b656f72",
+		"publisherDisplayName": "hanzo-ai",
+		"targetPlatform": "undefined",
+		"isApplicationScoped": false,
+		"isPreReleaseVersion": false,
+		"hasPreReleaseVersion": false,
+		"installedTimestamp": 1743812550788,
+		"pinned": false,
+		"preRelease": false,
+		"source": "gallery",
+		"size": 15245886
+	}
+}

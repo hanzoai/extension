@@ -1,0 +1,23 @@
+{
+  "name": "@hanzo/site",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Hanzo AI Platform Gateway - Download hub for all platforms",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 3001",
+    "clean": "rm -rf dist",
+    "clean:all": "rm -rf dist node_modules pnpm-lock.yaml",
+    "serve": "vite preview",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "terser": "^5.43.1",
+    "vite": "^5.4.19"
+  }
+}
