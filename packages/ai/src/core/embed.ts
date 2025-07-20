@@ -1,0 +1,1 @@
+export async function embed(params: any): Promise<any> { return { embeddings: [] }; }
