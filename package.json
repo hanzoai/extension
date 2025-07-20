@@ -13,9 +13,11 @@
     "node": ">=18.0.0"
   },
   "scripts": {
+    "compile": "pnpm -r build",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
+    "format": "pnpm -r format",
     "dev:vscode": "pnpm --filter @hanzo/vscode run dev",
     "dev:site": "pnpm --filter @hanzo/site run dev",
     "dev:cli": "pnpm --filter @hanzo/dev run dev",
@@ -24,7 +26,7 @@
     "build:dxt": "pnpm --filter @hanzo/dxt run build",
     "build:tools": "pnpm --filter @hanzo/cli-tools run build",
     "build:site": "pnpm --filter @hanzo/site run build",
-    "build:jetbrains": "cd pkg/jetbrains && ./gradlew build",
+    "build:jetbrains": "cd packages/jetbrains && ./gradlew build",
     "package:vscode": "pnpm --filter @hanzo/vscode run package",
     "package:dxt": "pnpm --filter @hanzo/dxt run package"
   }

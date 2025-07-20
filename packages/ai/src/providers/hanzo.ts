@@ -1,0 +1,1 @@
+export const hanzo = (config: any) => ({ name: 'hanzo', async complete(p: any) { return { content: '' }; }, async *stream(p: any) { yield { type: 'done' as const }; } });

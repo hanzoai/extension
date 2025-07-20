@@ -18,6 +18,7 @@
     "test:swe-bench": "vitest run --testNamePattern=SWE-bench",
     "lint": "eslint src tests --ext .ts",
     "type-check": "tsc --noEmit",
+    "demo:ui": "tsx src/demo/terminal-ui-demo.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
