@@ -5,6 +5,8 @@ import chalk from 'chalk';
 import { ConfigurableAgentLoop, AgentLoopConfig, LLMProvider } from './agent-loop';
 import { SwarmTool } from './swarm-tool';
 import { v4 as uuidv4 } from 'uuid';
+import { TerminalUI } from './terminal-ui';
+import { CommandRegistry, CommandContext, CommandCategory } from './command-registry';
 
 export interface Session {
   id: string;
@@ -22,11 +24,17 @@ export class InteractiveAgent {
   private swarmTool: SwarmTool;
   private swarmEnabled: boolean = false;
   private swarmCount: number = 5;
+  private ui: TerminalUI;
+  private commandRegistry: CommandRegistry;
+  private currentProvider: LLMProvider;
+  private isAuthenticated: boolean = false;
 
   constructor(provider?: LLMProvider, swarmCount?: number) {
     this.sessionId = uuidv4();
     this.sessionDir = path.join(process.cwd(), '.dev-sessions');
     this.swarmTool = new SwarmTool();
+    this.ui = TerminalUI.getInstance();
+    this.commandRegistry = new CommandRegistry();
     
     if (swarmCount) {
       this.swarmEnabled = true;
@@ -38,16 +46,16 @@ export class InteractiveAgent {
       fs.mkdirSync(this.sessionDir, { recursive: true });
     }
 
-    // Create readline interface
-    this.rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      prompt: chalk.cyan('dev> ')
-    });
+    // Initialize provider
+    this.currentProvider = provider || this.getDefaultProvider();
+    this.isAuthenticated = !!this.currentProvider.apiKey;
+
+    // Create readline interface with enhanced prompt
+    this.rl = this.ui.createPrompt();
 
     // Initialize agent with config
     const config: AgentLoopConfig = {
-      provider: provider || this.getDefaultProvider(),
+      provider: this.currentProvider,
       maxIterations: 10,
       enableMCP: true,
       enableBrowser: false,
@@ -58,6 +66,7 @@ export class InteractiveAgent {
 
     this.agent = new ConfigurableAgentLoop(config);
     this.setupAgentTools();
+    this.registerCustomCommands();
   }
 
   private getDefaultProvider(): LLMProvider {
@@ -131,17 +140,55 @@ export class InteractiveAgent {
     });
   }
 
+  private registerCustomCommands(): void {
+    // Override built-in command handlers with custom logic
+    const commandContext: CommandContext = {
+      ui: this.ui,
+      agent: this,
+      session: this.sessionId,
+      provider: this.currentProvider.name
+    };
+
+    // Update the ask command to work with our agent
+    this.commandRegistry.register({
+      name: 'ask',
+      aliases: ['a', 'query'],
+      category: CommandCategory.ASSISTANCE,
+      description: 'Ask a question about your code',
+      usage: 'ask <question>',
+      requiresAuth: true,
+      handler: async (args, context) => {
+        const question = args._.join(' ');
+        if (!question) {
+          this.ui.showError('Please provide a question');
+          return;
+        }
+        await this.handleInput(question);
+      }
+    });
+  }
+
   async start(initialPrompt?: string): Promise<void> {
-    console.log(chalk.bold.cyan('\n🤖 Hanzo Dev Interactive Mode\n'));
-    console.log(chalk.gray('Type your commands or questions. Use /help for available commands.\n'));
+    // Show welcome screen with version
+    const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf-8'));
+    this.ui.showWelcome(packageJson.version || '2.2.0');
 
     if (this.swarmEnabled) {
-      console.log(chalk.yellow(`🐝 Swarm mode enabled with ${this.swarmCount} workers\n`));
+      this.ui.showWarning(`Swarm mode enabled with ${this.swarmCount} workers`);
     }
+
+    if (!this.isAuthenticated) {
+      this.ui.showInfo('No API key detected. Use /login to authenticate with a provider.');
+    }
+
+    // Initialize agent
+    await this.agent.initialize();
 
     // Handle initial prompt if provided
     if (initialPrompt) {
+      this.ui.startSpinner('Processing your request...');
       await this.handleInput(initialPrompt);
+      this.ui.stopSpinner();
     }
 
     // Show prompt
@@ -156,11 +203,23 @@ export class InteractiveAgent {
         return;
       }
 
-      // Handle special commands
-      if (input.startsWith('/')) {
-        await this.handleCommand(input);
-      } else {
-        await this.handleInput(input);
+      // Check if it's a command
+      const commandContext: CommandContext = {
+        ui: this.ui,
+        agent: this,
+        session: this.isAuthenticated ? this.sessionId : undefined,
+        provider: this.currentProvider.name
+      };
+
+      const isCommand = await this.commandRegistry.execute(input, commandContext);
+      
+      if (!isCommand) {
+        // Not a command, send to agent
+        if (!this.isAuthenticated) {
+          this.ui.showError('Please login first using /login');
+        } else {
+          await this.handleInput(input);
+        }
       }
 
       this.rl.prompt();
@@ -168,89 +227,33 @@ export class InteractiveAgent {
 
     // Handle close
     this.rl.on('close', () => {
-      console.log(chalk.gray('\nGoodbye! 👋'));
+      this.ui.showInfo('Goodbye! 👋');
       this.cleanup();
       process.exit(0);
     });
   }
 
-  private async handleCommand(command: string): Promise<void> {
-    const [cmd, ...args] = command.split(' ');
-    
-    switch (cmd) {
-      case '/help':
-        this.showHelp();
-        break;
-        
-      case '/save':
-        await this.saveSession(args[0] || `session-${Date.now()}`);
-        console.log(chalk.green('Session saved!'));
-        break;
-        
-      case '/load':
-        if (args[0]) {
-          const loaded = await this.loadSession(args[0]);
-          if (loaded) {
-            console.log(chalk.green('Session loaded!'));
-          } else {
-            console.log(chalk.red('Session not found!'));
-          }
-        } else {
-          await this.listSessions();
-        }
-        break;
-        
-      case '/clear':
-        console.clear();
-        break;
-        
-      case '/exit':
-      case '/quit':
-        this.rl.close();
-        break;
-        
-      case '/swarm':
-        if (args[0] === 'on') {
-          this.swarmEnabled = true;
-          this.setupAgentTools();
-          console.log(chalk.yellow('Swarm mode enabled'));
-        } else if (args[0] === 'off') {
-          this.swarmEnabled = false;
-          console.log(chalk.gray('Swarm mode disabled'));
-        } else {
-          console.log(chalk.gray(`Swarm mode: ${this.swarmEnabled ? 'ON' : 'OFF'}`));
-        }
-        break;
-        
-      default:
-        console.log(chalk.red(`Unknown command: ${cmd}`));
-        console.log(chalk.gray('Use /help for available commands'));
-    }
-  }
-
   private async handleInput(input: string): Promise<void> {
     try {
+      const spinner = this.ui.startSpinner('Thinking...');
+      
       // Send to agent
       const response = await this.agent.processMessage(input);
+      
+      spinner.stop();
       
       // Response is streamed by the agent if streaming is enabled
       if (!this.agent.config.streamOutput) {
         console.log(response);
       }
     } catch (error) {
-      console.error(chalk.red(`Error: ${error}`));
+      this.ui.renderError(error as Error, 'Processing message');
     }
   }
 
-  private showHelp(): void {
-    console.log(chalk.bold('\nAvailable Commands:'));
-    console.log(chalk.gray('  /help          - Show this help message'));
-    console.log(chalk.gray('  /save [name]   - Save current session'));
-    console.log(chalk.gray('  /load [name]   - Load a previous session (or list if no name)'));
-    console.log(chalk.gray('  /clear         - Clear the screen'));
-    console.log(chalk.gray('  /swarm on/off  - Toggle swarm mode'));
-    console.log(chalk.gray('  /exit          - Exit interactive mode'));
-    console.log(chalk.gray('\nJust type normally to chat with the agent!\n'));
+  // Public method for command registry to access
+  async processMessage(message: string): Promise<void> {
+    await this.handleInput(message);
   }
 
   private async saveSession(name: string): Promise<void> {
@@ -294,13 +297,10 @@ export class InteractiveAgent {
       .map(f => f.replace('.json', ''));
 
     if (files.length === 0) {
-      console.log(chalk.gray('No saved sessions found.'));
+      this.ui.showInfo('No saved sessions found.');
     } else {
-      console.log(chalk.bold('\nSaved Sessions:'));
-      files.forEach(f => {
-        console.log(chalk.gray(`  - ${f}`));
-      });
-      console.log(chalk.gray('\nUse /load <name> to load a session\n'));
+      this.ui.drawBox(files, 'Saved Sessions');
+      this.ui.showInfo('Use /load <name> to load a session');
     }
   }
 
