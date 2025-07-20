@@ -109,10 +109,10 @@ export class SwarmRunner extends EventEmitter {
       
       // Use sync version for reliability
       const files = globSync(pattern, options);
-      console.log(chalk.gray(`Found ${files.length} total files`));
+      console.log(chalk.gray(`Found ${files?.length || 0} total files`));
       
       // Filter to only editable files
-      const editableFiles = files.filter(file => {
+      const editableFiles = (files || []).filter(file => {
         const ext = path.extname(file);
         return ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.h', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r', '.m', '.mm', '.md', '.txt', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.conf', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd'].includes(ext);
       });

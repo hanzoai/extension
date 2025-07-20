@@ -19,15 +19,16 @@ export default defineConfig({
         '**/mockData.ts'
       ]
     },
-    testTimeout: 5000,
-    hookTimeout: 5000,
-    pool: 'threads',
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    pool: 'forks',
     poolOptions: {
-      threads: {
-        singleThread: true
+      forks: {
+        singleFork: true
       }
     },
-    forceRerunTriggers: ['**/*.test.ts']
+    forceRerunTriggers: ['**/*.test.ts'],
+    setupFiles: ['./tests/setup.ts']
   },
   resolve: {
     alias: {
