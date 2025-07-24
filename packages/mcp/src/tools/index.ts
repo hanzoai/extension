@@ -3,6 +3,9 @@
  */
 
 import { Tool } from '../types';
+import { registerTool, getAllRegisteredTools } from './tool-registry';
+
+// Import and register all tool categories
 import { fileTools } from './file-ops';
 import { searchTools } from './search';
 import { shellTools } from './shell';
@@ -11,10 +14,10 @@ import { vectorTools } from './vector-search';
 import { aiTools } from './ai-tools';
 import { astTools } from './ast-search';
 import { todoTools } from './todo';
-import { modePaletteTools } from './mode-palette';
+import { modePresetTools } from './mode-preset';
 
-// Combine all tools
-export const allTools: Tool[] = [
+// Register all tools
+[
   ...fileTools,
   ...searchTools,
   ...shellTools,
@@ -23,13 +26,21 @@ export const allTools: Tool[] = [
   ...aiTools,
   ...astTools,
   ...todoTools,
-  ...modePaletteTools
-];
+  ...modePresetTools
+].forEach(tool => registerTool(tool));
 
-// Create a tool map for quick lookup
-export const toolMap = new Map<string, Tool>(
-  allTools.map(tool => [tool.name, tool])
-);
+// Export functions that return current values
+export function getAllTools(): Tool[] {
+  return getAllRegisteredTools();
+}
+
+export function getToolMap(): Map<string, Tool> {
+  return new Map(getAllRegisteredTools().map(tool => [tool.name, tool]));
+}
+
+// For backward compatibility
+export const allTools = getAllTools();
+export const toolMap = getToolMap();
 
 // Export individual tool categories
 export { fileTools } from './file-ops';
@@ -40,4 +51,7 @@ export { vectorTools } from './vector-search';
 export { aiTools } from './ai-tools';
 export { astTools } from './ast-search';
 export { todoTools } from './todo';
-export { modePaletteTools, modeUtils } from './mode-palette';
+export { modePresetTools, modeUtils } from './mode-preset';
+
+// Export the registry functions
+export { registerTool, getAllRegisteredTools } from './tool-registry';
