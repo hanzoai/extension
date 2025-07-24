@@ -4,7 +4,7 @@
  */
 
 import JsAutoGUI from 'jsautogui';
-import { mouse, keyboard, screen, imageResource } from '@nut-tree/nut-js';
+import { mouse, keyboard, screen, imageResource, Button, Key } from '@nut-tree-fork/nut-js';
 import sharp from 'sharp';
 import Tesseract from 'tesseract.js';
 
@@ -19,7 +19,7 @@ export interface Size {
   height: number;
 }
 
-export interface Region {
+export interface ACIRegion {
   x: number;
   y: number;
   width: number;
@@ -96,7 +96,7 @@ export class ACI {
     if (x !== undefined && y !== undefined) {
       await this.moveTo(x, y);
     }
-    await mouse.doubleClick();
+    await mouse.doubleClick(Button.LEFT);
   }
 
   async drag(fromX: number, fromY: number, toX: number, toY: number): Promise<void> {
@@ -120,41 +120,52 @@ export class ACI {
   }
 
   async press(key: string): Promise<void> {
-    await keyboard.pressKey(key);
+    // Convert string to Key enum if needed
+    const keyEnum = (Key as any)[key.toUpperCase()] || (Key as any)[key];
+    await keyboard.pressKey(keyEnum || key);
   }
 
   async hotkey(...keys: string[]): Promise<void> {
     const modifiers = keys.slice(0, -1);
     const key = keys[keys.length - 1];
     
+    // Convert strings to Key enums
+    const convertKey = (k: string) => {
+      const keyEnum = (Key as any)[k.toUpperCase()] || (Key as any)[k];
+      return keyEnum || k;
+    };
+    
     // Press modifiers
     for (const mod of modifiers) {
-      await keyboard.pressKey(mod);
+      await keyboard.pressKey(convertKey(mod));
     }
     
     // Press final key
-    await keyboard.pressKey(key);
+    await keyboard.pressKey(convertKey(key));
     
     // Release in reverse order
-    await keyboard.releaseKey(key);
+    await keyboard.releaseKey(convertKey(key));
     for (const mod of modifiers.reverse()) {
-      await keyboard.releaseKey(mod);
+      await keyboard.releaseKey(convertKey(mod));
     }
   }
 
   // Screen operations
-  async screenshot(region?: Region): Promise<Screenshot> {
+  async screenshot(region?: ACIRegion): Promise<Screenshot> {
     const screenSize = await screen.width();
     const screenHeight = await screen.height();
     
     let image: any;
     if (region) {
-      image = await screen.grabRegion({
+      // Convert ACIRegion to nut-js Region format
+      const nutRegion = {
         left: region.x,
         top: region.y,
         width: region.width,
-        height: region.height
-      });
+        height: region.height,
+        area: () => region.width * region.height
+      };
+      image = await screen.grabRegion(nutRegion);
     } else {
       image = await screen.grab();
     }
@@ -179,7 +190,7 @@ export class ACI {
   async locateOnScreen(imagePath: string, confidence: number = 0.9): Promise<Point | null> {
     try {
       const location = await screen.find(imageResource(imagePath));
-      return { x: location.x, y: location.y };
+      return { x: location.left, y: location.top };
     } catch {
       return null;
     }
@@ -188,14 +199,14 @@ export class ACI {
   async locateAllOnScreen(imagePath: string, confidence: number = 0.9): Promise<Point[]> {
     try {
       const locations = await screen.findAll(imageResource(imagePath));
-      return locations.map(loc => ({ x: loc.x, y: loc.y }));
+      return locations.map(loc => ({ x: loc.left, y: loc.top }));
     } catch {
       return [];
     }
   }
 
   // OCR operations
-  async readText(region?: Region): Promise<string> {
+  async readText(region?: ACIRegion): Promise<string> {
     if (!this.ocrWorker) {
       throw new Error('OCR not initialized. Set ocr: true in options.');
     }
@@ -296,7 +307,7 @@ export class ACI {
 }
 
 // Export convenience functions
-export async function screenshot(region?: Region): Promise<Screenshot> {
+export async function screenshot(region?: ACIRegion): Promise<Screenshot> {
   const aci = new ACI();
   return aci.screenshot(region);
 }

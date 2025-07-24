@@ -23,8 +23,8 @@
   "author": "Hanzo AI",
   "license": "MIT",
   "dependencies": {
-    "jsautogui": "^0.1.8",
-    "@nut-tree/nut-js": "^4.2.2",
+    "jsautogui": "^2.0.9",
+    "@nut-tree-fork/nut-js": "^4.2.6",
     "robotjs": "^0.6.0",
     "sharp": "^0.33.5",
     "tesseract.js": "^5.1.1"
