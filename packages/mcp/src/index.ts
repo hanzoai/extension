@@ -41,8 +41,8 @@ export async function createMCPServer(config?: {
     customTools = []
   } = config || {};
   
-  // Import tools
-  const { allTools, toolMap } = await import('./tools/index.js');
+  // Import tools and mode utils
+  const { allTools, toolMap, modeUtils } = await import('./tools/index.js');
   
   // Combine built-in and custom tools
   const combinedTools = [...allTools, ...customTools];
@@ -58,10 +58,18 @@ export async function createMCPServer(config?: {
     }
   );
   
-  // Handle tool listing
+  // Handle tool listing with mode filtering
   server.setRequestHandler(ListToolsRequestSchema, async () => {
+    // Get available tools based on current mode
+    const availableToolNames = modeUtils.getAvailableTools();
+    const filteredTools = combinedTools.filter(tool => 
+      availableToolNames.includes(tool.name) || 
+      // Always include mode/palette management tools
+      ['mode_switch', 'mode_list', 'palette_select', 'palette_list'].includes(tool.name)
+    );
+    
     return {
-      tools: combinedTools.map(tool => ({
+      tools: filteredTools.map(tool => ({
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema
@@ -69,7 +77,7 @@ export async function createMCPServer(config?: {
     };
   });
   
-  // Handle tool execution
+  // Handle tool execution with mode checking
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const tool = combinedToolMap.get(request.params.name);
     
@@ -78,6 +86,19 @@ export async function createMCPServer(config?: {
         content: [{
           type: 'text',
           text: `Unknown tool: ${request.params.name}`
+        }],
+        isError: true
+      };
+    }
+    
+    // Check if tool is available in current mode
+    const modeManagementTools = ['mode_switch', 'mode_list', 'palette_select', 'palette_list', 'mode_create', 'shortcut'];
+    if (!modeManagementTools.includes(tool.name) && !modeUtils.isToolAvailable(tool.name)) {
+      const currentMode = modeUtils.getCurrentMode();
+      return {
+        content: [{
+          type: 'text',
+          text: `Tool '${tool.name}' is not available in ${currentMode.name} mode. Switch modes with 'mode_switch' or use 'mode_list' to see available modes.`
         }],
         isError: true
       };
