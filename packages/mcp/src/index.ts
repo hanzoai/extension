@@ -42,7 +42,10 @@ export async function createMCPServer(config?: {
   } = config || {};
   
   // Import tools and mode utils
-  const { allTools, toolMap, modeUtils } = await import('./tools/index.js');
+  const { getAllRegisteredTools, modeUtils } = await import('./tools/index.js');
+  
+  // Get all registered tools
+  const allTools = getAllRegisteredTools();
   
   // Combine built-in and custom tools
   const combinedTools = [...allTools, ...customTools];
@@ -64,8 +67,8 @@ export async function createMCPServer(config?: {
     const availableToolNames = modeUtils.getAvailableTools();
     const filteredTools = combinedTools.filter(tool => 
       availableToolNames.includes(tool.name) || 
-      // Always include mode/palette management tools
-      ['mode_switch', 'mode_list', 'palette_select', 'palette_list'].includes(tool.name)
+      // Always include mode/preset management tools
+      ['mode_switch', 'mode_list', 'preset_select', 'preset_list'].includes(tool.name)
     );
     
     return {
@@ -92,7 +95,7 @@ export async function createMCPServer(config?: {
     }
     
     // Check if tool is available in current mode
-    const modeManagementTools = ['mode_switch', 'mode_list', 'palette_select', 'palette_list', 'mode_create', 'shortcut'];
+    const modeManagementTools = ['mode_switch', 'mode_list', 'preset_select', 'preset_list', 'mode_create', 'shortcut'];
     if (!modeManagementTools.includes(tool.name) && !modeUtils.isToolAvailable(tool.name)) {
       const currentMode = modeUtils.getCurrentMode();
       return {
