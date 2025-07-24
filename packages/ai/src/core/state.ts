@@ -187,18 +187,20 @@ export class State extends EventEmitter {
   
   // Persistence methods
   private save(): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    // Only available in browser environments
+    if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
       const data = {
         state: this.toJSON(),
         history: this.history
       };
-      window.localStorage.setItem('hanzo-ai-state', JSON.stringify(data));
+      (globalThis as any).localStorage.setItem('hanzo-ai-state', JSON.stringify(data));
     }
   }
   
   private load(): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const stored = window.localStorage.getItem('hanzo-ai-state');
+    // Only available in browser environments
+    if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
+      const stored = (globalThis as any).localStorage.getItem('hanzo-ai-state');
       if (stored) {
         try {
           const data = JSON.parse(stored);
