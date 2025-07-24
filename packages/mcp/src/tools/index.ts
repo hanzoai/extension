@@ -9,6 +9,8 @@ import { shellTools } from './shell';
 import { editTools } from './edit';
 import { vectorTools } from './vector-search';
 import { aiTools } from './ai-tools';
+import { astTools } from './ast-search';
+import { todoTools } from './todo';
 
 // Combine all tools
 export const allTools: Tool[] = [
@@ -17,7 +19,9 @@ export const allTools: Tool[] = [
   ...shellTools,
   ...editTools,
   ...vectorTools,
-  ...aiTools
+  ...aiTools,
+  ...astTools,
+  ...todoTools
 ];
 
 // Create a tool map for quick lookup
@@ -32,3 +36,5 @@ export { shellTools } from './shell';
 export { editTools } from './edit';
 export { vectorTools } from './vector-search';
 export { aiTools } from './ai-tools';
+export { astTools } from './ast-search';
+export { todoTools } from './todo';
