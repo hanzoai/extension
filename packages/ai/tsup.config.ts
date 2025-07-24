@@ -6,7 +6,7 @@ export default defineConfig({
     'server/index': 'src/server/index.ts',
   },
   format: ['cjs', 'esm'],
-  dts: false, // Disable type generation for now
+  dts: false, // Temporarily disable type generation - needs fixing
   splitting: false,
   sourcemap: true,
   clean: true,
