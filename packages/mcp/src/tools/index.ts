@@ -11,6 +11,7 @@ import { vectorTools } from './vector-search';
 import { aiTools } from './ai-tools';
 import { astTools } from './ast-search';
 import { todoTools } from './todo';
+import { modePaletteTools } from './mode-palette';
 
 // Combine all tools
 export const allTools: Tool[] = [
@@ -21,7 +22,8 @@ export const allTools: Tool[] = [
   ...vectorTools,
   ...aiTools,
   ...astTools,
-  ...todoTools
+  ...todoTools,
+  ...modePaletteTools
 ];
 
 // Create a tool map for quick lookup
@@ -38,3 +40,4 @@ export { vectorTools } from './vector-search';
 export { aiTools } from './ai-tools';
 export { astTools } from './ast-search';
 export { todoTools } from './todo';
+export { modePaletteTools, modeUtils } from './mode-palette';
