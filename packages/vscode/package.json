@@ -1,5 +1,5 @@
 {
-	"name": "@hanzo/vscode",
+	"name": "@hanzo/extension",
 	"displayName": "Hanzo AI",
 	"description": "The ultimate meta AI development platform. Manage and run all LLMs and CLI tools (Claude, Codex, Gemini, OpenHands, Aider) in one unified interface. Features MCP integration, async execution, git worktrees, and universal context sync.",
 	"version": "1.5.7",
@@ -143,6 +143,40 @@
 					"default": 3000,
 					"description": "Port for MCP server when using TCP transport"
 				},
+				"hanzo.mcp.backend": {
+					"type": "string",
+					"enum": [
+						"auto",
+						"python",
+						"typescript",
+						"rust",
+						"local-node"
+					],
+					"enumDescriptions": [
+						"Auto-detect: prefer Python (uvx) if available, fallback to TypeScript",
+						"Python MCP via uvx (recommended, most comprehensive tools)",
+						"Built-in TypeScript MCP server",
+						"Rust MCP binary (hanzo-mcp)",
+						"Connect to local hanzod node"
+					],
+					"default": "auto",
+					"description": "MCP backend to use. Python via uvx is recommended for the most comprehensive tool support."
+				},
+				"hanzo.mcp.pythonCommand": {
+					"type": "string",
+					"default": "uvx hanzo-mcp",
+					"description": "Command to run Python MCP server (e.g., 'uvx hanzo-mcp' or 'python -m hanzo_mcp')"
+				},
+				"hanzo.mcp.rustBinary": {
+					"type": "string",
+					"default": "hanzo-mcp",
+					"description": "Path to Rust MCP binary (when backend is 'rust')"
+				},
+				"hanzo.mcp.localNodeUrl": {
+					"type": "string",
+					"default": "http://localhost:8080",
+					"description": "URL of local hanzod node (when backend is 'local-node')"
+				},
 				"hanzo.mcp.allowedPaths": {
 					"type": "array",
 					"items": {
@@ -160,6 +194,11 @@
 					"type": "boolean",
 					"default": false,
 					"description": "Disable all search operations in MCP tools"
+				},
+				"hanzo.mcp.disableBrowserTool": {
+					"type": "boolean",
+					"default": false,
+					"description": "Disable the built-in browser tool (useful when using Antigravity's native browser)"
 				},
 				"hanzo.mcp.enabledTools": {
 					"type": "array",
@@ -279,7 +318,7 @@
 		"build:windsurf": "node scripts/build-windsurf.js",
 		"build:all": "node scripts/build-all-platforms.js",
 		"build:browser-extension": "node src/browser-extension/build.js",
-		"package": "npm run build:all && vsce package",
+		"package": "npm run build:all && sed -i '' 's/\"name\": \"@hanzo\\/extension\"/\"name\": \"hanzo-extension\"/' package.json && vsce package --no-dependencies; sed -i '' 's/\"name\": \"hanzo-extension\"/\"name\": \"@hanzo\\/extension\"/' package.json",
 		"package:claude": "npm run build:claude-desktop",
 		"package:dxt": "npm run build:dxt",
 		"publish": "npm run package && npx vsce publish && ovsx publish",
