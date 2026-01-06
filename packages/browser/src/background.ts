@@ -1,14 +1,24 @@
 // Background Service Worker for Browser Extension
 import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
+import { getCDPBridge, CDPBridge } from './cdp-bridge';
 
 // Initialize browser control
 const browserControl = new BrowserControl();
 const webgpuAI = new WebGPUAI();
 
-// Initialize WebGPU on startup
+// Initialize CDP bridge for hanzo-mcp integration
+const cdpBridge: CDPBridge = getCDPBridge();
+
+// Initialize WebGPU and CDP on startup
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('[Hanzo] Extension installed, initializing WebGPU...');
+  console.log('[Hanzo] Extension installed, initializing...');
+  
+  // Initialize CDP bridge for hanzo-mcp browser tool integration
+  // Default port 9223 (one above Chrome's default 9222)
+  const cdpPort = parseInt(process.env.HANZO_CDP_PORT || '9223');
+  cdpBridge.startWebSocketServer(cdpPort);
+  console.log(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
   
   const gpuAvailable = await webgpuAI.initialize();
   if (gpuAvailable) {
@@ -76,6 +86,79 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     case 'listTabFS':
       const tabs = await browserControl.listTabs();
       sendResponse({ success: true, tabs });
+      break;
+      
+    // CDP bridge commands for hanzo-mcp integration
+    case 'cdp.attach':
+      try {
+        const attached = await cdpBridge.attach(request.tabId);
+        sendResponse({ success: attached });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+      
+    case 'cdp.detach':
+      try {
+        await cdpBridge.detach(request.tabId);
+        sendResponse({ success: true });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+      
+    case 'cdp.send':
+      try {
+        const result = await cdpBridge.send(request.tabId, request.method, request.params);
+        sendResponse({ success: true, result });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+      
+    case 'cdp.screenshot':
+      try {
+        const screenshot = await cdpBridge.screenshot(request.tabId, request.options);
+        sendResponse({ success: true, data: screenshot });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+      
+    case 'cdp.click':
+      try {
+        const clicked = await cdpBridge.clickSelector(request.tabId, request.selector);
+        sendResponse({ success: clicked });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+      
+    case 'cdp.fill':
+      try {
+        const filled = await cdpBridge.fillSelector(request.tabId, request.selector, request.value);
+        sendResponse({ success: filled });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+      
+    case 'cdp.navigate':
+      try {
+        await cdpBridge.navigate(request.tabId, request.url);
+        sendResponse({ success: true });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+      
+    case 'cdp.evaluate':
+      try {
+        const evalResult = await cdpBridge.evaluate(request.tabId, request.expression);
+        sendResponse({ success: true, result: evalResult });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
       break;
   }
 }
