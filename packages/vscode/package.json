@@ -379,7 +379,8 @@
 		"rxjs": "^7.8.2",
 		"tree-sitter": "^0.21.1",
 		"tree-sitter-javascript": "^0.23.1",
-		"tree-sitter-typescript": "^0.23.2"
+		"tree-sitter-typescript": "^0.23.2",
+		"zod": "^3.25.71"
 	},
 	"__metadata": {
 		"id": "fd0ca99f-75f0-4318-af8c-660c5e883c16",

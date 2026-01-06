@@ -54,59 +54,59 @@ export class MCPTools {
 
     async initialize() {
         console.log('[MCPTools] Initializing tools');
-        
+
         // Register tool handlers for batch tool
         const toolHandlers = new Map<string, (args: any) => Promise<any>>();
-        
+
         // Create all tools - unified without duplicates
         const allTools = [
             // File System (unified)
             createUnifiedReadTool(this.context),  // Replaces read from filesystem
             ...createFileSystemTools(this.context).filter(t => t.name !== 'read'),
-            
+
             // Shell & Process
             ...createShellTools(this.context),
             ...createBashTools(this.context),
             createProcessTool(this.context),
-            
+
             // Search (unified)
             ...createSearchTools(this.context),
             ...createGitSearchTools(this.context),
             createUnifiedSearchTool(this.context),
-            
+
             // Development Tools
             ...createJupyterTools(this.context),
             ...createEditorTools(this.context),
             createUnifiedProjectAnalyzeTool(this.context),
-            
+
             // AI & Agents
             ...createAgentTools(this.context),
             ...this.aiTools.getTools(),
             createThinkTool(this.context),
             createCriticTool(this.context),
             createZenTool(this.context),
-            
+
             // Task Management
             ...createTodoTools(this.context),
             createUnifiedTodoTool(this.context),
-            
+
             // Database & Storage
             ...createDatabaseTools(this.context),
             ...createVectorTools(this.context),
-            
+
             // LLM & Platform
             ...createLLMTools(this.context),
             ...createHanzoPlatformMCPTools(this.context),
-            
+
             // MCP Management
             ...createMCPManagementTools(this.context),
             ...createMCPRunnerTools(this.context),
             ...createMCPUniversalProxyTools(this.context),
-            
+
             // Browser & Web
             ...createBrowserTools(this.context),
             createWebFetchTool(this.context),
-            
+
             // Configuration & System
             ...createSystemTools(this.context),
             ...createPaletteTools(this.context),
@@ -114,37 +114,37 @@ export class MCPTools {
             createRulesTool(this.context),
             createModeTool(this.context),
             createUnixAliasTool(this.context),
-            
+
             // Batch operations
             ...this.batchTools.getTools(),
-            
+
             // Dev tools for agent spawning
             ...createDevTools(this.devToolManager),
-            
+
             // Dynamic Unix aliases
             ...registerUnixAliasTools(this.context)
             // createASTAnalyzerTool(this.context),
             // createTreeSitterAnalyzerTool(this.context)
         ];
-        
+
         // Wrap tools with session tracking
         const wrappedTools = wrapToolsWithTracking(allTools as any, this.context);
-        
+
         // Register wrapped tools
         this.registerTools(wrappedTools);
-        
+
         // Register tool handlers with batch tool
         for (const [name, tool] of this.tools) {
             this.batchTools.registerToolHandler(name, tool.handler);
         }
-        
+
         console.log(`[MCPTools] Registered ${this.tools.size} tools`);
     }
 
     private registerTools(tools: MCPTool[]) {
         for (const tool of tools) {
             this.tools.set(tool.name, tool);
-            
+
             // Check if tool is enabled
             if (this.isToolEnabled(tool.name)) {
                 this.enabledTools.add(tool.name);
@@ -157,7 +157,7 @@ export class MCPTools {
         const config = vscode.workspace.getConfiguration('hanzo.mcp');
         const enabled = config.get<string[]>('enabledTools', []);
         const disabled = config.get<string[]>('disabledTools', []);
-        
+
         // Default enabled tools if not configured
         if (enabled.length === 0) {
             this.enabledTools = new Set([
@@ -169,7 +169,7 @@ export class MCPTools {
                 'git_search', 'content_replace', 'diff',
                 // Shell
                 'run_command', 'open', 'process',
-                'bash', 'run_background', 'processes', 'pkill', 'logs',
+                'bash', 'zsh', 'run_background', 'processes', 'pkill', 'logs',
                 'npx', 'uvx',
                 // Development
                 'todo_read', 'todo_write', 'todo_unified',
@@ -177,7 +177,7 @@ export class MCPTools {
                 // Configuration
                 'config', 'rules', 'palette', 'mode',
                 // Database & AI
-                'graph_db', 'vector_index', 'vector_search', 
+                'graph_db', 'vector_index', 'vector_search',
                 'vector_similar', 'document_store',
                 // AI/LLM
                 'zen', 'llm', 'consensus', 'llm_manage', 'agent',
@@ -193,7 +193,7 @@ export class MCPTools {
         } else {
             this.enabledTools = new Set(enabled);
         }
-        
+
         // Remove disabled tools
         for (const tool of disabled) {
             this.enabledTools.delete(tool);
@@ -202,37 +202,37 @@ export class MCPTools {
 
     private isToolEnabled(toolName: string): boolean {
         const config = vscode.workspace.getConfiguration('hanzo.mcp');
-        
+
         // Check category-level settings
         if (toolName.startsWith('write') || toolName === 'edit' || toolName === 'multi_edit') {
             if (config.get<boolean>('disableWriteTools', false)) {
                 return false;
             }
         }
-        
+
         if (toolName.includes('search') || toolName === 'grep' || toolName === 'symbols') {
             if (config.get<boolean>('disableSearchTools', false)) {
                 return false;
             }
         }
-        
+
         // Don't allow individual tool management tools (they're in config now)
         if (toolName === 'tool_enable' || toolName === 'tool_disable' || toolName === 'tool_list') {
             return false;
         }
-        
+
         return this.enabledTools.has(toolName);
     }
 
     getAllTools(): MCPTool[] {
         const enabledTools: MCPTool[] = [];
-        
+
         for (const [name, tool] of this.tools) {
             if (this.isToolEnabled(name)) {
                 enabledTools.push(tool);
             }
         }
-        
+
         return enabledTools;
     }
 
