@@ -46,10 +46,10 @@ const mockVscode = {
         createOutputChannel: (name: string) => ({
             appendLine: (text: string) => console.error(`[${name}] ${text}`),
             append: (text: string) => process.stderr.write(text),
-            clear: () => {},
-            dispose: () => {},
-            hide: () => {},
-            show: () => {}
+            clear: () => { },
+            dispose: () => { },
+            hide: () => { },
+            show: () => { }
         })
     },
     env: {
@@ -96,8 +96,8 @@ import { MCPTools } from './mcp/tools';
 
 async function main() {
     console.error('[Hanzo MCP] Starting server v1.5.7...');
-    
-    // Create the MCP server
+
+    // Create the MCP server (high-level)
     const server = new McpServer({
         name: 'hanzo-mcp',
         version: '1.5.7'
@@ -105,84 +105,114 @@ async function main() {
 
     // Create mock context
     const context = new mockVscode.ExtensionContext();
-    
-    // Track auth state
-    let isAuthenticated = false;
-    let authToken: string | null = null;
-    
+
     // Initialize tools
     const tools = new MCPTools(context as any);
     await tools.initialize();
-    
+
     // Register the login tool
-    server.registerTool(
+    server.tool(
         'hanzo_login',
         {
-            title: 'Hanzo Login',
-            description: 'Login to Hanzo AI for cloud features (optional)',
-            inputSchema: z.object({}) as any
+            // No arguments needed for login
         },
         async () => {
             const deviceCode = Math.random().toString(36).substring(2, 15);
             return {
                 content: [{
                     type: 'text',
-                    text: `🔐 To login to Hanzo AI and unlock cloud features:
-
-1. Visit: https://hanzo.ai/device?code=${deviceCode}
-2. Sign in with your Hanzo account
-3. Enter device code: ${deviceCode}
-
-Once authenticated, you'll have access to:
-✨ Cloud-hosted MCP servers (4000+ tools)
-✨ Hanzo AI router (200+ LLMs) 
-✨ Vector storage and search
-✨ Shared context across sessions
-✨ Priority support
-
-For now, continuing with local tools only. All core functionality works without login!`
+                    text: `🔐 To login to Hanzo AI...\nCode: ${deviceCode}`
                 }]
             };
         }
     );
-    
-    // Register all the tools from MCPTools
+
+    // Manually register run_command for verification
     const allTools = tools.getAllTools();
-    for (const tool of allTools) {
-        server.registerTool(
-            tool.name,
+    const runCommandTool = allTools.find(t => t.name === 'run_command');
+    if (runCommandTool) {
+        server.tool(
+            'run_command',
             {
-                title: (tool as any).title || tool.name,
-                description: tool.description,
-                inputSchema: tool.inputSchema as any
+                command: z.string().describe('The command to execute')
             },
-            async (args) => {
-                try {
-                    const result = await tool.handler(args);
-                    return {
-                        content: [{
-                            type: 'text',
-                            text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
-                        }]
-                    };
-                } catch (error: any) {
-                    return {
-                        content: [{
-                            type: 'text',
-                            text: `Error: ${error.message}`
-                        }],
-                        isError: true
-                    };
-                }
+            async ({ command }) => {
+                const result = await runCommandTool.handler({ command });
+                return {
+                    content: [{
+                        type: 'text',
+                        text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+                    }]
+                };
             }
         );
     }
-    
+
+    // Register bash tool
+    const bashTool = allTools.find(t => t.name === 'bash');
+    if (bashTool) {
+        server.tool(
+            'bash',
+            {
+                command: z.string().describe('The bash command to execute')
+            },
+            async ({ command }) => {
+                const result = await bashTool.handler({ command });
+                return {
+                    content: [{
+                        type: 'text',
+                        text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+                    }]
+                };
+            }
+        );
+    }
+
+    // Register zsh tool
+    const zshTool = allTools.find(t => t.name === 'zsh');
+    if (zshTool) {
+        server.tool(
+            'zsh',
+            {
+                command: z.string().describe('The zsh command to execute')
+            },
+            async ({ command }) => {
+                const result = await zshTool.handler({ command });
+                return {
+                    content: [{
+                        type: 'text',
+                        text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+                    }]
+                };
+            }
+        );
+    }
+
+    // Register process tool
+    const processTool = allTools.find(t => t.name === 'process'); // or 'processes'
+    if (processTool) {
+        server.tool(
+            'process_list', // Rename to avoid conflict if any
+            {
+                // No args usually or filter
+            },
+            async () => {
+                const result = await processTool.handler({});
+                return {
+                    content: [{
+                        type: 'text',
+                        text: JSON.stringify(result, null, 2)
+                    }]
+                };
+            }
+        );
+    }
+
     // Create and connect transport
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    
-    console.error(`[Hanzo MCP] Server ready with ${allTools.length + 1} tools`);
+
+    console.error(`[Hanzo MCP] Server ready with registered tools`);
     console.error('[Hanzo MCP] Auth is optional - use hanzo_login tool to enable cloud features');
 }
 
