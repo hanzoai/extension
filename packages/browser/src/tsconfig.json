@@ -15,11 +15,10 @@
     "moduleResolution": "node"
   },
   "include": [
-    "../browser-extension/**/*.ts",
-    "../mcp-tools/browser-extension-server.ts"
+    "**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "../node_modules"
   ]
 }

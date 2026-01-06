@@ -8,6 +8,7 @@ import { MCPServer } from './mcp/server';
 import { getConfig } from './config';
 import { getWebviewContent } from './webview/content';
 import { HanzoChatParticipant } from './chat/hanzo-chat-participant';
+import { PythonSdkSetup } from './mcp/python-setup';
 
 let projectManager: ProjectManager | undefined;
 let authManager: AuthManager | undefined;
@@ -25,14 +26,14 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBar = StatusBarService.getInstance();
     reminderService = new ReminderService(context);
     metricsService = HanzoMetricsService.getInstance(context);
-    
+
     // Initialize MCP Server for Claude Desktop integration
     const config = getConfig();
     if (config.mcp.enabled) {
         mcpServer = new MCPServer(context);
         await mcpServer.initialize();
     }
-    
+
     // Initialize VS Code Chat Participant
     try {
         chatParticipant = new HanzoChatParticipant(context);
@@ -92,7 +93,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (!isAuth) {
         vscode.window.showInformationMessage('Please login to use Hanzo AI features');
     }
-    
+
     // Auto-open manager on startup if configured
     const autoOpenManager = vscode.workspace.getConfiguration('hanzo').get<boolean>('autoOpenManager', false);
     if (autoOpenManager) {
@@ -101,6 +102,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize reminder service
     // Reminder service starts automatically in constructor
+
+    // Setup Python SDK (Auto-discovery)
+    const pythonSetup = new PythonSdkSetup(context);
+    // Don't await this to avoid blocking activation
+    pythonSetup.setup().catch(console.error);
 }
 
 function openProjectManager(context: vscode.ExtensionContext) {
@@ -115,7 +121,7 @@ function openProjectManager(context: vscode.ExtensionContext) {
     );
 
     projectManager = new ProjectManager(panel, context);
-    
+
     panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
 
     panel.webview.onDidReceiveMessage(
