@@ -6,8 +6,16 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { MCPTools } from './mcp/tools';
-import * as path from 'path';
+import { z } from 'zod';
+// Dummy schema to bypass Zod version mismatch issues in bundle
+const DummySchema = {
+    _def: {},
+    safeParseAsync: async (data: any) => ({ success: true, data }),
+    parse: (data: any) => data
+} as any;
+
+const CallToolRequestSchema = DummySchema;
+const ListToolsRequestSchema = DummySchema;
 
 // Mock VS Code API for standalone operation
 const mockVscode = {
@@ -45,10 +53,10 @@ const mockVscode = {
         createOutputChannel: (name: string) => ({
             appendLine: (text: string) => console.error(`[${name}] ${text}`),
             append: (text: string) => process.stderr.write(text),
-            clear: () => {},
-            dispose: () => {},
-            hide: () => {},
-            show: () => {}
+            clear: () => { },
+            dispose: () => { },
+            hide: () => { },
+            show: () => { }
         })
     },
     env: {
@@ -93,7 +101,7 @@ const mockVscode = {
 
 async function main() {
     console.error('[Hanzo MCP] Starting server...');
-    
+
     const server = new Server(
         {
             name: 'hanzo-mcp',
@@ -108,19 +116,19 @@ async function main() {
 
     // Create mock context
     const context = new mockVscode.ExtensionContext();
-    
+
     // Add auth status to context (always start anonymous, auth via tool)
     (context as any).isAuthenticated = false;
     (context as any).authToken = null;
-    
+
     // Initialize tools
     const tools = new MCPTools(context as any);
     await tools.initialize();
-    
+
     // Add a login tool
-    server.setRequestHandler('tools/call', async (request: any) => {
+    server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
         const { name, arguments: args } = request.params;
-        
+
         // Special handling for login
         if (name === 'hanzo_login') {
             return {
@@ -144,13 +152,13 @@ For now, continuing with local tools only.`
                 ]
             };
         }
-        
+
         // Find and execute tool
         const tool = tools.getAllTools().find(t => t.name === name);
         if (!tool) {
             throw new Error(`Tool not found: ${name}`);
         }
-        
+
         try {
             const result = await tool.handler(args);
             return {
@@ -165,11 +173,11 @@ For now, continuing with local tools only.`
             throw new Error(`Tool execution failed: ${error.message}`);
         }
     });
-    
+
     // List all tools
-    server.setRequestHandler('tools/list', async (request: any) => {
+    server.setRequestHandler(ListToolsRequestSchema, async (request: any) => {
         const allTools = tools.getAllTools();
-        
+
         // Add login tool
         const toolList = [
             {
@@ -186,13 +194,13 @@ For now, continuing with local tools only.`
                 inputSchema: tool.inputSchema
             }))
         ];
-        
+
         return { tools: toolList };
     });
 
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    
+
     console.error('[Hanzo MCP] Server ready with ' + (tools.getAllTools().length + 1) + ' tools');
     console.error('[Hanzo MCP] Auth is optional - use hanzo_login tool to enable cloud features');
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { BrowserExtensionServer } from '../mcp-tools/browser-extension-server';
+import { BrowserExtensionServer } from './browser-extension-server';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -23,14 +23,14 @@ program
   .action(async (options) => {
     const port = parseInt(options.port);
     const projectRoot = path.resolve(options.root);
-    
+
     console.log(chalk.blue('🚀 Starting Hanzo Browser Extension Server'));
     console.log(chalk.gray(`   Port: ${port}`));
     console.log(chalk.gray(`   Project root: ${projectRoot}`));
-    
+
     // Start the server
     const server = new BrowserExtensionServer(port, projectRoot);
-    
+
     server.on('elementSelected', (data) => {
       console.log(chalk.green('✓ Element selected:'));
       console.log(chalk.gray(`   File: ${data.file}`));
@@ -38,17 +38,17 @@ program
       if (data.column) console.log(chalk.gray(`   Column: ${data.column}`));
       console.log(chalk.gray(`   Framework: ${data.framework || 'unknown'}`));
     });
-    
+
     console.log(chalk.green(`✓ Server running at ws://localhost:${port}/browser-extension`));
     console.log(chalk.yellow('\n📝 Instructions:'));
     console.log('1. Install the browser extension (run with --install-extension flag)');
     console.log('2. Alt+Click any element in your browser to navigate to its source code');
     console.log('3. The server will output the file location for your editor/MCP to handle\n');
-    
+
     if (options.installExtension) {
       await installExtension();
     }
-    
+
     // Keep the process running
     process.on('SIGINT', () => {
       console.log(chalk.red('\n⏹ Shutting down server...'));
@@ -69,9 +69,9 @@ program
   .description('Run integration tests with mock browser events')
   .action(async () => {
     console.log(chalk.blue('🧪 Running integration tests...'));
-    
+
     const server = new BrowserExtensionServer(3001);
-    
+
     // Simulate browser events
     const testEvents = [
       {
@@ -100,16 +100,16 @@ program
         fallbackId: 'hanzo-id-12345'
       }
     ];
-    
+
     console.log(chalk.gray('Sending test events...\n'));
-    
+
     // Wait for server to start
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Create a mock WebSocket client
     const WebSocket = require('ws');
     const ws = new WebSocket('ws://localhost:3001/browser-extension');
-    
+
     ws.on('open', () => {
       testEvents.forEach((event, index) => {
         setTimeout(() => {
@@ -118,7 +118,7 @@ program
           ws.send(JSON.stringify(event));
         }, index * 1000);
       });
-      
+
       setTimeout(() => {
         ws.close();
         server.close();
@@ -130,14 +130,14 @@ program
 
 async function installExtension() {
   console.log(chalk.blue('📦 Building browser extension...'));
-  
+
   const buildScript = path.join(__dirname, '..', 'browser-extension', 'build.js');
-  
+
   return new Promise<void>((resolve, reject) => {
     const build = spawn('node', [buildScript], {
       stdio: 'inherit'
     });
-    
+
     build.on('close', (code) => {
       if (code === 0) {
         console.log(chalk.green('\n✓ Extension built successfully!'));

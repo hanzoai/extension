@@ -10,10 +10,41 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     const activeProcesses = new Map<string, any>();
 
+    // Helper to execute commands in a specific shell
+    const executeShellCommand = async (args: { command: string; cwd?: string; timeout?: number }, shell?: string) => {
+        const cwd = args.cwd || workspaceRoot;
+        const timeout = args.timeout || 120000;
+
+        try {
+            const options: any = {
+                cwd,
+                timeout,
+                maxBuffer: 10 * 1024 * 1024 // 10MB
+            };
+
+            if (shell) {
+                options.shell = shell;
+            }
+
+            const { stdout, stderr } = await execAsync(args.command, options);
+
+            let result = '';
+            if (stdout) result += stdout;
+            if (stderr) result += '\n[stderr]\n' + stderr;
+
+            return result.trim() || 'Command completed successfully';
+        } catch (error: any) {
+            if (error.killed) {
+                throw new Error(`Command timed out after ${timeout}ms`);
+            }
+            throw new Error(`Command failed: ${error.message}\n${error.stdout || ''}\n${error.stderr || ''}`);
+        }
+    };
+
     return [
         {
             name: 'run_command',
-            description: 'Execute a shell command',
+            description: 'Execute a shell command (uses system default shell)',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -33,33 +64,13 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
                 required: ['command']
             },
             handler: async (args: { command: string; cwd?: string; timeout?: number }) => {
-                const cwd = args.cwd || workspaceRoot;
-                const timeout = args.timeout || 120000;
-
-                try {
-                    const { stdout, stderr } = await execAsync(args.command, {
-                        cwd,
-                        timeout,
-                        maxBuffer: 10 * 1024 * 1024 // 10MB
-                    });
-
-                    let result = '';
-                    if (stdout) result += stdout;
-                    if (stderr) result += '\n[stderr]\n' + stderr;
-                    
-                    return result.trim() || 'Command completed successfully';
-                } catch (error: any) {
-                    if (error.killed) {
-                        throw new Error(`Command timed out after ${timeout}ms`);
-                    }
-                    throw new Error(`Command failed: ${error.message}\n${error.stdout || ''}\n${error.stderr || ''}`);
-                }
+                return executeShellCommand(args);
             }
         },
 
         {
             name: 'bash',
-            description: 'Execute a bash command (alias for run_command)',
+            description: 'Execute a bash command',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -79,9 +90,33 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
                 required: ['command']
             },
             handler: async (args: { command: string; cwd?: string; timeout?: number }) => {
-                // Delegate to run_command
-                const runCommand = createShellTools(context)[0];
-                return runCommand.handler(args);
+                return executeShellCommand(args, '/bin/bash');
+            }
+        },
+
+        {
+            name: 'zsh',
+            description: 'Execute a zsh command',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    command: {
+                        type: 'string',
+                        description: 'The zsh command to execute'
+                    },
+                    cwd: {
+                        type: 'string',
+                        description: 'Working directory for the command'
+                    },
+                    timeout: {
+                        type: 'number',
+                        description: 'Timeout in milliseconds (default: 120000)'
+                    }
+                },
+                required: ['command']
+            },
+            handler: async (args: { command: string; cwd?: string; timeout?: number }) => {
+                return executeShellCommand(args, '/bin/zsh');
             }
         },
 
@@ -110,10 +145,9 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
                 if (activeProcesses.has(args.name)) {
                     throw new Error(`Process with name '${args.name}' already exists`);
                 }
-
                 const cwd = args.cwd || workspaceRoot;
                 const [cmd, ...cmdArgs] = args.command.split(' ');
-                
+
                 const process = spawn(cmd, cmdArgs, {
                     cwd,
                     detached: true,
@@ -168,10 +202,10 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
 
                 const processList = Array.from(activeProcesses.entries()).map(([name, info]) => {
                     const status = info.exitCode !== undefined ? `Exited (${info.exitCode})` : 'Running';
-                    const runtime = info.endTime ? 
-                        `${(info.endTime - info.startTime) / 1000}s` : 
+                    const runtime = info.endTime ?
+                        `${(info.endTime - info.startTime) / 1000}s` :
                         `${(Date.now() - info.startTime) / 1000}s`;
-                    
+
                     return `${name}: ${status} (PID: ${info.pid}, Runtime: ${runtime})\n  Command: ${info.command}`;
                 });
 
@@ -262,10 +296,10 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
                         return `Opened URL: ${args.path}`;
                     } else {
                         // It's a file path
-                        const filePath = path.isAbsolute(args.path) ? 
-                            args.path : 
+                        const filePath = path.isAbsolute(args.path) ?
+                            args.path :
                             path.join(workspaceRoot, args.path);
-                        
+
                         const uri = vscode.Uri.file(filePath);
                         await vscode.env.openExternal(uri);
                         return `Opened file: ${filePath}`;
