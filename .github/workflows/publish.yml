@@ -1,0 +1,164 @@
+name: Publish Extensions
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.5.8)'
+        required: true
+        type: string
+
+jobs:
+  publish-vscode:
+    name: Publish to VS Code Marketplace
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.12.4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'pnpm'
+    
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    
+    - name: Install vsce and ovsx
+      run: |
+        pnpm add -g @vscode/vsce
+        pnpm add -g ovsx
+    
+    - name: Build extension
+      run: pnpm --filter @hanzo/extension run compile
+    
+    - name: Package extension
+      working-directory: packages/vscode
+      run: vsce package --no-dependencies
+    
+    - name: Publish to VS Code Marketplace
+      working-directory: packages/vscode
+      run: vsce publish -p ${{ secrets.VSCE_PAT }}
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    
+    - name: Publish to Open VSX
+      working-directory: packages/vscode
+      run: ovsx publish *.vsix -p ${{ secrets.OVSX_PAT }}
+      env:
+        OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      continue-on-error: true  # Don't fail if Open VSX is down
+
+  publish-npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.12.4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'pnpm'
+        registry-url: 'https://registry.npmjs.org'
+    
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    
+    - name: Build MCP package
+      run: pnpm --filter @hanzo/mcp run build
+    
+    - name: Publish @hanzo/mcp
+      working-directory: packages/mcp
+      run: npm publish --access public
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      continue-on-error: true  # May already be published
+
+  publish-jetbrains:
+    name: Publish to JetBrains Marketplace
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
+    
+    - name: Build and publish plugin
+      working-directory: packages/jetbrains
+      run: ./gradlew publishPlugin
+      env:
+        PUBLISH_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
+      continue-on-error: true  # May need marketplace approval first
+
+  publish-browser:
+    name: Publish Browser Extensions
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.12.4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'pnpm'
+    
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    
+    - name: Build browser extension
+      run: pnpm --filter @hanzo/browser-extension run build
+    
+    - name: Package for Chrome
+      working-directory: packages/browser
+      run: |
+        mkdir -p dist/chrome
+        zip -r dist/chrome/hanzo-browser-extension.zip \
+          dist/*.js \
+          src/manifest.json \
+          src/popup.html \
+          src/popup.css \
+          src/sidebar.html \
+          src/sidebar.css \
+          src/sidebar.js
+    
+    - name: Upload Chrome extension artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: chrome-extension
+        path: packages/browser/dist/chrome/*.zip
+    
+    # Note: Chrome Web Store and Firefox Add-ons require manual review
+    # The artifacts can be uploaded manually via developer consoles
+    - name: Print upload instructions
+      run: |
+        echo "Chrome Web Store: https://chrome.google.com/webstore/devconsole"
+        echo "Firefox Add-ons: https://addons.mozilla.org/developers/"
+        echo "Upload the packaged extensions from the artifacts"
