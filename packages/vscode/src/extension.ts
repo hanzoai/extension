@@ -42,6 +42,7 @@ export async function activate(context: vscode.ExtensionContext) {
         console.log('Hanzo Chat Participant registered successfully');
     } catch (error) {
         console.error('Failed to register chat participant:', error);
+        vscode.window.showErrorMessage(`Hanzo: Failed to initialize chat participant. ${error instanceof Error ? error.message : String(error)}`);
     }
 
     // Register commands

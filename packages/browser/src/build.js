@@ -24,15 +24,26 @@ async function build() {
     sourcemap: 'inline'
   });
 
-  // Build background script with WebGPU support
+  // Build background script for Chrome (with WebGPU support)
   await esbuild.build({
     entryPoints: ['src/background.ts'],
     bundle: true,
     outfile: 'dist/browser-extension/background.js',
     platform: 'browser',
-    target: ['chrome90', 'firefox91', 'safari14'],
+    target: ['chrome90', 'safari14'],
     format: 'esm',
     external: ['chrome', 'browser']
+  });
+
+  // Build Firefox-specific background script (no ESM export, uses browser.* APIs)
+  await esbuild.build({
+    entryPoints: ['src/background-firefox.ts'],
+    bundle: true,
+    outfile: 'dist/browser-extension/background-firefox.js',
+    platform: 'browser',
+    target: ['firefox91'],
+    format: 'iife',  // Immediately-invoked function expression (no exports)
+    external: ['browser']
   });
 
   // Build WebGPU AI module
@@ -124,15 +135,23 @@ async function build() {
 </plist>`);
 
   // Copy common files to each browser directory
-  ['chrome', 'firefox', 'safari'].forEach(browser => {
+  ['chrome', 'firefox', 'safari'].forEach(browserName => {
     fs.copyFileSync(
       'dist/browser-extension/content-script.js',
-      `dist/browser-extension/${browser}/content-script.js`
+      `dist/browser-extension/${browserName}/content-script.js`
     );
-    fs.copyFileSync(
-      'dist/browser-extension/background.js',
-      `dist/browser-extension/${browser}/background.js`
-    );
+    // Firefox uses its own background script (no ESM, uses browser.* APIs)
+    if (browserName === 'firefox') {
+      fs.copyFileSync(
+        'dist/browser-extension/background-firefox.js',
+        `dist/browser-extension/${browserName}/background.js`
+      );
+    } else {
+      fs.copyFileSync(
+        'dist/browser-extension/background.js',
+        `dist/browser-extension/${browserName}/background.js`
+      );
+    }
   });
 
   // Copy package.json for npm
