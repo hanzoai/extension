@@ -204,5 +204,16 @@ function handleMCPMessage(data: any) {
 // Connect on startup
 connectToMCP();
 
+// Also connect CDP bridge immediately (not just on install)
+// This ensures it works for temporary extensions in Firefox
+// Note: process.env may not exist in browser extensions
+const cdpPort = 9223;
+try {
+  cdpBridge.startWebSocketServer(cdpPort);
+  console.log(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
+} catch (e) {
+  console.error('[Hanzo] Failed to start CDP bridge:', e);
+}
+
 // Export for testing
 export { browserControl, webgpuAI };
