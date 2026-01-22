@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
 import { MCPTool } from '../server';
 
 interface MCPServer {
@@ -24,6 +25,7 @@ export class MCPRunnerTools {
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
         this.loadServers();
+        this.loadExternalConfig();
     }
 
     private loadServers() {
@@ -38,25 +40,93 @@ export class MCPRunnerTools {
         }
     }
 
+    private async loadExternalConfig() {
+        try {
+            // Check workspace mcp_config.json
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders) {
+                for (const folder of workspaceFolders) {
+                    const configPath = path.join(folder.uri.fsPath, 'mcp_config.json');
+                    if (fs.existsSync(configPath)) {
+                        await this.loadConfigFile(configPath);
+                    }
+                    // Also check .vscode/mcp_config.json
+                    const vscodeConfigPath = path.join(folder.uri.fsPath, '.vscode', 'mcp_config.json');
+                    if (fs.existsSync(vscodeConfigPath)) {
+                        await this.loadConfigFile(vscodeConfigPath);
+                    }
+                }
+            }
+
+            // Check standard Claude Desktop config locations
+            const homeDir = process.env.HOME || process.env.USERPROFILE;
+            if (homeDir) {
+                const claudeConfigPath = process.platform === 'win32'
+                    ? path.join(homeDir, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json')
+                    : path.join(homeDir, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+
+                if (fs.existsSync(claudeConfigPath)) {
+                    await this.loadConfigFile(claudeConfigPath);
+                }
+            }
+        } catch (error) {
+            console.error('[MCPRunner] Failed to load external config:', error);
+        }
+    }
+
+    private async loadConfigFile(filePath: string) {
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const config = JSON.parse(content);
+
+            if (config.mcpServers) {
+                for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+                    const conf = serverConfig as any;
+                    if (!this.servers.has(name)) {
+                        console.log(`[MCPRunner] Loading external server: ${name}`);
+                        this.servers.set(name, {
+                            name,
+                            command: conf.command,
+                            args: conf.args,
+                            env: conf.env,
+                            transport: 'stdio', // Default for config files
+                            status: 'stopped',
+                            logs: []
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error(`[MCPRunner] Error reading ${filePath}:`, error);
+        }
+    }
+
     private saveServers() {
-        const serversArray = Array.from(this.servers.values()).map(s => ({
-            name: s.name,
-            command: s.command,
-            args: s.args,
-            env: s.env,
-            transport: s.transport,
-            host: s.host,
-            port: s.port,
-            status: s.status,
-            error: s.error
-        }));
+        const serversArray = Array.from(this.servers.values())
+            // Only save servers that were manually added, not config-loaded ones ideally
+            // But for simplicity/persistence we might save all, OR we filter?
+            // Let's filter out ones that match what we'd load from config? 
+            // Actually, simplest is to just save all for now, or maybe we shouldn't overwrite if it exists in config?
+            // For this implementation, we will save state, but maybe we should mark origin.
+            // Let's just save.
+            .map(s => ({
+                name: s.name,
+                command: s.command,
+                args: s.args,
+                env: s.env,
+                transport: s.transport,
+                host: s.host,
+                port: s.port,
+                status: s.status,
+                error: s.error
+            }));
         this.context.globalState.update('hanzo.mcpServers', serversArray);
     }
 
     getTools(): MCPTool[] {
         return [
             {
-                name: 'mcp',
+                name: 'mcp_manage',
                 description: 'Manage and run arbitrary MCP servers. Actions: add, remove, start, stop, list, logs, call',
                 inputSchema: {
                     type: 'object',
@@ -122,11 +192,11 @@ export class MCPRunnerTools {
         switch (action) {
             case 'add': {
                 const { name, command, args: cmdArgs, env, transport = 'stdio', host, port } = args;
-                
+
                 if (this.servers.has(name)) {
                     throw new Error(`MCP server '${name}' already exists`);
                 }
-                
+
                 const server: MCPServer = {
                     name,
                     command,
@@ -138,73 +208,73 @@ export class MCPRunnerTools {
                     status: 'stopped',
                     logs: []
                 };
-                
+
                 this.servers.set(name, server);
                 this.saveServers();
-                
+
                 return `Added MCP server '${name}'\nCommand: ${command} ${(cmdArgs || []).join(' ')}\nTransport: ${transport}`;
             }
-            
+
             case 'remove': {
                 const { name } = args;
                 const server = this.servers.get(name);
-                
+
                 if (!server) {
                     throw new Error(`MCP server '${name}' not found`);
                 }
-                
+
                 if (server.status === 'running' && server.process) {
                     server.process.kill();
                 }
-                
+
                 this.servers.delete(name);
                 this.saveServers();
-                
+
                 return `Removed MCP server '${name}'`;
             }
-            
+
             case 'start': {
                 const { name } = args;
                 const server = this.servers.get(name);
-                
+
                 if (!server) {
                     throw new Error(`MCP server '${name}' not found`);
                 }
-                
+
                 if (server.status === 'running') {
                     return `MCP server '${name}' is already running`;
                 }
-                
+
                 return this.startServer(server);
             }
-            
+
             case 'stop': {
                 const { name } = args;
                 const server = this.servers.get(name);
-                
+
                 if (!server) {
                     throw new Error(`MCP server '${name}' not found`);
                 }
-                
+
                 if (server.status !== 'running' || !server.process) {
                     return `MCP server '${name}' is not running`;
                 }
-                
+
                 server.process.kill();
                 server.status = 'stopped';
                 server.process = undefined;
                 this.saveServers();
-                
+
                 return `Stopped MCP server '${name}'`;
             }
-            
+
             case 'list': {
                 if (this.servers.size === 0) {
                     return 'No MCP servers configured';
                 }
-                
+
                 let output = 'MCP Servers:\n\n';
-                
+
                 for (const [name, server] of this.servers) {
                     output += `**${name}** (${server.status})\n`;
                     output += `  Command: ${server.command} ${(server.args || []).join(' ')}\n`;
@@ -218,43 +288,43 @@ export class MCPRunnerTools {
                     }
                     output += '\n';
                 }
-                
+
                 return output.trim();
             }
-            
+
             case 'logs': {
                 const { name, lines = 50 } = args;
                 const server = this.servers.get(name);
-                
+
                 if (!server) {
                     throw new Error(`MCP server '${name}' not found`);
                 }
-                
+
                 if (server.logs.length === 0) {
                     return `No logs available for '${name}'`;
                 }
-                
+
                 const recentLogs = server.logs.slice(-lines);
                 return `Logs for '${name}' (last ${recentLogs.length} lines):\n\n${recentLogs.join('\n')}`;
             }
-            
+
             case 'call': {
                 const { name, tool, tool_args } = args;
                 const server = this.servers.get(name);
-                
+
                 if (!server) {
                     throw new Error(`MCP server '${name}' not found`);
                 }
-                
+
                 if (server.status !== 'running') {
                     throw new Error(`MCP server '${name}' is not running`);
                 }
-                
+
                 // In a real implementation, this would use the MCP protocol to call the tool
                 // For now, we'll return a placeholder
                 return `Tool call to '${tool}' on server '${name}' not yet implemented\n\nThis would call the tool with args: ${JSON.stringify(tool_args, null, 2)}`;
             }
-            
+
             default:
                 throw new Error(`Unknown action: ${action}`);
         }
@@ -266,16 +336,16 @@ export class MCPRunnerTools {
                 server.status = 'starting';
                 server.logs = [];
                 server.error = undefined;
-                
+
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
                 const cwd = workspaceFolder?.uri.fsPath || process.cwd();
-                
+
                 // Prepare environment
                 const env = {
                     ...process.env,
                     ...server.env
                 };
-                
+
                 if (server.transport === 'stdio') {
                     // For stdio transport, spawn the process
                     const proc = cp.spawn(server.command, server.args || [], {
@@ -283,9 +353,9 @@ export class MCPRunnerTools {
                         env,
                         shell: true
                     });
-                    
+
                     server.process = proc;
-                    
+
                     // Capture output
                     proc.stdout?.on('data', (data) => {
                         const lines = data.toString().split('\n').filter((l: string) => l);
@@ -294,7 +364,7 @@ export class MCPRunnerTools {
                             server.logs.splice(0, server.logs.length - 1000);
                         }
                     });
-                    
+
                     proc.stderr?.on('data', (data) => {
                         const lines = data.toString().split('\n').filter((l: string) => l);
                         server.logs.push(...lines.map((l: string) => `[stderr] ${l}`));
@@ -302,21 +372,21 @@ export class MCPRunnerTools {
                             server.logs.splice(0, server.logs.length - 1000);
                         }
                     });
-                    
+
                     proc.on('error', (error) => {
                         server.status = 'error';
                         server.error = error.message;
                         server.logs.push(`[error] ${error.message}`);
                         this.saveServers();
                     });
-                    
+
                     proc.on('exit', (code) => {
                         server.status = 'stopped';
                         server.process = undefined;
                         server.logs.push(`[exit] Process exited with code ${code}`);
                         this.saveServers();
                     });
-                    
+
                     // Wait a bit to see if it starts successfully
                     setTimeout(() => {
                         if (proc.killed) {
@@ -327,47 +397,47 @@ export class MCPRunnerTools {
                             resolve(`Started MCP server '${server.name}' with PID ${proc.pid}\nTransport: stdio`);
                         }
                     }, 1000);
-                    
+
                 } else if (server.transport === 'tcp') {
                     // For TCP transport, spawn the process
                     const host = server.host || 'localhost';
                     const port = server.port || 3000;
-                    
+
                     // Add host and port to environment
                     env.MCP_HOST = host;
                     env.MCP_PORT = port.toString();
-                    
+
                     const proc = cp.spawn(server.command, server.args || [], {
                         cwd,
                         env,
                         shell: true
                     });
-                    
+
                     server.process = proc;
-                    
+
                     // Similar event handling as stdio
                     proc.stdout?.on('data', (data) => {
                         const lines = data.toString().split('\n').filter((l: string) => l);
                         server.logs.push(...lines.map((l: string) => `[stdout] ${l}`));
                     });
-                    
+
                     proc.stderr?.on('data', (data) => {
                         const lines = data.toString().split('\n').filter((l: string) => l);
                         server.logs.push(...lines.map((l: string) => `[stderr] ${l}`));
                     });
-                    
+
                     proc.on('error', (error) => {
                         server.status = 'error';
                         server.error = error.message;
                         this.saveServers();
                     });
-                    
+
                     proc.on('exit', (code) => {
                         server.status = 'stopped';
                         server.process = undefined;
                         this.saveServers();
                     });
-                    
+
                     setTimeout(() => {
                         if (proc.killed) {
                             reject(new Error('Server failed to start'));
@@ -378,7 +448,7 @@ export class MCPRunnerTools {
                         }
                     }, 1000);
                 }
-                
+
             } catch (error: any) {
                 server.status = 'error';
                 server.error = error.message;
