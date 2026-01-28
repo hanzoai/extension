@@ -155,16 +155,13 @@ class CDPBridgeServer {
         return this.sendRaw('Page.reload');
 
       case 'url':
-        return this.sendRaw('Runtime.evaluate', {
-          expression: 'window.location.href',
-          returnByValue: true
-        });
+        return this.sendRaw('hanzo.url');
 
       case 'title':
-        return this.sendRaw('Runtime.evaluate', {
-          expression: 'document.title',
-          returnByValue: true
-        });
+        return this.sendRaw('hanzo.title');
+
+      case 'tab_info':
+        return this.sendRaw('hanzo.tabInfo');
 
       case 'content':
         return this.sendRaw('Runtime.evaluate', {
