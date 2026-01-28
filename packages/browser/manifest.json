@@ -5,11 +5,16 @@
   "description": "Click-to-code navigation with source-map support",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "tabs",
+    "webNavigation",
+    "debugger",
+    "scripting"
   ],
   "host_permissions": [
     "http://localhost/*",
-    "https://localhost/*"
+    "https://localhost/*",
+    "<all_urls>"
   ],
   "content_scripts": [
     {
