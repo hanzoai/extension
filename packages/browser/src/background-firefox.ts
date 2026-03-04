@@ -221,7 +221,7 @@ class HanzoFirefoxExtension {
         const quality = (params.quality as number) || (format === 'jpeg' ? 80 : undefined);
         const opts: any = { format: format as 'png' | 'jpeg' };
         if (quality !== undefined) opts.quality = quality;
-        const dataUrl = await browser.tabs.captureVisibleTab(null, opts);
+        const dataUrl = await browser.tabs.captureVisibleTab(opts);
         // Remove data URL prefix to return raw base64
         const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
         return { data: base64 };
@@ -310,6 +310,142 @@ class HanzoFirefoxExtension {
       .replace(/\n/g, '\\n');
   }
 }
+
+// =============================================================================
+// Auth + Chat Message Handlers (Firefox)
+// Uses browser.identity.launchWebAuthFlow for OAuth
+// =============================================================================
+
+const IAM_BASE = 'https://iam.hanzo.ai';
+const API_BASE = 'https://api.hanzo.ai';
+const CLIENT_ID = 'hanzo-browser';
+const SCOPES = 'openid profile email';
+
+const STORAGE_KEYS = {
+  accessToken: 'hanzo_iam_access_token',
+  refreshToken: 'hanzo_iam_refresh_token',
+  idToken: 'hanzo_iam_id_token',
+  expiresAt: 'hanzo_iam_expires_at',
+  user: 'hanzo_iam_user',
+};
+
+// PKCE helpers
+function generateRandomString(length: number): string {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, length);
+}
+
+async function sha256(plain: string): Promise<ArrayBuffer> {
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(plain));
+}
+
+function base64UrlEncode(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function firefoxLogin(): Promise<any> {
+  const codeVerifier = generateRandomString(64);
+  const codeChallenge = base64UrlEncode(await sha256(codeVerifier));
+  const state = generateRandomString(32);
+  const redirectUri = browser.identity.getRedirectURL();
+
+  const authorizeUrl = new URL(`${IAM_BASE}/login/oauth/authorize`);
+  authorizeUrl.searchParams.set('client_id', CLIENT_ID);
+  authorizeUrl.searchParams.set('response_type', 'code');
+  authorizeUrl.searchParams.set('redirect_uri', redirectUri);
+  authorizeUrl.searchParams.set('code_challenge', codeChallenge);
+  authorizeUrl.searchParams.set('code_challenge_method', 'S256');
+  authorizeUrl.searchParams.set('scope', SCOPES);
+  authorizeUrl.searchParams.set('state', state);
+
+  const callbackUrl = await browser.identity.launchWebAuthFlow({
+    url: authorizeUrl.toString(),
+    interactive: true,
+  });
+
+  if (!callbackUrl) throw new Error('Authentication cancelled');
+  const url = new URL(callbackUrl);
+  if (url.searchParams.get('state') !== state) throw new Error('State mismatch');
+  const code = url.searchParams.get('code');
+  if (!code) throw new Error(url.searchParams.get('error_description') || 'No code');
+
+  const tokenResponse = await fetch(`${IAM_BASE}/api/login/oauth/access_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code', client_id: CLIENT_ID,
+      code, redirect_uri: redirectUri, code_verifier: codeVerifier,
+    }),
+  });
+
+  if (!tokenResponse.ok) throw new Error(`Token exchange failed: ${await tokenResponse.text()}`);
+  const tokens = await tokenResponse.json();
+
+  const data: any = { [STORAGE_KEYS.accessToken]: tokens.access_token };
+  if (tokens.refresh_token) data[STORAGE_KEYS.refreshToken] = tokens.refresh_token;
+  if (tokens.id_token) data[STORAGE_KEYS.idToken] = tokens.id_token;
+  if (tokens.expires_in) data[STORAGE_KEYS.expiresAt] = Date.now() + tokens.expires_in * 1000;
+  await browser.storage.local.set(data);
+
+  const userResp = await fetch(`${IAM_BASE}/api/userinfo`, { headers: { Authorization: `Bearer ${tokens.access_token}` } });
+  const user = userResp.ok ? await userResp.json() : {};
+  await browser.storage.local.set({ [STORAGE_KEYS.user]: user });
+  return user;
+}
+
+browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
+  (async () => {
+    switch (request.action) {
+      case 'auth.login':
+        try {
+          const user = await firefoxLogin();
+          sendResponse({ success: true, user });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
+      case 'auth.logout':
+        await browser.storage.local.remove(Object.values(STORAGE_KEYS));
+        sendResponse({ success: true });
+        break;
+
+      case 'auth.status': {
+        const result = await browser.storage.local.get([STORAGE_KEYS.accessToken, STORAGE_KEYS.user]);
+        sendResponse({
+          success: true,
+          authenticated: !!result[STORAGE_KEYS.accessToken],
+          user: result[STORAGE_KEYS.user] || null,
+        });
+        break;
+      }
+
+      case 'auth.getToken': {
+        const r = await browser.storage.local.get([STORAGE_KEYS.accessToken]);
+        sendResponse({ success: !!r[STORAGE_KEYS.accessToken], token: r[STORAGE_KEYS.accessToken] || null });
+        break;
+      }
+
+      case 'chat.listModels': {
+        const t = await browser.storage.local.get([STORAGE_KEYS.accessToken]);
+        if (!t[STORAGE_KEYS.accessToken]) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
+        const resp = await fetch(`${API_BASE}/api/models`, { headers: { Authorization: `Bearer ${t[STORAGE_KEYS.accessToken]}` } });
+        const data = await resp.json();
+        sendResponse({ success: true, models: data.data || data.models || data || [] });
+        break;
+      }
+
+      default:
+        // Not an auth/chat message — ignore
+        break;
+    }
+  })();
+  return true; // Keep channel open
+});
 
 // Initialize extension (no export - Firefox doesn't support ES modules in background)
 const hanzoExtension = new HanzoFirefoxExtension();
