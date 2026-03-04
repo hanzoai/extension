@@ -27,10 +27,25 @@ const zapState: ZapState = {
   extensionId: `hanzo-ext-${Date.now().toString(36)}`,
 };
 
-// ZAP discovery ports (standard ZAP gateway ports)
-const ZAP_DISCOVERY_PORTS = [9999, 9998, 9997, 9996, 9995];
+// Default ports (overridable via chrome.storage.local settings)
+const DEFAULT_ZAP_PORTS = [9999, 9998, 9997, 9996, 9995];
+const DEFAULT_MCP_PORT = 3001;
+const DEFAULT_CDP_PORT = 9223;
 const ZAP_RECONNECT_DELAY = 3000;
 const ZAP_DISCOVERY_TIMEOUT = 2000;
+
+/** Load port configuration from storage */
+async function getPortConfig(): Promise<{ zapPorts: number[]; mcpPort: number; cdpPort: number }> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['zapPorts', 'mcpPort', 'cdpPort'], (result) => {
+      resolve({
+        zapPorts: result.zapPorts || DEFAULT_ZAP_PORTS,
+        mcpPort: result.mcpPort || DEFAULT_MCP_PORT,
+        cdpPort: result.cdpPort || DEFAULT_CDP_PORT,
+      });
+    });
+  });
+}
 
 /** Active ZAP WebSocket connections keyed by MCP id */
 const zapConnections = new Map<string, WebSocket>();
@@ -253,7 +268,8 @@ async function zapCallTool(name: string, args: Record<string, unknown> = {}, tar
  */
 async function discoverZapServers() {
   console.log('[Hanzo/ZAP] Discovering MCP servers...');
-  const results = await Promise.all(ZAP_DISCOVERY_PORTS.map(p => probeZapServer(p)));
+  const { zapPorts } = await getPortConfig();
+  const results = await Promise.all(zapPorts.map(p => probeZapServer(p)));
   const available = results.filter(Boolean) as string[];
 
   if (available.length === 0) {
@@ -454,6 +470,27 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         sendResponse({ success: false, error: error.message });
       }
       break;
+
+    // --- Content script element selection (routed from content script) ---
+    case 'elementSelected':
+      // Forward to ZAP-connected MCPs (primary)
+      if (zapState.connected) {
+        for (const [, conn] of zapConnections) {
+          if (conn.readyState === WebSocket.OPEN) {
+            conn.send(encodeZapMessage(MSG_REQUEST, {
+              id: `evt-${++requestIdCounter}`,
+              method: 'notifications/elementSelected',
+              params: request.data,
+            }));
+          }
+        }
+      }
+      // Also forward to legacy MCP WebSocket (fallback)
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(request.data));
+      }
+      sendResponse({ success: true });
+      break;
   }
 }
 
@@ -463,8 +500,9 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 
 let ws: WebSocket | null = null;
 
-function connectToMCP() {
-  ws = new WebSocket('ws://localhost:3001/browser-extension');
+async function connectToMCP() {
+  const { mcpPort } = await getPortConfig();
+  ws = new WebSocket(`ws://localhost:${mcpPort}/browser-extension`);
 
   ws.onopen = () => {
     console.log('[Hanzo] Connected to legacy MCP server');
@@ -506,14 +544,15 @@ discoverZapServers();
 // 2. Fallback: Connect to legacy MCP WebSocket
 connectToMCP();
 
-// 3. CDP bridge for browser control
-const cdpPort = 9223;
-try {
-  cdpBridge.startWebSocketServer(cdpPort);
-  console.log(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
-} catch (e) {
-  console.error('[Hanzo] Failed to start CDP bridge:', e);
-}
+// 3. CDP bridge for browser control (configurable port)
+getPortConfig().then(({ cdpPort }) => {
+  try {
+    cdpBridge.startWebSocketServer(cdpPort);
+    console.log(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
+  } catch (e) {
+    console.error('[Hanzo] Failed to start CDP bridge:', e);
+  }
+});
 
 // Export for testing
 export { browserControl, webgpuAI, zapState, zapCallTool };

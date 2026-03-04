@@ -161,7 +161,7 @@ async function build() {
     }
 
     // Copy popup + sidebar HTML/CSS/JS
-    for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'sidebar.js']) {
+    for (const f of ['popup.html', 'popup.css', 'popup.js', 'sidebar.html', 'sidebar.css', 'sidebar.js']) {
       const src = path.join('src', f);
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(dir, f));
