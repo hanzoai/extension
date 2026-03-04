@@ -5,6 +5,7 @@
   "description": "AI-powered dev assistant — click-to-code navigation, source maps, WebGPU AI, and MCP integration for Claude Code.",
   "permissions": [
     "activeTab",
+    "identity",
     "storage",
     "tabs",
     "webNavigation",
@@ -16,7 +17,7 @@
     "<all_urls>"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' ws://localhost:* http://localhost:*;"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' ws://localhost:* http://localhost:* https://api.hanzo.ai https://iam.hanzo.ai https://hanzo.id;"
   },
   "content_scripts": [
     {
@@ -35,6 +36,14 @@
       "16": "icon16.png",
       "48": "icon48.png",
       "128": "icon128.png"
+    }
+  },
+  "sidebar_action": {
+    "default_title": "Hanzo AI",
+    "default_panel": "sidebar.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png"
     }
   },
   "web_accessible_resources": [
