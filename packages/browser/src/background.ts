@@ -10,21 +10,283 @@ const webgpuAI = new WebGPUAI();
 // Initialize CDP bridge for hanzo-mcp integration
 const cdpBridge: CDPBridge = getCDPBridge();
 
-// Initialize WebGPU and CDP on startup
+// =============================================================================
+// ZAP Protocol Integration
+// =============================================================================
+
+/** ZAP connection state */
+interface ZapState {
+  connected: boolean;
+  mcps: Array<{ id: string; name: string; url: string; tools: string[] }>;
+  extensionId: string;
+}
+
+const zapState: ZapState = {
+  connected: false,
+  mcps: [],
+  extensionId: `hanzo-ext-${Date.now().toString(36)}`,
+};
+
+// ZAP discovery ports (standard ZAP gateway ports)
+const ZAP_DISCOVERY_PORTS = [9999, 9998, 9997, 9996, 9995];
+const ZAP_RECONNECT_DELAY = 3000;
+const ZAP_DISCOVERY_TIMEOUT = 2000;
+
+/** Active ZAP WebSocket connections keyed by MCP id */
+const zapConnections = new Map<string, WebSocket>();
+
+/**
+ * ZAP Protocol handshake message
+ * Binary format: [ZAP\x01][type:1][length:4][payload]
+ */
+const ZAP_MAGIC = new Uint8Array([0x5A, 0x41, 0x50, 0x01]); // "ZAP\x01"
+const MSG_HANDSHAKE    = 0x01;
+const MSG_HANDSHAKE_OK = 0x02;
+const MSG_REQUEST      = 0x10;
+const MSG_RESPONSE     = 0x11;
+const MSG_PING         = 0xFE;
+const MSG_PONG         = 0xFF;
+
+function encodeZapMessage(type: number, payload: object): ArrayBuffer {
+  const json = JSON.stringify(payload);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(json);
+  const buf = new ArrayBuffer(4 + 1 + 4 + data.length);
+  const view = new DataView(buf);
+  // Magic
+  new Uint8Array(buf, 0, 4).set(ZAP_MAGIC);
+  // Type
+  view.setUint8(4, type);
+  // Length (big-endian)
+  view.setUint32(5, data.length, false);
+  // Payload
+  new Uint8Array(buf, 9).set(data);
+  return buf;
+}
+
+function decodeZapMessage(buf: ArrayBuffer): { type: number; payload: any } | null {
+  if (buf.byteLength < 9) return null;
+  const view = new DataView(buf);
+  const magic = new Uint8Array(buf, 0, 4);
+  if (magic[0] !== 0x5A || magic[1] !== 0x41 || magic[2] !== 0x50 || magic[3] !== 0x01) {
+    return null; // Not a ZAP message — try JSON fallback
+  }
+  const type = view.getUint8(4);
+  const length = view.getUint32(5, false);
+  const decoder = new TextDecoder();
+  const json = decoder.decode(new Uint8Array(buf, 9, length));
+  return { type, payload: JSON.parse(json) };
+}
+
+/**
+ * Probe a ZAP server on given port
+ */
+function probeZapServer(port: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const url = `ws://localhost:${port}`;
+    const ws = new WebSocket(url);
+    const timer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
+
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => {
+      clearTimeout(timer);
+      // Send handshake
+      ws.send(encodeZapMessage(MSG_HANDSHAKE, {
+        clientId: zapState.extensionId,
+        clientType: 'browser_extension',
+        browser: detectBrowser(),
+        version: chrome.runtime.getManifest().version,
+        capabilities: ['tabs', 'navigate', 'screenshot', 'evaluate', 'cookies', 'storage'],
+      }));
+
+      // Wait for handshake response
+      const hsTimer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
+      ws.onmessage = (ev) => {
+        clearTimeout(hsTimer);
+        ws.close();
+        resolve(url);
+      };
+    };
+    ws.onerror = () => { clearTimeout(timer); resolve(null); };
+  });
+}
+
+/**
+ * Connect to a ZAP server and set up message handling
+ */
+async function connectZap(url: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer';
+
+    const connTimer = setTimeout(() => { ws.close(); resolve(null); }, 10000);
+
+    ws.onopen = () => {
+      // Send handshake
+      ws.send(encodeZapMessage(MSG_HANDSHAKE, {
+        clientId: zapState.extensionId,
+        clientType: 'browser_extension',
+        browser: detectBrowser(),
+        version: chrome.runtime.getManifest().version,
+        capabilities: ['tabs', 'navigate', 'screenshot', 'evaluate', 'cookies', 'storage'],
+      }));
+    };
+
+    ws.onmessage = (ev) => {
+      // Handle both binary ZAP and JSON fallback
+      let msg: { type: number; payload: any } | null = null;
+      if (ev.data instanceof ArrayBuffer) {
+        msg = decodeZapMessage(ev.data);
+      }
+      if (!msg && typeof ev.data === 'string') {
+        // JSON fallback for MCP servers that don't speak binary ZAP
+        try {
+          const json = JSON.parse(ev.data);
+          handleMCPMessage(json);
+          return;
+        } catch { return; }
+      }
+      if (!msg) return;
+
+      switch (msg.type) {
+        case MSG_HANDSHAKE_OK: {
+          clearTimeout(connTimer);
+          const info = msg.payload;
+          const mcpId = info.serverId || `mcp-${Date.now().toString(36)}`;
+          zapConnections.set(mcpId, ws);
+          zapState.connected = true;
+          zapState.mcps.push({
+            id: mcpId,
+            name: info.name || `MCP@${url}`,
+            url,
+            tools: (info.tools || []).map((t: any) => t.name),
+          });
+          console.log(`[Hanzo/ZAP] Connected to ${info.name || url} (${(info.tools || []).length} tools)`);
+          resolve(mcpId);
+          break;
+        }
+        case MSG_RESPONSE: {
+          // Route responses to pending requests
+          const { id, result, error } = msg.payload;
+          const pending = pendingRequests.get(id);
+          if (pending) {
+            pendingRequests.delete(id);
+            if (error) pending.reject(new Error(error.message || error));
+            else pending.resolve(result);
+          }
+          break;
+        }
+        case MSG_PING:
+          ws.send(encodeZapMessage(MSG_PONG, {}));
+          break;
+      }
+    };
+
+    ws.onclose = () => {
+      // Remove from connections
+      for (const [id, conn] of zapConnections) {
+        if (conn === ws) {
+          zapConnections.delete(id);
+          zapState.mcps = zapState.mcps.filter(m => m.id !== id);
+          break;
+        }
+      }
+      zapState.connected = zapConnections.size > 0;
+      console.log(`[Hanzo/ZAP] Disconnected from ${url}, reconnecting in ${ZAP_RECONNECT_DELAY}ms...`);
+      setTimeout(() => connectZap(url), ZAP_RECONNECT_DELAY);
+    };
+
+    ws.onerror = () => {
+      clearTimeout(connTimer);
+      resolve(null);
+    };
+  });
+}
+
+/** Pending ZAP RPC requests */
+const pendingRequests = new Map<string, { resolve: Function; reject: Function }>();
+let requestIdCounter = 0;
+
+/**
+ * Send a ZAP RPC request to an MCP server
+ */
+function zapRequest(mcpId: string, method: string, params: any = {}): Promise<any> {
+  const ws = zapConnections.get(mcpId);
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    return Promise.reject(new Error(`MCP ${mcpId} not connected`));
+  }
+
+  const id = `req-${++requestIdCounter}`;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingRequests.delete(id);
+      reject(new Error(`ZAP request timeout: ${method}`));
+    }, 30000);
+
+    pendingRequests.set(id, {
+      resolve: (r: any) => { clearTimeout(timer); resolve(r); },
+      reject:  (e: any) => { clearTimeout(timer); reject(e); },
+    });
+
+    ws.send(encodeZapMessage(MSG_REQUEST, { id, method, params }));
+  });
+}
+
+/**
+ * Call a tool via ZAP on the first MCP that has it
+ */
+async function zapCallTool(name: string, args: Record<string, unknown> = {}, targetMcpId?: string): Promise<any> {
+  if (targetMcpId) {
+    return zapRequest(targetMcpId, 'tools/call', { name, arguments: args });
+  }
+  // Find first MCP that has the tool
+  for (const mcp of zapState.mcps) {
+    if (mcp.tools.includes(name)) {
+      return zapRequest(mcp.id, 'tools/call', { name, arguments: args });
+    }
+  }
+  throw new Error(`Tool not found on any ZAP-connected MCP: ${name}`);
+}
+
+/**
+ * Discover and connect to ZAP servers on startup
+ */
+async function discoverZapServers() {
+  console.log('[Hanzo/ZAP] Discovering MCP servers...');
+  const results = await Promise.all(ZAP_DISCOVERY_PORTS.map(p => probeZapServer(p)));
+  const available = results.filter(Boolean) as string[];
+
+  if (available.length === 0) {
+    console.log('[Hanzo/ZAP] No servers found, retrying in 10s...');
+    setTimeout(discoverZapServers, 10000);
+    return;
+  }
+
+  console.log(`[Hanzo/ZAP] Found ${available.length} server(s): ${available.join(', ')}`);
+  await Promise.all(available.map(url => connectZap(url)));
+}
+
+function detectBrowser(): string {
+  if (typeof navigator === 'undefined') return 'unknown';
+  const ua = navigator.userAgent;
+  if (ua.includes('Firefox')) return 'firefox';
+  if (ua.includes('Edg/')) return 'edge';
+  if (ua.includes('Chrome')) return 'chrome';
+  if (ua.includes('Safari')) return 'safari';
+  return 'unknown';
+}
+
+// =============================================================================
+// Extension Lifecycle
+// =============================================================================
+
+// Initialize WebGPU and CDP on install
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('[Hanzo] Extension installed, initializing...');
-  
-  // Initialize CDP bridge for hanzo-mcp browser tool integration
-  // Default port 9223 (one above Chrome's default 9222)
-  const cdpPort = parseInt(process.env.HANZO_CDP_PORT || '9223');
-  cdpBridge.startWebSocketServer(cdpPort);
-  console.log(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
-  
+
   const gpuAvailable = await webgpuAI.initialize();
   if (gpuAvailable) {
     console.log('[Hanzo] WebGPU available, loading local models...');
-    
-    // Load small local model for browser control
     try {
       await webgpuAI.loadModel({
         name: 'hanzo-browser-control',
@@ -38,7 +300,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
-// Handle messages from content scripts
+// Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   handleMessage(request, sender, sendResponse);
   return true; // Keep channel open for async response
@@ -46,49 +308,81 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleMessage(request: any, sender: chrome.runtime.MessageSender, sendResponse: Function) {
   switch (request.action) {
+    // --- ZAP Protocol actions ---
+    case 'zap.status':
+      sendResponse({ success: true, zap: zapState });
+      break;
+
+    case 'zap.discover':
+      discoverZapServers().then(() => sendResponse({ success: true, mcps: zapState.mcps }));
+      break;
+
+    case 'zap.connect':
+      try {
+        const mcpId = await connectZap(request.url);
+        sendResponse({ success: !!mcpId, mcpId });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'zap.callTool':
+      try {
+        const result = await zapCallTool(request.name, request.args, request.mcpId);
+        sendResponse({ success: true, result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'zap.listTools': {
+      const tools = zapState.mcps.flatMap(m => m.tools.map(t => ({ name: t, mcpId: m.id, mcpName: m.name })));
+      sendResponse({ success: true, tools });
+      break;
+    }
+
+    // --- Local AI ---
     case 'runLocalAI':
       try {
-        const result = await webgpuAI.runInference(
-          request.model || 'hanzo-browser-control',
-          request.prompt
-        );
+        const result = await webgpuAI.runInference(request.model || 'hanzo-browser-control', request.prompt);
         sendResponse({ success: true, result });
-      } catch (error) {
+      } catch (error: any) {
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'launchAIWorker':
       if (sender.tab?.id) {
         await browserControl.launchAIWorker(sender.tab.id, request.model);
         sendResponse({ success: true });
       }
       break;
-      
+
+    // --- Tab Filesystem ---
     case 'readTabFS':
       try {
         const content = await browserControl.readTab(request.path);
         sendResponse({ success: true, content });
-      } catch (error) {
+      } catch (error: any) {
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'writeTabFS':
       try {
         await browserControl.writeTab(request.path, request.content);
         sendResponse({ success: true });
-      } catch (error) {
+      } catch (error: any) {
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'listTabFS':
       const tabs = await browserControl.listTabs();
       sendResponse({ success: true, tabs });
       break;
-      
-    // CDP bridge commands for hanzo-mcp integration
+
+    // --- CDP bridge commands ---
     case 'cdp.attach':
       try {
         const attached = await cdpBridge.attach(request.tabId);
@@ -97,7 +391,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'cdp.detach':
       try {
         await cdpBridge.detach(request.tabId);
@@ -106,7 +400,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'cdp.send':
       try {
         const result = await cdpBridge.send(request.tabId, request.method, request.params);
@@ -115,7 +409,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'cdp.screenshot':
       try {
         const screenshot = await cdpBridge.screenshot(request.tabId, request.options);
@@ -124,7 +418,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'cdp.click':
       try {
         const clicked = await cdpBridge.clickSelector(request.tabId, request.selector);
@@ -133,7 +427,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'cdp.fill':
       try {
         const filled = await cdpBridge.fillSelector(request.tabId, request.selector, request.value);
@@ -142,7 +436,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'cdp.navigate':
       try {
         await cdpBridge.navigate(request.tabId, request.url);
@@ -151,7 +445,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         sendResponse({ success: false, error: error.message });
       }
       break;
-      
+
     case 'cdp.evaluate':
       try {
         const evalResult = await cdpBridge.evaluate(request.tabId, request.expression);
@@ -163,27 +457,29 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
   }
 }
 
-// Connect to WebSocket for MCP communication
+// =============================================================================
+// Legacy MCP WebSocket (fallback when no ZAP gateway running)
+// =============================================================================
+
 let ws: WebSocket | null = null;
 
 function connectToMCP() {
   ws = new WebSocket('ws://localhost:3001/browser-extension');
-  
+
   ws.onopen = () => {
-    console.log('[Hanzo] Connected to MCP server');
+    console.log('[Hanzo] Connected to legacy MCP server');
   };
-  
+
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     handleMCPMessage(data);
   };
-  
-  ws.onerror = (error) => {
-    console.error('[Hanzo] WebSocket error:', error);
+
+  ws.onerror = () => {
+    // Silent — ZAP is primary, this is fallback
   };
-  
+
   ws.onclose = () => {
-    console.log('[Hanzo] Disconnected from MCP server, reconnecting...');
     setTimeout(connectToMCP, 5000);
   };
 }
@@ -191,7 +487,6 @@ function connectToMCP() {
 function handleMCPMessage(data: any) {
   switch (data.type) {
     case 'browserControl':
-      // Execute browser control commands from MCP
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           browserControl.launchAIWorker(tabs[0].id, data.model);
@@ -201,12 +496,17 @@ function handleMCPMessage(data: any) {
   }
 }
 
-// Connect on startup
+// =============================================================================
+// Startup
+// =============================================================================
+
+// 1. Primary: Discover ZAP servers (high-performance binary protocol)
+discoverZapServers();
+
+// 2. Fallback: Connect to legacy MCP WebSocket
 connectToMCP();
 
-// Also connect CDP bridge immediately (not just on install)
-// This ensures it works for temporary extensions in Firefox
-// Note: process.env may not exist in browser extensions
+// 3. CDP bridge for browser control
 const cdpPort = 9223;
 try {
   cdpBridge.startWebSocketServer(cdpPort);
@@ -216,4 +516,4 @@ try {
 }
 
 // Export for testing
-export { browserControl, webgpuAI };
+export { browserControl, webgpuAI, zapState, zapCallTool };

@@ -141,21 +141,39 @@ async function build() {
 
   // Copy common files to each browser directory
   ['chrome', 'firefox', 'safari'].forEach(browserName => {
+    const dir = `dist/browser-extension/${browserName}`;
+
     fs.copyFileSync(
       'dist/browser-extension/content-script.js',
-      `dist/browser-extension/${browserName}/content-script.js`
+      `${dir}/content-script.js`
     );
     // Firefox uses its own background script (no ESM, uses browser.* APIs)
     if (browserName === 'firefox') {
       fs.copyFileSync(
         'dist/browser-extension/background-firefox.js',
-        `dist/browser-extension/${browserName}/background.js`
+        `${dir}/background.js`
       );
     } else {
       fs.copyFileSync(
         'dist/browser-extension/background.js',
-        `dist/browser-extension/${browserName}/background.js`
+        `${dir}/background.js`
       );
+    }
+
+    // Copy popup + sidebar HTML/CSS/JS
+    for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'sidebar.js']) {
+      const src = path.join('src', f);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, path.join(dir, f));
+      }
+    }
+
+    // Copy icons into each browser directory
+    for (const icon of ['icon16.png', 'icon48.png', 'icon128.png']) {
+      const iconPath = path.join('images', icon);
+      if (fs.existsSync(iconPath)) {
+        fs.copyFileSync(iconPath, path.join(dir, icon));
+      }
     }
   });
 
