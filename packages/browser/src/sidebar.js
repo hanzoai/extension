@@ -501,12 +501,108 @@ class HanzoSidebar {
   }
 
   showAgentLauncher() {
-    const modal = document.createElement('div');
-    modal.className = 'notification';
-    modal.style.bottom = '80px';
-    modal.innerHTML = 'Agent launcher coming soon';
-    document.body.appendChild(modal);
-    setTimeout(() => modal.remove(), 2000);
+    // Create agent launcher modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Launch Agent</h3>
+          <button class="icon-btn close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <label class="setting-item">
+            <span>Target Tab</span>
+            <select id="agent-tab-select">
+              <option value="active">Active Tab</option>
+            </select>
+          </label>
+          <label class="setting-item">
+            <span>Agent Type</span>
+            <select id="agent-type-select">
+              <option value="browser-control">Browser Automation</option>
+              <option value="page-analyzer">Page Analyzer</option>
+              <option value="form-filler">Form Filler</option>
+              <option value="data-extractor">Data Extractor</option>
+            </select>
+          </label>
+          <label class="setting-item">
+            <span>Instructions</span>
+            <textarea id="agent-instructions" rows="3" placeholder="Describe what the agent should do..."></textarea>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button class="secondary-btn cancel-modal">Cancel</button>
+          <button class="primary-btn launch-modal">Launch</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // Populate tabs
+    chrome.tabs.query({}, (tabs) => {
+      const select = overlay.querySelector('#agent-tab-select');
+      tabs.forEach(tab => {
+        if (tab.id) {
+          const opt = document.createElement('option');
+          opt.value = tab.id;
+          opt.textContent = `${tab.title?.substring(0, 40) || 'Untitled'} ${tab.active ? '(active)' : ''}`;
+          select.appendChild(opt);
+        }
+      });
+    });
+
+    // Close handlers
+    overlay.querySelector('.close-modal').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('.cancel-modal').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    // Launch handler
+    overlay.querySelector('.launch-modal').addEventListener('click', async () => {
+      const tabSelect = overlay.querySelector('#agent-tab-select');
+      const typeSelect = overlay.querySelector('#agent-type-select');
+      const instructions = overlay.querySelector('#agent-instructions');
+
+      let tabId;
+      if (tabSelect.value === 'active') {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        tabId = activeTab?.id;
+      } else {
+        tabId = parseInt(tabSelect.value);
+      }
+
+      if (!tabId) {
+        this.showError('No tab selected');
+        return;
+      }
+
+      const agentType = typeSelect.value;
+      overlay.remove();
+
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: 'launchAIWorker',
+          tabId,
+          model: agentType,
+        });
+
+        if (response?.success) {
+          const agentId = response.agentId || `agent-${Date.now().toString(36)}`;
+          this.agents.set(agentId, {
+            id: agentId,
+            name: agentType,
+            tabId,
+            status: 'running',
+          });
+          this.updateAgentList();
+          this.showNotification(`Agent launched on tab ${tabId}`);
+        } else {
+          this.showError(response?.error || 'Failed to launch agent');
+        }
+      } catch (error) {
+        this.showError('Failed to launch agent: ' + error.message);
+      }
+    });
   }
 
   // ===========================================================================
