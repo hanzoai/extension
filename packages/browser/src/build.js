@@ -147,11 +147,18 @@ async function build() {
       'dist/browser-extension/content-script.js',
       `${dir}/content-script.js`
     );
-    // All browsers use ESM background with MV3
-    fs.copyFileSync(
-      'dist/browser-extension/background.js',
-      `${dir}/background.js`
-    );
+    // Firefox uses IIFE background (no ESM service workers); Chrome/Safari use ESM
+    if (browserName === 'firefox') {
+      fs.copyFileSync(
+        'dist/browser-extension/background-firefox.js',
+        `${dir}/background.js`
+      );
+    } else {
+      fs.copyFileSync(
+        'dist/browser-extension/background.js',
+        `${dir}/background.js`
+      );
+    }
 
     // Copy popup + sidebar HTML/CSS/JS
     for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'sidebar.js']) {
