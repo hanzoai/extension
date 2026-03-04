@@ -1,237 +1,442 @@
-// Hanzo AI Browser Extension Sidebar Script
+// Hanzo AI Browser Extension Sidebar — Chat + Tools + Settings
 
 class HanzoSidebar {
   constructor() {
-    this.authToken = null;
-    this.user = null;
-    this.mcpConnection = null;
     this.agents = new Map();
-    this.processes = new Map();
-    
+    this.currentTab = 'chat';
+    this.messages = [];
+    this.streaming = false;
+    this.streamController = null;
+
     this.initializeUI();
     this.setupEventListeners();
-    this.checkAuthStatus();
-    this.connectToMCP();
-    this.startMonitoring();
+    this.checkAuth();
   }
 
   initializeUI() {
-    // Get DOM elements
-    this.elements = {
+    this.el = {
+      // Auth
       authSection: document.getElementById('auth-section'),
-      authStatus: document.getElementById('auth-status'),
       authBtn: document.getElementById('auth-btn'),
-      mainContent: document.getElementById('main-content'),
+      tabBar: document.getElementById('tab-bar'),
+      userBadge: document.getElementById('user-badge'),
+      headerAvatar: document.getElementById('header-avatar'),
+
+      // Chat
+      tabChat: document.getElementById('tab-chat'),
+      chatMessages: document.getElementById('chat-messages'),
+      chatInput: document.getElementById('chat-input'),
+      sendBtn: document.getElementById('send-btn'),
+      modelSelect: document.getElementById('model-select'),
+
+      // Tools
+      tabTools: document.getElementById('tab-tools'),
+      mcpStatus: document.getElementById('mcp-status'),
+      mcpTools: document.getElementById('mcp-tools'),
+      agentCount: document.getElementById('agent-count'),
+      agentList: document.getElementById('agent-list'),
+      tabFs: document.getElementById('tab-fs'),
+      refreshTabs: document.getElementById('refresh-tabs'),
+      gpuStatus: document.getElementById('gpu-status'),
+      gpuModel: document.getElementById('gpu-model'),
+      launchAgent: document.getElementById('launch-agent'),
+
+      // Settings
+      tabSettings: document.getElementById('tab-settings'),
       userAvatar: document.getElementById('user-avatar'),
       userName: document.getElementById('user-name'),
       userEmail: document.getElementById('user-email'),
       logoutBtn: document.getElementById('logout-btn'),
-      
-      mcpStatus: document.getElementById('mcp-status'),
-      mcpTools: document.getElementById('mcp-tools'),
-      
-      agentCount: document.getElementById('agent-count'),
-      agentList: document.getElementById('agent-list'),
-      
-      tabFs: document.getElementById('tab-fs'),
-      refreshTabs: document.getElementById('refresh-tabs'),
-      
-      gpuStatus: document.getElementById('gpu-status'),
-      gpuModel: document.getElementById('gpu-model'),
-      gpuMemory: document.getElementById('gpu-memory'),
-      
-      processCount: document.getElementById('process-count'),
-      processList: document.getElementById('process-list'),
-      
-      launchAgent: document.getElementById('launch-agent'),
-      settingsBtn: document.getElementById('settings-btn'),
-      settingsPanel: document.getElementById('settings-panel'),
-      closeSettings: document.getElementById('close-settings'),
-      saveSettings: document.getElementById('save-settings')
+      saveSettings: document.getElementById('save-settings'),
+      defaultModel: document.getElementById('default-model'),
     };
   }
 
   setupEventListeners() {
     // Auth
-    this.elements.authBtn.addEventListener('click', () => this.authenticate());
-    this.elements.logoutBtn.addEventListener('click', () => this.logout());
-    
-    // Actions
-    this.elements.launchAgent.addEventListener('click', () => this.showAgentLauncher());
-    this.elements.refreshTabs.addEventListener('click', () => this.refreshTabFilesystem());
-    
+    this.el.authBtn.addEventListener('click', () => this.login());
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+    });
+
+    // Chat
+    this.el.sendBtn.addEventListener('click', () => this.sendMessage());
+    this.el.chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this.sendMessage();
+      }
+    });
+    this.el.chatInput.addEventListener('input', () => this.autoResize());
+
+    // Tools
+    this.el.refreshTabs.addEventListener('click', () => this.refreshTabFilesystem());
+    this.el.launchAgent.addEventListener('click', () => this.showAgentLauncher());
+
     // Settings
-    this.elements.settingsBtn.addEventListener('click', () => this.showSettings());
-    this.elements.closeSettings.addEventListener('click', () => this.hideSettings());
-    this.elements.saveSettings.addEventListener('click', () => this.saveSettings());
-    
-    // Listen for messages from background script
+    this.el.logoutBtn.addEventListener('click', () => this.logout());
+    this.el.saveSettings.addEventListener('click', () => this.saveSettings());
+
+    // Background messages
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      this.handleMessage(request, sender, sendResponse);
+      this.handleMessage(request);
       return true;
     });
   }
 
-  async checkAuthStatus() {
+  // ===========================================================================
+  // Auth
+  // ===========================================================================
+
+  async checkAuth() {
     try {
-      const { authToken, user } = await chrome.storage.local.get(['authToken', 'user']);
-      
-      if (authToken && user) {
-        this.authToken = authToken;
-        this.user = user;
-        this.showAuthenticated();
+      const response = await chrome.runtime.sendMessage({ action: 'auth.status' });
+      if (response?.success && response.authenticated) {
+        this.showApp(response.user);
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      console.error('Auth check failed:', error);
     }
   }
 
-  async authenticate() {
-    this.elements.authBtn.disabled = true;
-    this.elements.authBtn.textContent = 'Connecting...';
-    
+  async login() {
+    this.el.authBtn.disabled = true;
+    this.el.authBtn.textContent = 'Signing in...';
+
     try {
-      // Open IAM login in new tab
-      const authUrl = 'https://iam.hanzo.ai/auth/browser-extension';
-      const authTab = await chrome.tabs.create({ url: authUrl });
-      
-      // Listen for auth callback
-      const authListener = (tabId, changeInfo, tab) => {
-        if (tabId === authTab.id && changeInfo.url) {
-          const url = new URL(changeInfo.url);
-          
-          if (url.hostname === 'localhost' && url.searchParams.has('token')) {
-            const token = url.searchParams.get('token');
-            const user = {
-              id: url.searchParams.get('user_id'),
-              name: url.searchParams.get('name'),
-              email: url.searchParams.get('email'),
-              avatar: url.searchParams.get('avatar')
-            };
-            
-            // Store auth data
-            chrome.storage.local.set({ authToken: token, user });
-            
-            // Update UI
-            this.authToken = token;
-            this.user = user;
-            this.showAuthenticated();
-            
-            // Close auth tab
-            chrome.tabs.remove(tabId);
-            chrome.tabs.onUpdated.removeListener(authListener);
-          }
-        }
-      };
-      
-      chrome.tabs.onUpdated.addListener(authListener);
-      
+      const response = await chrome.runtime.sendMessage({ action: 'auth.login' });
+      if (response?.success) {
+        this.showApp(response.user);
+      } else {
+        this.showError(response?.error || 'Sign in failed');
+      }
     } catch (error) {
-      console.error('Authentication error:', error);
-      this.showError('Failed to authenticate');
+      this.showError('Sign in failed');
     } finally {
-      this.elements.authBtn.disabled = false;
-      this.elements.authBtn.textContent = 'Connect to Hanzo IAM';
+      this.el.authBtn.disabled = false;
+      this.el.authBtn.textContent = 'Sign in with Hanzo';
     }
-  }
-
-  showAuthenticated() {
-    // Update auth status
-    this.elements.authStatus.innerHTML = `
-      <div class="status-indicator connected"></div>
-      <span>Connected</span>
-    `;
-    
-    // Show user info
-    if (this.user) {
-      this.elements.userAvatar.src = this.user.avatar || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%23FF6B6B"/></svg>';
-      this.elements.userName.textContent = this.user.name || 'User';
-      this.elements.userEmail.textContent = this.user.email || '';
-    }
-    
-    // Show main content
-    this.elements.authSection.style.display = 'none';
-    this.elements.mainContent.classList.remove('hidden');
   }
 
   async logout() {
-    await chrome.storage.local.remove(['authToken', 'user']);
-    this.authToken = null;
-    this.user = null;
-    
-    // Reset UI
-    this.elements.authSection.style.display = 'flex';
-    this.elements.mainContent.classList.add('hidden');
-    this.elements.authStatus.innerHTML = `
-      <div class="status-indicator disconnected"></div>
-      <span>Not connected</span>
-    `;
+    await chrome.runtime.sendMessage({ action: 'auth.logout' });
+    this.el.authSection.classList.remove('hidden');
+    this.el.tabBar.classList.add('hidden');
+    this.el.userBadge.classList.add('hidden');
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
   }
+
+  showApp(user) {
+    // Hide auth, show tabs
+    this.el.authSection.classList.add('hidden');
+    this.el.tabBar.classList.remove('hidden');
+    this.switchTab('chat');
+
+    // Set user info
+    if (user) {
+      const avatar = user.picture || user.avatar || '';
+      if (avatar) {
+        this.el.headerAvatar.src = avatar;
+        this.el.userBadge.classList.remove('hidden');
+        this.el.userAvatar.src = avatar;
+      }
+      this.el.userName.textContent = user.name || user.displayName || 'User';
+      this.el.userEmail.textContent = user.email || '';
+    }
+
+    // Init data
+    this.loadModels();
+    this.loadConversation();
+    this.connectToMCP();
+    this.refreshTabFilesystem();
+    this.checkWebGPU();
+    this.loadSettings();
+    this.startMonitoring();
+  }
+
+  // ===========================================================================
+  // Tab Navigation
+  // ===========================================================================
+
+  switchTab(name) {
+    this.currentTab = name;
+
+    // Update tab buttons
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === name);
+    });
+
+    // Show/hide content
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+    const target = document.getElementById(`tab-${name}`);
+    if (target) target.classList.remove('hidden');
+  }
+
+  // ===========================================================================
+  // Chat
+  // ===========================================================================
+
+  async loadModels() {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'chat.listModels' });
+      if (response?.success && response.models?.length) {
+        const select = this.el.modelSelect;
+        select.innerHTML = '';
+        for (const model of response.models) {
+          const opt = document.createElement('option');
+          opt.value = model.id;
+          opt.textContent = model.name || model.id;
+          select.appendChild(opt);
+        }
+        // Also populate settings default model
+        this.el.defaultModel.innerHTML = select.innerHTML;
+      }
+    } catch {
+      // Keep default options
+    }
+  }
+
+  async sendMessage() {
+    const text = this.el.chatInput.value.trim();
+    if (!text || this.streaming) return;
+
+    // Get token
+    const tokenResp = await chrome.runtime.sendMessage({ action: 'auth.getToken' });
+    if (!tokenResp?.success || !tokenResp.token) {
+      this.showError('Please sign in again');
+      return;
+    }
+
+    // Add user message
+    this.messages.push({ role: 'user', content: text });
+    this.appendMessage('user', text);
+
+    // Clear input
+    this.el.chatInput.value = '';
+    this.autoResize();
+
+    // Show typing
+    this.streaming = true;
+    this.el.sendBtn.disabled = true;
+    const typingEl = this.showTyping();
+
+    // Create assistant message element
+    const assistantEl = this.appendMessage('assistant', '');
+    let fullContent = '';
+
+    try {
+      // Stream via direct fetch (sidebar has access via CSP)
+      const model = this.el.modelSelect.value;
+      const response = await fetch('https://api.hanzo.ai/api/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokenResp.token}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: this.messages,
+          stream: true,
+        }),
+        signal: (this.streamController = new AbortController()).signal,
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`API error ${response.status}: ${errText}`);
+      }
+
+      typingEl.remove();
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(':')) continue;
+          if (trimmed.startsWith('data: ')) {
+            const data = trimmed.slice(6);
+            if (data === '[DONE]') break;
+            try {
+              const parsed = JSON.parse(data);
+              const delta = parsed.choices?.[0]?.delta?.content;
+              if (delta) {
+                fullContent += delta;
+                assistantEl.innerHTML = this.renderMarkdown(fullContent);
+                this.scrollToBottom();
+              }
+            } catch {}
+          }
+        }
+      }
+
+      this.messages.push({ role: 'assistant', content: fullContent });
+      this.saveConversation();
+    } catch (error) {
+      typingEl.remove();
+      if (error.name !== 'AbortError') {
+        assistantEl.remove();
+        this.appendError(error.message);
+      }
+    } finally {
+      this.streaming = false;
+      this.streamController = null;
+      this.el.sendBtn.disabled = false;
+    }
+  }
+
+  appendMessage(role, content) {
+    // Remove welcome message
+    const welcome = this.el.chatMessages.querySelector('.chat-welcome');
+    if (welcome) welcome.remove();
+
+    const div = document.createElement('div');
+    div.className = `msg msg-${role}`;
+    div.innerHTML = role === 'assistant' ? this.renderMarkdown(content) : this.escapeHtml(content);
+    this.el.chatMessages.appendChild(div);
+    this.scrollToBottom();
+    return div;
+  }
+
+  appendError(message) {
+    const div = document.createElement('div');
+    div.className = 'msg-error';
+    div.textContent = message;
+    this.el.chatMessages.appendChild(div);
+    this.scrollToBottom();
+  }
+
+  showTyping() {
+    const div = document.createElement('div');
+    div.className = 'typing-indicator';
+    div.innerHTML = '<span></span><span></span><span></span>';
+    this.el.chatMessages.appendChild(div);
+    this.scrollToBottom();
+    return div;
+  }
+
+  scrollToBottom() {
+    this.el.chatMessages.scrollTop = this.el.chatMessages.scrollHeight;
+  }
+
+  autoResize() {
+    const el = this.el.chatInput;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  // Minimal markdown: code blocks, inline code, bold, italic, line breaks
+  renderMarkdown(text) {
+    if (!text) return '';
+    let html = this.escapeHtml(text);
+
+    // Code blocks: ```lang\n...\n```
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      return `<pre><code>${code.trim()}</code></pre>`;
+    });
+
+    // Inline code: `...`
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Bold: **...**
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+    // Italic: *...*
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
+
+    return html;
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  async loadConversation() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['hanzo_chat_messages'], (result) => {
+        if (result.hanzo_chat_messages?.length) {
+          this.messages = result.hanzo_chat_messages;
+          // Render stored messages
+          const welcome = this.el.chatMessages.querySelector('.chat-welcome');
+          if (welcome) welcome.remove();
+          for (const msg of this.messages) {
+            this.appendMessage(msg.role, msg.content);
+          }
+        }
+        resolve();
+      });
+    });
+  }
+
+  saveConversation() {
+    // Keep last 50 messages
+    const toStore = this.messages.slice(-50);
+    chrome.storage.local.set({ hanzo_chat_messages: toStore });
+  }
+
+  // ===========================================================================
+  // Tools Tab
+  // ===========================================================================
 
   async connectToMCP() {
     try {
-      // Check ZAP status (primary protocol)
       const zapResponse = await chrome.runtime.sendMessage({ action: 'zap.status' });
       if (zapResponse?.success) {
         const zap = zapResponse.zap;
         const toolCount = zap.mcps?.reduce((sum, m) => sum + (m.tools?.length || 0), 0) || 0;
         this.updateMCPStatus(zap.connected, toolCount, zap.mcps?.length || 0);
       } else {
-        // Fallback: check legacy MCP
-        const response = await chrome.runtime.sendMessage({ action: 'getMCPStatus' });
-        this.updateMCPStatus(response?.connected || false, response?.tools || 0, 0);
+        this.updateMCPStatus(false);
       }
-    } catch (error) {
-      console.error('MCP connection error:', error);
+    } catch {
       this.updateMCPStatus(false);
     }
   }
 
   updateMCPStatus(connected, toolCount = 0, mcpCount = 0) {
-    const statusEl = this.elements.mcpStatus;
-    statusEl.innerHTML = connected ? `
+    this.el.mcpStatus.innerHTML = connected ? `
       <span class="status-indicator connected"></span>
       ${mcpCount > 0 ? `ZAP: ${mcpCount} MCP(s)` : 'Connected'}
     ` : `
       <span class="status-indicator disconnected"></span>
       Disconnected
     `;
-
-    this.elements.mcpTools.textContent = toolCount;
+    this.el.mcpTools.textContent = toolCount;
   }
 
   async refreshTabFilesystem() {
     try {
       const tabs = await chrome.tabs.query({});
-      const filesystem = tabs.map((tab, index) => ({
-        path: `/tabs/${index}/${this.sanitizePath(tab.title || 'untitled')}`,
-        tabId: tab.id,
-        url: tab.url,
-        title: tab.title || 'Untitled',
-        active: tab.active
-      }));
-      
-      // Update UI
-      this.elements.tabFs.innerHTML = filesystem.map(item => `
-        <div class="tab-item ${item.active ? 'active' : ''}" data-tab-id="${item.tabId}">
+      this.el.tabFs.innerHTML = tabs.map((tab, i) => `
+        <div class="tab-item ${tab.active ? 'active' : ''}" data-tab-id="${tab.id}">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
             <path d="M2 2v12h12V2H2zm1 1h10v10H3V3z"/>
           </svg>
-          <span title="${item.url}">${item.path}</span>
+          <span title="${this.escapeHtml(tab.url || '')}">/tabs/${i}/${this.sanitizePath(tab.title || 'untitled')}</span>
         </div>
       `).join('');
-      
-      // Add click handlers
-      this.elements.tabFs.querySelectorAll('.tab-item').forEach(item => {
+
+      this.el.tabFs.querySelectorAll('.tab-item').forEach(item => {
         item.addEventListener('click', () => {
-          const tabId = parseInt(item.dataset.tabId);
-          chrome.tabs.update(tabId, { active: true });
+          chrome.tabs.update(parseInt(item.dataset.tabId), { active: true });
         });
       });
-      
-    } catch (error) {
-      console.error('Error refreshing tab filesystem:', error);
-    }
+    } catch {}
   }
 
   sanitizePath(title) {
@@ -241,35 +446,29 @@ class HanzoSidebar {
   async checkWebGPU() {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'checkWebGPU' });
-      
       if (response?.available) {
-        this.elements.gpuStatus.innerHTML = `
+        this.el.gpuStatus.innerHTML = `
           <span class="status-indicator connected"></span>
           Available
         `;
-        this.elements.gpuModel.textContent = response.adapter || 'Unknown';
-        this.elements.gpuMemory.textContent = response.memory || '-';
+        this.el.gpuModel.textContent = response.adapter || 'Unknown';
       } else {
-        this.elements.gpuStatus.innerHTML = `
+        this.el.gpuStatus.innerHTML = `
           <span class="status-indicator disconnected"></span>
           Not Available
         `;
       }
-    } catch (error) {
-      console.error('WebGPU check error:', error);
-    }
+    } catch {}
   }
 
   updateAgentList() {
-    const agentArray = Array.from(this.agents.values());
-    this.elements.agentCount.textContent = agentArray.length;
-    
-    if (agentArray.length === 0) {
-      this.elements.agentList.innerHTML = '<div class="empty-state">No active agents</div>';
+    const arr = Array.from(this.agents.values());
+    this.el.agentCount.textContent = arr.length;
+    if (arr.length === 0) {
+      this.el.agentList.innerHTML = '<div class="empty-state">No active agents</div>';
       return;
     }
-    
-    this.elements.agentList.innerHTML = agentArray.map(agent => `
+    this.el.agentList.innerHTML = arr.map(a => `
       <div class="agent-item">
         <div class="agent-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -278,16 +477,11 @@ class HanzoSidebar {
           </svg>
         </div>
         <div class="agent-info">
-          <div class="agent-name">${agent.name}</div>
-          <div class="agent-status">${agent.status} • Tab ${agent.tabId}</div>
+          <div class="agent-name">${this.escapeHtml(a.name)}</div>
+          <div class="agent-status">${a.status} • Tab ${a.tabId}</div>
         </div>
         <div class="agent-actions">
-          <button class="icon-btn small" onclick="hanzoSidebar.pauseAgent('${agent.id}')">
-            <svg viewBox="0 0 16 16" fill="currentColor">
-              <path d="M6 3v10M10 3v10" stroke-width="2"/>
-            </svg>
-          </button>
-          <button class="icon-btn small" onclick="hanzoSidebar.stopAgent('${agent.id}')">
+          <button class="icon-btn small" data-stop="${a.id}" title="Stop">
             <svg viewBox="0 0 16 16" fill="currentColor">
               <rect x="4" y="4" width="8" height="8" stroke-width="2"/>
             </svg>
@@ -295,148 +489,75 @@ class HanzoSidebar {
         </div>
       </div>
     `).join('');
-  }
 
-  updateProcessList() {
-    const processArray = Array.from(this.processes.values());
-    this.elements.processCount.textContent = processArray.length;
-    
-    if (processArray.length === 0) {
-      this.elements.processList.innerHTML = '<div class="empty-state">No running processes</div>';
-      return;
-    }
-    
-    this.elements.processList.innerHTML = processArray.map(proc => `
-      <div class="process-item">
-        <span class="process-name">${proc.name}</span>
-        <span class="process-time">${this.formatDuration(proc.startTime)}</span>
-      </div>
-    `).join('');
-  }
-
-  formatDuration(startTime) {
-    const elapsed = Date.now() - startTime;
-    const seconds = Math.floor(elapsed / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    
-    if (hours > 0) return `${hours}h ${minutes % 60}m`;
-    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-    return `${seconds}s`;
+    this.el.agentList.querySelectorAll('[data-stop]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.stop;
+        chrome.runtime.sendMessage({ action: 'stopAgent', agentId: id });
+        this.agents.delete(id);
+        this.updateAgentList();
+      });
+    });
   }
 
   showAgentLauncher() {
-    // Create agent launcher modal
     const modal = document.createElement('div');
-    modal.className = 'agent-launcher-modal';
-    modal.innerHTML = `
-      <div class="modal-content">
-        <h3>Launch Agent</h3>
-        <label>
-          Agent Type
-          <select id="agent-type">
-            <option value="browser-control">Browser Control</option>
-            <option value="data-extraction">Data Extraction</option>
-            <option value="form-automation">Form Automation</option>
-            <option value="testing">Testing</option>
-          </select>
-        </label>
-        <label>
-          Target Tab
-          <select id="target-tab">
-            <option value="current">Current Tab</option>
-            <option value="all">All Tabs</option>
-          </select>
-        </label>
-        <label>
-          Model
-          <select id="agent-model">
-            <option value="local">Local (WebGPU)</option>
-            <option value="claude">Claude</option>
-            <option value="gpt4">GPT-4</option>
-          </select>
-        </label>
-        <div class="modal-actions">
-          <button class="btn secondary" onclick="this.parentElement.parentElement.parentElement.remove()">Cancel</button>
-          <button class="btn primary" onclick="hanzoSidebar.launchAgent()">Launch</button>
-        </div>
-      </div>
-    `;
-    
+    modal.className = 'notification';
+    modal.style.bottom = '80px';
+    modal.innerHTML = 'Agent launcher coming soon';
     document.body.appendChild(modal);
+    setTimeout(() => modal.remove(), 2000);
   }
 
-  async launchAgent() {
-    const type = document.getElementById('agent-type').value;
-    const target = document.getElementById('target-tab').value;
-    const model = document.getElementById('agent-model').value;
-    
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'launchAgent',
-        config: { type, target, model }
-      });
-      
-      if (response.success) {
-        this.agents.set(response.agentId, {
-          id: response.agentId,
-          name: `${type}-${response.agentId.slice(0, 6)}`,
-          status: 'Running',
-          tabId: response.tabId,
-          type,
-          model
-        });
-        
-        this.updateAgentList();
-        document.querySelector('.agent-launcher-modal').remove();
+  // ===========================================================================
+  // Settings Tab
+  // ===========================================================================
+
+  loadSettings() {
+    chrome.storage.local.get(['mcpPort', 'cdpPort', 'zapPorts', 'hanzo_default_model'], (result) => {
+      const mcpPort = document.getElementById('mcp-port-setting');
+      const cdpPort = document.getElementById('cdp-port-setting');
+      const zapPorts = document.getElementById('zap-ports-setting');
+
+      if (mcpPort) mcpPort.value = result.mcpPort || 3001;
+      if (cdpPort) cdpPort.value = result.cdpPort || 9223;
+      if (zapPorts) zapPorts.value = (result.zapPorts || [9999,9998,9997,9996,9995]).join(',');
+      if (result.hanzo_default_model && this.el.defaultModel) {
+        this.el.defaultModel.value = result.hanzo_default_model;
       }
-    } catch (error) {
-      console.error('Error launching agent:', error);
-    }
-  }
-
-  showSettings() {
-    this.elements.settingsPanel.classList.remove('hidden');
-  }
-
-  hideSettings() {
-    this.elements.settingsPanel.classList.add('hidden');
+    });
   }
 
   async saveSettings() {
-    const settings = {
-      mcpUrl: document.getElementById('mcp-url').value,
-      autoReconnect: document.getElementById('auto-reconnect').checked,
-      enableWebGPU: document.getElementById('enable-webgpu').checked,
-      quantization: document.getElementById('quantization').value,
-      safeMode: document.getElementById('safe-mode').checked,
-      maxAgents: parseInt(document.getElementById('max-agents').value)
-    };
-    
-    await chrome.storage.local.set({ settings });
-    this.hideSettings();
+    const mcpPort = parseInt(document.getElementById('mcp-port-setting')?.value) || 3001;
+    const cdpPort = parseInt(document.getElementById('cdp-port-setting')?.value) || 9223;
+    const zapPorts = (document.getElementById('zap-ports-setting')?.value || '')
+      .split(',').map(p => parseInt(p.trim())).filter(p => p > 0 && p < 65536);
+
+    await chrome.storage.local.set({
+      mcpPort,
+      cdpPort,
+      zapPorts: zapPorts.length ? zapPorts : [9999,9998,9997,9996,9995],
+      hanzo_default_model: this.el.defaultModel?.value || 'gpt-4o',
+      'safe-mode': document.getElementById('safe-mode')?.checked,
+      'enable-webgpu': document.getElementById('enable-webgpu')?.checked,
+      maxAgents: parseInt(document.getElementById('max-agents')?.value) || 3,
+    });
+
     this.showNotification('Settings saved');
   }
 
-  showNotification(message) {
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
-    setTimeout(() => notification.remove(), 3000);
+  // ===========================================================================
+  // Utility
+  // ===========================================================================
+
+  startMonitoring() {
+    setInterval(() => this.connectToMCP(), 10000);
+    chrome.tabs.onUpdated.addListener(() => this.refreshTabFilesystem());
+    chrome.tabs.onRemoved.addListener(() => this.refreshTabFilesystem());
   }
 
-  showError(message) {
-    const error = document.createElement('div');
-    error.className = 'notification error';
-    error.textContent = message;
-    document.body.appendChild(error);
-    
-    setTimeout(() => error.remove(), 5000);
-  }
-
-  handleMessage(request, sender, sendResponse) {
+  handleMessage(request) {
     switch (request.action) {
       case 'agentUpdate':
         if (request.agentId && this.agents.has(request.agentId)) {
@@ -444,50 +565,25 @@ class HanzoSidebar {
           this.updateAgentList();
         }
         break;
-        
-      case 'processUpdate':
-        if (request.processId) {
-          if (request.status === 'started') {
-            this.processes.set(request.processId, {
-              id: request.processId,
-              name: request.name,
-              startTime: Date.now()
-            });
-          } else if (request.status === 'ended') {
-            this.processes.delete(request.processId);
-          }
-          this.updateProcessList();
-        }
-        break;
     }
   }
 
-  pauseAgent(agentId) {
-    chrome.runtime.sendMessage({ action: 'pauseAgent', agentId });
+  showNotification(message) {
+    const el = document.createElement('div');
+    el.className = 'notification';
+    el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
   }
 
-  stopAgent(agentId) {
-    chrome.runtime.sendMessage({ action: 'stopAgent', agentId });
-    this.agents.delete(agentId);
-    this.updateAgentList();
-  }
-
-  startMonitoring() {
-    // Initial checks
-    this.refreshTabFilesystem();
-    this.checkWebGPU();
-    
-    // Periodic updates
-    setInterval(() => {
-      this.connectToMCP();
-      this.updateProcessList();
-    }, 5000);
-    
-    // Tab change listener
-    chrome.tabs.onUpdated.addListener(() => this.refreshTabFilesystem());
-    chrome.tabs.onRemoved.addListener(() => this.refreshTabFilesystem());
+  showError(message) {
+    const el = document.createElement('div');
+    el.className = 'notification error';
+    el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 5000);
   }
 }
 
-// Initialize sidebar
+// Initialize
 const hanzoSidebar = new HanzoSidebar();

@@ -1,4 +1,5 @@
-// Hanzo AI - Popup Script
+// Hanzo AI — Popup Script
+// Uses background message passing for auth (not direct storage access).
 
 document.addEventListener('DOMContentLoaded', () => {
   const loginSection = document.getElementById('login-section');
@@ -8,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Auth
   const loginBtn = document.getElementById('login-btn');
   const logoutBtn = document.getElementById('logout-btn');
+
+  // Open panel
+  const openPanel = document.getElementById('open-panel');
 
   // Status dots
   const zapStatus = document.getElementById('zap-status');
@@ -25,19 +29,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveSettings = document.getElementById('save-settings');
   const testConnection = document.getElementById('test-connection');
 
-  // --- Auth ---
+  // --- Auth via background ---
   function checkAuth() {
-    chrome.storage.local.get(['hanzoToken', 'hanzoUser'], (result) => {
-      if (result.hanzoToken) {
+    chrome.runtime.sendMessage({ action: 'auth.status' }, (response) => {
+      if (chrome.runtime.lastError) return;
+      if (response?.success && response.authenticated) {
         loginSection.classList.add('hidden');
         mainSection.classList.remove('hidden');
-        if (result.hanzoUser) {
+        if (response.user) {
           const avatar = document.getElementById('user-avatar');
           const name = document.getElementById('user-name');
           const email = document.getElementById('user-email');
-          avatar.src = result.hanzoUser.avatar || 'icon48.png';
-          name.textContent = result.hanzoUser.name || 'Hanzo User';
-          email.textContent = result.hanzoUser.email || '';
+          avatar.src = response.user.picture || response.user.avatar || 'icon48.png';
+          name.textContent = response.user.name || response.user.displayName || 'Hanzo User';
+          email.textContent = response.user.email || '';
         }
         refreshStatus();
       } else {
@@ -48,14 +53,36 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   loginBtn?.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://iam.hanzo.ai/login?redirect=extension' });
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Signing in...';
+    chrome.runtime.sendMessage({ action: 'auth.login' }, (response) => {
+      loginBtn.disabled = false;
+      loginBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Sign in with Hanzo';
+      if (response?.success) {
+        checkAuth();
+      }
+    });
   });
 
   logoutBtn?.addEventListener('click', () => {
-    chrome.storage.local.remove(['hanzoToken', 'hanzoUser'], () => {
+    chrome.runtime.sendMessage({ action: 'auth.logout' }, () => {
       mainSection.classList.add('hidden');
       loginSection.classList.remove('hidden');
     });
+  });
+
+  // --- Open side panel ---
+  openPanel?.addEventListener('click', () => {
+    if (chrome.sidePanel) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.sidePanel.open({ tabId: tabs[0].id });
+        }
+      });
+    } else {
+      // Firefox: sidebar_action is automatic
+      window.close();
+    }
   });
 
   // --- Status ---
@@ -82,17 +109,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // GPU status
     chrome.runtime.sendMessage({ action: 'runLocalAI', prompt: '' }, (response) => {
       if (chrome.runtime.lastError) return;
-      // If we get a response (even error), GPU check is working
       gpuStatus.classList.add(response?.success ? 'connected' : 'disconnected');
       gpuStatus.classList.remove(response?.success ? 'disconnected' : 'connected');
       gpuDetail.textContent = response?.success ? 'Available' : 'Not available';
     });
 
-    // MCP legacy status (check if ws is open via background)
+    // MCP/CDP — set as active for now (checked via ZAP)
     mcpStatus.classList.add('connected');
     mcpPort.textContent = 'Fallback';
-
-    // CDP status
     cdpStatus.classList.add('connected');
     cdpDetail.textContent = 'Active';
   }
@@ -142,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     testConnection.textContent = 'Testing...';
     testConnection.disabled = true;
 
-    chrome.runtime.sendMessage({ action: 'zap.discover' }, (response) => {
+    chrome.runtime.sendMessage({ action: 'zap.discover' }, () => {
       refreshStatus();
       testConnection.textContent = 'Test Connection';
       testConnection.disabled = false;
