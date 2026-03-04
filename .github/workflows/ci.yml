@@ -57,6 +57,7 @@ jobs:
     - run: pnpm install --frozen-lockfile
 
     - name: Install Playwright Chromium
+      working-directory: packages/browser
       run: npx playwright install --with-deps chromium
 
     - name: Build browser extension
@@ -65,7 +66,7 @@ jobs:
 
     - name: Run Playwright E2E tests
       working-directory: packages/browser
-      run: npx playwright test --config=e2e/playwright.config.ts
+      run: xvfb-run npx playwright test --config=e2e/playwright.config.ts
 
     - uses: actions/upload-artifact@v4
       if: failure()
