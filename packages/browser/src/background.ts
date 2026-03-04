@@ -2,6 +2,8 @@
 import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './cdp-bridge';
+import * as auth from './auth';
+import { listModels } from './chat-client';
 
 // Initialize browser control
 const browserControl = new BrowserControl();
@@ -471,6 +473,58 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       }
       break;
 
+    // --- Auth (Hanzo IAM OAuth2 + PKCE) ---
+    case 'auth.login':
+      try {
+        const user = await auth.login();
+        sendResponse({ success: true, user });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'auth.logout':
+      try {
+        await auth.logout();
+        sendResponse({ success: true });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'auth.status':
+      try {
+        const status = await auth.getAuthStatus();
+        sendResponse({ success: true, ...status });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'auth.getToken':
+      try {
+        const token = await auth.getValidAccessToken();
+        sendResponse({ success: !!token, token });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    // --- Cloud Chat ---
+    case 'chat.listModels':
+      try {
+        const token = await auth.getValidAccessToken();
+        if (!token) {
+          sendResponse({ success: false, error: 'Not authenticated' });
+          break;
+        }
+        const models = await listModels(token);
+        sendResponse({ success: true, models });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
     // --- Content script element selection (routed from content script) ---
     case 'elementSelected':
       // Forward to ZAP-connected MCPs (primary)
@@ -537,6 +591,11 @@ function handleMCPMessage(data: any) {
 // =============================================================================
 // Startup
 // =============================================================================
+
+// 0. Register side panel
+if (chrome.sidePanel) {
+  chrome.sidePanel.setOptions({ path: 'sidebar.html', enabled: true });
+}
 
 // 1. Primary: Discover ZAP servers (high-performance binary protocol)
 discoverZapServers();
