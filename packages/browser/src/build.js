@@ -147,18 +147,11 @@ async function build() {
       'dist/browser-extension/content-script.js',
       `${dir}/content-script.js`
     );
-    // Firefox uses its own background script (no ESM, uses browser.* APIs)
-    if (browserName === 'firefox') {
-      fs.copyFileSync(
-        'dist/browser-extension/background-firefox.js',
-        `${dir}/background.js`
-      );
-    } else {
-      fs.copyFileSync(
-        'dist/browser-extension/background.js',
-        `${dir}/background.js`
-      );
-    }
+    // All browsers use ESM background with MV3
+    fs.copyFileSync(
+      'dist/browser-extension/background.js',
+      `${dir}/background.js`
+    );
 
     // Copy popup + sidebar HTML/CSS/JS
     for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'sidebar.js']) {
@@ -239,8 +232,26 @@ server.on('elementSelected', (data) => {
     }
   });
 
+  // Generate Safari Xcode project (macOS + iOS) if safari-web-extension-converter exists
+  try {
+    execSync('xcrun --find safari-web-extension-converter', { stdio: 'ignore' });
+    console.log('Generating Safari Xcode project (macOS + iOS)...');
+    execSync(
+      `xcrun safari-web-extension-converter dist/browser-extension/chrome/ ` +
+      `--project-location dist/safari ` +
+      `--app-name "Hanzo AI" ` +
+      `--bundle-identifier ai.hanzo.browser-extension ` +
+      `--no-prompt --no-open --force`,
+      { stdio: 'inherit' }
+    );
+    console.log('📦 Safari: dist/safari/ (macOS + iOS Xcode project)');
+  } catch {
+    console.log('⚠️  Safari: skipped (Xcode not available)');
+  }
+
   console.log('✅ Browser extension built successfully!');
-  console.log('📦 Extension: dist/browser-extension/');
+  console.log('📦 Chrome: dist/browser-extension/chrome/');
+  console.log('📦 Firefox: dist/browser-extension/firefox/');
   console.log('📦 NPM package ready in: dist/browser-extension/');
   console.log('\nTo publish to npm: cd dist/browser-extension && npm publish');
 }
