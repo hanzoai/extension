@@ -48,7 +48,7 @@ jobs:
 
     # --- Chrome Web Store ---
     - name: Publish to Chrome Web Store
-      if: secrets.CHROME_EXTENSION_ID != ''
+      if: ${{ secrets.CHROME_EXTENSION_ID != '' }}
       working-directory: packages/browser
       run: |
         ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
@@ -70,7 +70,7 @@ jobs:
 
     # --- Firefox Add-ons ---
     - name: Publish to Firefox Add-ons
-      if: secrets.AMO_API_KEY != ''
+      if: ${{ secrets.AMO_API_KEY != '' }}
       working-directory: packages/browser
       run: |
         npx web-ext sign \
