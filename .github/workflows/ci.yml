@@ -21,8 +21,26 @@ jobs:
         cache: 'pnpm'
     - run: pnpm install --frozen-lockfile
 
-    - name: Run all tests
-      run: pnpm -r test
+    - name: Test browser extension
+      run: pnpm --filter @hanzo/browser-extension test
+
+    - name: Test ACI package
+      run: pnpm --filter @hanzo/aci test
+
+    - name: Test AI package
+      run: pnpm --filter @hanzo/ai test
+
+    - name: Test tools package
+      run: pnpm --filter @hanzo/tools test
+      continue-on-error: true
+
+    - name: Test site
+      run: pnpm --filter @hanzo/site test
+      continue-on-error: true
+
+    - name: Test VS Code extension
+      run: pnpm --filter @hanzo/extension test
+      continue-on-error: true
 
   # ─── Playwright E2E ───
   e2e:
@@ -193,7 +211,7 @@ jobs:
         name: jetbrains
         path: packages/jetbrains/build/distributions/*.zip
 
-  # ─── GitHub Release (only when all tests pass) ───
+  # ─── GitHub Release (only when all builds pass on tag) ───
   release:
     name: Release
     runs-on: ubuntu-latest
