@@ -1,14 +1,14 @@
 /* Hanzo AI Browser Extension Popup Styles */
 
 :root {
-  --primary: #FF6B6B;
-  --primary-dark: #E55555;
-  --bg: #0A0A0A;
-  --surface: #1A1A1A;
-  --surface-light: #2A2A2A;
+  --primary: #FFFFFF;
+  --primary-dark: #D4D4D4;
+  --bg: #000000;
+  --surface: #0A0A0A;
+  --surface-light: #1A1A1A;
   --text: #FFFFFF;
   --text-dim: #888888;
-  --border: #333333;
+  --border: #1F1F1F;
   --success: #4CAF50;
   --warning: #FFC107;
   --error: #F44336;
@@ -44,8 +44,9 @@ header {
 }
 
 .logo {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
+  color: var(--text);
 }
 
 h1 {
@@ -97,11 +98,13 @@ h3 {
 
 .btn-primary {
   background: var(--primary);
-  color: white;
+  color: #000000;
+  font-weight: 600;
 }
 
 .btn-primary:hover {
   background: var(--primary-dark);
+  color: #000000;
 }
 
 .btn-secondary {
@@ -214,7 +217,7 @@ h3 {
 }
 
 input:checked + .toggle {
-  background: var(--primary);
+  background: var(--text);
 }
 
 input:checked + .toggle::after {
@@ -361,7 +364,7 @@ kbd {
 }
 
 .help-text a {
-  color: var(--primary);
+  color: var(--text-dim);
   text-decoration: none;
 }
 
