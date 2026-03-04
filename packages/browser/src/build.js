@@ -116,7 +116,7 @@ async function build() {
     'dist/browser-extension/firefox/manifest.json'
   );
 
-  // Safari needs special handling - create stub (unchanged)
+  // Safari needs special handling — write Info.plist for Xcode project
   fs.writeFileSync('dist/browser-extension/safari/Info.plist', `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
