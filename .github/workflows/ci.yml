@@ -3,12 +3,14 @@ name: CI
 on:
   push:
     branches: [main, dev]
+    tags: ['v*']
   pull_request:
     branches: [main]
 
 jobs:
-  build:
-    name: Build All Extensions
+  # ─── Tests ───
+  test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -19,60 +21,84 @@ jobs:
         cache: 'pnpm'
     - run: pnpm install --frozen-lockfile
 
-    # ── Browser (Chrome + Firefox) ──
+    - name: Run all tests
+      run: pnpm -r test
+      continue-on-error: true
+
+  # ─── Build all extensions ───
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'pnpm'
+    - run: pnpm install --frozen-lockfile
+
+    # Browser (Chrome + Firefox)
     - name: Build browser extension
       working-directory: packages/browser
       run: node src/build.js
 
-    - name: Package Chrome
+    - name: Package Chrome + Firefox
       working-directory: packages/browser
-      run: cd dist/browser-extension/chrome && zip -r ../../../dist/hanzo-ai-chrome.zip .
-
-    - name: Package Firefox
-      working-directory: packages/browser
-      run: cd dist/browser-extension/firefox && zip -r ../../../dist/hanzo-ai-firefox.zip .
+      run: |
+        cd dist/browser-extension/chrome && zip -r ../../../hanzo-ai-chrome.zip .
+        cd ../../browser-extension/firefox && zip -r ../../../hanzo-ai-firefox.zip .
 
     - name: Lint Firefox
       working-directory: packages/browser
       run: npx web-ext lint --source-dir dist/browser-extension/firefox
       continue-on-error: true
 
-    # ── VS Code ──
-    - name: Build VS Code extension
-      run: pnpm --filter @hanzo/extension run compile
-      continue-on-error: true
-
-    - name: Package VSIX
+    # VS Code
+    - name: Build & package VS Code extension
       run: |
+        pnpm --filter @hanzo/extension run compile || true
         pnpm add -g @vscode/vsce
-        cd packages/vscode && vsce package --no-dependencies -o dist/
-      continue-on-error: true
+        cd packages/vscode
+        # vsce requires non-scoped name
+        node -e "
+          const p = require('./package.json');
+          p.name = 'hanzo-ai';
+          require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2));
+        "
+        vsce package --no-dependencies
+        # restore original name
+        node -e "
+          const p = require('./package.json');
+          p.name = '@hanzo/extension';
+          require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2));
+        "
 
-    # ── DXT (Claude Code) ──
-    - name: Build DXT extension
-      run: pnpm --filter @hanzo/dxt run build
-      continue-on-error: true
-
-    # ── MCP ──
+    # MCP
     - name: Build MCP server
       run: pnpm --filter @hanzo/mcp run build
       continue-on-error: true
 
-    # ── Upload all artifacts ──
-    - uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: dist
-        path: |
-          packages/browser/dist/hanzo-ai-chrome.zip
-          packages/browser/dist/hanzo-ai-firefox.zip
-          packages/vscode/dist/*.vsix
-          packages/dxt/dist/*.dxt
-          packages/mcp/dist/
+    # DXT (Claude Code)
+    - name: Build DXT extension
+      run: pnpm --filter @hanzo/dxt run build
+      continue-on-error: true
 
+    - uses: actions/upload-artifact@v4
+      with:
+        name: extensions
+        path: |
+          packages/browser/hanzo-ai-chrome.zip
+          packages/browser/hanzo-ai-firefox.zip
+          packages/vscode/*.vsix
+          packages/dxt/dist/*.dxt
+
+  # ─── Safari (needs macOS) ───
   build-safari:
-    name: Build Safari (macOS + iOS)
+    name: Safari
     runs-on: macos-latest
+    needs: test
     steps:
     - uses: actions/checkout@v4
     - uses: pnpm/action-setup@v4
@@ -90,8 +116,7 @@ jobs:
       working-directory: packages/browser
       run: |
         xcodebuild -project "dist/safari/Hanzo AI/Hanzo AI.xcodeproj" \
-          -scheme "Hanzo AI (macOS)" \
-          -configuration Release \
+          -scheme "Hanzo AI (macOS)" -configuration Release \
           CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO \
           -derivedDataPath dist/safari-build-macos
 
@@ -99,20 +124,25 @@ jobs:
       working-directory: packages/browser
       run: |
         xcodebuild -project "dist/safari/Hanzo AI/Hanzo AI.xcodeproj" \
-          -scheme "Hanzo AI (iOS)" \
-          -configuration Release \
+          -scheme "Hanzo AI (iOS)" -configuration Release \
           -sdk iphoneos \
           CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
           -derivedDataPath dist/safari-build-ios
 
+    - name: Package Safari
+      working-directory: packages/browser
+      run: cd dist/safari && zip -r ../../hanzo-ai-safari.zip "Hanzo AI/"
+
     - uses: actions/upload-artifact@v4
       with:
         name: safari
-        path: packages/browser/dist/safari/
+        path: packages/browser/hanzo-ai-safari.zip
 
+  # ─── JetBrains ───
   build-jetbrains:
-    name: Build JetBrains Plugin
+    name: JetBrains
     runs-on: ubuntu-latest
+    needs: test
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
@@ -124,10 +154,55 @@ jobs:
     - name: Build plugin
       working-directory: packages/jetbrains
       run: ./gradlew buildPlugin
-      continue-on-error: true
 
     - uses: actions/upload-artifact@v4
-      if: always()
       with:
         name: jetbrains
         path: packages/jetbrains/build/distributions/*.zip
+
+  # ─── GitHub Release (on tag or nightly) ───
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [build, build-safari, build-jetbrains]
+    if: always() && (needs.build.result == 'success')
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: List artifacts
+      run: find artifacts -type f | sort
+
+    - name: Determine release info
+      id: info
+      run: |
+        if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "tag=$VERSION" >> $GITHUB_OUTPUT
+          echo "name=Release $VERSION" >> $GITHUB_OUTPUT
+          echo "prerelease=false" >> $GITHUB_OUTPUT
+        else
+          TAG="nightly-$(date +'%Y%m%d.%H%M%S')"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "name=Nightly $(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "prerelease=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.info.outputs.tag }}
+        name: ${{ steps.info.outputs.name }}
+        prerelease: ${{ steps.info.outputs.prerelease }}
+        generate_release_notes: true
+        files: |
+          artifacts/extensions/packages/browser/hanzo-ai-chrome.zip
+          artifacts/extensions/packages/vscode/*.vsix
+          artifacts/extensions/packages/browser/hanzo-ai-firefox.zip
+          artifacts/safari/hanzo-ai-safari.zip
+          artifacts/jetbrains/*.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
