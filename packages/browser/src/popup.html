@@ -98,9 +98,19 @@
       <!-- Connection Status -->
       <div class="status">
         <div class="status-item">
+          <span class="status-dot" id="zap-status"></span>
+          <span>ZAP Protocol</span>
+          <span id="zap-detail" class="status-detail">Discovering...</span>
+        </div>
+        <div class="status-item">
           <span class="status-dot" id="mcp-status"></span>
           <span>MCP Server</span>
-          <span id="mcp-port" class="status-detail">Port 3001</span>
+          <span id="mcp-port" class="status-detail">Fallback</span>
+        </div>
+        <div class="status-item">
+          <span class="status-dot" id="cdp-status"></span>
+          <span>CDP Bridge</span>
+          <span id="cdp-detail" class="status-detail">Checking...</span>
         </div>
         <div class="status-item">
           <span class="status-dot" id="gpu-status"></span>
@@ -140,8 +150,16 @@
         <div class="setting-group">
           <h3>Connection</h3>
           <label>
-            MCP Server URL
-            <input type="text" id="mcp-url" value="ws://localhost:3001/browser-extension">
+            MCP Port
+            <input type="number" id="mcp-port-setting" value="3001" min="1024" max="65535">
+          </label>
+          <label>
+            CDP Bridge Port
+            <input type="number" id="cdp-port-setting" value="9223" min="1024" max="65535">
+          </label>
+          <label>
+            ZAP Discovery Ports
+            <input type="text" id="zap-ports-setting" value="9999,9998,9997,9996,9995" placeholder="Comma-separated ports">
           </label>
         </div>
 
