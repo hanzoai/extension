@@ -16,33 +16,22 @@ interface ElementSelectedEvent {
 }
 
 class HanzoContentScript {
-  private ws: WebSocket | null = null;
-  private readonly WS_URL = 'ws://localhost:3001/browser-extension';
-  
   constructor() {
-    this.connect();
     this.setupClickHandler();
     this.injectHelpers();
   }
 
-  private connect() {
-    this.ws = new WebSocket(this.WS_URL);
-    this.ws.onopen = () => console.log('[Hanzo] Connected to MCP server');
-    this.ws.onerror = () => setTimeout(() => this.connect(), 5000);
-    this.ws.onclose = () => setTimeout(() => this.connect(), 5000);
-  }
-
   private setupClickHandler() {
     document.addEventListener('click', (e) => {
-      if (!e.altKey || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-      
+      if (!e.altKey) return;
+
       e.preventDefault();
       e.stopPropagation();
-      
+
       const element = e.target as HTMLElement;
       const source = this.extractSourceLocation(element);
       const domPath = this.getDOMPath(element);
-      
+
       const event: ElementSelectedEvent = {
         event: 'elementSelected',
         framework: this.detectFramework(),
@@ -50,8 +39,9 @@ class HanzoContentScript {
         source,
         fallbackId: element.getAttribute('data-hanzo-id') || undefined
       };
-      
-      this.ws.send(JSON.stringify(event));
+
+      // Route through background script (works with both ZAP and legacy MCP)
+      chrome.runtime.sendMessage({ action: 'elementSelected', data: event });
     });
   }
 

@@ -170,13 +170,16 @@ class HanzoSidebar {
 
   async connectToMCP() {
     try {
-      // Send message to background script to check MCP connection
-      const response = await chrome.runtime.sendMessage({ action: 'getMCPStatus' });
-      
-      if (response?.connected) {
-        this.updateMCPStatus(true, response.tools || 0);
+      // Check ZAP status (primary protocol)
+      const zapResponse = await chrome.runtime.sendMessage({ action: 'zap.status' });
+      if (zapResponse?.success) {
+        const zap = zapResponse.zap;
+        const toolCount = zap.mcps?.reduce((sum, m) => sum + (m.tools?.length || 0), 0) || 0;
+        this.updateMCPStatus(zap.connected, toolCount, zap.mcps?.length || 0);
       } else {
-        this.updateMCPStatus(false);
+        // Fallback: check legacy MCP
+        const response = await chrome.runtime.sendMessage({ action: 'getMCPStatus' });
+        this.updateMCPStatus(response?.connected || false, response?.tools || 0, 0);
       }
     } catch (error) {
       console.error('MCP connection error:', error);
@@ -184,16 +187,16 @@ class HanzoSidebar {
     }
   }
 
-  updateMCPStatus(connected, toolCount = 0) {
+  updateMCPStatus(connected, toolCount = 0, mcpCount = 0) {
     const statusEl = this.elements.mcpStatus;
     statusEl.innerHTML = connected ? `
       <span class="status-indicator connected"></span>
-      Connected
+      ${mcpCount > 0 ? `ZAP: ${mcpCount} MCP(s)` : 'Connected'}
     ` : `
       <span class="status-indicator disconnected"></span>
       Disconnected
     `;
-    
+
     this.elements.mcpTools.textContent = toolCount;
   }
 
