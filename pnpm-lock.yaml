@@ -133,6 +133,9 @@ importers:
         specifier: ^8.18.3
         version: 8.18.3
     devDependencies:
+      '@playwright/test':
+        specifier: ^1.52.0
+        version: 1.54.1
       '@types/chrome':
         specifier: ^0.0.270
         version: 0.0.270
@@ -1645,6 +1648,7 @@ packages:
     resolution: {integrity: sha512-ffI9sLdlJ0L0FjKVy5QpznRTgVaEGL2INJVcJauuzsYY2aOC3weNfE+v58n/cm9I/NulTdu1BemwzFpESoZf5A==}
     cpu: [arm64]
     os: [darwin]
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
 
   '@lancedb/vectordb-darwin-x64@0.11.0':
     resolution: {integrity: sha512-sMGKVmTj7Gt1z+1Sy24toCV8UgcQkX0ljQU1QunVEzJvoP9yah/DN5rw5Ozxiv8Obk6Pz3BMZYqV3BPmL9AiAg==}
