@@ -1,25 +1,25 @@
 /* Hanzo AI Browser Extension Sidebar */
 
 :root {
-  --bg-primary: #0A0A0A;
-  --bg-secondary: #141414;
-  --bg-tertiary: #1F1F1F;
-  --bg-hover: #2A2A2A;
+  --bg-primary: #000000;
+  --bg-secondary: #0A0A0A;
+  --bg-tertiary: #141414;
+  --bg-hover: #1F1F1F;
 
   --text-primary: #FFFFFF;
   --text-secondary: #A0A0A0;
   --text-tertiary: #6B6B6B;
 
-  --accent: #FF6B6B;
-  --accent-hover: #FF5252;
-  --accent-dim: #FF6B6B20;
+  --accent: #FFFFFF;
+  --accent-hover: #D4D4D4;
+  --accent-dim: #FFFFFF10;
 
   --success: #4CAF50;
   --warning: #FFC107;
   --error: #F44336;
 
-  --border: #2A2A2A;
-  --shadow: 0 4px 12px rgba(0,0,0,0.4);
+  --border: #1A1A1A;
+  --shadow: 0 4px 12px rgba(0,0,0,0.6);
 }
 
 * {
@@ -111,10 +111,10 @@ body {
 }
 
 .auth-logo {
-  width: 48px;
-  height: 48px;
-  color: var(--accent);
-  margin-bottom: 16px;
+  width: 56px;
+  height: 56px;
+  color: var(--text-primary);
+  margin-bottom: 20px;
 }
 
 .auth-card h2 {
@@ -214,8 +214,9 @@ body {
 
 .msg-user {
   align-self: flex-end;
-  background: var(--accent);
-  color: white;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-bottom-right-radius: 4px;
 }
 
@@ -345,7 +346,7 @@ body {
   background: var(--accent);
   border: none;
   border-radius: 10px;
-  color: white;
+  color: #000000;
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.2s;
@@ -400,10 +401,10 @@ body {
   width: 100%;
   padding: 10px 16px;
   background: var(--accent);
-  color: white;
+  color: #000000;
   border: none;
   border-radius: 8px;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
