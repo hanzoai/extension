@@ -27,23 +27,10 @@
       </div>
     </header>
 
-    <!-- Auth Gate (shown when not logged in) -->
-    <section id="auth-section" class="auth-section">
-      <div class="auth-card">
-        <svg class="auth-logo" viewBox="0 0 67 67" xmlns="http://www.w3.org/2000/svg">
-          <path d="M22.21 67V44.6369H0V67H22.21Z" fill="currentColor"/>
-          <path d="M66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184Z" fill="currentColor"/>
-          <path d="M22.21 0H0V22.3184H22.21V0Z" fill="currentColor"/>
-          <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z" fill="currentColor"/>
-          <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z" fill="currentColor"/>
-        </svg>
-        <h2>Hanzo AI</h2>
-        <p>Sign in to access AI chat, tools, and browser automation.</p>
-        <button id="auth-btn" class="primary-btn">Sign in with Hanzo</button>
-      </div>
-    </section>
+    <!-- Auth section removed — login prompt is now inside Chat tab -->
+    <section id="auth-section" class="hidden"></section>
 
-    <!-- Tab Bar (shown after auth) -->
+    <!-- Tab Bar (always visible) -->
     <nav id="tab-bar" class="tab-bar hidden">
       <button class="tab active" data-tab="chat">Chat</button>
       <button class="tab" data-tab="tools">Tools</button>
@@ -57,12 +44,21 @@
 
     <!-- Chat Tab -->
     <div id="tab-chat" class="tab-content hidden">
+      <!-- Login prompt (shown when not authenticated) -->
+      <div id="chat-login-prompt" class="chat-login-prompt hidden">
+        <div class="auth-card compact">
+          <p class="auth-headline">Chat with Zen AI models</p>
+          <p class="auth-sub">Claude, GPT-4o, Zen Coder Flash &amp; more</p>
+          <button id="auth-btn" class="primary-btn">Sign in</button>
+          <p class="auth-note">Browser tools work without sign-in. <a href="https://docs.hanzo.ai" target="_blank">Learn more</a></p>
+        </div>
+      </div>
       <div id="chat-messages" class="chat-messages">
         <div class="chat-welcome">
           <p>Ask anything. Powered by Hanzo Cloud.</p>
         </div>
       </div>
-      <div class="chat-input-area">
+      <div id="chat-composer" class="chat-input-area">
         <div class="model-selector">
           <select id="model-select">
             <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>

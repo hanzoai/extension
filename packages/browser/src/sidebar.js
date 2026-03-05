@@ -91,13 +91,29 @@ class HanzoSidebar {
   // ===========================================================================
 
   async checkAuth() {
+    // Always show tabs and initialize tools — auth only gates chat
+    this.el.tabBar.classList.remove('hidden');
+    this.el.authSection.classList.add('hidden');
+    this.switchTab('tools'); // Default to tools (always works)
+
+    // Initialize features that work without auth
+    this.connectToMCP();
+    this.refreshTabFilesystem();
+    this.checkWebGPU();
+    this.loadSettings();
+    this.startMonitoring();
+
     try {
       const response = await chrome.runtime.sendMessage({ action: 'auth.status' });
       if (response?.success && response.authenticated) {
-        this.showApp(response.user);
+        this.setUser(response.user);
+        this.switchTab('chat');
+      } else {
+        this.showChatLoginPrompt();
       }
     } catch (error) {
       console.error('Auth check failed:', error);
+      this.showChatLoginPrompt();
     }
   }
 
@@ -108,7 +124,8 @@ class HanzoSidebar {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'auth.login' });
       if (response?.success) {
-        this.showApp(response.user);
+        this.setUser(response.user);
+        this.hideChatLoginPrompt();
       } else {
         this.showError(response?.error || 'Sign in failed');
       }
@@ -122,19 +139,15 @@ class HanzoSidebar {
 
   async logout() {
     await chrome.runtime.sendMessage({ action: 'auth.logout' });
-    this.el.authSection.classList.remove('hidden');
-    this.el.tabBar.classList.add('hidden');
     this.el.userBadge.classList.add('hidden');
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+    this.el.userName.textContent = '';
+    this.el.userEmail.textContent = '';
+    this.showChatLoginPrompt();
+    this.switchTab('tools');
   }
 
-  showApp(user) {
-    // Hide auth, show tabs
-    this.el.authSection.classList.add('hidden');
-    this.el.tabBar.classList.remove('hidden');
-    this.switchTab('chat');
-
-    // Set user info
+  setUser(user) {
+    this.authenticated = true;
     if (user) {
       const avatar = user.picture || user.avatar || '';
       if (avatar) {
@@ -145,15 +158,24 @@ class HanzoSidebar {
       this.el.userName.textContent = user.name || user.displayName || 'User';
       this.el.userEmail.textContent = user.email || '';
     }
-
-    // Init data
     this.loadModels();
     this.loadConversation();
-    this.connectToMCP();
-    this.refreshTabFilesystem();
-    this.checkWebGPU();
-    this.loadSettings();
-    this.startMonitoring();
+  }
+
+  showChatLoginPrompt() {
+    this.authenticated = false;
+    // Show login prompt in chat area instead of blocking entire sidebar
+    const chatLogin = document.getElementById('chat-login-prompt');
+    if (chatLogin) chatLogin.classList.remove('hidden');
+    const chatComposer = document.getElementById('chat-composer');
+    if (chatComposer) chatComposer.classList.add('hidden');
+  }
+
+  hideChatLoginPrompt() {
+    const chatLogin = document.getElementById('chat-login-prompt');
+    if (chatLogin) chatLogin.classList.add('hidden');
+    const chatComposer = document.getElementById('chat-composer');
+    if (chatComposer) chatComposer.classList.remove('hidden');
   }
 
   // ===========================================================================
