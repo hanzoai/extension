@@ -316,9 +316,9 @@ class HanzoFirefoxExtension {
 // Uses browser.identity.launchWebAuthFlow for OAuth
 // =============================================================================
 
-const IAM_BASE = 'https://iam.hanzo.ai';
+const IAM_BASE = 'https://hanzo.id';
 const API_BASE = 'https://api.hanzo.ai';
-const CLIENT_ID = 'hanzo-browser';
+const CLIENT_ID = 'app-hanzo';
 const SCOPES = 'openid profile email';
 
 const STORAGE_KEYS = {
@@ -373,7 +373,7 @@ async function firefoxLogin(): Promise<any> {
   const code = url.searchParams.get('code');
   if (!code) throw new Error(url.searchParams.get('error_description') || 'No code');
 
-  const tokenResponse = await fetch(`${IAM_BASE}/api/login/oauth/access_token`, {
+  const tokenResponse = await fetch(`${IAM_BASE}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -391,7 +391,7 @@ async function firefoxLogin(): Promise<any> {
   if (tokens.expires_in) data[STORAGE_KEYS.expiresAt] = Date.now() + tokens.expires_in * 1000;
   await browser.storage.local.set(data);
 
-  const userResp = await fetch(`${IAM_BASE}/api/userinfo`, { headers: { Authorization: `Bearer ${tokens.access_token}` } });
+  const userResp = await fetch(`${IAM_BASE}/oauth/userinfo`, { headers: { Authorization: `Bearer ${tokens.access_token}` } });
   const user = userResp.ok ? await userResp.json() : {};
   await browser.storage.local.set({ [STORAGE_KEYS.user]: user });
   return user;
@@ -433,7 +433,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
       case 'chat.listModels': {
         const t = await browser.storage.local.get([STORAGE_KEYS.accessToken]);
         if (!t[STORAGE_KEYS.accessToken]) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
-        const resp = await fetch(`${API_BASE}/api/models`, { headers: { Authorization: `Bearer ${t[STORAGE_KEYS.accessToken]}` } });
+        const resp = await fetch(`${API_BASE}/v1/models`, { headers: { Authorization: `Bearer ${t[STORAGE_KEYS.accessToken]}` } });
         const data = await resp.json();
         sendResponse({ success: true, models: data.data || data.models || data || [] });
         break;
