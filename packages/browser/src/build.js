@@ -12,22 +12,25 @@ async function build() {
   const hanzoUiPrimitives = path.join(hanzoUiRoot, 'pkg/ui/dist/primitives/index-common.js');
   const localReact = path.join(hanzoUiRoot, 'node_modules/react');
   const localReactDom = path.join(hanzoUiRoot, 'node_modules/react-dom');
+  const forceLocalUiShim = process.env.HANZO_FORCE_LOCAL_UI_SHIM === '1';
   const canUseSharedUi =
+    !forceLocalUiShim &&
     fs.existsSync(hanzoUiPrimitives) &&
     fs.existsSync(localReact) &&
     fs.existsSync(localReactDom);
 
-  if (!canUseSharedUi) {
-    throw new Error(
+  if (canUseSharedUi) {
+    console.log('Using shared @hanzo/ui primitives from sibling repo:', hanzoUiPrimitives);
+  } else {
+    console.warn(
       [
-        'Shared @hanzo/ui dependencies were not found.',
+        'Shared @hanzo/ui dependencies were not found. Falling back to local primitives shim.',
         `Expected: ${hanzoUiPrimitives}`,
         `Expected: ${localReact}`,
         `Expected: ${localReactDom}`,
       ].join('\n')
     );
   }
-  console.log('Using shared @hanzo/ui primitives from sibling repo:', hanzoUiPrimitives);
 
   // Ensure dist directories exist
   fs.mkdirSync('dist/browser-extension', { recursive: true });
@@ -78,11 +81,15 @@ async function build() {
   });
 
   // Build sidebar + popup UI scripts (TypeScript-first, with JS fallback)
-  const sidebarAliases = {
-    '@hanzo/ui/primitives-common': hanzoUiPrimitives,
-    react: localReact,
-    'react-dom': localReactDom,
-  };
+  const sidebarAliases = canUseSharedUi
+    ? {
+        '@hanzo/ui/primitives-common': hanzoUiPrimitives,
+        react: localReact,
+        'react-dom': localReactDom,
+      }
+    : {
+        '@hanzo/ui/primitives-common': path.join(__dirname, 'primitives-common-fallback.tsx'),
+      };
 
   await esbuild.build({
     entryPoints: [fs.existsSync('src/sidebar.ts') ? 'src/sidebar.ts' : 'src/sidebar.js'],
@@ -314,4 +321,7 @@ server.on('elementSelected', (data) => {
   console.log('\nTo publish to npm: cd dist/browser-extension && npm publish');
 }
 
-build().catch(console.error);
+build().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
