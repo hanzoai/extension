@@ -46,13 +46,8 @@ function generateState(): string {
 // Configuration
 // ---------------------------------------------------------------------------
 
-const IAM_BASE = 'https://iam.hanzo.ai';
-// Each Hanzo extension is a separate OAuth app for per-app tracking
-// in console.hanzo.ai and unified billing.hanzo.ai:
-//   hanzo-browser  — this extension (Chrome/Firefox/Safari)
-//   hanzo-vscode   — VS Code extension
-//   hanzo-jetbrains — JetBrains plugin
-const CLIENT_ID = 'hanzo-browser';
+const IAM_BASE = 'https://hanzo.id';
+const CLIENT_ID = 'app-hanzo';
 const SCOPES = 'openid profile email';
 
 // Storage keys (matching @hanzo/iam SDK convention)
@@ -155,8 +150,8 @@ export async function login(): Promise<UserInfo> {
     throw new Error(error);
   }
 
-  // Exchange code for tokens
-  const tokenResponse = await fetch(`${IAM_BASE}/api/login/oauth/access_token`, {
+  // Exchange code for tokens (OIDC standard endpoint)
+  const tokenResponse = await fetch(`${IAM_BASE}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -222,7 +217,7 @@ export async function getValidAccessToken(): Promise<string | null> {
  * Refresh access token using refresh_token grant.
  */
 async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const response = await fetch(`${IAM_BASE}/api/login/oauth/access_token`, {
+  const response = await fetch(`${IAM_BASE}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -243,7 +238,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
  * Fetch user info from IAM.
  */
 async function fetchUserInfo(accessToken: string): Promise<UserInfo> {
-  const response = await fetch(`${IAM_BASE}/api/userinfo`, {
+  const response = await fetch(`${IAM_BASE}/oauth/userinfo`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error('Failed to fetch user info');
