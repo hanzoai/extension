@@ -217,13 +217,6 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Generate Gradle wrapper
-      working-directory: packages/jetbrains
-      run: |
-        if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-          gradle wrapper --gradle-version 8.5
-        fi
-
     - name: Build plugin
       working-directory: packages/jetbrains
       run: ./gradlew buildPlugin
