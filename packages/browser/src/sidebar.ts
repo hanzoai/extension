@@ -1,4 +1,14 @@
-import { mountModernChatWidget } from './chat-widget';
+import {
+  CHAT_BUDGETS,
+  debugLog,
+  debounce,
+  estimateTextTokens,
+  loadDebugFlagFromStorage,
+  makeChatRequestKey,
+  pickModelForTokenBudget,
+  recordUsageDelta,
+  trimMessagesToBudget,
+} from './runtime-guard';
 
 // Hanzo AI Browser Extension Sidebar — Chat + Tools + Settings
 
@@ -11,8 +21,26 @@ class HanzoSidebar {
     this.streamController = null;
     this.authenticated = false;
     this.ragContext = null;
+    this.chatWidgetMounted = false;
+    this.chatWidgetMountPromise = null;
+    this.toolsInitialized = false;
+    this.monitoringStarted = false;
+    this.lastRequestKey = null;
+    this.lastRequestAt = 0;
+    this.requestEpoch = 0;
+    this.lastInputTokens = 0;
+    this.lastOutputTokens = 0;
+    this.refreshTabFilesystemDebounced = debounce(() => {
+      if (this.currentTab === 'tools') {
+        void this.refreshTabFilesystem();
+      }
+    }, 500);
+    this.persistConversationDebounced = debounce(() => {
+      const toStore = this.messages.slice(-50);
+      chrome.storage.local.set({ hanzo_chat_messages: toStore });
+    }, 400);
 
-    mountModernChatWidget();
+    void loadDebugFlagFromStorage();
     this.initializeUI();
     this.setupEventListeners();
     this.checkAuth();
@@ -49,6 +77,11 @@ class HanzoSidebar {
       gpuStatus: document.getElementById('gpu-status'),
       gpuModel: document.getElementById('gpu-model'),
       launchAgent: document.getElementById('launch-agent'),
+      usageChatRequests: document.getElementById('usage-chat-requests'),
+      usageInputTokens: document.getElementById('usage-input-tokens'),
+      usageOutputTokens: document.getElementById('usage-output-tokens'),
+      usageDedupe: document.getElementById('usage-dedupe'),
+      usageCanceled: document.getElementById('usage-canceled'),
 
       // Settings
       tabSettings: document.getElementById('tab-settings'),
@@ -84,7 +117,7 @@ class HanzoSidebar {
         this.sendMessage();
       }
     });
-    this.el.chatInput.addEventListener('input', () => this.autoResize());
+    this.el.chatInput.addEventListener('input', () => this.scheduleAutoResize());
     this.el.ragEnabled?.addEventListener('change', () => {
       this.setRagStatus(this.el.ragEnabled.checked ? 'RAG enabled' : 'RAG disabled');
     });
@@ -106,6 +139,9 @@ class HanzoSidebar {
       this.handleMessage(request);
       return true;
     });
+
+    chrome.tabs.onUpdated.addListener(() => this.refreshTabFilesystemDebounced());
+    chrome.tabs.onRemoved.addListener(() => this.refreshTabFilesystemDebounced());
   }
 
   // ===========================================================================
@@ -118,10 +154,6 @@ class HanzoSidebar {
     this.el.authSection.classList.add('hidden');
     this.switchTab('tools'); // Default to tools (always works)
 
-    // Initialize features that work without auth
-    this.connectToMCP();
-    this.refreshTabFilesystem();
-    this.checkWebGPU();
     this.loadSettings();
     this.startMonitoring();
 
@@ -134,7 +166,7 @@ class HanzoSidebar {
         this.showChatLoginPrompt();
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
+      debugLog('Auth check failed:', error);
       this.showChatLoginPrompt();
     }
   }
@@ -207,6 +239,13 @@ class HanzoSidebar {
 
   switchTab(name) {
     this.currentTab = name;
+    if (name === 'chat') {
+      void this.ensureChatWidgetMounted();
+    }
+    if (name === 'tools') {
+      this.ensureToolsInitialized();
+      void this.refreshUsageMetrics();
+    }
 
     // Update tab buttons
     document.querySelectorAll('.tab').forEach(t => {
@@ -219,6 +258,37 @@ class HanzoSidebar {
     if (target) target.classList.remove('hidden');
   }
 
+  async ensureChatWidgetMounted() {
+    if (this.chatWidgetMounted) return;
+    if (this.chatWidgetMountPromise) {
+      await this.chatWidgetMountPromise;
+      return;
+    }
+
+    this.chatWidgetMountPromise = import('./chat-widget')
+      .then((mod) => {
+        mod.mountModernChatWidget();
+        this.chatWidgetMounted = true;
+      })
+      .catch((error) => {
+        debugLog('Failed to mount chat widget:', error);
+      })
+      .finally(() => {
+        this.chatWidgetMountPromise = null;
+      });
+
+    await this.chatWidgetMountPromise;
+  }
+
+  ensureToolsInitialized() {
+    if (this.toolsInitialized) return;
+    this.toolsInitialized = true;
+    void this.connectToMCP();
+    void this.refreshTabFilesystem();
+    void this.checkWebGPU();
+    void this.refreshUsageMetrics();
+  }
+
   // ===========================================================================
   // Chat
   // ===========================================================================
@@ -229,27 +299,45 @@ class HanzoSidebar {
       if (response?.success && response.models?.length) {
         const select = this.el.modelSelect;
         select.innerHTML = '';
+        const autoOpt = document.createElement('option');
+        autoOpt.value = 'auto';
+        autoOpt.textContent = 'Auto (cost-aware)';
+        select.appendChild(autoOpt);
+
         for (const model of response.models) {
           const opt = document.createElement('option');
           opt.value = model.id;
           opt.textContent = model.name || model.id;
           select.appendChild(opt);
         }
+        select.value = 'auto';
         // Also populate settings default model
         this.el.defaultModel.innerHTML = select.innerHTML;
       }
-    } catch {
+    } catch (error) {
+      debugLog('Failed to load models:', error);
       // Keep default options
     }
   }
 
   async sendMessage() {
     const text = this.el.chatInput.value.trim();
-    if (!text || this.streaming) return;
+    if (!text) return;
     if (!this.authenticated) {
       this.showError('Please sign in to use chat');
       return;
     }
+
+    if (this.streaming && this.streamController) {
+      this.streamController.abort();
+      await chrome.runtime.sendMessage({ action: 'chat.cancel' }).catch(() => {});
+      await recordUsageDelta({ canceledRequests: 1 });
+      this.streaming = false;
+      this.streamController = null;
+      this.el.sendBtn.disabled = false;
+    }
+
+    const requestId = ++this.requestEpoch;
 
     // Get token
     const tokenResp = await chrome.runtime.sendMessage({ action: 'auth.getToken' });
@@ -259,7 +347,7 @@ class HanzoSidebar {
     }
 
     const userMessage = { role: 'user', content: text };
-    const model = this.el.modelSelect.value;
+    const selectedModel = this.el.modelSelect.value || 'auto';
     let requestMessages = [...this.messages, userMessage];
 
     this.ragContext = null;
@@ -282,13 +370,50 @@ class HanzoSidebar {
       this.setRagStatus('RAG disabled');
     }
 
+    const budgeted = trimMessagesToBudget(requestMessages, {
+      maxMessages: CHAT_BUDGETS.maxMessages,
+      maxInputTokens: CHAT_BUDGETS.maxInputTokens,
+    });
+
+    if (!budgeted.messages.length) {
+      this.showError('Message budget exhausted, please shorten your prompt');
+      return;
+    }
+
+    const availableModelIds = Array.from(this.el.modelSelect?.options || [])
+      .map((option) => option.value)
+      .filter((value) => value && value !== 'auto');
+    const resolvedModel = pickModelForTokenBudget(selectedModel, availableModelIds, budgeted.inputTokens);
+    const maxTokens = Math.min(
+      CHAT_BUDGETS.maxOutputTokens,
+      Math.max(200, Math.ceil(estimateTextTokens(text) * 1.8)),
+    );
+    const requestKey = makeChatRequestKey(resolvedModel, budgeted.messages, undefined, maxTokens);
+
+    if (
+      this.lastRequestKey === requestKey &&
+      Date.now() - this.lastRequestAt < CHAT_BUDGETS.duplicateWindowMs
+    ) {
+      this.showNotification('Duplicate request skipped');
+      await recordUsageDelta({ dedupeHits: 1 });
+      return;
+    }
+    this.lastRequestKey = requestKey;
+    this.lastRequestAt = Date.now();
+
+    if (budgeted.droppedMessages > 0) {
+      this.setRagStatus(
+        `Trimmed ${budgeted.droppedMessages} older message(s) for token budget`,
+      );
+    }
+
     // Add user message to transcript
     this.messages.push(userMessage);
     this.appendMessage('user', text);
 
     // Clear input
     this.el.chatInput.value = '';
-    this.autoResize();
+    this.scheduleAutoResize();
 
     // Show typing
     this.streaming = true;
@@ -308,9 +433,10 @@ class HanzoSidebar {
           'Authorization': `Bearer ${tokenResp.token}`,
         },
         body: JSON.stringify({
-          model,
-          messages: requestMessages,
+          model: resolvedModel,
+          messages: budgeted.messages,
           stream: true,
+          max_tokens: maxTokens,
         }),
         signal: (this.streamController = new AbortController()).signal,
       });
@@ -326,6 +452,9 @@ class HanzoSidebar {
       let buffer = '';
 
       while (true) {
+        if (requestId !== this.requestEpoch) {
+          throw new DOMException('Superseded by a newer request', 'AbortError');
+        }
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -358,17 +487,30 @@ class HanzoSidebar {
       }
 
       this.messages.push({ role: 'assistant', content: fullContent });
+      this.lastInputTokens = budgeted.inputTokens;
+      this.lastOutputTokens = estimateTextTokens(fullContent);
+      await recordUsageDelta({
+        chatRequests: 1,
+        inputTokens: this.lastInputTokens,
+        outputTokens: this.lastOutputTokens,
+      });
       this.saveConversation();
+      if (this.currentTab === 'tools') {
+        void this.refreshUsageMetrics();
+      }
     } catch (error) {
       typingEl.remove();
       if (error?.name !== 'AbortError') {
         assistantEl.remove();
         this.appendError(error?.message || 'Chat failed');
+        await recordUsageDelta({ errors: 1 });
       }
     } finally {
-      this.streaming = false;
-      this.streamController = null;
-      this.el.sendBtn.disabled = false;
+      if (requestId === this.requestEpoch) {
+        this.streaming = false;
+        this.streamController = null;
+        this.el.sendBtn.disabled = false;
+      }
     }
   }
 
@@ -477,6 +619,10 @@ class HanzoSidebar {
     this.el.chatMessages.scrollTop = this.el.chatMessages.scrollHeight;
   }
 
+  scheduleAutoResize() {
+    requestAnimationFrame(() => this.autoResize());
+  }
+
   autoResize() {
     const el = this.el.chatInput;
     el.style.height = 'auto';
@@ -532,9 +678,7 @@ class HanzoSidebar {
   }
 
   saveConversation() {
-    // Keep last 50 messages
-    const toStore = this.messages.slice(-50);
-    chrome.storage.local.set({ hanzo_chat_messages: toStore });
+    this.persistConversationDebounced();
   }
 
   // ===========================================================================
@@ -586,6 +730,21 @@ class HanzoSidebar {
     const preview = names.slice(0, 20);
     const suffix = names.length > preview.length ? `\n... +${names.length - preview.length} more` : '';
     this.el.mcpToolList.textContent = `${preview.join('\n')}${suffix}`;
+  }
+
+  async refreshUsageMetrics() {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'usage.metrics' });
+      if (!response?.success || !response.metrics) return;
+      const metrics = response.metrics;
+      if (this.el.usageChatRequests) this.el.usageChatRequests.textContent = String(metrics.chatRequests || 0);
+      if (this.el.usageInputTokens) this.el.usageInputTokens.textContent = String(metrics.inputTokens || 0);
+      if (this.el.usageOutputTokens) this.el.usageOutputTokens.textContent = String(metrics.outputTokens || 0);
+      if (this.el.usageDedupe) this.el.usageDedupe.textContent = String(metrics.dedupeHits || 0);
+      if (this.el.usageCanceled) this.el.usageCanceled.textContent = String(metrics.canceledRequests || 0);
+    } catch (error) {
+      debugLog('Failed to fetch usage metrics:', error);
+    }
   }
 
   async refreshTabFilesystem() {
@@ -828,7 +987,7 @@ class HanzoSidebar {
       mcpPort,
       cdpPort,
       zapPorts: zapPorts.length ? zapPorts : [9999,9998,9997,9996,9995],
-      hanzo_default_model: this.el.defaultModel?.value || 'gpt-4o',
+      hanzo_default_model: this.el.defaultModel?.value || 'auto',
       'safe-mode': document.getElementById('safe-mode')?.checked,
       'enable-webgpu': document.getElementById('enable-webgpu')?.checked,
       maxAgents: parseInt(document.getElementById('max-agents')?.value) || 3,
@@ -850,9 +1009,14 @@ class HanzoSidebar {
   // ===========================================================================
 
   startMonitoring() {
-    setInterval(() => this.connectToMCP(), 10000);
-    chrome.tabs.onUpdated.addListener(() => this.refreshTabFilesystem());
-    chrome.tabs.onRemoved.addListener(() => this.refreshTabFilesystem());
+    if (this.monitoringStarted) return;
+    this.monitoringStarted = true;
+
+    setInterval(() => {
+      if (this.currentTab !== 'tools') return;
+      void this.connectToMCP();
+      void this.refreshUsageMetrics();
+    }, 15000);
   }
 
   handleMessage(request) {

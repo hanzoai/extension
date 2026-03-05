@@ -1,5 +1,6 @@
 // CDP Bridge for hanzo-mcp Browser Tool Integration
 // Enables Playwright to control browser via Chrome DevTools Protocol
+import { ActionRateLimiter, debugLog, loadDebugFlagFromStorage } from './runtime-guard';
 
 interface CDPSession {
   tabId: number;
@@ -26,8 +27,11 @@ export class CDPBridge {
   private commandId: number = 0;
   private wsServer: WebSocket | null = null;
   private wsClients: Set<WebSocket> = new Set();
+  private overlayLimiter = new ActionRateLimiter();
+  private overlaySignatures = new Map<string, string>();
   
   constructor() {
+    void loadDebugFlagFromStorage();
     this.setupDebuggerListener();
   }
   
@@ -39,7 +43,7 @@ export class CDPBridge {
       });
       
       chrome.debugger.onDetach.addListener((source, reason) => {
-        console.log(`[CDP] Detached from tab ${source.tabId}: ${reason}`);
+        debugLog(`[CDP] Detached from tab ${source.tabId}: ${reason}`);
         if (source.tabId) {
           this.sessions.delete(source.tabId);
         }
@@ -66,7 +70,7 @@ export class CDPBridge {
             debuggee,
             connected: true
           });
-          console.log(`[CDP] Attached to tab ${tabId}`);
+          debugLog(`[CDP] Attached to tab ${tabId}`);
           resolve(true);
         }
       });
@@ -275,7 +279,7 @@ export class CDPBridge {
       this.wsServer = new WebSocket(url);
       
       this.wsServer.onopen = () => {
-        console.log('[CDP] Connected to bridge server');
+        debugLog('[CDP] Connected to bridge server');
         // Register as CDP provider with browser identification
         const browser = typeof navigator !== 'undefined'
           ? (navigator.userAgent.includes('Firefox') ? 'firefox'
@@ -310,7 +314,7 @@ export class CDPBridge {
       };
       
       this.wsServer.onclose = () => {
-        console.log('[CDP] Bridge disconnected, reconnecting in 5s...');
+        debugLog('[CDP] Bridge disconnected, reconnecting in 5s...');
         setTimeout(() => this.connectToBridge(url), 5000);
       };
     } catch (error) {
@@ -463,6 +467,25 @@ export class CDPBridge {
   }
   
   private notifyControlOverlay(tabId: number, action: string, data: any): void {
+    const key = `${tabId}:${action}`;
+    const signature = JSON.stringify(data || {});
+    const throttleMs = action === 'ai.control.cursor'
+      ? 40
+      : action === 'ai.control.status'
+        ? 200
+        : action === 'ai.control.highlight'
+          ? 90
+          : 0;
+
+    if (throttleMs > 0 && !this.overlayLimiter.allow(key, throttleMs)) {
+      return;
+    }
+
+    if (this.overlaySignatures.get(key) === signature && action !== 'ai.control.start' && action !== 'ai.control.stop') {
+      return;
+    }
+    this.overlaySignatures.set(key, signature);
+
     try {
       chrome.tabs.sendMessage(tabId, { action, ...data }, () => {
         // Ignore errors (tab may not have content script)
