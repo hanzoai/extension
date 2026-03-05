@@ -266,7 +266,10 @@ const aiOverlay = (() => {
         inset: 0;
         z-index: 2147483646;
         pointer-events: all;
-        background: rgba(0, 0, 0, 0.40);
+        background:
+          radial-gradient(90vw 90vh at 15% 8%, rgba(56, 189, 248, 0.10), transparent 55%),
+          radial-gradient(65vw 65vh at 84% 82%, rgba(99, 102, 241, 0.10), transparent 60%),
+          rgba(2, 4, 10, 0.42);
         backdrop-filter: blur(1.5px);
         opacity: 0;
         transition: opacity 300ms ease;
@@ -337,18 +340,56 @@ const aiOverlay = (() => {
         align-items: center;
         gap: 10px;
         max-width: 90vw;
-        padding: 10px 18px;
-        border-radius: 9999px;
-        background: rgba(10, 12, 17, 0.94);
-        border: 1px solid rgba(6, 182, 212, 0.25);
+        padding: 10px 14px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, rgba(8, 12, 20, 0.94), rgba(10, 16, 24, 0.96));
+        border: 1px solid rgba(56, 189, 248, 0.26);
         color: #f3f4f6;
         font: 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        box-shadow:
+          0 10px 36px rgba(0, 0, 0, 0.46),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
         opacity: 0;
         transition: opacity 300ms ease;
+        overflow: hidden;
+      }
+      .hanzo-ai-status::before {
+        content: '';
+        position: absolute;
+        inset: -2px auto -2px -20%;
+        width: 40%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+        transform: skewX(-18deg);
+        animation: hanzo-status-sheen 3.6s ease-in-out infinite;
+        pointer-events: none;
+      }
+      @keyframes hanzo-status-sheen {
+        0%, 68% { left: -30%; opacity: 0; }
+        72% { opacity: 0.4; }
+        100% { left: 130%; opacity: 0; }
+      }
+      .hanzo-ai-status > * {
+        position: relative;
       }
       .hanzo-ai-status.hanzo-visible {
         opacity: 1;
+      }
+
+      .hanzo-ai-status .hanzo-brand-bubble {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 20px;
+        min-width: 30px;
+        padding: 0 8px;
+        border-radius: 9999px;
+        font-size: 10px;
+        letter-spacing: 0.25px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #e0f2fe;
+        background: linear-gradient(180deg, rgba(14, 116, 144, 0.95), rgba(15, 23, 42, 0.95));
+        border: 1px solid rgba(56, 189, 248, 0.35);
       }
 
       .hanzo-ai-status .hanzo-pulse-dot {
@@ -364,6 +405,7 @@ const aiOverlay = (() => {
       }
 
       .hanzo-ai-status .hanzo-label {
+        max-width: 46vw;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -382,16 +424,17 @@ const aiOverlay = (() => {
 
       .hanzo-ai-status .hanzo-stop-btn {
         border: 1px solid rgba(255, 255, 255, 0.24);
-        background: transparent;
-        color: #f3f4f6;
-        border-radius: 9999px;
+        background: rgba(0, 0, 0, 0.18);
+        color: #f8fafc;
+        border-radius: 10px;
         padding: 4px 12px;
         font-size: 12px;
         cursor: pointer;
-        transition: background 0.15s;
+        transition: background 0.15s, border-color 0.15s;
       }
       .hanzo-ai-status .hanzo-stop-btn:hover {
         background: rgba(220, 38, 38, 0.28);
+        border-color: rgba(248, 113, 113, 0.6);
       }
 
       /* ---- "Take Back Control" button (bottom-right) ---- */
@@ -496,6 +539,7 @@ const aiOverlay = (() => {
     statusEl = document.createElement('div');
     statusEl.className = 'hanzo-ai-status';
     statusEl.innerHTML = `
+      <span class="hanzo-brand-bubble">AI</span>
       <div class="hanzo-pulse-dot"></div>
       <span class="hanzo-label">${escapeHtml(task || 'Hanzo AI is controlling this tab')}</span><span class="hanzo-dots"></span>
       <button class="hanzo-stop-btn">Stop</button>
