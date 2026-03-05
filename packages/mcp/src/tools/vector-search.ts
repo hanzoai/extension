@@ -87,14 +87,25 @@ export const vectorIndexTool: Tool = {
             metadata: args.metadata
           });
         } else {
-          // TODO: Handle directory indexing
-          return {
-            content: [{
-              type: 'text',
-              text: 'Directory indexing not yet implemented'
-            }],
-            isError: true
-          };
+          const files = await fs.readdir(args.path, { recursive: true });
+          for (const file of files) {
+            const filePath = path.join(args.path, file as string);
+            const fileStat = await fs.stat(filePath).catch(() => null);
+            if (fileStat?.isFile()) {
+              try {
+                const content = await fs.readFile(filePath, 'utf-8');
+                items.push({ content, path: filePath, metadata: args.metadata });
+              } catch {
+                // Skip binary/unreadable files
+              }
+            }
+          }
+          if (items.length === 0) {
+            return {
+              content: [{ type: 'text', text: 'No readable files found in directory' }],
+              isError: true
+            };
+          }
         }
       }
       
@@ -202,9 +213,8 @@ export const vectorSearchTool: Tool = {
         .search(queryEmbedding)
         .limit(args.limit || 10);
       
-      // Apply filters if provided
       if (args.filter) {
-        // TODO: Implement filtering
+        results = results.where(args.filter);
       }
       
       // Execute search
