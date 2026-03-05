@@ -3,7 +3,7 @@ import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './cdp-bridge';
 import * as auth from './auth';
-import { listModels } from './chat-client';
+import { listModels, chatCompletion, ChatMessage } from './chat-client';
 
 // Initialize browser control
 const browserControl = new BrowserControl();
@@ -490,6 +490,18 @@ function sendControlMessageToTab(tabId: number, message: Record<string, unknown>
   });
 }
 
+function sendMessageToTab(tabId: number, message: Record<string, unknown>): Promise<any> {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message || 'Failed to contact page content script'));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
 function getActiveTabId(): Promise<number | null> {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -805,6 +817,28 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       sendResponse({ success: true });
       break;
 
+    // --- In-page overlay (content script) ---
+    case 'page.overlay.toggle':
+    case 'page.overlay.show':
+    case 'page.overlay.hide':
+    case 'page.overlay.status': {
+      try {
+        const tabId = typeof request.tabId === 'number'
+          ? request.tabId
+          : (sender.tab?.id ?? await getActiveTabId());
+        if (tabId === null) {
+          sendResponse({ success: false, error: 'No target tab found' });
+          break;
+        }
+
+        const response = await sendMessageToTab(tabId, { action: request.action });
+        sendResponse({ success: true, tabId, ...(response || {}) });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+    }
+
     // --- Auth (Hanzo IAM OAuth2 + PKCE) ---
     case 'auth.login':
       try {
@@ -904,6 +938,112 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         sendResponse({ success: false, error: error.message });
       }
       break;
+
+    case 'chat.complete':
+      try {
+        const token = await auth.getValidAccessToken();
+        if (!token) {
+          sendResponse({ success: false, error: 'Not authenticated' });
+          break;
+        }
+
+        const model = String(request.model || 'gpt-4o');
+        const messagesInput = Array.isArray(request.messages) ? request.messages : [];
+        const messages: ChatMessage[] = messagesInput
+          .filter((msg: any) => msg && typeof msg.content === 'string' && typeof msg.role === 'string')
+          .map((msg: any) => ({
+            role: (msg.role === 'system' || msg.role === 'assistant') ? msg.role : 'user',
+            content: String(msg.content),
+          }))
+          .slice(-24);
+
+        if (!messages.length) {
+          sendResponse({ success: false, error: 'messages are required' });
+          break;
+        }
+
+        const content = await chatCompletion(token, {
+          model,
+          messages,
+          temperature: typeof request.temperature === 'number' ? request.temperature : undefined,
+          max_tokens: typeof request.max_tokens === 'number' ? request.max_tokens : undefined,
+        });
+
+        sendResponse({ success: true, content });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    // --- Bridge status ---
+    case 'bridge.status': {
+      const bridgeConnected = cdpBridge.isBridgeConnected();
+      sendResponse({
+        success: true,
+        connected: bridgeConnected,
+        browsers: bridgeConnected ? [detectBrowser()] : [],
+      });
+      break;
+    }
+
+    // --- Config persistence ---
+    case 'config.save': {
+      const { key, value } = request;
+      // Forward to CDP bridge server so it can save to ~/.hanzo/extension/config.json
+      cdpBridge.sendConfig(key, value);
+
+      // Also sync to IAM if authenticated (best-effort)
+      try {
+        const token = await auth.getValidAccessToken();
+        if (token) {
+          fetch('https://hanzo.id/api/update-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              properties: { [key]: value },
+            }),
+          }).catch(() => {});
+        }
+      } catch {
+        // Not authenticated
+      }
+      sendResponse({ success: true });
+      break;
+    }
+
+    // --- Takeover messages (forwarded from CDP bridge to content script) ---
+    case 'hanzo.takeover.start': {
+      const takeoverTabId = await resolveControlTabId(request.tabId);
+      if (takeoverTabId === null) {
+        sendResponse({ success: false, error: 'No target tab found' });
+        break;
+      }
+      await startControlSession(takeoverTabId, request.task);
+      sendResponse({ success: true });
+      break;
+    }
+
+    case 'hanzo.takeover.end': {
+      await stopControlSession();
+      sendResponse({ success: true });
+      break;
+    }
+
+    case 'hanzo.takeover.cursor': {
+      const cursorTabId = await resolveControlTabId(request.tabId);
+      if (cursorTabId !== null) {
+        sendControlMessageToTab(cursorTabId, {
+          action: 'ai.control.cursor',
+          x: request.x,
+          y: request.y,
+        });
+      }
+      sendResponse({ success: true });
+      break;
+    }
 
     // --- Content script element selection (routed from content script) ---
     case 'elementSelected':

@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Open panel
   const openPanel = document.getElementById('open-panel');
+  const openPageOverlay = document.getElementById('open-page-overlay');
 
   // Status dots
   const zapStatus = document.getElementById('zap-status');
@@ -84,6 +85,36 @@ document.addEventListener('DOMContentLoaded', () => {
       // Firefox: sidebar_action is automatic
       window.close();
     }
+  });
+
+  openPageOverlay?.addEventListener('click', () => {
+    openPageOverlay.textContent = 'Opening...';
+    openPageOverlay.setAttribute('disabled', 'true');
+
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = tabs[0];
+      if (!activeTab?.id) {
+        openPageOverlay.textContent = 'No Active Tab';
+        setTimeout(() => {
+          openPageOverlay.textContent = 'Toggle On-Page Overlay';
+          openPageOverlay.removeAttribute('disabled');
+        }, 1200);
+        return;
+      }
+
+      chrome.runtime.sendMessage({ action: 'page.overlay.toggle', tabId: activeTab.id }, (response) => {
+        if (chrome.runtime.lastError || !response?.success) {
+          openPageOverlay.textContent = 'Unavailable on this page';
+        } else {
+          const opened = !!response?.open;
+          openPageOverlay.textContent = opened ? 'Overlay Opened' : 'Overlay Hidden';
+        }
+        setTimeout(() => {
+          openPageOverlay.textContent = 'Toggle On-Page Overlay';
+          openPageOverlay.removeAttribute('disabled');
+        }, 900);
+      });
+    });
   });
 
   // --- Status ---
@@ -186,6 +217,54 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   });
+
+  // --- Browser Backend Picker ---
+  const backendSelect = document.getElementById('browser-backend') as HTMLSelectElement | null;
+  const bridgeStatus = document.getElementById('bridge-status');
+  const bridgeDetail = document.getElementById('bridge-detail');
+
+  function loadBackendPreference() {
+    chrome.storage.sync.get(['browserBackend'], (result) => {
+      if (backendSelect && result.browserBackend) {
+        backendSelect.value = result.browserBackend;
+      }
+    });
+  }
+
+  function refreshBridgeStatus() {
+    chrome.runtime.sendMessage({ action: 'bridge.status' }, (response) => {
+      if (chrome.runtime.lastError) return;
+      if (response?.success && response.connected) {
+        bridgeStatus?.classList.add('connected');
+        bridgeStatus?.classList.remove('disconnected');
+        const browsers = response.browsers || [];
+        bridgeDetail.textContent = browsers.length
+          ? `Connected: ${browsers.join(', ')}`
+          : 'Connected';
+      } else {
+        bridgeStatus?.classList.remove('connected');
+        bridgeStatus?.classList.add('disconnected');
+        bridgeDetail.textContent = 'Not connected';
+      }
+    });
+  }
+
+  backendSelect?.addEventListener('change', () => {
+    const value = backendSelect.value;
+
+    // Save to chrome.storage.sync (cross-device)
+    chrome.storage.sync.set({ browserBackend: value });
+
+    // Forward to background to persist via CDP bridge + sync to IAM
+    chrome.runtime.sendMessage({
+      action: 'config.save',
+      key: 'browserBackend',
+      value,
+    });
+  });
+
+  loadBackendPreference();
+  refreshBridgeStatus();
 
   // Init
   checkAuth();
