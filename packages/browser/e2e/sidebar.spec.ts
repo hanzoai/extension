@@ -1,26 +1,61 @@
 import { test, expect } from './fixtures';
 
 test.describe('Sidebar', () => {
-  test('loads and shows auth gate when not logged in', async ({ context, extensionId }) => {
+  test('loads and shows tab bar immediately (no auth gate)', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
 
-    // Auth section should be visible
-    const authSection = page.locator('#auth-section');
-    await expect(authSection).toBeVisible();
-
-    // Auth button should be present
-    const authBtn = page.locator('#auth-btn');
-    await expect(authBtn).toBeVisible();
-    await expect(authBtn).toContainText('Sign in with Hanzo');
+    // Tab bar should be visible (tools work without login)
+    const tabBar = page.locator('#tab-bar');
+    await expect(tabBar).toBeVisible();
   });
 
-  test('tab bar is hidden before auth', async ({ context, extensionId }) => {
+  test('defaults to tools tab when not authenticated', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
 
-    const tabBar = page.locator('#tab-bar');
-    await expect(tabBar).toHaveClass(/hidden/);
+    // Wait for JS to initialize
+    await page.waitForTimeout(500);
+
+    // Tools tab should be active by default (no auth required)
+    const toolsTab = page.locator('#tab-tools');
+    await expect(toolsTab).toBeVisible();
+  });
+
+  test('chat tab shows login prompt when not authenticated', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
+
+    // Switch to chat tab
+    await page.locator('[data-tab="chat"]').click();
+
+    // Login prompt should be visible in chat area
+    const loginPrompt = page.locator('#chat-login-prompt');
+    await expect(loginPrompt).toBeVisible();
+
+    // Should mention Zen AI models
+    await expect(loginPrompt).toContainText('Zen AI models');
+
+    // Sign in button should be present
+    const authBtn = page.locator('#auth-btn');
+    await expect(authBtn).toBeVisible();
+    await expect(authBtn).toContainText('Sign in');
+
+    // Should have link to docs
+    const docsLink = loginPrompt.locator('a[href="https://docs.hanzo.ai"]');
+    await expect(docsLink).toBeAttached();
+  });
+
+  test('chat composer is hidden when not authenticated', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
+
+    // Switch to chat tab
+    await page.locator('[data-tab="chat"]').click();
+
+    // Chat composer (input area) should be hidden
+    const chatComposer = page.locator('#chat-composer');
+    await expect(chatComposer).toHaveClass(/hidden/);
   });
 
   test('has chat, tools, and settings tabs', async ({ context, extensionId }) => {
@@ -33,6 +68,27 @@ test.describe('Sidebar', () => {
     await expect(page.locator('[data-tab="settings"]')).toBeAttached();
   });
 
+  test('tab switching works', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
+    await page.waitForTimeout(500);
+
+    // Click chat tab
+    await page.locator('[data-tab="chat"]').click();
+    await expect(page.locator('#tab-chat')).toBeVisible();
+    await expect(page.locator('#tab-tools')).toHaveClass(/hidden/);
+
+    // Click tools tab
+    await page.locator('[data-tab="tools"]').click();
+    await expect(page.locator('#tab-tools')).toBeVisible();
+    await expect(page.locator('#tab-chat')).toHaveClass(/hidden/);
+
+    // Click settings tab
+    await page.locator('[data-tab="settings"]').click();
+    await expect(page.locator('#tab-settings')).toBeVisible();
+    await expect(page.locator('#tab-tools')).toHaveClass(/hidden/);
+  });
+
   test('chat tab has model selector and input', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
@@ -43,22 +99,23 @@ test.describe('Sidebar', () => {
     await expect(page.locator('#send-btn')).toBeAttached();
   });
 
-  test('model selector has default options', async ({ context, extensionId }) => {
+  test('model selector includes Zen models', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
 
     const options = page.locator('#model-select option');
     const count = await options.count();
-    expect(count).toBeGreaterThanOrEqual(2);
+    expect(count).toBeGreaterThanOrEqual(3);
 
-    // Should include Claude and GPT models
+    // Should include Claude, GPT, and Zen models
     const values = await options.allTextContents();
     const allText = values.join(' ');
-    expect(allText).toContain('GPT');
     expect(allText).toContain('Claude');
+    expect(allText).toContain('GPT');
+    expect(allText).toContain('Zen');
   });
 
-  test('tools tab has ZAP status', async ({ context, extensionId }) => {
+  test('tools tab has ZAP status and MCP info', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
 

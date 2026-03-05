@@ -23,10 +23,24 @@ interface ZapState {
   extensionId: string;
 }
 
+interface ControlSession {
+  active: boolean;
+  tabId: number | null;
+  task: string | null;
+  startedAt: number | null;
+}
+
 const zapState: ZapState = {
   connected: false,
   mcps: [],
   extensionId: `hanzo-ext-${Date.now().toString(36)}`,
+};
+
+const controlSession: ControlSession = {
+  active: false,
+  tabId: null,
+  task: null,
+  startedAt: null,
 };
 
 // Default ports (overridable via chrome.storage.local settings)
@@ -294,6 +308,54 @@ function detectBrowser(): string {
   return 'unknown';
 }
 
+function sendControlMessageToTab(tabId: number, message: Record<string, unknown>): void {
+  chrome.tabs.sendMessage(tabId, message, () => {
+    if (chrome.runtime.lastError) {
+      // Content script may not be injected on privileged pages.
+    }
+  });
+}
+
+function getActiveTabId(): Promise<number | null> {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      resolve(tabs[0]?.id ?? null);
+    });
+  });
+}
+
+async function resolveControlTabId(tabId?: number): Promise<number | null> {
+  if (typeof tabId === 'number') return tabId;
+  if (controlSession.active && controlSession.tabId !== null) return controlSession.tabId;
+  return getActiveTabId();
+}
+
+async function startControlSession(tabId: number, task?: string): Promise<void> {
+  if (controlSession.active && controlSession.tabId !== null && controlSession.tabId !== tabId) {
+    sendControlMessageToTab(controlSession.tabId, { action: 'ai.control.stop' });
+  }
+
+  controlSession.active = true;
+  controlSession.tabId = tabId;
+  controlSession.task = task || 'AI is controlling this page';
+  controlSession.startedAt = Date.now();
+
+  sendControlMessageToTab(tabId, {
+    action: 'ai.control.start',
+    task: controlSession.task,
+  });
+}
+
+async function stopControlSession(): Promise<void> {
+  if (controlSession.active && controlSession.tabId !== null) {
+    sendControlMessageToTab(controlSession.tabId, { action: 'ai.control.stop' });
+  }
+  controlSession.active = false;
+  controlSession.tabId = null;
+  controlSession.task = null;
+  controlSession.startedAt = null;
+}
+
 // =============================================================================
 // Extension Lifecycle
 // =============================================================================
@@ -473,6 +535,69 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       }
       break;
 
+    // --- AI Control Overlay ---
+    case 'ai.control.start': {
+      const tabId = await resolveControlTabId(request.tabId);
+      if (tabId === null) {
+        sendResponse({ success: false, error: 'No target tab found' });
+        break;
+      }
+      await startControlSession(tabId, request.task);
+      sendResponse({
+        success: true,
+        session: {
+          active: controlSession.active,
+          tabId: controlSession.tabId,
+          task: controlSession.task,
+          startedAt: controlSession.startedAt,
+        },
+      });
+      break;
+    }
+
+    case 'ai.control.stop': {
+      await stopControlSession();
+      sendResponse({ success: true });
+      break;
+    }
+
+    case 'ai.control.cursor':
+    case 'ai.control.highlight':
+    case 'ai.control.status': {
+      const tabId = await resolveControlTabId(request.tabId);
+      if (tabId === null) {
+        sendResponse({ success: false, error: 'No target tab found' });
+        break;
+      }
+      if (controlSession.active && controlSession.tabId !== null && tabId !== controlSession.tabId) {
+        sendResponse({
+          success: false,
+          error: `Control locked to tab ${controlSession.tabId}`,
+        });
+        break;
+      }
+      sendControlMessageToTab(tabId, request);
+      sendResponse({ success: true, tabId });
+      break;
+    }
+
+    case 'ai.control.cancel':
+      // User clicked Stop — notify ZAP/MCP to cancel current task
+      await stopControlSession();
+      if (zapState.connected) {
+        for (const [, conn] of zapConnections) {
+          if (conn.readyState === WebSocket.OPEN) {
+            conn.send(encodeZapMessage(MSG_REQUEST, {
+              id: `cancel-${++requestIdCounter}`,
+              method: 'notifications/controlCancelled',
+              params: {},
+            }));
+          }
+        }
+      }
+      sendResponse({ success: true });
+      break;
+
     // --- Auth (Hanzo IAM OAuth2 + PKCE) ---
     case 'auth.login':
       try {
@@ -596,6 +721,13 @@ function handleMCPMessage(data: any) {
 if (chrome.sidePanel) {
   chrome.sidePanel.setOptions({ path: 'sidebar.html', enabled: true });
 }
+
+// End active session when the controlled tab closes.
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (controlSession.active && controlSession.tabId === tabId) {
+    void stopControlSession();
+  }
+});
 
 // 1. Primary: Discover ZAP servers (high-performance binary protocol)
 discoverZapServers();
