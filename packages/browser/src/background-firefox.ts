@@ -26,6 +26,20 @@ interface CDPResponse {
   error?: { code: number; message: string };
 }
 
+interface ControlSession {
+  active: boolean;
+  tabId: number | null;
+  task: string | null;
+  startedAt: number | null;
+}
+
+const controlSession: ControlSession = {
+  active: false,
+  tabId: null,
+  task: null,
+  startedAt: null,
+};
+
 class HanzoFirefoxExtension {
   private wsConnection: WebSocket | null = null;
   private cdpPort: number = 9223;
@@ -170,6 +184,7 @@ class HanzoFirefoxExtension {
 
       case 'Page.navigate': {
         if (activeTab?.id) {
+          this.notifyOverlay(activeTab.id, 'ai.control.status', { text: `Navigating to ${params.url}` });
           await browser.tabs.update(activeTab.id, { url: params.url as string });
           return { frameId: 'main' };
         }
@@ -230,6 +245,8 @@ class HanzoFirefoxExtension {
       case 'hanzo.click': {
         if (activeTab?.id && params.selector) {
           const selector = this.escapeSelector(params.selector as string);
+          this.notifyOverlay(activeTab.id, 'ai.control.highlight', { selector: params.selector as string });
+          this.notifyOverlay(activeTab.id, 'ai.control.status', { text: `Clicking ${params.selector}` });
           await this.executeScriptWithTimeout(activeTab.id,
             `document.querySelector('${selector}')?.click()`
           );
@@ -242,6 +259,8 @@ class HanzoFirefoxExtension {
         if (activeTab?.id && params.selector) {
           const selector = this.escapeSelector(params.selector as string);
           const value = this.escapeValue((params.value as string) || '');
+          this.notifyOverlay(activeTab.id, 'ai.control.highlight', { selector: params.selector as string });
+          this.notifyOverlay(activeTab.id, 'ai.control.status', { text: `Filling ${params.selector}` });
           await this.executeScriptWithTimeout(activeTab.id, `
               var el = document.querySelector('${selector}');
               if (el) {
@@ -254,6 +273,20 @@ class HanzoFirefoxExtension {
           return { success: true };
         }
         throw new Error('No active tab or selector');
+      }
+
+      case 'hanzo.control.start': {
+        const targetTabId = await this.resolveControlTabId(params.tabId as number | undefined);
+        if (targetTabId) {
+          await this.startControlSession(targetTabId, params.task as string | undefined);
+          return { success: true };
+        }
+        throw new Error('No active tab');
+      }
+
+      case 'hanzo.control.stop': {
+        await this.stopControlSession();
+        return { success: true };
       }
 
       case 'hanzo.type': {
@@ -297,6 +330,42 @@ class HanzoFirefoxExtension {
         console.warn('[Hanzo] Unknown method:', method);
         return { error: `Unknown method: ${method}` };
     }
+  }
+
+  private notifyOverlay(tabId: number, action: string, data: Record<string, unknown>): void {
+    browser.tabs.sendMessage(tabId, { action, ...data }).catch(() => {});
+  }
+
+  async getActiveTabId(): Promise<number | null> {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    return tab?.id ?? null;
+  }
+
+  async resolveControlTabId(tabId?: number): Promise<number | null> {
+    if (typeof tabId === 'number') return tabId;
+    if (controlSession.active && controlSession.tabId !== null) return controlSession.tabId;
+    return this.getActiveTabId();
+  }
+
+  async startControlSession(tabId: number, task?: string): Promise<void> {
+    if (controlSession.active && controlSession.tabId !== null && controlSession.tabId !== tabId) {
+      this.notifyOverlay(controlSession.tabId, 'ai.control.stop', {});
+    }
+    controlSession.active = true;
+    controlSession.tabId = tabId;
+    controlSession.task = task || 'AI is controlling this page';
+    controlSession.startedAt = Date.now();
+    this.notifyOverlay(tabId, 'ai.control.start', { task: controlSession.task });
+  }
+
+  async stopControlSession(): Promise<void> {
+    if (controlSession.active && controlSession.tabId !== null) {
+      this.notifyOverlay(controlSession.tabId, 'ai.control.stop', {});
+    }
+    controlSession.active = false;
+    controlSession.tabId = null;
+    controlSession.task = null;
+    controlSession.startedAt = null;
   }
 
   private escapeSelector(selector: string): string {
@@ -464,8 +533,44 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         break;
       }
 
+      // --- AI Control Overlay (forwarded to content script) ---
+      case 'ai.control.start':
+      case 'ai.control.cursor':
+      case 'ai.control.highlight':
+      case 'ai.control.status': {
+        const targetTabId = request.tabId || controlSession.tabId || await hanzoExtension.getActiveTabId();
+        if (!targetTabId) {
+          sendResponse({ success: false, error: 'No target tab found' });
+          break;
+        }
+
+        if (request.action !== 'ai.control.start' && controlSession.active && controlSession.tabId && targetTabId !== controlSession.tabId) {
+          sendResponse({ success: false, error: `Control locked to tab ${controlSession.tabId}` });
+          break;
+        }
+
+        if (request.action === 'ai.control.start') {
+          await hanzoExtension.startControlSession(targetTabId, request.task);
+        } else {
+          browser.tabs.sendMessage(targetTabId, request).catch(() => {});
+        }
+        sendResponse({ success: true, tabId: targetTabId });
+        break;
+      }
+
+      case 'ai.control.stop':
+        await hanzoExtension.stopControlSession();
+        sendResponse({ success: true });
+        break;
+
+      case 'ai.control.cancel':
+        // User clicked Stop — end local control session
+        await hanzoExtension.stopControlSession();
+        sendResponse({ success: true });
+        break;
+
       default:
-        // Not an auth/chat message — ignore
+        // Not a handled message — ignore
         break;
     }
   })();
@@ -474,4 +579,12 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
 
 // Initialize extension (no export - Firefox doesn't support ES modules in background)
 const hanzoExtension = new HanzoFirefoxExtension();
+
+// End active session when the controlled tab closes.
+browser.tabs.onRemoved.addListener((tabId) => {
+  if (controlSession.active && controlSession.tabId === tabId) {
+    void hanzoExtension.stopControlSession();
+  }
+});
+
 console.log('[Hanzo] Firefox background script loaded');

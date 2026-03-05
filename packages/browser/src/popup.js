@@ -31,11 +31,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Auth via background ---
   function checkAuth() {
+    // Always show main section and status (tools work without login)
+    mainSection.classList.remove('hidden');
+    refreshStatus();
+
     chrome.runtime.sendMessage({ action: 'auth.status' }, (response) => {
       if (chrome.runtime.lastError) return;
       if (response?.success && response.authenticated) {
         loginSection.classList.add('hidden');
-        mainSection.classList.remove('hidden');
         if (response.user) {
           const avatar = document.getElementById('user-avatar');
           const name = document.getElementById('user-name');
@@ -44,10 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
           name.textContent = response.user.name || response.user.displayName || 'Hanzo User';
           email.textContent = response.user.email || '';
         }
-        refreshStatus();
       } else {
         loginSection.classList.remove('hidden');
-        mainSection.classList.add('hidden');
       }
     });
   }

@@ -1,14 +1,11 @@
 import { test, expect } from './fixtures';
 
 test.describe('Popup', () => {
-  test('loads and renders login UI', async ({ context, extensionId }) => {
+  test('shows login section when not authenticated', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
 
-    // Verify popup renders
-    await expect(page.locator('body')).toBeVisible();
-
-    // Login section should be visible (user not authenticated)
+    // Login section visible (user not authenticated)
     const loginSection = page.locator('#login-section');
     await expect(loginSection).toBeVisible();
 
@@ -17,6 +14,18 @@ test.describe('Popup', () => {
     await expect(loginBtn).toBeVisible();
     await expect(loginBtn).toContainText('Sign in with Hanzo');
     await expect(loginBtn).toBeEnabled();
+  });
+
+  test('main section visible without auth (tools work without login)', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
+
+    // Wait for JS to initialize
+    await page.waitForTimeout(500);
+
+    // Main section always visible (tools work without auth)
+    const mainSection = page.locator('#main-section');
+    await expect(mainSection).toBeVisible();
   });
 
   test('shows feature toggles', async ({ context, extensionId }) => {
@@ -41,11 +50,10 @@ test.describe('Popup', () => {
     await expect(page.locator('#gpu-status')).toBeAttached();
   });
 
-  test('settings panel opens and closes', async ({ context, extensionId }) => {
+  test('settings button exists in main section', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
 
-    // Main section may be hidden (auth gate), so check settings button exists
     const settingsBtn = page.locator('#open-settings');
     await expect(settingsBtn).toBeAttached();
   });

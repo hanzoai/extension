@@ -328,60 +328,81 @@ export class CDPBridge {
             userAgent: navigator.userAgent
           };
           break;
-          
+
         case 'Target.getTargets':
           result = await this.getTargets();
           break;
-          
+
         case 'Page.navigate':
+          // Background workers do not have a DOM/window; use a safe default cursor hint.
+          this.notifyControlOverlay(tabId, 'ai.control.cursor', { x: 24, y: 24 });
+          this.notifyControlOverlay(tabId, 'ai.control.status', { text: `Navigating to ${params.url}` });
           await this.navigate(tabId, params.url);
           result = { frameId: 'main' };
           break;
-          
+
         case 'Page.captureScreenshot':
           const screenshot = await this.screenshot(tabId, params);
           result = { data: screenshot };
           break;
-          
+
         case 'Input.dispatchMouseEvent':
+          if (params?.x !== undefined && params?.y !== undefined) {
+            this.notifyControlOverlay(tabId, 'ai.control.cursor', { x: params.x, y: params.y });
+          }
           await this.send(tabId, method, params);
           result = {};
           break;
-          
+
         case 'Input.dispatchKeyEvent':
           await this.send(tabId, method, params);
           result = {};
           break;
-          
+
         case 'Runtime.evaluate':
           result = await this.send(tabId, method, params);
           break;
-          
+
         case 'DOM.getDocument':
           result = await this.getDocument(tabId);
           break;
-          
+
         case 'DOM.querySelector':
           const nodeId = await this.querySelector(tabId, params.selector);
           result = { nodeId };
           break;
-          
+
         // High-level commands for hanzo-mcp
         case 'hanzo.click':
+          this.notifyControlOverlay(tabId, 'ai.control.highlight', { selector: params.selector });
+          this.notifyControlOverlay(tabId, 'ai.control.status', { text: `Clicking ${params.selector}` });
           const clicked = await this.clickSelector(tabId, params.selector);
           result = { success: clicked };
           break;
-          
+
         case 'hanzo.fill':
+          this.notifyControlOverlay(tabId, 'ai.control.highlight', { selector: params.selector });
+          this.notifyControlOverlay(tabId, 'ai.control.status', { text: `Filling ${params.selector}` });
           const filled = await this.fillSelector(tabId, params.selector, params.value);
           result = { success: filled };
           break;
-          
+
         case 'hanzo.screenshot':
           const screenshotData = await this.screenshot(tabId, params);
           result = { data: screenshotData };
           break;
-          
+
+        // Control overlay management
+        case 'hanzo.control.start':
+          this.notifyControlOverlay(tabId, 'ai.control.start', { task: params.task || 'AI is controlling this page' });
+          result = { success: true };
+          break;
+
+        case 'hanzo.control.stop':
+          this.notifyControlOverlay(tabId, 'ai.control.stop', {});
+          result = { success: true };
+          break;
+
         default:
           // Pass through to Chrome debugger
           result = await this.send(tabId, method, params);
@@ -424,6 +445,15 @@ export class CDPBridge {
     });
   }
   
+  private notifyControlOverlay(tabId: number, action: string, data: any): void {
+    try {
+      chrome.tabs.sendMessage(tabId, { action, ...data }, () => {
+        // Ignore errors (tab may not have content script)
+        if (chrome.runtime.lastError) { /* noop */ }
+      });
+    } catch { /* noop */ }
+  }
+
   private broadcastEvent(tabId: number, method: string, params: any): void {
     const event = JSON.stringify({
       type: 'event',
