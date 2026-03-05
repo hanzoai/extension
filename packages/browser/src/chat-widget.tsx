@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import {
   Button,
   Card,
@@ -15,10 +16,10 @@ function LoginPrompt() {
     <Card className="chat-modern-login-card">
       <CardHeader>
         <CardTitle>Chat with Zen AI models</CardTitle>
-        <CardDescription>Claude, GPT-4o, Zen Coder Flash and more</CardDescription>
+        <CardDescription>Models enabled in Hanzo Cloud are loaded automatically.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Button id="auth-btn" className="chat-modern-auth-btn">
+        <Button id="auth-btn" className="chat-modern-auth-btn" type="button">
           Sign in
         </Button>
         <p className="auth-note">
@@ -60,8 +61,8 @@ function ChatComposer() {
       </div>
 
       <div className="input-row">
-        <Textarea id="chat-input" placeholder="Ask anything..." rows={1} />
-        <Button id="send-btn" className="send-btn" title="Send">
+        <Textarea id="chat-input" className="chat-modern-input" placeholder="Ask anything..." rows={1} />
+        <Button id="send-btn" className="send-btn chat-modern-send" title="Send" type="button">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
             <path d="M4 10l12-6-6 12-2-6-4-2z" strokeWidth="1.5" fill="currentColor" />
           </svg>
@@ -75,12 +76,18 @@ export function mountModernChatWidget() {
   const loginTarget = document.getElementById('chat-login-prompt');
   if (loginTarget) {
     loginTarget.innerHTML = '';
-    createRoot(loginTarget).render(<LoginPrompt />);
+    const loginRoot = createRoot(loginTarget);
+    flushSync(() => {
+      loginRoot.render(<LoginPrompt />);
+    });
   }
 
   const composerTarget = document.getElementById('chat-composer');
   if (composerTarget) {
     composerTarget.innerHTML = '';
-    createRoot(composerTarget).render(<ChatComposer />);
+    const composerRoot = createRoot(composerTarget);
+    flushSync(() => {
+      composerRoot.render(<ChatComposer />);
+    });
   }
 }
