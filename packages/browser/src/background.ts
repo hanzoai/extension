@@ -934,6 +934,15 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       }
       break;
 
+    case 'auth.signup':
+      try {
+        await auth.signup();
+        sendResponse({ success: true });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
     case 'auth.logout':
       try {
         await auth.logout();

@@ -606,6 +606,15 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         }
         break;
 
+      case 'auth.signup':
+        try {
+          await browser.tabs.create({ url: `${IAM_BASE}/signup` });
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
       case 'auth.logout':
         await browser.storage.local.remove(Object.values(STORAGE_KEYS));
         sendResponse({ success: true });
