@@ -68,6 +68,17 @@
             <option value="zen-max">Zen Max</option>
           </select>
         </div>
+        <div class="chat-flags">
+          <label class="flag-toggle">
+            <input type="checkbox" id="rag-enabled" checked>
+            <span>RAG</span>
+          </label>
+          <label class="flag-toggle">
+            <input type="checkbox" id="tab-context-enabled" checked>
+            <span>Tab Context</span>
+          </label>
+          <span id="rag-status" class="rag-status">Ready</span>
+        </div>
         <div class="input-row">
           <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
           <button id="send-btn" class="send-btn" title="Send">
@@ -96,6 +107,10 @@
             <div class="status-row">
               <span>Tools Available</span>
               <span id="mcp-tools" class="status-value">0</span>
+            </div>
+            <div class="tool-list-wrap">
+              <div class="tool-list-header">Discovered Tools</div>
+              <div id="mcp-tool-list" class="tool-list">No tools discovered yet.</div>
             </div>
           </div>
         </div>
@@ -216,6 +231,35 @@
           <label class="setting-item">
             <span>Max Agents</span>
             <input type="number" id="max-agents" value="3" min="1" max="10">
+          </label>
+        </div>
+
+        <!-- RAG Settings -->
+        <div class="panel">
+          <h3>RAG Integration</h3>
+          <label class="setting-item">
+            <span>Use ZAP Memory</span>
+            <input type="checkbox" id="rag-use-zap" checked>
+          </label>
+          <label class="setting-item">
+            <span>Include Tab Context</span>
+            <input type="checkbox" id="rag-include-tab-context" checked>
+          </label>
+          <label class="setting-item">
+            <span>Top K</span>
+            <input type="number" id="rag-top-k" value="5" min="1" max="20">
+          </label>
+          <label class="setting-item setting-item-column">
+            <span>Knowledge Base</span>
+            <input type="text" id="rag-kb" placeholder="e.g. engineering-docs">
+          </label>
+          <label class="setting-item setting-item-column">
+            <span>RAG Endpoint</span>
+            <input type="text" id="rag-endpoint" placeholder="https://your-rag.company.com/query">
+          </label>
+          <label class="setting-item setting-item-column">
+            <span>RAG API Key</span>
+            <input type="password" id="rag-api-key" placeholder="Optional bearer token">
           </label>
         </div>
 

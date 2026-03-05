@@ -19,7 +19,7 @@
     "<all_urls>"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' ws://localhost:* http://localhost:* https://api.hanzo.ai https://iam.hanzo.ai https://hanzo.id;"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' ws://localhost:* wss://* http://* https://*;"
   },
   "content_scripts": [
     {

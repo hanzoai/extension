@@ -53,9 +53,11 @@ const IAM_BASE = 'https://hanzo.id';
 const CLIENT_ID = 'app-hanzo';
 const SCOPES = 'openid profile email';
 
-// Redirect URI: use the extension's own callback page
+// Redirect URI: use a web callback that Casdoor has registered.
+// The tab-based auth flow catches the redirect URL before the page loads,
+// extracts the code, and closes the tab — works across Chrome, Firefox, Safari.
 function getRedirectUri(): string {
-  return chrome.runtime.getURL('callback.html');
+  return 'https://hanzo.ai/callback';
 }
 
 // Storage keys (matching @hanzo/iam SDK convention)

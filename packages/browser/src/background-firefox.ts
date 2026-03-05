@@ -33,6 +33,14 @@ interface ControlSession {
   startedAt: number | null;
 }
 
+interface RagSnippet {
+  content: string;
+  title?: string;
+  source?: string;
+  score?: number;
+  url?: string;
+}
+
 const controlSession: ControlSession = {
   active: false,
   tabId: null,
@@ -416,11 +424,106 @@ function base64UrlEncode(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+async function getRagConfig(): Promise<{
+  endpoint: string;
+  apiKey: string;
+  knowledgeBase: string;
+  topK: number;
+  includeTabContext: boolean;
+}> {
+  const result = await browser.storage.local.get([
+    'hanzo_rag_endpoint',
+    'hanzo_rag_api_key',
+    'hanzo_rag_kb',
+    'hanzo_rag_top_k',
+    'hanzo_rag_include_tab_context',
+  ]);
+
+  const topKParsed = Number.parseInt(String(result.hanzo_rag_top_k ?? 5), 10);
+  return {
+    endpoint: String(result.hanzo_rag_endpoint || '').trim(),
+    apiKey: String(result.hanzo_rag_api_key || '').trim(),
+    knowledgeBase: String(result.hanzo_rag_kb || '').trim(),
+    topK: Number.isFinite(topKParsed) ? Math.max(1, Math.min(topKParsed, 20)) : 5,
+    includeTabContext: result.hanzo_rag_include_tab_context !== false,
+  };
+}
+
+function normalizeRagSnippets(raw: any): RagSnippet[] {
+  if (!raw) return [];
+
+  const candidates: any[] = [];
+  if (Array.isArray(raw)) candidates.push(...raw);
+  if (Array.isArray(raw?.snippets)) candidates.push(...raw.snippets);
+  if (Array.isArray(raw?.documents)) candidates.push(...raw.documents);
+  if (Array.isArray(raw?.items)) candidates.push(...raw.items);
+  if (Array.isArray(raw?.results)) candidates.push(...raw.results);
+
+  if (!candidates.length && typeof raw?.content === 'string') {
+    candidates.push({ content: raw.content, source: raw.source || 'rag-endpoint' });
+  }
+
+  return candidates
+    .map((item) => {
+      const content = String(item?.content ?? item?.text ?? item?.snippet ?? item?.body ?? '').trim();
+      if (!content) return null;
+      return {
+        content,
+        title: item?.title ? String(item.title) : undefined,
+        source: item?.source ? String(item.source) : undefined,
+        score: typeof item?.score === 'number' ? item.score : undefined,
+        url: item?.url ? String(item.url) : undefined,
+      } as RagSnippet;
+    })
+    .filter((item): item is RagSnippet => !!item)
+    .slice(0, 20);
+}
+
+async function queryRagEndpoint(params: {
+  endpoint: string;
+  apiKey: string;
+  query: string;
+  topK: number;
+  knowledgeBase: string;
+  includeTabContext: boolean;
+  pageContext?: { url?: string; title?: string };
+}): Promise<RagSnippet[]> {
+  if (!params.endpoint) return [];
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (params.apiKey) headers.Authorization = `Bearer ${params.apiKey}`;
+
+  const response = await fetch(params.endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      query: params.query,
+      top_k: params.topK,
+      knowledge_base: params.knowledgeBase || undefined,
+      page_context: params.includeTabContext ? params.pageContext : undefined,
+      source: 'hanzo-browser-extension-firefox',
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`RAG endpoint error ${response.status}: ${text || 'Unknown error'}`);
+  }
+
+  const raw = await response.json();
+  return normalizeRagSnippets(raw).map((snippet) => ({
+    ...snippet,
+    source: snippet.source || 'rag-endpoint',
+  }));
+}
+
 async function firefoxLogin(): Promise<any> {
   const codeVerifier = generateRandomString(64);
   const codeChallenge = base64UrlEncode(await sha256(codeVerifier));
   const state = generateRandomString(32);
-  const redirectUri = browser.runtime.getURL('callback.html');
+  const redirectUri = 'https://hanzo.ai/callback';
 
   const authorizeUrl = new URL(`${IAM_BASE}/login/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', CLIENT_ID);
@@ -533,6 +636,75 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         break;
       }
 
+      case 'checkWebGPU': {
+        try {
+          if (!navigator.gpu) {
+            sendResponse({ available: false });
+            break;
+          }
+          const adapter = await navigator.gpu.requestAdapter();
+          sendResponse({
+            available: !!adapter,
+            adapter: (adapter as any)?.name || 'Unknown GPU',
+            models: [],
+          });
+        } catch {
+          sendResponse({ available: false });
+        }
+        break;
+      }
+
+      case 'listAgents':
+        sendResponse({ success: true, agents: [] });
+        break;
+
+      case 'stopAgent':
+        sendResponse({ success: false, error: 'Agent workers are not available in Firefox background mode yet' });
+        break;
+
+      case 'launchAIWorker':
+        sendResponse({ success: false, error: 'launchAIWorker is not implemented in Firefox background mode yet' });
+        break;
+
+      case 'rag.query': {
+        try {
+          const config = await getRagConfig();
+          const topKInput = Number.parseInt(String(request.topK ?? config.topK), 10);
+          const params = {
+            endpoint: String(request.endpoint ?? config.endpoint ?? '').trim(),
+            apiKey: String(request.apiKey ?? config.apiKey ?? '').trim(),
+            query: String(request.query || '').trim(),
+            topK: Number.isFinite(topKInput) ? Math.max(1, Math.min(topKInput, 20)) : 5,
+            knowledgeBase: String(request.knowledgeBase ?? config.knowledgeBase ?? '').trim(),
+            includeTabContext: request.includeTabContext !== undefined
+              ? !!request.includeTabContext
+              : config.includeTabContext,
+            pageContext: request.pageContext && typeof request.pageContext === 'object'
+              ? {
+                  url: request.pageContext.url ? String(request.pageContext.url) : undefined,
+                  title: request.pageContext.title ? String(request.pageContext.title) : undefined,
+                }
+              : undefined,
+          };
+
+          if (!params.query) {
+            sendResponse({ success: false, error: 'Query is required' });
+            break;
+          }
+
+          if (!params.endpoint) {
+            sendResponse({ success: true, source: 'none', snippets: [] });
+            break;
+          }
+
+          const snippets = await queryRagEndpoint(params);
+          sendResponse({ success: true, source: snippets.length ? 'rag-endpoint' : 'none', snippets });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
       // --- AI Control Overlay (forwarded to content script) ---
       case 'ai.control.start':
       case 'ai.control.cursor':
@@ -570,7 +742,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         break;
 
       default:
-        // Not a handled message — ignore
+        sendResponse({ success: false, error: `Unknown action: ${request.action}` });
         break;
     }
   })();
