@@ -22,6 +22,9 @@ function LoginPrompt() {
         <Button id="auth-btn" className="chat-modern-auth-btn" type="button">
           Sign in
         </Button>
+        <Button id="signup-btn" className="secondary-btn" type="button">
+          Create account
+        </Button>
         <p className="auth-note">
           Browser tools work without sign-in.{' '}
           <a href="https://docs.hanzo.ai" target="_blank" rel="noreferrer">

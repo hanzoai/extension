@@ -274,6 +274,11 @@ body {
   margin-bottom: 14px;
 }
 
+.chat-modern-login-card #signup-btn {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
 .chat-modern-login-card .auth-note {
   font-size: 11px;
   color: var(--text-tertiary);
