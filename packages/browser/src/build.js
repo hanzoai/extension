@@ -8,6 +8,27 @@ const { execSync } = require('child_process');
 async function build() {
   console.log('Building browser extension...');
 
+  const hanzoUiRoot = path.resolve(__dirname, '../../../../ui');
+  const hanzoUiPrimitives = path.join(hanzoUiRoot, 'pkg/ui/dist/primitives/index-common.js');
+  const localReact = path.join(hanzoUiRoot, 'node_modules/react');
+  const localReactDom = path.join(hanzoUiRoot, 'node_modules/react-dom');
+  const canUseSharedUi =
+    fs.existsSync(hanzoUiPrimitives) &&
+    fs.existsSync(localReact) &&
+    fs.existsSync(localReactDom);
+
+  if (!canUseSharedUi) {
+    throw new Error(
+      [
+        'Shared @hanzo/ui dependencies were not found.',
+        `Expected: ${hanzoUiPrimitives}`,
+        `Expected: ${localReact}`,
+        `Expected: ${localReactDom}`,
+      ].join('\n')
+    );
+  }
+  console.log('Using shared @hanzo/ui primitives from sibling repo:', hanzoUiPrimitives);
+
   // Ensure dist directories exist
   fs.mkdirSync('dist/browser-extension', { recursive: true });
   fs.mkdirSync('dist/browser-extension/chrome', { recursive: true });
@@ -57,6 +78,12 @@ async function build() {
   });
 
   // Build sidebar + popup UI scripts (TypeScript-first, with JS fallback)
+  const sidebarAliases = {
+    '@hanzo/ui/primitives-common': hanzoUiPrimitives,
+    react: localReact,
+    'react-dom': localReactDom,
+  };
+
   await esbuild.build({
     entryPoints: [fs.existsSync('src/sidebar.ts') ? 'src/sidebar.ts' : 'src/sidebar.js'],
     bundle: true,
@@ -64,6 +91,7 @@ async function build() {
     platform: 'browser',
     target: ['chrome90', 'firefox91', 'safari14'],
     sourcemap: 'inline',
+    alias: sidebarAliases,
   });
 
   await esbuild.build({
