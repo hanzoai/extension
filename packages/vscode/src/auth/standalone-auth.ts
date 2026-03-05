@@ -12,7 +12,8 @@ interface AuthToken {
 }
 
 interface CasdoorConfig {
-    endpoint: string;
+    endpoint: string;     // Casdoor API (iam.hanzo.ai)
+    loginUrl: string;     // Login UI (hanzo.id)
     clientId: string;
     clientSecret?: string;
     applicationName: string;
@@ -38,9 +39,10 @@ export class StandaloneAuthManager {
         this.tokenFile = path.join(this.configDir, 'auth.json');
         this.deviceIdFile = path.join(this.configDir, 'device.json');
         
-        // Casdoor configuration for iam.hanzo.ai
+        // Casdoor configuration: login UI on hanzo.id, API on iam.hanzo.ai
         this.casdoorConfig = {
             endpoint: process.env.HANZO_IAM_ENDPOINT || 'https://iam.hanzo.ai',
+            loginUrl: process.env.HANZO_IAM_LOGIN_URL || 'https://hanzo.id',
             clientId: process.env.HANZO_IAM_CLIENT_ID || 'hanzo-mcp',
             clientSecret: process.env.HANZO_IAM_CLIENT_SECRET,
             applicationName: 'hanzo-mcp',
@@ -102,7 +104,7 @@ export class StandaloneAuthManager {
 
     private async refreshToken(refreshToken: string): Promise<AuthToken | null> {
         try {
-            const response = await axios.post(`${this.casdoorConfig.endpoint}/api/refresh-token`, {
+            const response = await axios.post(`${this.casdoorConfig.endpoint}/api/login/oauth/access_token`, {
                 grant_type: 'refresh_token',
                 refresh_token: refreshToken,
                 client_id: this.casdoorConfig.clientId,
@@ -160,8 +162,8 @@ export class StandaloneAuthManager {
             const deviceId = this.getDeviceId();
             const state = crypto.randomBytes(16).toString('hex');
             
-            // Build OAuth URL for Casdoor
-            const authUrl = new URL(`${this.casdoorConfig.endpoint}/login/oauth/authorize`);
+            // Build OAuth URL — login UI is on hanzo.id, not iam.hanzo.ai
+            const authUrl = new URL(`${this.casdoorConfig.loginUrl}/login/oauth/authorize`);
             authUrl.searchParams.append('client_id', this.casdoorConfig.clientId);
             authUrl.searchParams.append('response_type', 'code');
             authUrl.searchParams.append('redirect_uri', 'http://localhost:8765/callback');

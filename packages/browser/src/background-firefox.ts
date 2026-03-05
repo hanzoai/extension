@@ -393,7 +393,9 @@ class HanzoFirefoxExtension {
 // Uses browser.identity.launchWebAuthFlow for OAuth
 // =============================================================================
 
-const IAM_BASE = 'https://hanzo.id';
+// Login UI lives on hanzo.id; Casdoor API is on iam.hanzo.ai
+const IAM_LOGIN = 'https://hanzo.id';
+const IAM_API = 'https://iam.hanzo.ai';
 const API_BASE = 'https://api.hanzo.ai';
 const CLIENT_ID = 'app-hanzo';
 const SCOPES = 'openid profile email';
@@ -525,7 +527,7 @@ async function firefoxLogin(): Promise<any> {
   const state = generateRandomString(32);
   const redirectUri = 'https://hanzo.ai/callback';
 
-  const authorizeUrl = new URL(`${IAM_BASE}/login/oauth/authorize`);
+  const authorizeUrl = new URL(`${IAM_LOGIN}/login/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', CLIENT_ID);
   authorizeUrl.searchParams.set('response_type', 'code');
   authorizeUrl.searchParams.set('redirect_uri', redirectUri);
@@ -567,28 +569,50 @@ async function firefoxLogin(): Promise<any> {
 
   const url = new URL(callbackUrl);
   if (url.searchParams.get('state') !== state) throw new Error('State mismatch');
+
+  // Handle both code flow and implicit token flow responses
   const code = url.searchParams.get('code');
-  if (!code) throw new Error(url.searchParams.get('error_description') || 'No code');
+  const directToken = url.searchParams.get('access_token');
 
-  const tokenResponse = await fetch(`${IAM_BASE}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code', client_id: CLIENT_ID,
-      code, redirect_uri: redirectUri, code_verifier: codeVerifier,
-    }),
-  });
+  if (directToken) {
+    // Implicit flow — tokens returned directly in redirect URL
+    const data: any = { [STORAGE_KEYS.accessToken]: directToken };
+    const refreshToken = url.searchParams.get('refresh_token');
+    if (refreshToken) data[STORAGE_KEYS.refreshToken] = refreshToken;
+    await browser.storage.local.set(data);
+  } else if (code) {
+    // Authorization code flow — exchange code for tokens via PKCE
+    const tokenResponse = await fetch(`${IAM_API}/api/login/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        client_id: CLIENT_ID,
+        code,
+        redirect_uri: redirectUri,
+        code_verifier: codeVerifier,
+      }),
+    });
 
-  if (!tokenResponse.ok) throw new Error(`Token exchange failed: ${await tokenResponse.text()}`);
-  const tokens = await tokenResponse.json();
+    if (!tokenResponse.ok) throw new Error(`Token exchange failed: ${await tokenResponse.text()}`);
+    const tokens = await tokenResponse.json();
 
-  const data: any = { [STORAGE_KEYS.accessToken]: tokens.access_token };
-  if (tokens.refresh_token) data[STORAGE_KEYS.refreshToken] = tokens.refresh_token;
-  if (tokens.id_token) data[STORAGE_KEYS.idToken] = tokens.id_token;
-  if (tokens.expires_in) data[STORAGE_KEYS.expiresAt] = Date.now() + tokens.expires_in * 1000;
-  await browser.storage.local.set(data);
+    const data: any = { [STORAGE_KEYS.accessToken]: tokens.access_token };
+    if (tokens.refresh_token) data[STORAGE_KEYS.refreshToken] = tokens.refresh_token;
+    if (tokens.id_token) data[STORAGE_KEYS.idToken] = tokens.id_token;
+    if (tokens.expires_in) data[STORAGE_KEYS.expiresAt] = Date.now() + tokens.expires_in * 1000;
+    await browser.storage.local.set(data);
+  } else {
+    const error = url.searchParams.get('error_description') || url.searchParams.get('error') || 'No authorization code or token';
+    throw new Error(error);
+  }
 
-  const userResp = await fetch(`${IAM_BASE}/oauth/userinfo`, { headers: { Authorization: `Bearer ${tokens.access_token}` } });
+  // Fetch user info
+  const stored = await browser.storage.local.get([STORAGE_KEYS.accessToken]);
+  const accessToken = stored[STORAGE_KEYS.accessToken];
+  if (!accessToken) throw new Error('Login succeeded but no token was stored');
+
+  const userResp = await fetch(`${IAM_API}/api/userinfo`, { headers: { Authorization: `Bearer ${accessToken}` } });
   const user = userResp.ok ? await userResp.json() : {};
   await browser.storage.local.set({ [STORAGE_KEYS.user]: user });
   return user;
@@ -608,7 +632,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
 
       case 'auth.signup':
         try {
-          await browser.tabs.create({ url: `${IAM_BASE}/signup` });
+          await browser.tabs.create({ url: `${IAM_LOGIN}/signup` });
           sendResponse({ success: true });
         } catch (e: any) {
           sendResponse({ success: false, error: e.message });

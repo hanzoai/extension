@@ -8,7 +8,8 @@ import * as crypto from 'crypto';
 
 export interface HanzoAuthConfig {
     apiUrl: string;
-    iamUrl: string;
+    iamUrl: string;      // Casdoor API (iam.hanzo.ai)
+    iamLoginUrl: string;  // Login UI (hanzo.id)
     clientId: string;
     scope: string;
     configPath?: string;
@@ -44,6 +45,7 @@ export class HanzoAuth extends EventEmitter {
         this.config = {
             apiUrl: config.apiUrl || 'https://api.hanzo.ai',
             iamUrl: config.iamUrl || 'https://iam.hanzo.ai',
+            iamLoginUrl: config.iamLoginUrl || 'https://hanzo.id',
             clientId: config.clientId || 'hanzo-dev-cli',
             scope: config.scope || 'api:access tools:manage',
             configPath: config.configPath || path.join(os.homedir(), '.hanzo')
@@ -158,7 +160,7 @@ export class HanzoAuth extends EventEmitter {
             
             this.server.listen(port, () => {
                 // Build authorization URL
-                const authUrl = new URL('/oauth/authorize', this.config.iamUrl);
+                const authUrl = new URL('/login/oauth/authorize', this.config.iamLoginUrl);
                 authUrl.searchParams.set('client_id', this.config.clientId);
                 authUrl.searchParams.set('response_type', 'code');
                 authUrl.searchParams.set('redirect_uri', `http://localhost:${port}/callback`);
@@ -185,7 +187,7 @@ export class HanzoAuth extends EventEmitter {
     }
 
     private async exchangeCodeForTokens(code: string, codeVerifier: string): Promise<void> {
-        const response = await fetch(`${this.config.iamUrl}/oauth/token`, {
+        const response = await fetch(`${this.config.iamUrl}/api/login/oauth/access_token`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -225,7 +227,7 @@ export class HanzoAuth extends EventEmitter {
     private async fetchUserInfo(): Promise<void> {
         if (!this.credentials?.accessToken) return;
         
-        const response = await fetch(`${this.config.iamUrl}/api/user`, {
+        const response = await fetch(`${this.config.iamUrl}/api/userinfo`, {
             headers: {
                 'Authorization': `Bearer ${this.credentials.accessToken}`
             }
@@ -293,7 +295,7 @@ export class HanzoAuth extends EventEmitter {
         }
         
         try {
-            const response = await fetch(`${this.config.iamUrl}/oauth/token`, {
+            const response = await fetch(`${this.config.iamUrl}/api/login/oauth/access_token`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
