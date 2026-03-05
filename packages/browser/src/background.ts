@@ -4,6 +4,19 @@ import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './cdp-bridge';
 import * as auth from './auth';
 import { listModels, chatCompletion, ChatMessage } from './chat-client';
+import {
+  ActionRateLimiter,
+  CHAT_BUDGETS,
+  InFlightRequestDeduper,
+  debugLog,
+  estimateTextTokens,
+  loadDebugFlagFromStorage,
+  makeChatRequestKey,
+  pickModelForTokenBudget,
+  readUsageMetrics,
+  recordUsageDelta,
+  trimMessagesToBudget,
+} from './runtime-guard';
 
 // Initialize browser control
 const browserControl = new BrowserControl();
@@ -73,6 +86,17 @@ const DEFAULT_CDP_PORT = 9223;
 const ZAP_RECONNECT_DELAY = 3000;
 const ZAP_DISCOVERY_TIMEOUT = 2000;
 const DEFAULT_RAG_TOP_K = 5;
+const MODEL_CACHE_TTL_MS = 60 * 1000;
+
+let cachedModels: { at: number; models: Array<{ id: string; name?: string; description?: string }> } = {
+  at: 0,
+  models: [],
+};
+
+const inFlightChatRequests = new InFlightRequestDeduper<string>();
+const senderRequestGeneration = new Map<string, number>();
+const controlMessageLimiter = new ActionRateLimiter();
+const controlMessageSignatures = new Map<string, string>();
 
 /** Load port configuration from storage */
 async function getPortConfig(): Promise<{ zapPorts: number[]; mcpPort: number; cdpPort: number }> {
@@ -115,6 +139,47 @@ async function getRagConfig(): Promise<{
       });
     });
   });
+}
+
+function getSenderKey(sender: chrome.runtime.MessageSender): string {
+  const tabPart = sender.tab?.id !== undefined ? String(sender.tab.id) : 'sidepanel';
+  const urlPart = sender.url || sender.origin || 'unknown';
+  return `${sender.id || 'local'}:${tabPart}:${urlPart}`;
+}
+
+function bumpSenderGeneration(key: string): number {
+  const next = (senderRequestGeneration.get(key) || 0) + 1;
+  senderRequestGeneration.set(key, next);
+  return next;
+}
+
+function isSenderGenerationCurrent(key: string, generation: number): boolean {
+  return senderRequestGeneration.get(key) === generation;
+}
+
+async function listModelsCached(token: string): Promise<Array<{ id: string; name?: string; description?: string }>> {
+  if (Date.now() - cachedModels.at < MODEL_CACHE_TTL_MS && cachedModels.models.length) {
+    return cachedModels.models;
+  }
+
+  const models = await listModels(token);
+  cachedModels = {
+    at: Date.now(),
+    models: (models || [])
+      .filter((model) => model && typeof model.id === 'string')
+      .map((model) => ({
+        id: String(model.id),
+        name: model.name ? String(model.name) : undefined,
+        description: model.description ? String(model.description) : undefined,
+      })),
+  };
+  return cachedModels.models;
+}
+
+function getCachedModelIds(): string[] {
+  return cachedModels.models
+    .map((model) => String(model?.id || '').trim())
+    .filter((id) => !!id);
 }
 
 /** Active ZAP WebSocket connections keyed by MCP id */
@@ -246,7 +311,7 @@ async function connectZap(url: string): Promise<string | null> {
             url,
             tools: (info.tools || []).map((t: any) => t.name),
           });
-          console.log(`[Hanzo/ZAP] Connected to ${info.name || url} (${(info.tools || []).length} tools)`);
+          debugLog(`[Hanzo/ZAP] Connected to ${info.name || url} (${(info.tools || []).length} tools)`);
           resolve(mcpId);
           break;
         }
@@ -277,7 +342,7 @@ async function connectZap(url: string): Promise<string | null> {
         }
       }
       zapState.connected = zapConnections.size > 0;
-      console.log(`[Hanzo/ZAP] Disconnected from ${url}, reconnecting in ${ZAP_RECONNECT_DELAY}ms...`);
+      debugLog(`[Hanzo/ZAP] Disconnected from ${url}, reconnecting in ${ZAP_RECONNECT_DELAY}ms...`);
       setTimeout(() => connectZap(url), ZAP_RECONNECT_DELAY);
     };
 
@@ -457,18 +522,18 @@ async function queryRagFromEndpoint(params: RagQueryParams): Promise<RagSnippet[
  * Discover and connect to ZAP servers on startup
  */
 async function discoverZapServers() {
-  console.log('[Hanzo/ZAP] Discovering MCP servers...');
+  debugLog('[Hanzo/ZAP] Discovering MCP servers...');
   const { zapPorts } = await getPortConfig();
   const results = await Promise.all(zapPorts.map(p => probeZapServer(p)));
   const available = results.filter(Boolean) as string[];
 
   if (available.length === 0) {
-    console.log('[Hanzo/ZAP] No servers found, retrying in 10s...');
+    debugLog('[Hanzo/ZAP] No servers found, retrying in 10s...');
     setTimeout(discoverZapServers, 10000);
     return;
   }
 
-  console.log(`[Hanzo/ZAP] Found ${available.length} server(s): ${available.join(', ')}`);
+  debugLog(`[Hanzo/ZAP] Found ${available.length} server(s): ${available.join(', ')}`);
   await Promise.all(available.map(url => connectZap(url)));
 }
 
@@ -546,13 +611,15 @@ async function stopControlSession(): Promise<void> {
 // Extension Lifecycle
 // =============================================================================
 
+void loadDebugFlagFromStorage();
+
 // Initialize WebGPU and CDP on install
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('[Hanzo] Extension installed, initializing...');
+  debugLog('[Hanzo] Extension installed, initializing...');
 
   const gpuAvailable = await webgpuAI.initialize();
   if (gpuAvailable) {
-    console.log('[Hanzo] WebGPU available, loading local models...');
+    debugLog('[Hanzo] WebGPU available, loading local models...');
     try {
       await webgpuAI.loadModel({
         name: 'hanzo-browser-control',
@@ -795,6 +862,24 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         });
         break;
       }
+
+      const key = `${tabId}:${request.action}`;
+      const signature = JSON.stringify(request);
+      const throttleMs = request.action === 'ai.control.cursor'
+        ? 40
+        : request.action === 'ai.control.status'
+          ? 200
+          : 90;
+      if (!controlMessageLimiter.allow(key, throttleMs)) {
+        sendResponse({ success: true, tabId, throttled: true });
+        break;
+      }
+      if (controlMessageSignatures.get(key) === signature) {
+        sendResponse({ success: true, tabId, deduped: true });
+        break;
+      }
+      controlMessageSignatures.set(key, signature);
+
       sendControlMessageToTab(tabId, request);
       sendResponse({ success: true, tabId });
       break;
@@ -932,12 +1017,20 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
           sendResponse({ success: false, error: 'Not authenticated' });
           break;
         }
-        const models = await listModels(token);
+        const models = await listModelsCached(token);
         sendResponse({ success: true, models });
       } catch (error: any) {
         sendResponse({ success: false, error: error.message });
       }
       break;
+
+    case 'chat.cancel': {
+      const senderKey = getSenderKey(sender);
+      bumpSenderGeneration(senderKey);
+      await recordUsageDelta({ canceledRequests: 1 });
+      sendResponse({ success: true });
+      break;
+    }
 
     case 'chat.complete':
       try {
@@ -947,29 +1040,85 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
           break;
         }
 
-        const model = String(request.model || 'gpt-4o');
+        const senderKey = getSenderKey(sender);
+        const requestedModel = String(request.model || 'auto');
         const messagesInput = Array.isArray(request.messages) ? request.messages : [];
-        const messages: ChatMessage[] = messagesInput
+        const rawMessages: ChatMessage[] = messagesInput
           .filter((msg: any) => msg && typeof msg.content === 'string' && typeof msg.role === 'string')
           .map((msg: any) => ({
             role: (msg.role === 'system' || msg.role === 'assistant') ? msg.role : 'user',
             content: String(msg.content),
-          }))
-          .slice(-24);
+          }));
 
-        if (!messages.length) {
+        const budgeted = trimMessagesToBudget(rawMessages, {
+          maxMessages: CHAT_BUDGETS.maxMessages,
+          maxInputTokens: CHAT_BUDGETS.maxInputTokens,
+        });
+
+        if (!budgeted.messages.length) {
           sendResponse({ success: false, error: 'messages are required' });
           break;
         }
 
-        const content = await chatCompletion(token, {
+        let availableModelIds = getCachedModelIds();
+        if (!availableModelIds.length) {
+          availableModelIds = (await listModelsCached(token)).map((model) => model.id);
+        }
+        const model = pickModelForTokenBudget(requestedModel, availableModelIds, budgeted.inputTokens);
+        const temperature = typeof request.temperature === 'number' ? request.temperature : undefined;
+        const maxTokens = typeof request.max_tokens === 'number'
+          ? Math.max(64, Math.min(request.max_tokens, CHAT_BUDGETS.maxOutputTokens))
+          : CHAT_BUDGETS.maxOutputTokens;
+
+        const requestKey = makeChatRequestKey(model, budgeted.messages, temperature, maxTokens);
+        const { promise, deduped } = inFlightChatRequests.getOrCreate(requestKey, async () => chatCompletion(token, {
           model,
-          messages,
-          temperature: typeof request.temperature === 'number' ? request.temperature : undefined,
-          max_tokens: typeof request.max_tokens === 'number' ? request.max_tokens : undefined,
+          messages: budgeted.messages,
+          temperature,
+          max_tokens: maxTokens,
+        }));
+        const generation = deduped
+          ? (senderRequestGeneration.get(senderKey) || 0)
+          : bumpSenderGeneration(senderKey);
+
+        if (deduped) {
+          await recordUsageDelta({ dedupeHits: 1 });
+          debugLog('[Hanzo] Deduped in-flight chat request');
+        }
+
+        const content = await promise;
+
+        if (!isSenderGenerationCurrent(senderKey, generation)) {
+          await recordUsageDelta({ canceledRequests: 1 });
+          sendResponse({ success: false, error: 'Chat request superseded by a newer request' });
+          break;
+        }
+
+        await recordUsageDelta({
+          chatRequests: 1,
+          inputTokens: budgeted.inputTokens,
+          outputTokens: estimateTextTokens(content),
         });
 
-        sendResponse({ success: true, content });
+        sendResponse({
+          success: true,
+          content,
+          model,
+          budget: {
+            inputTokens: budgeted.inputTokens,
+            droppedMessages: budgeted.droppedMessages,
+          },
+        });
+      } catch (error: any) {
+        await recordUsageDelta({ errors: 1 });
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'usage.metrics':
+      try {
+        const metrics = await readUsageMetrics();
+        sendResponse({ success: true, metrics });
       } catch (error: any) {
         sendResponse({ success: false, error: error.message });
       }
@@ -1080,7 +1229,7 @@ async function connectToMCP() {
   ws = new WebSocket(`ws://localhost:${mcpPort}/browser-extension`);
 
   ws.onopen = () => {
-    console.log('[Hanzo] Connected to legacy MCP server');
+    debugLog('[Hanzo] Connected to legacy MCP server');
   };
 
   ws.onmessage = (event) => {
@@ -1135,7 +1284,7 @@ connectToMCP();
 getPortConfig().then(({ cdpPort }) => {
   try {
     cdpBridge.startWebSocketServer(cdpPort);
-    console.log(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
+    debugLog(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
   } catch (e) {
     console.error('[Hanzo] Failed to start CDP bridge:', e);
   }

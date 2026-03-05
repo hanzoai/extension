@@ -61,6 +61,7 @@
       <div id="chat-composer" class="chat-input-area">
         <div class="model-selector">
           <select id="model-select">
+            <option value="auto">Auto (cost-aware)</option>
             <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
             <option value="claude-opus-4-20250514">Claude Opus 4</option>
             <option value="gpt-4o">GPT-4o</option>
@@ -111,6 +112,32 @@
             <div class="tool-list-wrap">
               <div class="tool-list-header">Discovered Tools</div>
               <div id="mcp-tool-list" class="tool-list">No tools discovered yet.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Usage (1h)</h3>
+          <div class="mcp-status">
+            <div class="status-row">
+              <span>Chat Requests</span>
+              <span id="usage-chat-requests" class="status-value mono">0</span>
+            </div>
+            <div class="status-row">
+              <span>Input Tokens</span>
+              <span id="usage-input-tokens" class="status-value mono">0</span>
+            </div>
+            <div class="status-row">
+              <span>Output Tokens</span>
+              <span id="usage-output-tokens" class="status-value mono">0</span>
+            </div>
+            <div class="status-row">
+              <span>Dedupe Hits</span>
+              <span id="usage-dedupe" class="status-value mono">0</span>
+            </div>
+            <div class="status-row">
+              <span>Canceled</span>
+              <span id="usage-canceled" class="status-value mono">0</span>
             </div>
           </div>
         </div>
@@ -208,6 +235,7 @@
           <label class="setting-item">
             <span>Default Model</span>
             <select id="default-model">
+              <option value="auto">Auto (cost-aware)</option>
               <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
               <option value="claude-opus-4-20250514">Claude Opus 4</option>
               <option value="gpt-4o">GPT-4o</option>

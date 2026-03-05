@@ -64,6 +64,10 @@ jobs:
       working-directory: packages/browser
       run: node src/build.js
 
+    - name: Check browser bundle budgets
+      working-directory: packages/browser
+      run: pnpm run check:bundle-budget
+
     - name: Run Playwright E2E tests
       working-directory: packages/browser
       run: xvfb-run npx playwright test --config=e2e/playwright.config.ts
