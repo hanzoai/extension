@@ -351,7 +351,7 @@ async function firefoxLogin(): Promise<any> {
   const codeVerifier = generateRandomString(64);
   const codeChallenge = base64UrlEncode(await sha256(codeVerifier));
   const state = generateRandomString(32);
-  const redirectUri = browser.identity.getRedirectURL();
+  const redirectUri = browser.runtime.getURL('callback.html');
 
   const authorizeUrl = new URL(`${IAM_BASE}/login/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', CLIENT_ID);
@@ -362,12 +362,37 @@ async function firefoxLogin(): Promise<any> {
   authorizeUrl.searchParams.set('scope', SCOPES);
   authorizeUrl.searchParams.set('state', state);
 
-  const callbackUrl = await browser.identity.launchWebAuthFlow({
-    url: authorizeUrl.toString(),
-    interactive: true,
+  // Tab-based auth: open a real browser tab for login
+  const callbackUrl = await new Promise<string>((resolve, reject) => {
+    let authTabId: number | undefined;
+    const timeout = setTimeout(() => { cleanup(); reject(new Error('Login timed out')); }, 300_000);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      browser.tabs.onUpdated.removeListener(onUpdated);
+      browser.tabs.onRemoved.removeListener(onRemoved);
+    }
+    function onUpdated(tabId: number, changeInfo: any) {
+      if (tabId !== authTabId || !changeInfo.url) return;
+      if (changeInfo.url.startsWith(redirectUri)) {
+        cleanup();
+        browser.tabs.remove(tabId).catch(() => {});
+        resolve(changeInfo.url);
+      }
+    }
+    function onRemoved(tabId: number) {
+      if (tabId !== authTabId) return;
+      cleanup();
+      reject(new Error('Login cancelled'));
+    }
+
+    browser.tabs.onUpdated.addListener(onUpdated);
+    browser.tabs.onRemoved.addListener(onRemoved);
+    browser.tabs.create({ url: authorizeUrl.toString() }).then((tab: any) => {
+      authTabId = tab.id;
+    });
   });
 
-  if (!callbackUrl) throw new Error('Authentication cancelled');
   const url = new URL(callbackUrl);
   if (url.searchParams.get('state') !== state) throw new Error('State mismatch');
   const code = url.searchParams.get('code');
