@@ -1,7 +1,10 @@
 /**
  * Hanzo IAM OAuth2 + PKCE authentication for browser extensions.
  *
- * Uses chrome.identity.launchWebAuthFlow() — the proper extension OAuth API.
+ * Uses tab-based auth flow: opens a real browser tab for login,
+ * monitors for redirect via chrome.tabs.onUpdated, then exchanges
+ * the authorization code for tokens.
+ *
  * Token storage uses hanzo_iam_* prefix (matching @hanzo/iam SDK convention).
  */
 
@@ -49,6 +52,11 @@ function generateState(): string {
 const IAM_BASE = 'https://hanzo.id';
 const CLIENT_ID = 'app-hanzo';
 const SCOPES = 'openid profile email';
+
+// Redirect URI: use the extension's own callback page
+function getRedirectUri(): string {
+  return chrome.runtime.getURL('callback.html');
+}
 
 // Storage keys (matching @hanzo/iam SDK convention)
 const STORAGE_KEYS = {
@@ -111,17 +119,18 @@ async function getStoredTokens(): Promise<{
 }
 
 // ---------------------------------------------------------------------------
-// OAuth2 + PKCE Flow
+// OAuth2 + PKCE Flow (tab-based)
 // ---------------------------------------------------------------------------
 
 /**
- * Initiate OAuth2 login via chrome.identity.launchWebAuthFlow.
- * Returns user info on success.
+ * Initiate OAuth2 login by opening a browser tab to Casdoor.
+ * Monitors the tab URL for the redirect back to callback.html,
+ * then extracts the authorization code and exchanges it for tokens.
  */
 export async function login(): Promise<UserInfo> {
   const { codeVerifier, codeChallenge } = await generatePkceChallenge();
   const state = generateState();
-  const redirectUri = chrome.identity.getRedirectURL();
+  const redirectUri = getRedirectUri();
 
   const authorizeUrl = new URL(`${IAM_BASE}/login/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', CLIENT_ID);
@@ -132,13 +141,8 @@ export async function login(): Promise<UserInfo> {
   authorizeUrl.searchParams.set('scope', SCOPES);
   authorizeUrl.searchParams.set('state', state);
 
-  // Launch browser-managed auth popup
-  const callbackUrl = await chrome.identity.launchWebAuthFlow({
-    url: authorizeUrl.toString(),
-    interactive: true,
-  });
-
-  if (!callbackUrl) throw new Error('Authentication cancelled');
+  // Open a real browser tab for login (works with all OAuth providers)
+  const callbackUrl = await openAuthTab(authorizeUrl.toString(), redirectUri);
 
   const url = new URL(callbackUrl);
   const returnedState = url.searchParams.get('state');
@@ -150,7 +154,7 @@ export async function login(): Promise<UserInfo> {
     throw new Error(error);
   }
 
-  // Exchange code for tokens (OIDC standard endpoint)
+  // Exchange code for tokens
   const tokenResponse = await fetch(`${IAM_BASE}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -176,6 +180,59 @@ export async function login(): Promise<UserInfo> {
   await chrome.storage.local.set({ [STORAGE_KEYS.user]: user });
 
   return user;
+}
+
+/**
+ * Open a browser tab for OAuth login and wait for the redirect.
+ * Returns the full callback URL with authorization code.
+ */
+function openAuthTab(authorizeUrl: string, redirectUriPrefix: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let authTabId: number | undefined;
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Login timed out'));
+    }, 300_000); // 5 minute timeout
+
+    function cleanup() {
+      clearTimeout(timeout);
+      chrome.tabs.onUpdated.removeListener(onTabUpdated);
+      chrome.tabs.onRemoved.removeListener(onTabRemoved);
+    }
+
+    function onTabUpdated(tabId: number, changeInfo: chrome.tabs.TabChangeInfo) {
+      if (tabId !== authTabId || !changeInfo.url) return;
+
+      // Check if the tab has navigated to our callback URL
+      if (changeInfo.url.startsWith(redirectUriPrefix)) {
+        const callbackUrl = changeInfo.url;
+        cleanup();
+        // Close the auth tab
+        chrome.tabs.remove(tabId).catch(() => {});
+        resolve(callbackUrl);
+      }
+    }
+
+    function onTabRemoved(tabId: number) {
+      if (tabId !== authTabId) return;
+      cleanup();
+      reject(new Error('Login cancelled'));
+    }
+
+    // Listen for tab URL changes and tab closure
+    chrome.tabs.onUpdated.addListener(onTabUpdated);
+    chrome.tabs.onRemoved.addListener(onTabRemoved);
+
+    // Open the auth tab
+    chrome.tabs.create({ url: authorizeUrl }, (tab) => {
+      if (chrome.runtime.lastError || !tab?.id) {
+        cleanup();
+        reject(new Error(chrome.runtime.lastError?.message || 'Failed to open login tab'));
+        return;
+      }
+      authTabId = tab.id;
+    });
+  });
 }
 
 /**
