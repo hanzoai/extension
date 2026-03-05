@@ -95,6 +95,9 @@ test.describe('Sidebar', () => {
 
     // Chat UI elements should exist
     await expect(page.locator('#model-select')).toBeAttached();
+    await expect(page.locator('#rag-enabled')).toBeAttached();
+    await expect(page.locator('#tab-context-enabled')).toBeAttached();
+    await expect(page.locator('#rag-status')).toBeAttached();
     await expect(page.locator('#chat-input')).toBeAttached();
     await expect(page.locator('#send-btn')).toBeAttached();
   });
@@ -121,6 +124,7 @@ test.describe('Sidebar', () => {
 
     await expect(page.locator('#mcp-status')).toBeAttached();
     await expect(page.locator('#mcp-tools')).toBeAttached();
+    await expect(page.locator('#mcp-tool-list')).toBeAttached();
     await expect(page.locator('#agent-count')).toBeAttached();
     await expect(page.locator('#tab-fs')).toBeAttached();
     await expect(page.locator('#gpu-status')).toBeAttached();
@@ -137,6 +141,12 @@ test.describe('Sidebar', () => {
     await expect(page.locator('#mcp-port-setting')).toBeAttached();
     await expect(page.locator('#cdp-port-setting')).toBeAttached();
     await expect(page.locator('#zap-ports-setting')).toBeAttached();
+    await expect(page.locator('#rag-use-zap')).toBeAttached();
+    await expect(page.locator('#rag-include-tab-context')).toBeAttached();
+    await expect(page.locator('#rag-top-k')).toBeAttached();
+    await expect(page.locator('#rag-kb')).toBeAttached();
+    await expect(page.locator('#rag-endpoint')).toBeAttached();
+    await expect(page.locator('#rag-api-key')).toBeAttached();
     await expect(page.locator('#save-settings')).toBeAttached();
   });
 

@@ -14,5 +14,4 @@
 // Main manager (without auth import for now)
 // export * from './cli-tool-manager';
 
-// For now, just export a placeholder
-export const version = '1.5.7';
+export const version = '1.7.1';
