@@ -229,7 +229,7 @@ class HanzoSidebar {
     try {
       // Stream via direct fetch (sidebar has access via CSP)
       const model = this.el.modelSelect.value;
-      const response = await fetch('https://api.hanzo.ai/api/chat/completions', {
+      const response = await fetch('https://api.hanzo.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

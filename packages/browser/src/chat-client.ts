@@ -45,7 +45,7 @@ export interface ChatDelta {
  * List available models from Hanzo Cloud.
  */
 export async function listModels(token: string): Promise<ChatModel[]> {
-  const response = await fetch(`${API_BASE}/api/models`, {
+  const response = await fetch(`${API_BASE}/v1/models`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -73,7 +73,7 @@ export function chatCompletionStream(
 
   (async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/chat/completions`, {
+      const response = await fetch(`${API_BASE}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -150,7 +150,7 @@ export async function chatCompletion(
   token: string,
   options: ChatCompletionOptions,
 ): Promise<string> {
-  const response = await fetch(`${API_BASE}/api/chat/completions`, {
+  const response = await fetch(`${API_BASE}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
