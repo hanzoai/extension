@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/browser-extension",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "Hanzo AI Browser Extension",
   "main": "dist/background.js",
   "scripts": {
@@ -8,7 +8,8 @@
     "watch": "node src/build.js --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test --config=e2e/playwright.config.ts"
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "check:bundle-budget": "node scripts/check-bundle-budgets.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.3",
