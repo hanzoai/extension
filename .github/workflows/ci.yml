@@ -229,12 +229,13 @@ jobs:
         name: jetbrains
         path: packages/jetbrains/build/distributions/*.zip
 
-  # ─── GitHub Release (only when all builds pass on tag) ───
+  # ─── GitHub Release (on tag, after core build passes) ───
   release:
     name: Release
     runs-on: ubuntu-latest
     needs: [build, build-safari, build-jetbrains]
     if: >-
+      always() &&
       github.ref_type == 'tag' &&
       needs.build.result == 'success'
     steps:
@@ -254,17 +255,18 @@ jobs:
         echo "tag=$VERSION" >> $GITHUB_OUTPUT
         echo "name=Release $VERSION" >> $GITHUB_OUTPUT
 
+    - name: Collect release assets
+      run: |
+        mkdir -p release
+        find artifacts -type f \( -name '*.zip' -o -name '*.vsix' -o -name '*.dxt' \) -exec cp {} release/ \;
+        echo "Release assets:" && ls -la release/
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.info.outputs.tag }}
         name: ${{ steps.info.outputs.name }}
         generate_release_notes: true
-        files: |
-          artifacts/extensions/browser/hanzo-ai-chrome-*.zip
-          artifacts/extensions/browser/hanzo-ai-firefox-*.zip
-          artifacts/extensions/vscode/*.vsix
-          artifacts/safari/hanzo-ai-safari-*.zip
-          artifacts/jetbrains/*.zip
+        files: release/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
