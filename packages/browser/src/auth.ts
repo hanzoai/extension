@@ -184,6 +184,10 @@ export async function login(): Promise<UserInfo> {
   return user;
 }
 
+export async function signup(): Promise<void> {
+  await openExternalTab(`${IAM_BASE}/signup`);
+}
+
 /**
  * Open a browser tab for OAuth login and wait for the redirect.
  * Returns the full callback URL with authorization code.
@@ -233,6 +237,18 @@ function openAuthTab(authorizeUrl: string, redirectUriPrefix: string): Promise<s
         return;
       }
       authTabId = tab.id;
+    });
+  });
+}
+
+function openExternalTab(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.create({ url }, (tab) => {
+      if (chrome.runtime.lastError || !tab?.id) {
+        reject(new Error(chrome.runtime.lastError?.message || 'Failed to open tab'));
+        return;
+      }
+      resolve();
     });
   });
 }

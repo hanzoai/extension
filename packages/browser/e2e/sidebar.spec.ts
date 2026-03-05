@@ -41,6 +41,10 @@ test.describe('Sidebar', () => {
     await expect(authBtn).toBeVisible();
     await expect(authBtn).toContainText('Sign in');
 
+    const signupBtn = page.locator('#signup-btn');
+    await expect(signupBtn).toBeVisible();
+    await expect(signupBtn).toContainText('Create account');
+
     // Should have link to docs
     const docsLink = loginPrompt.locator('a[href="https://docs.hanzo.ai"]');
     await expect(docsLink).toBeAttached();

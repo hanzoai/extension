@@ -30,6 +30,7 @@ class HanzoSidebar {
     this.requestEpoch = 0;
     this.lastInputTokens = 0;
     this.lastOutputTokens = 0;
+    this.authInFlight = false;
     this.refreshTabFilesystemDebounced = debounce(() => {
       if (this.currentTab === 'tools') {
         void this.refreshTabFilesystem();
@@ -101,8 +102,20 @@ class HanzoSidebar {
   }
 
   setupEventListeners() {
-    // Auth
-    this.el.authBtn.addEventListener('click', () => this.login());
+    // Auth (delegated so lazy-mounted React login card keeps working)
+    document.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('#auth-btn')) {
+        event.preventDefault();
+        void this.login();
+        return;
+      }
+      if (target.closest('#signup-btn')) {
+        event.preventDefault();
+        void this.signup();
+      }
+    });
 
     // Tabs
     document.querySelectorAll('.tab').forEach(tab => {
@@ -172,8 +185,14 @@ class HanzoSidebar {
   }
 
   async login() {
-    this.el.authBtn.disabled = true;
-    this.el.authBtn.textContent = 'Signing in...';
+    if (this.authInFlight) return;
+    this.authInFlight = true;
+
+    const authBtn = document.getElementById('auth-btn') as HTMLButtonElement | null;
+    if (authBtn) {
+      authBtn.disabled = true;
+      authBtn.textContent = 'Signing in...';
+    }
 
     try {
       const response = await chrome.runtime.sendMessage({ action: 'auth.login' });
@@ -186,8 +205,21 @@ class HanzoSidebar {
     } catch (error) {
       this.showError('Sign in failed');
     } finally {
-      this.el.authBtn.disabled = false;
-      this.el.authBtn.textContent = 'Sign in with Hanzo';
+      this.authInFlight = false;
+      const latestAuthBtn = document.getElementById('auth-btn') as HTMLButtonElement | null;
+      if (latestAuthBtn) {
+        latestAuthBtn.disabled = false;
+        latestAuthBtn.textContent = 'Sign in with Hanzo';
+      }
+    }
+  }
+
+  async signup() {
+    const response = await chrome.runtime.sendMessage({ action: 'auth.signup' });
+    if (!response?.success) {
+      this.showError(response?.error || 'Unable to open signup');
+    } else {
+      this.showNotification('Signup opened in a new tab');
     }
   }
 
