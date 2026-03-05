@@ -75,9 +75,11 @@ class HanzoSidebar {
       agentList: document.getElementById('agent-list'),
       tabFs: document.getElementById('tab-fs'),
       refreshTabs: document.getElementById('refresh-tabs'),
-      gpuStatus: document.getElementById('gpu-status'),
-      gpuModel: document.getElementById('gpu-model'),
       launchAgent: document.getElementById('launch-agent'),
+      hanzoNodeStatus: document.getElementById('hanzo-node-status'),
+      hanzoMcpStatus: document.getElementById('hanzo-mcp-status'),
+      startHanzoNode: document.getElementById('start-hanzo-node'),
+      startHanzoMcp: document.getElementById('start-hanzo-mcp'),
       usageChatRequests: document.getElementById('usage-chat-requests'),
       usageInputTokens: document.getElementById('usage-input-tokens'),
       usageOutputTokens: document.getElementById('usage-output-tokens'),
@@ -142,6 +144,8 @@ class HanzoSidebar {
     // Tools
     this.el.refreshTabs.addEventListener('click', () => this.refreshTabFilesystem());
     this.el.launchAgent.addEventListener('click', () => this.showAgentLauncher());
+    this.el.startHanzoNode?.addEventListener('click', () => this.startHanzoService('node'));
+    this.el.startHanzoMcp?.addEventListener('click', () => this.startHanzoService('mcp'));
 
     // Settings
     this.el.logoutBtn.addEventListener('click', () => this.logout());
@@ -317,7 +321,7 @@ class HanzoSidebar {
     this.toolsInitialized = true;
     void this.connectToMCP();
     void this.refreshTabFilesystem();
-    void this.checkWebGPU();
+    void this.checkHanzoServices();
     void this.refreshUsageMetrics();
   }
 
@@ -803,22 +807,70 @@ class HanzoSidebar {
     return title.replace(/[^a-zA-Z0-9-_]/g, '_').toLowerCase().substring(0, 30);
   }
 
-  async checkWebGPU() {
+  async checkHanzoServices() {
+    // Check hanzo node (default port 52415)
+    const nodePort = parseInt(document.getElementById('node-port-setting')?.value || '52415') || 52415;
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'checkWebGPU' });
-      if (response?.available) {
-        this.el.gpuStatus.innerHTML = `
-          <span class="status-indicator connected"></span>
-          Available
-        `;
-        this.el.gpuModel.textContent = response.adapter || 'Unknown';
+      const resp = await fetch(`http://localhost:${nodePort}/health`, { signal: AbortSignal.timeout(2000) });
+      if (resp.ok) {
+        this.el.hanzoNodeStatus.innerHTML = `<span class="status-indicator connected"></span> Running`;
+        this.el.startHanzoNode.textContent = 'Running';
+        this.el.startHanzoNode.disabled = true;
       } else {
-        this.el.gpuStatus.innerHTML = `
-          <span class="status-indicator disconnected"></span>
-          Not Available
-        `;
+        this.el.hanzoNodeStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
+        this.el.startHanzoNode.disabled = false;
+      }
+    } catch {
+      this.el.hanzoNodeStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
+      if (this.el.startHanzoNode) this.el.startHanzoNode.disabled = false;
+    }
+
+    // Check hanzo MCP server (via ZAP status which already probes MCP)
+    try {
+      const zapResp = await chrome.runtime.sendMessage({ action: 'zap.status' });
+      const hasTools = zapResp?.success && zapResp.zap?.connected;
+      if (this.el.hanzoMcpStatus) {
+        this.el.hanzoMcpStatus.innerHTML = hasTools
+          ? `<span class="status-indicator connected"></span> Running`
+          : `<span class="status-indicator disconnected"></span> Stopped`;
+      }
+      if (this.el.startHanzoMcp) {
+        this.el.startHanzoMcp.disabled = !!hasTools;
+        if (hasTools) this.el.startHanzoMcp.textContent = 'Running';
+      }
+    } catch {
+      if (this.el.hanzoMcpStatus) {
+        this.el.hanzoMcpStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
+      }
+    }
+  }
+
+  async startHanzoService(service: string) {
+    // Open a new tab with instructions to start the service via terminal
+    const commands = {
+      node: 'hanzo node --port 52415',
+      mcp: 'hanzo mcp serve',
+    };
+    const cmd = commands[service] || commands.node;
+
+    // Try sending command to CDP bridge (if running, it can spawn processes)
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'cdp.exec',
+        command: cmd,
+      });
+      if (response?.success) {
+        this.showNotification(`Starting ${service}...`);
+        // Re-check after a short delay
+        setTimeout(() => this.checkHanzoServices(), 3000);
+        return;
       }
     } catch {}
+
+    // Fallback: open docs page with terminal command
+    const url = `https://docs.hanzo.ai/cli#${service}`;
+    chrome.tabs.create({ url });
+    this.showNotification(`Run: ${cmd}`);
   }
 
   updateAgentList() {
@@ -976,6 +1028,7 @@ class HanzoSidebar {
       'mcpPort',
       'cdpPort',
       'zapPorts',
+      'nodePort',
       'hanzo_default_model',
       'hanzo_rag_endpoint',
       'hanzo_rag_api_key',
@@ -989,10 +1042,12 @@ class HanzoSidebar {
       const mcpPort = document.getElementById('mcp-port-setting');
       const cdpPort = document.getElementById('cdp-port-setting');
       const zapPorts = document.getElementById('zap-ports-setting');
+      const nodePort = document.getElementById('node-port-setting');
 
       if (mcpPort) mcpPort.value = result.mcpPort || 3001;
       if (cdpPort) cdpPort.value = result.cdpPort || 9223;
       if (zapPorts) zapPorts.value = (result.zapPorts || [9999,9998,9997,9996,9995]).join(',');
+      if (nodePort) nodePort.value = result.nodePort || 52415;
       if (result.hanzo_default_model && this.el.defaultModel) {
         this.el.defaultModel.value = result.hanzo_default_model;
       }
@@ -1015,9 +1070,12 @@ class HanzoSidebar {
     const zapPorts = (document.getElementById('zap-ports-setting')?.value || '')
       .split(',').map(p => parseInt(p.trim())).filter(p => p > 0 && p < 65536);
 
+    const nodePort = parseInt(document.getElementById('node-port-setting')?.value) || 52415;
+
     await chrome.storage.local.set({
       mcpPort,
       cdpPort,
+      nodePort,
       zapPorts: zapPorts.length ? zapPorts : [9999,9998,9997,9996,9995],
       hanzo_default_model: this.el.defaultModel?.value || 'auto',
       'safe-mode': document.getElementById('safe-mode')?.checked,
@@ -1033,6 +1091,21 @@ class HanzoSidebar {
       hanzo_chat_tab_context_enabled: !!this.el.tabContextEnabled?.checked,
     });
 
+    // Sync settings to ~/.hanzo/extension/config.json via CDP bridge
+    chrome.runtime.sendMessage({
+      action: 'settings.sync',
+      settings: {
+        mcpPort,
+        cdpPort,
+        nodePort,
+        zapPorts: zapPorts.length ? zapPorts : [9999,9998,9997,9996,9995],
+        defaultModel: this.el.defaultModel?.value || 'auto',
+        safeMode: !!document.getElementById('safe-mode')?.checked,
+        maxAgents: parseInt(document.getElementById('max-agents')?.value) || 3,
+        enableWebGPU: !!document.getElementById('enable-webgpu')?.checked,
+      },
+    }).catch(() => {});
+
     this.showNotification('Settings saved');
   }
 
@@ -1047,6 +1120,7 @@ class HanzoSidebar {
     setInterval(() => {
       if (this.currentTab !== 'tools') return;
       void this.connectToMCP();
+      void this.checkHanzoServices();
       void this.refreshUsageMetrics();
     }, 15000);
   }
