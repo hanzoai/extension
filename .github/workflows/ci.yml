@@ -94,11 +94,16 @@ jobs:
       working-directory: packages/browser
       run: node src/build.js
 
+    - name: Get version
+      id: version
+      run: echo "ver=$(node -p "require('./packages/browser/src/manifest.json').version")" >> $GITHUB_OUTPUT
+
     - name: Package Chrome + Firefox
       working-directory: packages/browser
       run: |
-        cd dist/browser-extension/chrome && zip -r ../../../hanzo-ai-chrome.zip .
-        cd ../../browser-extension/firefox && zip -r ../../../hanzo-ai-firefox.zip .
+        VER="${{ steps.version.outputs.ver }}"
+        cd dist/browser-extension/chrome && zip -r ../../../hanzo-ai-chrome-${VER}.zip .
+        cd ../../browser-extension/firefox && zip -r ../../../hanzo-ai-firefox-${VER}.zip .
 
     - name: Lint Firefox
       working-directory: packages/browser
@@ -139,8 +144,8 @@ jobs:
       with:
         name: extensions
         path: |
-          packages/browser/hanzo-ai-chrome.zip
-          packages/browser/hanzo-ai-firefox.zip
+          packages/browser/hanzo-ai-chrome-*.zip
+          packages/browser/hanzo-ai-firefox-*.zip
           packages/vscode/*.vsix
           packages/dxt/dist/*.dxt
 
@@ -179,14 +184,20 @@ jobs:
           CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
           -derivedDataPath dist/safari-build-ios
 
+    - name: Get version
+      id: version
+      run: echo "ver=$(node -p "require('./packages/browser/src/manifest.json').version")" >> $GITHUB_OUTPUT
+
     - name: Package Safari
       working-directory: packages/browser
-      run: cd dist/safari && zip -r ../../hanzo-ai-safari.zip "Hanzo AI/"
+      run: |
+        VER="${{ steps.version.outputs.ver }}"
+        cd dist/safari && zip -r ../../hanzo-ai-safari-${VER}.zip "Hanzo AI/"
 
     - uses: actions/upload-artifact@v4
       with:
         name: safari
-        path: packages/browser/hanzo-ai-safari.zip
+        path: packages/browser/hanzo-ai-safari-*.zip
 
   # ─── JetBrains ───
   build-jetbrains:
@@ -244,10 +255,10 @@ jobs:
         name: ${{ steps.info.outputs.name }}
         generate_release_notes: true
         files: |
-          artifacts/extensions/browser/hanzo-ai-chrome.zip
-          artifacts/extensions/browser/hanzo-ai-firefox.zip
+          artifacts/extensions/browser/hanzo-ai-chrome-*.zip
+          artifacts/extensions/browser/hanzo-ai-firefox-*.zip
           artifacts/extensions/vscode/*.vsix
-          artifacts/safari/hanzo-ai-safari.zip
+          artifacts/safari/hanzo-ai-safari-*.zip
           artifacts/jetbrains/*.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
