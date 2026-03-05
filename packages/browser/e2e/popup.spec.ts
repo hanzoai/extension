@@ -77,4 +77,35 @@ test.describe('Popup', () => {
     const openPanel = page.locator('#open-panel');
     await expect(openPanel).toBeAttached();
   });
+
+  test('on-page overlay toggle button exists', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
+
+    const openOverlay = page.locator('#open-page-overlay');
+    await expect(openOverlay).toBeAttached();
+    await expect(openOverlay).toContainText('Overlay');
+  });
+
+  test('toggles on-page overlay on a live webpage', async ({ context, extensionId }) => {
+    const targetPage = await context.newPage();
+    await targetPage.goto('https://example.com', { waitUntil: 'domcontentloaded' });
+    await expect(targetPage.locator('body')).toBeVisible();
+
+    // Content script mounts hidden overlay root.
+    await expect(targetPage.locator('#hanzo-page-overlay-root')).toHaveCount(1);
+
+    const popupPage = await context.newPage();
+    await popupPage.goto(`chrome-extension://${extensionId}/popup.html`);
+
+    const toggleOverlayBtn = popupPage.locator('#open-page-overlay');
+    await expect(toggleOverlayBtn).toBeVisible();
+    await toggleOverlayBtn.click();
+
+    await targetPage.bringToFront();
+    const overlayRoot = targetPage.locator('#hanzo-page-overlay-root');
+    await expect(overlayRoot).toHaveAttribute('data-enabled', 'true');
+    await expect(overlayRoot).toHaveAttribute('data-open', 'true');
+    await expect(targetPage.locator('#hanzo-page-overlay-root .hanzo-page-panel')).toBeVisible();
+  });
 });
