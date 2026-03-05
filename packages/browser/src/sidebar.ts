@@ -1,3 +1,5 @@
+import { mountModernChatWidget } from './chat-widget';
+
 // Hanzo AI Browser Extension Sidebar — Chat + Tools + Settings
 
 class HanzoSidebar {
@@ -10,6 +12,7 @@ class HanzoSidebar {
     this.authenticated = false;
     this.ragContext = null;
 
+    mountModernChatWidget();
     this.initializeUI();
     this.setupEventListeners();
     this.checkAuth();

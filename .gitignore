@@ -54,3 +54,4 @@ packages/*/*.tgz
 # Claude chats
 .claude/
 claude_chats/
+*.zip
