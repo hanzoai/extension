@@ -835,16 +835,21 @@ body {
   font-size: 11px;
 }
 
-.tool-list-wrap {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
+.service-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
 }
 
-.tool-list-header {
-  color: var(--text-secondary);
+.action-btn.small {
+  padding: 6px 10px;
   font-size: 11px;
-  margin-bottom: 6px;
+  gap: 4px;
+}
+
+.action-btn.small svg {
+  width: 10px;
+  height: 10px;
 }
 
 .tool-list {
@@ -1086,6 +1091,43 @@ body {
 /* ==================== Loading ==================== */
 
 .loading { animation: pulse 1.5s infinite; }
+
+/* ==================== Footer ==================== */
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.4);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  font-size: 11px;
+  transition: color 0.2s;
+}
+
+.footer-brand:hover {
+  color: var(--text-secondary);
+}
+
+.footer-brand svg {
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.footer-brand:hover svg {
+  opacity: 0.8;
+}
 
 /* ==================== Agent Launcher Modal ==================== */
 

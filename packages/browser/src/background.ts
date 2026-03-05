@@ -1172,6 +1172,17 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       break;
     }
 
+    case 'settings.sync': {
+      // Sync all settings to ~/.hanzo/extension/config.json via CDP bridge
+      if (request.settings && typeof request.settings === 'object') {
+        for (const [key, value] of Object.entries(request.settings)) {
+          cdpBridge.sendConfig(key, value);
+        }
+      }
+      sendResponse({ success: true });
+      break;
+    }
+
     // --- Takeover messages (forwarded from CDP bridge to content script) ---
     case 'hanzo.takeover.start': {
       const takeoverTabId = await resolveControlTabId(request.tabId);
