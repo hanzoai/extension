@@ -87,13 +87,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  function isInjectableTab(tab: chrome.tabs.Tab | undefined): boolean {
+    if (!tab || !tab.id) return false;
+    const url = tab.url || '';
+    if (!url) return false;
+    if (url.startsWith('chrome://')) return false;
+    if (url.startsWith('chrome-extension://')) return false;
+    if (url.startsWith('devtools://')) return false;
+    if (url.startsWith('edge://')) return false;
+    if (url.startsWith('about:')) return false;
+    if (url.startsWith('view-source:')) return false;
+    if (url.startsWith('moz-extension://')) return false;
+    return true;
+  }
+
   openPageOverlay?.addEventListener('click', () => {
     openPageOverlay.textContent = 'Opening...';
     openPageOverlay.setAttribute('disabled', 'true');
 
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const activeTab = tabs[0];
-      if (!activeTab?.id) {
+      let targetTab = isInjectableTab(activeTab) ? activeTab : null;
+
+      if (!targetTab) {
+        chrome.tabs.query({ currentWindow: true }, (allTabs) => {
+          targetTab = allTabs.find((tab) => isInjectableTab(tab)) || null;
+          if (!targetTab?.id) {
+            openPageOverlay.textContent = 'No valid page tab';
+            setTimeout(() => {
+              openPageOverlay.textContent = 'Toggle On-Page Overlay';
+              openPageOverlay.removeAttribute('disabled');
+            }, 1200);
+            return;
+          }
+
+          chrome.runtime.sendMessage({ action: 'page.overlay.toggle', tabId: targetTab.id }, (response) => {
+            if (chrome.runtime.lastError || !response?.success) {
+              openPageOverlay.textContent = 'Unavailable on this page';
+            } else {
+              const opened = !!response?.open;
+              openPageOverlay.textContent = opened ? 'Overlay Opened' : 'Overlay Hidden';
+            }
+            setTimeout(() => {
+              openPageOverlay.textContent = 'Toggle On-Page Overlay';
+              openPageOverlay.removeAttribute('disabled');
+            }, 900);
+          });
+        });
+        return;
+      }
+
+      if (!targetTab?.id) {
         openPageOverlay.textContent = 'No Active Tab';
         setTimeout(() => {
           openPageOverlay.textContent = 'Toggle On-Page Overlay';
@@ -102,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      chrome.runtime.sendMessage({ action: 'page.overlay.toggle', tabId: activeTab.id }, (response) => {
+      chrome.runtime.sendMessage({ action: 'page.overlay.toggle', tabId: targetTab.id }, (response) => {
         if (chrome.runtime.lastError || !response?.success) {
           openPageOverlay.textContent = 'Unavailable on this page';
         } else {
