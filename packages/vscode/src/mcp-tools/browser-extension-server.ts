@@ -134,7 +134,7 @@ export class BrowserExtensionServer extends EventEmitter {
     return null;
   }
 
-  public close() {
-    this.wss.close();
+  public close(callback?: () => void) {
+    this.wss.close(callback);
   }
 }

@@ -21,9 +21,13 @@ describe('Claude Code Browser Extension Integration', () => {
     await new Promise(resolve => ws.on('open', resolve));
   });
   
-  afterEach(() => {
+  afterEach(async () => {
     ws.close();
-    server.close();
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      // Fallback if close callback never fires
+      setTimeout(resolve, 500);
+    });
   });
   
   describe('React source-map integration', () => {
