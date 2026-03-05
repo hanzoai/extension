@@ -56,6 +56,25 @@ async function build() {
     format: 'esm'
   });
 
+  // Build sidebar + popup UI scripts (TypeScript-first, with JS fallback)
+  await esbuild.build({
+    entryPoints: [fs.existsSync('src/sidebar.ts') ? 'src/sidebar.ts' : 'src/sidebar.js'],
+    bundle: true,
+    outfile: 'dist/browser-extension/sidebar.js',
+    platform: 'browser',
+    target: ['chrome90', 'firefox91', 'safari14'],
+    sourcemap: 'inline',
+  });
+
+  await esbuild.build({
+    entryPoints: [fs.existsSync('src/popup.ts') ? 'src/popup.ts' : 'src/popup.js'],
+    bundle: true,
+    outfile: 'dist/browser-extension/popup.js',
+    platform: 'browser',
+    target: ['chrome90', 'firefox91', 'safari14'],
+    sourcemap: 'inline',
+  });
+
   // Build browser control module
   await esbuild.build({
     entryPoints: ['src/browser-control.ts'],
@@ -160,13 +179,17 @@ async function build() {
       );
     }
 
-    // Copy popup + sidebar HTML/CSS/JS
-    for (const f of ['popup.html', 'popup.css', 'popup.js', 'sidebar.html', 'sidebar.css', 'sidebar.js', 'callback.html', 'ai-worker.js']) {
+    // Copy popup + sidebar HTML/CSS
+    for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'callback.html', 'ai-worker.js']) {
       const src = path.join('src', f);
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(dir, f));
       }
     }
+
+    // Copy compiled popup/sidebar scripts
+    fs.copyFileSync('dist/browser-extension/popup.js', path.join(dir, 'popup.js'));
+    fs.copyFileSync('dist/browser-extension/sidebar.js', path.join(dir, 'sidebar.js'));
 
     // Copy icons into each browser directory
     for (const icon of ['icon16.png', 'icon48.png', 'icon128.png']) {

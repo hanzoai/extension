@@ -7,6 +7,8 @@ class HanzoSidebar {
     this.messages = [];
     this.streaming = false;
     this.streamController = null;
+    this.authenticated = false;
+    this.ragContext = null;
 
     this.initializeUI();
     this.setupEventListeners();
@@ -28,11 +30,15 @@ class HanzoSidebar {
       chatInput: document.getElementById('chat-input'),
       sendBtn: document.getElementById('send-btn'),
       modelSelect: document.getElementById('model-select'),
+      ragEnabled: document.getElementById('rag-enabled'),
+      tabContextEnabled: document.getElementById('tab-context-enabled'),
+      ragStatus: document.getElementById('rag-status'),
 
       // Tools
       tabTools: document.getElementById('tab-tools'),
       mcpStatus: document.getElementById('mcp-status'),
       mcpTools: document.getElementById('mcp-tools'),
+      mcpToolList: document.getElementById('mcp-tool-list'),
       agentCount: document.getElementById('agent-count'),
       agentList: document.getElementById('agent-list'),
       tabFs: document.getElementById('tab-fs'),
@@ -49,6 +55,12 @@ class HanzoSidebar {
       logoutBtn: document.getElementById('logout-btn'),
       saveSettings: document.getElementById('save-settings'),
       defaultModel: document.getElementById('default-model'),
+      ragUseZap: document.getElementById('rag-use-zap'),
+      ragIncludeTabContext: document.getElementById('rag-include-tab-context'),
+      ragTopK: document.getElementById('rag-top-k'),
+      ragKb: document.getElementById('rag-kb'),
+      ragEndpoint: document.getElementById('rag-endpoint'),
+      ragApiKey: document.getElementById('rag-api-key'),
     };
   }
 
@@ -70,6 +82,13 @@ class HanzoSidebar {
       }
     });
     this.el.chatInput.addEventListener('input', () => this.autoResize());
+    this.el.ragEnabled?.addEventListener('change', () => {
+      this.setRagStatus(this.el.ragEnabled.checked ? 'RAG enabled' : 'RAG disabled');
+    });
+    this.el.tabContextEnabled?.addEventListener('change', () => {
+      if (!this.el.ragEnabled?.checked) return;
+      this.setRagStatus(this.el.tabContextEnabled.checked ? 'Tab context on' : 'Tab context off');
+    });
 
     // Tools
     this.el.refreshTabs.addEventListener('click', () => this.refreshTabFilesystem());
@@ -172,6 +191,7 @@ class HanzoSidebar {
   }
 
   hideChatLoginPrompt() {
+    this.authenticated = true;
     const chatLogin = document.getElementById('chat-login-prompt');
     if (chatLogin) chatLogin.classList.add('hidden');
     const chatComposer = document.getElementById('chat-composer');
@@ -223,6 +243,10 @@ class HanzoSidebar {
   async sendMessage() {
     const text = this.el.chatInput.value.trim();
     if (!text || this.streaming) return;
+    if (!this.authenticated) {
+      this.showError('Please sign in to use chat');
+      return;
+    }
 
     // Get token
     const tokenResp = await chrome.runtime.sendMessage({ action: 'auth.getToken' });
@@ -231,8 +255,32 @@ class HanzoSidebar {
       return;
     }
 
-    // Add user message
-    this.messages.push({ role: 'user', content: text });
+    const userMessage = { role: 'user', content: text };
+    const model = this.el.modelSelect.value;
+    let requestMessages = [...this.messages, userMessage];
+
+    this.ragContext = null;
+    if (this.el.ragEnabled?.checked) {
+      this.setRagStatus('Retrieving context...');
+      const ragResp = await this.requestRagContext(text);
+      if (ragResp?.success && Array.isArray(ragResp.snippets) && ragResp.snippets.length) {
+        this.ragContext = ragResp;
+        requestMessages = [
+          { role: 'system', content: this.buildRagSystemPrompt(ragResp) },
+          ...requestMessages,
+        ];
+        this.setRagStatus(`RAG: ${ragResp.snippets.length} snippet(s) from ${ragResp.source || 'context'}`);
+      } else if (ragResp?.error) {
+        this.setRagStatus(`RAG unavailable (${ragResp.error})`);
+      } else {
+        this.setRagStatus('No context found');
+      }
+    } else {
+      this.setRagStatus('RAG disabled');
+    }
+
+    // Add user message to transcript
+    this.messages.push(userMessage);
     this.appendMessage('user', text);
 
     // Clear input
@@ -250,7 +298,6 @@ class HanzoSidebar {
 
     try {
       // Stream via direct fetch (sidebar has access via CSP)
-      const model = this.el.modelSelect.value;
       const response = await fetch('https://api.hanzo.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -259,7 +306,7 @@ class HanzoSidebar {
         },
         body: JSON.stringify({
           model,
-          messages: this.messages,
+          messages: requestMessages,
           stream: true,
         }),
         signal: (this.streamController = new AbortController()).signal,
@@ -302,19 +349,95 @@ class HanzoSidebar {
         }
       }
 
+      if (this.ragContext?.snippets?.length) {
+        fullContent += this.buildRagCitationBlock(this.ragContext);
+        assistantEl.innerHTML = this.renderMarkdown(fullContent);
+      }
+
       this.messages.push({ role: 'assistant', content: fullContent });
       this.saveConversation();
     } catch (error) {
       typingEl.remove();
-      if (error.name !== 'AbortError') {
+      if (error?.name !== 'AbortError') {
         assistantEl.remove();
-        this.appendError(error.message);
+        this.appendError(error?.message || 'Chat failed');
       }
     } finally {
       this.streaming = false;
       this.streamController = null;
       this.el.sendBtn.disabled = false;
     }
+  }
+
+  async getActiveTabContext() {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!activeTab) return null;
+      return {
+        url: activeTab.url || '',
+        title: activeTab.title || '',
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async requestRagContext(query) {
+    try {
+      const pageContext = this.el.tabContextEnabled?.checked ? await this.getActiveTabContext() : null;
+      const topK = Math.max(1, Math.min(parseInt(this.el.ragTopK?.value || '5', 10) || 5, 20));
+
+      return await chrome.runtime.sendMessage({
+        action: 'rag.query',
+        query,
+        topK,
+        includeTabContext: !!this.el.tabContextEnabled?.checked,
+        useZapMemory: !!this.el.ragUseZap?.checked,
+        knowledgeBase: this.el.ragKb?.value || '',
+        endpoint: this.el.ragEndpoint?.value || '',
+        apiKey: this.el.ragApiKey?.value || '',
+        pageContext: pageContext || undefined,
+      });
+    } catch (error) {
+      return { success: false, error: error?.message || 'Failed to query RAG' };
+    }
+  }
+
+  buildRagSystemPrompt(ragResponse) {
+    const snippets = (ragResponse?.snippets || []).slice(0, 8);
+    const lines = snippets.map((snippet, index) => {
+      const title = snippet.title || snippet.source || `Snippet ${index + 1}`;
+      const score = typeof snippet.score === 'number' ? ` (score ${snippet.score.toFixed(3)})` : '';
+      const sourceLine = snippet.url ? `${title}${score} — ${snippet.url}` : `${title}${score}`;
+      return `[${index + 1}] ${sourceLine}\n${snippet.content}`;
+    });
+
+    return [
+      'You are assisting inside Hanzo Browser Extension.',
+      'Use the retrieved context below when relevant, and state uncertainty if context is insufficient.',
+      'Retrieved Context:',
+      ...lines,
+    ].join('\n\n');
+  }
+
+  buildRagCitationBlock(ragResponse) {
+    const snippets = (ragResponse?.snippets || []).slice(0, 5);
+    if (!snippets.length) return '';
+
+    const rows = snippets.map((snippet, index) => {
+      const title = snippet.title || snippet.source || `Snippet ${index + 1}`;
+      if (snippet.url) {
+        return `- ${title}: ${snippet.url}`;
+      }
+      return `- ${title}`;
+    });
+
+    return `\n\n---\nContext Sources:\n${rows.join('\n')}`;
+  }
+
+  setRagStatus(text) {
+    if (!this.el.ragStatus) return;
+    this.el.ragStatus.textContent = text || 'Ready';
   }
 
   appendMessage(role, content) {
@@ -422,11 +545,19 @@ class HanzoSidebar {
         const zap = zapResponse.zap;
         const toolCount = zap.mcps?.reduce((sum, m) => sum + (m.tools?.length || 0), 0) || 0;
         this.updateMCPStatus(zap.connected, toolCount, zap.mcps?.length || 0);
+        if (zap.connected) {
+          const toolsResp = await chrome.runtime.sendMessage({ action: 'zap.listTools' });
+          this.updateMCPToolList(toolsResp?.success ? toolsResp.tools : []);
+        } else {
+          this.updateMCPToolList([]);
+        }
       } else {
         this.updateMCPStatus(false);
+        this.updateMCPToolList([]);
       }
     } catch {
       this.updateMCPStatus(false);
+      this.updateMCPToolList([]);
     }
   }
 
@@ -439,6 +570,19 @@ class HanzoSidebar {
       Disconnected
     `;
     this.el.mcpTools.textContent = toolCount;
+  }
+
+  updateMCPToolList(tools) {
+    if (!this.el.mcpToolList) return;
+    if (!tools || !tools.length) {
+      this.el.mcpToolList.textContent = 'No tools discovered yet.';
+      return;
+    }
+
+    const names = Array.from(new Set(tools.map((tool) => tool.name))).sort();
+    const preview = names.slice(0, 20);
+    const suffix = names.length > preview.length ? `\n... +${names.length - preview.length} more` : '';
+    this.el.mcpToolList.textContent = `${preview.join('\n')}${suffix}`;
   }
 
   async refreshTabFilesystem() {
@@ -599,6 +743,7 @@ class HanzoSidebar {
       }
 
       const agentType = typeSelect.value;
+      const agentInstructions = instructions.value?.trim() || '';
       overlay.remove();
 
       try {
@@ -606,6 +751,7 @@ class HanzoSidebar {
           action: 'launchAIWorker',
           tabId,
           model: agentType,
+          instructions: agentInstructions,
         });
 
         if (response?.success) {
@@ -632,7 +778,20 @@ class HanzoSidebar {
   // ===========================================================================
 
   loadSettings() {
-    chrome.storage.local.get(['mcpPort', 'cdpPort', 'zapPorts', 'hanzo_default_model'], (result) => {
+    chrome.storage.local.get([
+      'mcpPort',
+      'cdpPort',
+      'zapPorts',
+      'hanzo_default_model',
+      'hanzo_rag_endpoint',
+      'hanzo_rag_api_key',
+      'hanzo_rag_kb',
+      'hanzo_rag_top_k',
+      'hanzo_rag_include_tab_context',
+      'hanzo_rag_use_zap',
+      'hanzo_chat_rag_enabled',
+      'hanzo_chat_tab_context_enabled',
+    ], (result) => {
       const mcpPort = document.getElementById('mcp-port-setting');
       const cdpPort = document.getElementById('cdp-port-setting');
       const zapPorts = document.getElementById('zap-ports-setting');
@@ -643,6 +802,16 @@ class HanzoSidebar {
       if (result.hanzo_default_model && this.el.defaultModel) {
         this.el.defaultModel.value = result.hanzo_default_model;
       }
+
+      if (this.el.ragEndpoint) this.el.ragEndpoint.value = result.hanzo_rag_endpoint || '';
+      if (this.el.ragApiKey) this.el.ragApiKey.value = result.hanzo_rag_api_key || '';
+      if (this.el.ragKb) this.el.ragKb.value = result.hanzo_rag_kb || '';
+      if (this.el.ragTopK) this.el.ragTopK.value = String(result.hanzo_rag_top_k || 5);
+      if (this.el.ragIncludeTabContext) this.el.ragIncludeTabContext.checked = result.hanzo_rag_include_tab_context !== false;
+      if (this.el.ragUseZap) this.el.ragUseZap.checked = result.hanzo_rag_use_zap !== false;
+      if (this.el.ragEnabled) this.el.ragEnabled.checked = result.hanzo_chat_rag_enabled !== false;
+      if (this.el.tabContextEnabled) this.el.tabContextEnabled.checked = result.hanzo_chat_tab_context_enabled !== false;
+      this.setRagStatus(this.el.ragEnabled?.checked ? 'Ready' : 'RAG disabled');
     });
   }
 
@@ -660,6 +829,14 @@ class HanzoSidebar {
       'safe-mode': document.getElementById('safe-mode')?.checked,
       'enable-webgpu': document.getElementById('enable-webgpu')?.checked,
       maxAgents: parseInt(document.getElementById('max-agents')?.value) || 3,
+      hanzo_rag_endpoint: this.el.ragEndpoint?.value?.trim() || '',
+      hanzo_rag_api_key: this.el.ragApiKey?.value?.trim() || '',
+      hanzo_rag_kb: this.el.ragKb?.value?.trim() || '',
+      hanzo_rag_top_k: Math.max(1, Math.min(parseInt(this.el.ragTopK?.value || '5', 10) || 5, 20)),
+      hanzo_rag_include_tab_context: !!this.el.ragIncludeTabContext?.checked,
+      hanzo_rag_use_zap: !!this.el.ragUseZap?.checked,
+      hanzo_chat_rag_enabled: !!this.el.ragEnabled?.checked,
+      hanzo_chat_tab_context_enabled: !!this.el.tabContextEnabled?.checked,
     });
 
     this.showNotification('Settings saved');

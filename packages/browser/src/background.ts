@@ -30,6 +30,29 @@ interface ControlSession {
   startedAt: number | null;
 }
 
+interface RagSnippet {
+  content: string;
+  title?: string;
+  source?: string;
+  score?: number;
+  url?: string;
+}
+
+interface RagQueryParams {
+  query: string;
+  topK: number;
+  knowledgeBase: string;
+  includeTabContext: boolean;
+  useZapMemory: boolean;
+  endpoint: string;
+  apiKey: string;
+  mcpId?: string;
+  pageContext?: {
+    url?: string;
+    title?: string;
+  };
+}
+
 const zapState: ZapState = {
   connected: false,
   mcps: [],
@@ -49,6 +72,7 @@ const DEFAULT_MCP_PORT = 3001;
 const DEFAULT_CDP_PORT = 9223;
 const ZAP_RECONNECT_DELAY = 3000;
 const ZAP_DISCOVERY_TIMEOUT = 2000;
+const DEFAULT_RAG_TOP_K = 5;
 
 /** Load port configuration from storage */
 async function getPortConfig(): Promise<{ zapPorts: number[]; mcpPort: number; cdpPort: number }> {
@@ -58,6 +82,36 @@ async function getPortConfig(): Promise<{ zapPorts: number[]; mcpPort: number; c
         zapPorts: result.zapPorts || DEFAULT_ZAP_PORTS,
         mcpPort: result.mcpPort || DEFAULT_MCP_PORT,
         cdpPort: result.cdpPort || DEFAULT_CDP_PORT,
+      });
+    });
+  });
+}
+
+async function getRagConfig(): Promise<{
+  endpoint: string;
+  apiKey: string;
+  knowledgeBase: string;
+  topK: number;
+  includeTabContext: boolean;
+  useZapMemory: boolean;
+}> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([
+      'hanzo_rag_endpoint',
+      'hanzo_rag_api_key',
+      'hanzo_rag_kb',
+      'hanzo_rag_top_k',
+      'hanzo_rag_include_tab_context',
+      'hanzo_rag_use_zap',
+    ], (result) => {
+      const parsedTopK = Number.parseInt(String(result.hanzo_rag_top_k ?? DEFAULT_RAG_TOP_K), 10);
+      resolve({
+        endpoint: String(result.hanzo_rag_endpoint || '').trim(),
+        apiKey: String(result.hanzo_rag_api_key || '').trim(),
+        knowledgeBase: String(result.hanzo_rag_kb || '').trim(),
+        topK: Number.isFinite(parsedTopK) ? Math.max(1, Math.min(parsedTopK, 20)) : DEFAULT_RAG_TOP_K,
+        includeTabContext: result.hanzo_rag_include_tab_context !== false,
+        useZapMemory: result.hanzo_rag_use_zap !== false,
       });
     });
   });
@@ -279,6 +333,126 @@ async function zapCallTool(name: string, args: Record<string, unknown> = {}, tar
   throw new Error(`Tool not found on any ZAP-connected MCP: ${name}`);
 }
 
+function hasZapTool(name: string): boolean {
+  return zapState.mcps.some((mcp) => mcp.tools.includes(name));
+}
+
+function normalizeRagSnippets(raw: any): RagSnippet[] {
+  if (!raw) return [];
+
+  const candidates: any[] = [];
+  if (Array.isArray(raw)) candidates.push(...raw);
+  if (Array.isArray(raw?.snippets)) candidates.push(...raw.snippets);
+  if (Array.isArray(raw?.documents)) candidates.push(...raw.documents);
+  if (Array.isArray(raw?.items)) candidates.push(...raw.items);
+  if (Array.isArray(raw?.results)) candidates.push(...raw.results);
+  if (Array.isArray(raw?.memories)) candidates.push(...raw.memories);
+  if (Array.isArray(raw?.matches)) candidates.push(...raw.matches);
+
+  if (!candidates.length && typeof raw?.content === 'string') {
+    candidates.push({ content: raw.content, source: raw.source || 'memory' });
+  }
+
+  const snippets = candidates
+    .map((item) => {
+      const content = String(
+        item?.content ??
+        item?.text ??
+        item?.snippet ??
+        item?.body ??
+        item?.value ??
+        '',
+      ).trim();
+      if (!content) return null;
+
+      return {
+        content,
+        title: item?.title ? String(item.title) : undefined,
+        source: item?.source ? String(item.source) : undefined,
+        score: typeof item?.score === 'number' ? item.score : undefined,
+        url: item?.url ? String(item.url) : undefined,
+      } as RagSnippet;
+    })
+    .filter((item): item is RagSnippet => !!item);
+
+  return snippets.slice(0, 20);
+}
+
+async function queryRagFromZap(params: RagQueryParams): Promise<RagSnippet[]> {
+  if (!params.useZapMemory || !zapState.connected || !hasZapTool('memory')) {
+    return [];
+  }
+
+  const payloads: Record<string, unknown>[] = [
+    {
+      action: 'query',
+      query: params.query,
+      top_k: params.topK,
+      limit: params.topK,
+      kb: params.knowledgeBase || undefined,
+      page_context: params.pageContext,
+    },
+    {
+      query: params.query,
+      topK: params.topK,
+      limit: params.topK,
+      knowledge_base: params.knowledgeBase || undefined,
+      context: params.pageContext,
+    },
+  ];
+
+  for (const payload of payloads) {
+    try {
+      const raw = await zapCallTool('memory', payload, params.mcpId);
+      const snippets = normalizeRagSnippets(raw);
+      if (snippets.length) {
+        return snippets.map((snippet) => ({
+          ...snippet,
+          source: snippet.source || 'zap-memory',
+        }));
+      }
+    } catch {
+      // Try alternative payload shape before giving up.
+    }
+  }
+
+  return [];
+}
+
+async function queryRagFromEndpoint(params: RagQueryParams): Promise<RagSnippet[]> {
+  if (!params.endpoint) return [];
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (params.apiKey) {
+    headers.Authorization = `Bearer ${params.apiKey}`;
+  }
+
+  const response = await fetch(params.endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      query: params.query,
+      top_k: params.topK,
+      knowledge_base: params.knowledgeBase || undefined,
+      page_context: params.includeTabContext ? params.pageContext : undefined,
+      source: 'hanzo-browser-extension',
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`RAG endpoint error ${response.status}: ${text || 'Unknown error'}`);
+  }
+
+  const raw = await response.json();
+  return normalizeRagSnippets(raw).map((snippet) => ({
+    ...snippet,
+    source: snippet.source || 'rag-endpoint',
+  }));
+}
+
 /**
  * Discover and connect to ZAP servers on startup
  */
@@ -431,10 +605,43 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       }
       break;
 
+    case 'checkWebGPU': {
+      try {
+        if (!navigator.gpu) {
+          sendResponse({ available: false });
+          break;
+        }
+        const adapter = await navigator.gpu.requestAdapter();
+        sendResponse({
+          available: !!adapter,
+          adapter: (adapter as any)?.name || 'Unknown GPU',
+          models: webgpuAI.getStatus().models,
+        });
+      } catch {
+        sendResponse({ available: false });
+      }
+      break;
+    }
+
+    case 'listAgents':
+      sendResponse({ success: true, agents: browserControl.getAgents() });
+      break;
+
+    case 'stopAgent':
+      sendResponse({ success: browserControl.stopAgent(request.agentId) });
+      break;
+
     case 'launchAIWorker':
-      if (sender.tab?.id) {
-        await browserControl.launchAIWorker(sender.tab.id, request.model);
-        sendResponse({ success: true });
+      try {
+        const targetTabId = request.tabId || sender.tab?.id;
+        if (!targetTabId) {
+          sendResponse({ success: false, error: 'No target tab found' });
+          break;
+        }
+        const agentId = await browserControl.launchAIWorker(targetTabId, request.model || 'browser-control');
+        sendResponse({ success: true, agentId });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
       }
       break;
 
@@ -635,6 +842,54 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       }
       break;
 
+    case 'rag.query':
+      try {
+        const config = await getRagConfig();
+        const topKInput = Number.parseInt(String(request.topK ?? config.topK), 10);
+        const params: RagQueryParams = {
+          query: String(request.query || '').trim(),
+          topK: Number.isFinite(topKInput) ? Math.max(1, Math.min(topKInput, 20)) : DEFAULT_RAG_TOP_K,
+          knowledgeBase: String(request.knowledgeBase ?? config.knowledgeBase ?? '').trim(),
+          includeTabContext: request.includeTabContext !== undefined
+            ? !!request.includeTabContext
+            : config.includeTabContext,
+          useZapMemory: request.useZapMemory !== undefined
+            ? !!request.useZapMemory
+            : config.useZapMemory,
+          endpoint: String(request.endpoint ?? config.endpoint ?? '').trim(),
+          apiKey: String(request.apiKey ?? config.apiKey ?? '').trim(),
+          mcpId: request.mcpId ? String(request.mcpId) : undefined,
+          pageContext: request.pageContext && typeof request.pageContext === 'object'
+            ? {
+                url: request.pageContext.url ? String(request.pageContext.url) : undefined,
+                title: request.pageContext.title ? String(request.pageContext.title) : undefined,
+              }
+            : undefined,
+        };
+
+        if (!params.query) {
+          sendResponse({ success: false, error: 'Query is required' });
+          break;
+        }
+
+        let snippets = await queryRagFromZap(params);
+        let source = snippets.length ? 'zap-memory' : 'none';
+
+        if (!snippets.length && params.endpoint) {
+          snippets = await queryRagFromEndpoint(params);
+          source = snippets.length ? 'rag-endpoint' : source;
+        }
+
+        sendResponse({
+          success: true,
+          source,
+          snippets: snippets.slice(0, params.topK),
+        });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
     // --- Cloud Chat ---
     case 'chat.listModels':
       try {
@@ -670,6 +925,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       }
       sendResponse({ success: true });
       break;
+
   }
 }
 
