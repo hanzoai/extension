@@ -299,7 +299,7 @@ export const agentTool: Tool = {
 Task: ${args.task}
 ${args.tools ? `Available tools: ${args.tools.join(', ')}` : ''}
 Complete this task and report back with your findings.`,
-        tools: args.tools ? [] : undefined // TODO: Load actual tools when MCP integration is complete
+        tools: args.tools ?? []
       });
       
       // Execute the task

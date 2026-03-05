@@ -12,7 +12,6 @@ import {
 } from '../../src/config/agent-swarm-config';
 
 vi.mock('fs');
-vi.mock('path');
 
 describe('AgentSwarmManager', () => {
   let manager: AgentSwarmManager;
@@ -98,28 +97,21 @@ describe('AgentSwarmManager', () => {
       expect(fs.readFileSync).toHaveBeenCalledWith(mockConfigPath, 'utf8');
     });
 
-    it.skip('should try multiple paths if default not found', async () => {
+    it('should try multiple paths if default not found', async () => {
       const configYaml = yaml.dump(mockConfig);
-      
-      // Mock process.cwd
-      const originalCwd = process.cwd;
-      process.cwd = vi.fn().mockReturnValue('/test');
-      
+
+      // Pass a path that won't be found, forcing fallback to alternate paths
       vi.mocked(fs.existsSync)
-        .mockReturnValueOnce(false) // .hanzo/agents.yaml
+        .mockReturnValueOnce(false) // primary configPath
         .mockReturnValueOnce(false) // agents.yaml
         .mockReturnValueOnce(true); // .agents.yaml
       vi.mocked(fs.readFileSync).mockReturnValue(configYaml);
-      
-      // Create new manager without specific path to test multiple paths
-      const testManager = new AgentSwarmManager();
+
+      const testManager = new AgentSwarmManager('/nonexistent/agents.yaml');
       const config = await testManager.loadConfig();
-      
+
       expect(config).toEqual(mockConfig);
       expect(fs.existsSync).toHaveBeenCalledTimes(3);
-      
-      // Restore process.cwd
-      process.cwd = originalCwd;
     });
 
     it('should throw error if no config found', async () => {
@@ -409,11 +401,10 @@ describe('AgentSwarmManager', () => {
         vi.mocked(fs.existsSync).mockReturnValue(false);
         vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
         vi.mocked(fs.writeFileSync).mockImplementation(() => undefined);
-        vi.mocked(path.dirname).mockReturnValue('.hanzo');
 
         await AgentSwarmManager.initConfig('/test/agents.yaml');
 
-        expect(fs.mkdirSync).toHaveBeenCalledWith('.hanzo', { recursive: true });
+        expect(fs.mkdirSync).toHaveBeenCalledWith('/test', { recursive: true });
         expect(fs.writeFileSync).toHaveBeenCalled();
       });
 
@@ -430,7 +421,6 @@ describe('AgentSwarmManager', () => {
         vi.mocked(fs.existsSync).mockReturnValue(false);
         vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
         vi.mocked(fs.writeFileSync).mockImplementation(() => undefined);
-        vi.mocked(path.dirname).mockReturnValue('.hanzo');
 
         await AgentSwarmManager.initPeerNetworkConfig('/test/agents-peer.yaml');
 
