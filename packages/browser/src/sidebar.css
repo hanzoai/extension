@@ -178,6 +178,39 @@ body {
   color: var(--text-primary);
 }
 
+/* React login card (shared @hanzo/ui primitives) */
+.chat-modern-login-card {
+  width: min(320px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 180% at 0% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 90%, black), var(--bg-secondary));
+  color: var(--text-primary);
+  box-shadow: 0 16px 30px color-mix(in srgb, black 28%, transparent);
+}
+
+.chat-modern-login-card .chat-modern-auth-btn {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.chat-modern-login-card .auth-note {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.chat-modern-login-card .auth-note a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chat-modern-login-card .auth-note a:hover {
+  color: var(--text-primary);
+}
+
 /* ==================== Tab Bar ==================== */
 
 .tab-bar {
@@ -344,6 +377,12 @@ body {
   flex-shrink: 0;
 }
 
+.chat-modern-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .model-selector {
   margin-bottom: 8px;
 }
@@ -411,6 +450,10 @@ body {
 
 .input-row textarea:focus {
   border-color: var(--accent);
+}
+
+.chat-modern-input {
+  min-height: 40px;
 }
 
 .send-btn {

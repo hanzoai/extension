@@ -54,6 +54,12 @@
         </svg>
         Open Chat Panel
       </button>
+      <button id="open-page-overlay" class="btn btn-secondary" style="margin-bottom: 16px;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M4 4h16v12H8l-4 4V4z"/>
+        </svg>
+        Toggle On-Page Overlay
+      </button>
 
       <!-- Features -->
       <div class="features">
@@ -99,6 +105,26 @@
               <small>Mount tabs as files</small>
             </div>
           </label>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Browser Backend -->
+      <div class="setting-group backend-picker">
+        <h3>Browser Backend</h3>
+        <div class="backend-select-wrapper">
+          <select id="browser-backend">
+            <option value="auto">Auto (default)</option>
+            <option value="this">This Browser</option>
+            <option value="firefox">Firefox</option>
+            <option value="chrome">Chrome</option>
+            <option value="playwright">Playwright Only</option>
+          </select>
+        </div>
+        <div class="backend-status">
+          <span class="status-dot" id="bridge-status"></span>
+          <span id="bridge-detail" class="status-detail">Checking bridge...</span>
         </div>
       </div>
 
