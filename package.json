@@ -1,12 +1,12 @@
 {
   "name": "hanzo-ai-monorepo",
-  "version": "1.6.3",
+  "version": "1.7.6",
   "private": true,
   "description": "Hanzo AI Development Platform Monorepo",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hanzoai/dev.git"
+    "url": "https://github.com/hanzoai/extension.git"
   },
   "packageManager": "pnpm@10.12.4",
   "engines": {
