@@ -208,17 +208,20 @@ class CDPBridgeServer {
         });
 
       // Screenshots
-      case 'screenshot':
+      case 'screenshot': {
         const screenshot = await this.sendRaw('hanzo.screenshot', {
           format: rest.format || 'png',
-          fullPage: rest.fullPage
+          fullPage: rest.fullPage,
+          ...(rest.tabId ? { tabId: rest.tabId } : {}),
+          ...(rest.tabIndex !== undefined ? { tabIndex: rest.tabIndex } : {}),
         });
-        if (rest.filename && screenshot.data) {
+        if (rest.filename && screenshot?.data) {
           const buffer = Buffer.from(screenshot.data, 'base64');
           fs.writeFileSync(rest.filename, buffer);
-          return { saved: rest.filename, bytes: buffer.length };
+          return { saved: rest.filename, bytes: buffer.length, data: screenshot.data };
         }
         return screenshot;
+      }
 
       case 'snapshot':
         // Accessibility snapshot
@@ -283,12 +286,79 @@ class CDPBridgeServer {
           selector: rest.selector || rest.ref
         });
 
+      // DOM Read/Write/Observe
+      case 'get_html':
+        return this.sendRaw('hanzo.getHTML', { selector: rest.selector, outer: rest.outer });
+
+      case 'set_html':
+        return this.sendRaw('hanzo.setHTML', { selector: rest.selector, html: rest.html, outer: rest.outer });
+
+      case 'get_text':
+        return this.sendRaw('hanzo.getText', { selector: rest.selector });
+
+      case 'set_text':
+        return this.sendRaw('hanzo.setText', { selector: rest.selector, text: rest.text });
+
+      case 'get_attribute':
+        return this.sendRaw('hanzo.getAttribute', { selector: rest.selector, attr: rest.attr });
+
+      case 'set_attribute':
+        return this.sendRaw('hanzo.setAttribute', { selector: rest.selector, attr: rest.attr, value: rest.value });
+
+      case 'remove_attribute':
+        return this.sendRaw('hanzo.removeAttribute', { selector: rest.selector, attr: rest.attr });
+
+      case 'set_style':
+        return this.sendRaw('hanzo.setStyle', { selector: rest.selector, styles: rest.styles });
+
+      case 'add_class':
+        return this.sendRaw('hanzo.addClass', { selector: rest.selector, classNames: rest.classNames });
+
+      case 'remove_class':
+        return this.sendRaw('hanzo.removeClass', { selector: rest.selector, classNames: rest.classNames });
+
+      case 'insert_element':
+        return this.sendRaw('hanzo.insertElement', { selector: rest.selector, html: rest.html, position: rest.position });
+
+      case 'remove_element':
+        return this.sendRaw('hanzo.removeElement', { selector: rest.selector });
+
+      case 'observe_mutations':
+        return this.sendRaw('hanzo.observeMutations', { selector: rest.selector, options: rest.options, duration: rest.duration });
+
+      case 'computed_styles':
+        return this.sendRaw('hanzo.getComputedStyles', { selector: rest.selector, properties: rest.properties });
+
+      case 'bounding_rects':
+        return this.sendRaw('hanzo.getBoundingRects', { selector: rest.selector });
+
+      case 'inject_script':
+        return this.sendRaw('hanzo.injectScript', { url: rest.url });
+
+      case 'inject_css':
+        return this.sendRaw('hanzo.injectCSS', { css: rest.css });
+
+      case 'local_storage':
+        if (rest.value !== undefined) {
+          return this.sendRaw('hanzo.setLocalStorage', { key: rest.key, value: rest.value });
+        }
+        return this.sendRaw('hanzo.getLocalStorage', { key: rest.key });
+
+      case 'cookies':
+        return this.sendRaw('hanzo.getCookies', {});
+
       // Evaluate
-      case 'evaluate':
-        return this.sendRaw('Runtime.evaluate', {
+      case 'evaluate': {
+        const evalResult = await this.sendRaw('Runtime.evaluate', {
           expression: rest.code || rest.function || rest.expression,
-          returnByValue: true
+          returnByValue: true,
+          ...(rest.tabId ? { tabId: rest.tabId } : {}),
+          ...(rest.tabIndex !== undefined ? { tabIndex: rest.tabIndex } : {}),
         });
+        // Unwrap CDP result envelope: {result: {type, value}} → value
+        const value = evalResult?.result?.value ?? evalResult?.result ?? evalResult;
+        return { result: value };
+      }
 
       // Wait
       case 'wait':
@@ -358,7 +428,8 @@ async function startJSONRPCServer(bridgeServer: CDPBridgeServer) {
           const request = JSON.parse(body);
           const result = await bridgeServer.browser(request.params || request);
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ result }));
+          // Return result directly (no extra wrapping — Python expects flat dict)
+          res.end(JSON.stringify(result && typeof result === 'object' ? result : { result }));
         } catch (error: any) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: error.message }));
@@ -377,6 +448,13 @@ async function startJSONRPCServer(bridgeServer: CDPBridgeServer) {
           'click', 'dblclick', 'hover', 'type', 'fill', 'clear', 'press_key',
           'select_option', 'check', 'uncheck',
           'evaluate',
+          'get_html', 'set_html', 'get_text', 'set_text',
+          'get_attribute', 'set_attribute', 'remove_attribute',
+          'set_style', 'add_class', 'remove_class',
+          'insert_element', 'remove_element',
+          'observe_mutations', 'computed_styles', 'bounding_rects',
+          'inject_script', 'inject_css',
+          'local_storage', 'cookies',
           'wait', 'wait_for_load',
           'tabs', 'new_tab', 'close_tab', 'select_tab',
           'console', 'network_requests',
