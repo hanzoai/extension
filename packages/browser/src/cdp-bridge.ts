@@ -404,6 +404,86 @@ export class CDPBridge {
           result = { data: screenshotData };
           break;
 
+        // Navigation
+        case 'Page.goBack':
+          await chrome.tabs.goBack(tabId);
+          result = { success: true };
+          break;
+
+        case 'Page.goForward':
+          await chrome.tabs.goForward(tabId);
+          result = { success: true };
+          break;
+
+        case 'Page.reload':
+          await chrome.tabs.reload(tabId);
+          result = { success: true };
+          break;
+
+        case 'hanzo.url':
+          result = { result: { value: (await chrome.tabs.get(tabId))?.url || '' } };
+          break;
+
+        case 'hanzo.title':
+          result = { result: { value: (await chrome.tabs.get(tabId))?.title || '' } };
+          break;
+
+        case 'hanzo.tabInfo': {
+          const tab = await chrome.tabs.get(tabId);
+          result = { id: tab?.id, url: tab?.url, title: tab?.title, status: tab?.status, active: tab?.active, index: tab?.index };
+          break;
+        }
+
+        case 'hanzo.waitForNavigation':
+          result = await new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+              chrome.tabs.onUpdated.removeListener(listener);
+              resolve({ success: false });
+            }, params?.timeout || 30000);
+            const listener = (updatedId: number, info: chrome.tabs.TabChangeInfo) => {
+              if (updatedId === tabId && info.status === 'complete') {
+                clearTimeout(timeout);
+                chrome.tabs.onUpdated.removeListener(listener);
+                resolve({ success: true });
+              }
+            };
+            chrome.tabs.onUpdated.addListener(listener);
+          });
+          break;
+
+        // High-level hanzo.* commands — forward to BrowserControl via executeScript
+        case 'hanzo.getHTML':
+        case 'hanzo.setHTML':
+        case 'hanzo.getText':
+        case 'hanzo.setText':
+        case 'hanzo.getAttribute':
+        case 'hanzo.setAttribute':
+        case 'hanzo.removeAttribute':
+        case 'hanzo.setStyle':
+        case 'hanzo.addClass':
+        case 'hanzo.removeClass':
+        case 'hanzo.insertElement':
+        case 'hanzo.removeElement':
+        case 'hanzo.observeMutations':
+        case 'hanzo.getComputedStyles':
+        case 'hanzo.getBoundingRects':
+        case 'hanzo.injectScript':
+        case 'hanzo.injectCSS':
+        case 'hanzo.getLocalStorage':
+        case 'hanzo.setLocalStorage':
+        case 'hanzo.getCookies':
+        case 'hanzo.getHistory':
+        case 'hanzo.fetch': {
+          // Map hanzo.X → browser.X and forward via chrome.runtime message
+          const action = 'browser.' + method.replace('hanzo.', '');
+          result = await new Promise((resolve) => {
+            chrome.runtime.sendMessage({ action, tabId, ...params }, (response) => {
+              resolve(response || { error: chrome.runtime.lastError?.message });
+            });
+          });
+          break;
+        }
+
         // Control overlay management
         case 'hanzo.control.start':
         case 'hanzo.takeover.start':
