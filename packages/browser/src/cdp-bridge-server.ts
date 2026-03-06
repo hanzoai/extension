@@ -286,6 +286,53 @@ class CDPBridgeServer {
           selector: rest.selector || rest.ref
         });
 
+      // Navigation
+      case 'go_back':
+      case 'navigate_back':
+        return this.sendRaw('Page.goBack');
+
+      case 'go_forward':
+      case 'navigate_forward':
+        return this.sendRaw('Page.goForward');
+
+      case 'get_url':
+        return this.sendRaw('hanzo.url');
+
+      case 'get_title':
+        return this.sendRaw('hanzo.title');
+
+      case 'get_tab_info':
+      case 'tab_info':
+        return this.sendRaw('hanzo.tabInfo');
+
+      case 'get_history':
+      case 'history':
+        return this.sendRaw('hanzo.getHistory', { maxResults: rest.maxResults });
+
+      case 'wait_for_navigation':
+        return this.sendRaw('hanzo.waitForNavigation', { timeout: rest.timeout });
+
+      case 'create_tab':
+        return this.sendRaw('Target.createTarget', { url: rest.url || 'about:blank' });
+
+      case 'close_tab':
+        return this.sendRaw('Target.closeTarget', { targetId: rest.tabId });
+
+      // Fetch through browser context (uses page cookies/auth)
+      case 'fetch': {
+        const fetchResult = await this.sendRaw('hanzo.fetch', {
+          url: rest.url,
+          options: {
+            method: rest.method || rest.options?.method,
+            headers: rest.headers || rest.options?.headers,
+            body: rest.body || rest.options?.body,
+            mode: rest.mode || rest.options?.mode,
+            credentials: rest.credentials || rest.options?.credentials,
+          },
+        });
+        return fetchResult;
+      }
+
       // DOM Read/Write/Observe
       case 'get_html':
         return this.sendRaw('hanzo.getHTML', { selector: rest.selector, outer: rest.outer });
@@ -448,6 +495,9 @@ async function startJSONRPCServer(bridgeServer: CDPBridgeServer) {
           'click', 'dblclick', 'hover', 'type', 'fill', 'clear', 'press_key',
           'select_option', 'check', 'uncheck',
           'evaluate',
+          'go_back', 'go_forward', 'get_url', 'get_title', 'get_tab_info',
+          'wait_for_navigation', 'get_history', 'create_tab', 'close_tab',
+          'fetch',
           'get_html', 'set_html', 'get_text', 'set_text',
           'get_attribute', 'set_attribute', 'remove_attribute',
           'set_style', 'add_class', 'remove_class',

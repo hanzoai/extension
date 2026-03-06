@@ -674,6 +674,85 @@ export class BrowserControl {
     });
   }
 
+  async getURL(tabId: number): Promise<string> {
+    return new Promise((resolve) => {
+      chrome.tabs.get(tabId, (tab) => resolve(tab?.url || ''));
+    });
+  }
+
+  async getTitle(tabId: number): Promise<string> {
+    return new Promise((resolve) => {
+      chrome.tabs.get(tabId, (tab) => resolve(tab?.title || ''));
+    });
+  }
+
+  async getTabInfo(tabId: number): Promise<any> {
+    return new Promise((resolve) => {
+      chrome.tabs.get(tabId, (tab) => resolve({
+        id: tab?.id,
+        url: tab?.url,
+        title: tab?.title,
+        status: tab?.status,
+        active: tab?.active,
+        index: tab?.index,
+        pinned: tab?.pinned,
+        incognito: tab?.incognito,
+      }));
+    });
+  }
+
+  async getHistory(tabId: number, maxResults: number = 50): Promise<any[]> {
+    return this.executeScript(tabId, `
+      (() => {
+        const entries = performance.getEntriesByType('navigation');
+        return {
+          length: history.length,
+          scrollRestoration: history.scrollRestoration,
+          current: location.href,
+          navigation: entries.map(e => ({
+            type: e.type,
+            redirectCount: e.redirectCount,
+            duration: Math.round(e.duration),
+          })),
+        };
+      })()
+    `);
+  }
+
+  async browserFetch(tabId: number, url: string, options?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    mode?: string;
+    credentials?: string;
+  }): Promise<{ status: number; statusText: string; headers: Record<string, string>; body: string; url: string }> {
+    const opts = {
+      method: options?.method || 'GET',
+      headers: options?.headers || {},
+      body: options?.body,
+      mode: options?.mode || 'cors',
+      credentials: options?.credentials || 'include',
+    };
+    return this.executeScript(tabId, `
+      (async () => {
+        const opts = ${JSON.stringify(opts)};
+        if (!opts.body) delete opts.body;
+        const res = await fetch(${JSON.stringify(url)}, opts);
+        const headers = {};
+        res.headers.forEach((v, k) => headers[k] = v);
+        const ct = res.headers.get('content-type') || '';
+        let body;
+        if (ct.includes('json')) {
+          body = JSON.stringify(await res.json());
+        } else {
+          body = await res.text();
+        }
+        if (body.length > 500000) body = body.substring(0, 500000) + '...(truncated)';
+        return { status: res.status, statusText: res.statusText, headers, body, url: res.url };
+      })()
+    `);
+  }
+
   async closeTab(tabId: number): Promise<void> {
     chrome.tabs.remove(tabId);
   }
@@ -929,6 +1008,43 @@ export class BrowserControl {
           break;
         case 'browser.navigate':
           await this.navigateTo(tabId, request.url);
+          sendResponse({ success: true });
+          break;
+        case 'browser.goBack':
+          await this.goBack(tabId);
+          sendResponse({ success: true });
+          break;
+        case 'browser.goForward':
+          await this.goForward(tabId);
+          sendResponse({ success: true });
+          break;
+        case 'browser.reload':
+          await this.reload(tabId);
+          sendResponse({ success: true });
+          break;
+        case 'browser.getURL':
+          sendResponse({ success: true, url: await this.getURL(tabId) });
+          break;
+        case 'browser.getTitle':
+          sendResponse({ success: true, title: await this.getTitle(tabId) });
+          break;
+        case 'browser.getTabInfo':
+          sendResponse({ success: true, info: await this.getTabInfo(tabId) });
+          break;
+        case 'browser.waitForNavigation':
+          sendResponse({ success: await this.waitForNavigation(tabId, request.timeout) });
+          break;
+        case 'browser.getHistory':
+          sendResponse({ success: true, history: await this.getHistory(tabId, request.maxResults) });
+          break;
+        case 'browser.fetch':
+          sendResponse({ success: true, response: await this.browserFetch(tabId, request.url, request.options) });
+          break;
+        case 'browser.createTab':
+          sendResponse({ success: true, tabId: await this.createTab(request.url || 'about:blank', request.active !== false) });
+          break;
+        case 'browser.closeTab':
+          await this.closeTab(tabId);
           sendResponse({ success: true });
           break;
         case 'browser.waitForSelector':
