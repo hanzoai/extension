@@ -136,12 +136,14 @@ export async function login(): Promise<UserInfo> {
   const state = generateState();
   const redirectUri = getRedirectUri();
 
+  // Use response_type=token (implicit flow) — Casdoor returns the JWT
+  // directly in the redirect URL. The code flow (response_type=code) requires
+  // an empty-string grant_type that Casdoor's grant check doesn't support.
+  // We still generate PKCE params in case code flow is ever re-enabled.
   const authorizeUrl = new URL(`${IAM_LOGIN}/login/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', CLIENT_ID);
-  authorizeUrl.searchParams.set('response_type', 'code');
+  authorizeUrl.searchParams.set('response_type', 'token');
   authorizeUrl.searchParams.set('redirect_uri', redirectUri);
-  authorizeUrl.searchParams.set('code_challenge', codeChallenge);
-  authorizeUrl.searchParams.set('code_challenge_method', 'S256');
   authorizeUrl.searchParams.set('scope', SCOPES);
   authorizeUrl.searchParams.set('state', state);
 
@@ -327,11 +329,30 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
 
 /**
  * Fetch user info from IAM.
+ * /api/userinfo only returns sub/iss/aud; /api/get-account has full profile.
  */
 async function fetchUserInfo(accessToken: string): Promise<UserInfo> {
-  const response = await fetch(`${IAM_API}/api/userinfo`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const headers = { Authorization: `Bearer ${accessToken}` };
+
+  // Try /api/get-account first (returns name, email, avatar, etc.)
+  try {
+    const acctResp = await fetch(`${IAM_API}/api/get-account`, { headers });
+    if (acctResp.ok) {
+      const acctJson = await acctResp.json();
+      const acct = acctJson.data || acctJson;
+      if (acct.name || acct.email) {
+        return {
+          sub: acct.id || acct.sub,
+          name: acct.displayName || acct.name,
+          email: acct.email,
+          picture: acct.avatar || undefined,
+        };
+      }
+    }
+  } catch { /* fall through */ }
+
+  // Fallback to standard /api/userinfo
+  const response = await fetch(`${IAM_API}/api/userinfo`, { headers });
   if (!response.ok) throw new Error('Failed to fetch user info');
   return response.json();
 }
