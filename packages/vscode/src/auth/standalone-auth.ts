@@ -163,49 +163,40 @@ export class StandaloneAuthManager {
             const state = crypto.randomBytes(16).toString('hex');
             
             // Build OAuth URL — login UI is on hanzo.id, not iam.hanzo.ai
+            // Use response_type=token (implicit flow) — Casdoor returns the JWT
+            // directly in the redirect URL, avoiding the empty grant_type issue.
             const authUrl = new URL(`${this.casdoorConfig.loginUrl}/login/oauth/authorize`);
             authUrl.searchParams.append('client_id', this.casdoorConfig.clientId);
-            authUrl.searchParams.append('response_type', 'code');
+            authUrl.searchParams.append('response_type', 'token');
             authUrl.searchParams.append('redirect_uri', 'http://localhost:8765/callback');
             authUrl.searchParams.append('scope', 'read write');
             authUrl.searchParams.append('state', state);
             authUrl.searchParams.append('device_id', deviceId);
 
             // Start local callback server
-            const callbackServer = await this.startCallbackServer(state);
-            
+            const callbackResult = await this.startCallbackServer(state);
+
             // Open browser
             console.log('Opening browser for authentication...');
             this.openBrowser(authUrl.toString());
 
             // Wait for callback
-            const authCode = await callbackServer;
-            
-            if (!authCode) {
-                console.error('Authentication failed: No authorization code received');
+            const result = await callbackResult;
+
+            if (!result) {
+                console.error('Authentication failed: No token received');
                 return false;
             }
 
-            // Exchange code for token
-            const tokenResponse = await axios.post(`${this.casdoorConfig.endpoint}/api/login/oauth/access_token`, {
-                grant_type: 'authorization_code',
-                code: authCode,
-                client_id: this.casdoorConfig.clientId,
-                client_secret: this.casdoorConfig.clientSecret,
-                redirect_uri: 'http://localhost:8765/callback'
-            });
+            const token: AuthToken = {
+                token: result.accessToken,
+                refreshToken: result.refreshToken,
+                expiresAt: result.expiresAt || Date.now() + 168 * 3600 * 1000,
+            };
 
-            if (tokenResponse.data?.access_token) {
-                const token: AuthToken = {
-                    token: tokenResponse.data.access_token,
-                    refreshToken: tokenResponse.data.refresh_token,
-                    expiresAt: Date.now() + (tokenResponse.data.expires_in || 3600) * 1000
-                };
-                
-                await this.storeToken(token);
-                console.log('\n✅ Authentication successful!\n');
-                return true;
-            }
+            await this.storeToken(token);
+            console.log('\n✅ Authentication successful!\n');
+            return true;
         } catch (error) {
             console.error('Authentication failed:', error);
         }
@@ -213,50 +204,62 @@ export class StandaloneAuthManager {
         return false;
     }
 
-    private async startCallbackServer(expectedState: string): Promise<string | null> {
+    private async startCallbackServer(expectedState: string): Promise<{ accessToken: string; refreshToken?: string; expiresAt?: number } | null> {
         return new Promise((resolve) => {
             const http = require('http');
             const url = require('url');
-            
+
             const server = http.createServer((req: any, res: any) => {
                 const parsedUrl = url.parse(req.url, true);
-                
+
                 if (parsedUrl.pathname === '/callback') {
-                    const code = parsedUrl.query.code;
                     const state = parsedUrl.query.state;
-                    
-                    if (state === expectedState && code) {
-                        res.writeHead(200, { 'Content-Type': 'text/html' });
-                        res.end(`
-                            <html>
-                            <head>
-                                <title>Authentication Successful</title>
-                                <style>
-                                    body { font-family: system-ui; text-align: center; padding: 50px; }
-                                    h1 { color: #10b981; }
-                                </style>
-                            </head>
-                            <body>
-                                <h1>✅ Authentication Successful!</h1>
-                                <p>You can now close this window and return to your terminal.</p>
-                                <script>window.setTimeout(() => window.close(), 3000);</script>
-                            </body>
-                            </html>
-                        `);
+                    // Implicit flow: access_token comes as a query param
+                    const accessToken = parsedUrl.query.access_token;
+                    // Code flow fallback
+                    const code = parsedUrl.query.code;
+
+                    if (state !== expectedState) {
+                        res.writeHead(400, { 'Content-Type': 'text/html' });
+                        res.end('<h1>Authentication Failed</h1><p>Invalid state.</p>');
                         server.close();
-                        resolve(code as string);
+                        resolve(null);
+                        return;
+                    }
+
+                    if (accessToken) {
+                        res.writeHead(200, { 'Content-Type': 'text/html' });
+                        res.end(`<html><body style="font-family:system-ui;text-align:center;padding:50px">
+                            <h1 style="color:#10b981">Authentication Successful!</h1>
+                            <p>You can close this window.</p>
+                            <script>setTimeout(()=>window.close(),3000)</script></body></html>`);
+                        server.close();
+                        const expiresIn = parsedUrl.query.expires_in ? parseInt(parsedUrl.query.expires_in, 10) : undefined;
+                        resolve({
+                            accessToken: accessToken as string,
+                            refreshToken: parsedUrl.query.refresh_token as string | undefined,
+                            expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : undefined,
+                        });
+                    } else if (code) {
+                        // Fallback: extract code for code exchange (handled upstream if needed)
+                        res.writeHead(200, { 'Content-Type': 'text/html' });
+                        res.end(`<html><body style="font-family:system-ui;text-align:center;padding:50px">
+                            <h1 style="color:#10b981">Authentication Successful!</h1>
+                            <p>You can close this window.</p></body></html>`);
+                        server.close();
+                        // For now, cannot exchange code here — implicit flow is preferred
+                        resolve(null);
                     } else {
                         res.writeHead(400, { 'Content-Type': 'text/html' });
-                        res.end('<h1>Authentication Failed</h1><p>Invalid state or missing code.</p>');
+                        res.end('<h1>Authentication Failed</h1><p>No token received.</p>');
                         server.close();
                         resolve(null);
                     }
                 }
             });
-            
+
             server.listen(8765, 'localhost');
-            
-            // Timeout after 5 minutes
+
             setTimeout(() => {
                 server.close();
                 resolve(null);
