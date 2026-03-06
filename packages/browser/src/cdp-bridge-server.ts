@@ -333,6 +333,19 @@ class CDPBridgeServer {
         return fetchResult;
       }
 
+      // Selectors / Waiting
+      case 'wait_for_selector':
+        return this.sendRaw('hanzo.waitForSelector', { selector: rest.selector, timeout: rest.timeout });
+
+      case 'query_selector_all':
+        return this.sendRaw('hanzo.querySelectorAll', { selector: rest.selector });
+
+      case 'get_element_info':
+        return this.sendRaw('hanzo.getElementInfo', { selector: rest.selector });
+
+      case 'get_page_info':
+        return this.sendRaw('hanzo.getPageInfo', {});
+
       // DOM Read/Write/Observe
       case 'get_html':
         return this.sendRaw('hanzo.getHTML', { selector: rest.selector, outer: rest.outer });
