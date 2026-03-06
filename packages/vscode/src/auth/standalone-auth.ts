@@ -104,7 +104,7 @@ export class StandaloneAuthManager {
 
     private async refreshToken(refreshToken: string): Promise<AuthToken | null> {
         try {
-            const response = await axios.post(`${this.casdoorConfig.endpoint}/api/login/oauth/access_token`, {
+            const response = await axios.post(`${this.casdoorConfig.endpoint}/oauth/token`, {
                 grant_type: 'refresh_token',
                 refresh_token: refreshToken,
                 client_id: this.casdoorConfig.clientId,
@@ -166,7 +166,7 @@ export class StandaloneAuthManager {
             const codeVerifier = crypto.randomBytes(32).toString('base64url');
             const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
 
-            const authUrl = new URL(`${this.casdoorConfig.loginUrl}/login/oauth/authorize`);
+            const authUrl = new URL(`${this.casdoorConfig.loginUrl}/oauth/authorize`);
             authUrl.searchParams.append('client_id', this.casdoorConfig.clientId);
             authUrl.searchParams.append('response_type', 'code');
             authUrl.searchParams.append('redirect_uri', 'http://localhost:8765/callback');
@@ -249,7 +249,7 @@ export class StandaloneAuthManager {
                         };
                         if (clientSecret) body.client_secret = clientSecret;
 
-                        const tokenResp = await axios.post(`${endpoint}/api/login/oauth/access_token`, body);
+                        const tokenResp = await axios.post(`${endpoint}/oauth/token`, body);
                         const tokens = tokenResp.data;
                         res.writeHead(200, { 'Content-Type': 'text/html' });
                         res.end(successHtml);
