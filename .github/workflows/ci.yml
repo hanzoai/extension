@@ -257,7 +257,8 @@ jobs:
     - name: Collect release assets
       run: |
         mkdir -p release
-        find artifacts -type f \( -name '*.zip' -o -name '*.vsix' -o -name '*.dxt' \) -exec cp {} release/ \;
+        # Only collect artifacts with our expected naming patterns (prevents stale/duplicate files)
+        find artifacts -type f \( -name 'hanzo-ai-*.zip' -o -name 'hanzo-ai-*.vsix' -o -name 'hanzoai-*.dxt' \) -exec cp {} release/ \;
         echo "Release assets:" && ls -la release/
 
     - name: Create Release
