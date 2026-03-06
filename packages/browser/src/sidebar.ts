@@ -371,11 +371,21 @@ class HanzoSidebar {
   }
 
   async sendMessage() {
-    const text = this.el.chatInput.value.trim();
+    const text = this.el.chatInput?.value?.trim();
     if (!text) return;
     if (!this.authenticated) {
-      this.showError('Please sign in to use chat');
-      return;
+      // Double-check auth status in case it was set externally
+      try {
+        const status = await chrome.runtime.sendMessage({ action: 'auth.status' });
+        if (status?.success && status.authenticated) {
+          this.authenticated = true;
+          if (status.user) this.setUser(status.user);
+        }
+      } catch {}
+      if (!this.authenticated) {
+        this.showError('Please sign in to use chat');
+        return;
+      }
     }
 
     if (this.streaming && this.streamController) {
