@@ -424,6 +424,229 @@ export class BrowserControl {
   }
 
   // ===========================================================================
+  // DOM Read/Write/Observe
+  // ===========================================================================
+
+  async getHTML(tabId: number, selector: string, outer: boolean = true): Promise<string | null> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        return el ? (${outer} ? el.outerHTML : el.innerHTML) : null;
+      })()
+    `);
+  }
+
+  async setHTML(tabId: number, selector: string, html: string, outer: boolean = false): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        ${outer ? `el.outerHTML = ${JSON.stringify(html)};` : `el.innerHTML = ${JSON.stringify(html)};`}
+        return true;
+      })()
+    `);
+  }
+
+  async getText(tabId: number, selector: string): Promise<string | null> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        return el ? el.textContent : null;
+      })()
+    `);
+  }
+
+  async setText(tabId: number, selector: string, text: string): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        el.textContent = ${JSON.stringify(text)};
+        return true;
+      })()
+    `);
+  }
+
+  async getAttribute(tabId: number, selector: string, attr: string): Promise<string | null> {
+    return this.executeScript(tabId, `
+      document.querySelector(${JSON.stringify(selector)})?.getAttribute(${JSON.stringify(attr)}) ?? null
+    `);
+  }
+
+  async setAttribute(tabId: number, selector: string, attr: string, value: string): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        el.setAttribute(${JSON.stringify(attr)}, ${JSON.stringify(value)});
+        return true;
+      })()
+    `);
+  }
+
+  async removeAttribute(tabId: number, selector: string, attr: string): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        el.removeAttribute(${JSON.stringify(attr)});
+        return true;
+      })()
+    `);
+  }
+
+  async setStyle(tabId: number, selector: string, styles: Record<string, string>): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        Object.assign(el.style, ${JSON.stringify(styles)});
+        return true;
+      })()
+    `);
+  }
+
+  async addClass(tabId: number, selector: string, ...classNames: string[]): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        el.classList.add(${classNames.map(c => JSON.stringify(c)).join(',')});
+        return true;
+      })()
+    `);
+  }
+
+  async removeClass(tabId: number, selector: string, ...classNames: string[]): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        el.classList.remove(${classNames.map(c => JSON.stringify(c)).join(',')});
+        return true;
+      })()
+    `);
+  }
+
+  async insertElement(tabId: number, parentSelector: string, html: string, position: 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend' = 'beforeend'): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const parent = document.querySelector(${JSON.stringify(parentSelector)});
+        if (!parent) return false;
+        parent.insertAdjacentHTML(${JSON.stringify(position)}, ${JSON.stringify(html)});
+        return true;
+      })()
+    `);
+  }
+
+  async removeElement(tabId: number, selector: string): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        el.remove();
+        return true;
+      })()
+    `);
+  }
+
+  async observeMutations(tabId: number, selector: string, options: { attributes?: boolean; childList?: boolean; characterData?: boolean; subtree?: boolean } = {}, durationMs: number = 5000): Promise<any[]> {
+    const opts = { childList: true, subtree: true, attributes: true, ...options };
+    return this.executeScript(tabId, `
+      new Promise((resolve) => {
+        const target = ${selector === 'document' ? 'document.documentElement' : `document.querySelector(${JSON.stringify(selector)})`};
+        if (!target) { resolve([]); return; }
+        const mutations = [];
+        const observer = new MutationObserver((records) => {
+          for (const r of records) {
+            mutations.push({
+              type: r.type,
+              target: r.target.nodeName + (r.target.id ? '#' + r.target.id : ''),
+              added: r.addedNodes.length,
+              removed: r.removedNodes.length,
+              attribute: r.attributeName || null,
+              oldValue: r.oldValue?.substring(0, 200) || null,
+            });
+            if (mutations.length >= 200) { observer.disconnect(); resolve(mutations); }
+          }
+        });
+        observer.observe(target, ${JSON.stringify(opts)});
+        setTimeout(() => { observer.disconnect(); resolve(mutations); }, ${durationMs});
+      })
+    `);
+  }
+
+  async getComputedStyles(tabId: number, selector: string, properties?: string[]): Promise<Record<string, string> | null> {
+    return this.executeScript(tabId, `
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return null;
+        const cs = window.getComputedStyle(el);
+        ${properties ? `return Object.fromEntries(${JSON.stringify(properties)}.map(p => [p, cs.getPropertyValue(p)]));` : `
+        const props = ['display','visibility','opacity','position','width','height','margin','padding',
+          'color','background','font-size','font-weight','border','overflow','z-index','transform'];
+        return Object.fromEntries(props.map(p => [p, cs.getPropertyValue(p)]));`}
+      })()
+    `);
+  }
+
+  async getBoundingRects(tabId: number, selector: string): Promise<any[]> {
+    return this.executeScript(tabId, `
+      Array.from(document.querySelectorAll(${JSON.stringify(selector)})).slice(0, 50).map(el => {
+        const r = el.getBoundingClientRect();
+        return { tag: el.tagName.toLowerCase(), id: el.id, x: r.x, y: r.y, w: r.width, h: r.height };
+      })
+    `);
+  }
+
+  async injectScript(tabId: number, url: string): Promise<boolean> {
+    return this.executeScript(tabId, `
+      new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = ${JSON.stringify(url)};
+        s.onload = () => resolve(true);
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
+      })
+    `);
+  }
+
+  async injectCSS(tabId: number, css: string): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => {
+        const style = document.createElement('style');
+        style.textContent = ${JSON.stringify(css)};
+        document.head.appendChild(style);
+        return true;
+      })()
+    `);
+  }
+
+  async getLocalStorage(tabId: number, key?: string): Promise<any> {
+    if (key) {
+      return this.executeScript(tabId, `localStorage.getItem(${JSON.stringify(key)})`);
+    }
+    return this.executeScript(tabId, `JSON.parse(JSON.stringify(localStorage))`);
+  }
+
+  async setLocalStorage(tabId: number, key: string, value: string): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => { localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(value)}); return true; })()
+    `);
+  }
+
+  async getCookies(tabId: number): Promise<any[]> {
+    return new Promise((resolve) => {
+      chrome.tabs.get(tabId, (tab) => {
+        if (!tab?.url) { resolve([]); return; }
+        chrome.cookies.getAll({ url: tab.url }, (cookies) => {
+          resolve(cookies || []);
+        });
+      });
+    });
+  }
+
+  // ===========================================================================
   // Navigation
   // ===========================================================================
 
@@ -719,6 +942,66 @@ export class BrowserControl {
           break;
         case 'browser.querySelectorAll':
           sendResponse({ success: true, elements: await this.querySelectorAll(tabId, request.selector) });
+          break;
+        case 'browser.getHTML':
+          sendResponse({ success: true, html: await this.getHTML(tabId, request.selector, request.outer !== false) });
+          break;
+        case 'browser.setHTML':
+          sendResponse({ success: await this.setHTML(tabId, request.selector, request.html, request.outer) });
+          break;
+        case 'browser.getText':
+          sendResponse({ success: true, text: await this.getText(tabId, request.selector) });
+          break;
+        case 'browser.setText':
+          sendResponse({ success: await this.setText(tabId, request.selector, request.text) });
+          break;
+        case 'browser.getAttribute':
+          sendResponse({ success: true, value: await this.getAttribute(tabId, request.selector, request.attr) });
+          break;
+        case 'browser.setAttribute':
+          sendResponse({ success: await this.setAttribute(tabId, request.selector, request.attr, request.value) });
+          break;
+        case 'browser.removeAttribute':
+          sendResponse({ success: await this.removeAttribute(tabId, request.selector, request.attr) });
+          break;
+        case 'browser.setStyle':
+          sendResponse({ success: await this.setStyle(tabId, request.selector, request.styles) });
+          break;
+        case 'browser.addClass':
+          sendResponse({ success: await this.addClass(tabId, request.selector, ...(request.classNames || [])) });
+          break;
+        case 'browser.removeClass':
+          sendResponse({ success: await this.removeClass(tabId, request.selector, ...(request.classNames || [])) });
+          break;
+        case 'browser.insertElement':
+          sendResponse({ success: await this.insertElement(tabId, request.selector, request.html, request.position) });
+          break;
+        case 'browser.removeElement':
+          sendResponse({ success: await this.removeElement(tabId, request.selector) });
+          break;
+        case 'browser.observeMutations':
+          sendResponse({ success: true, mutations: await this.observeMutations(tabId, request.selector || 'document', request.options, request.duration) });
+          break;
+        case 'browser.getComputedStyles':
+          sendResponse({ success: true, styles: await this.getComputedStyles(tabId, request.selector, request.properties) });
+          break;
+        case 'browser.getBoundingRects':
+          sendResponse({ success: true, rects: await this.getBoundingRects(tabId, request.selector) });
+          break;
+        case 'browser.injectScript':
+          sendResponse({ success: await this.injectScript(tabId, request.url) });
+          break;
+        case 'browser.injectCSS':
+          sendResponse({ success: await this.injectCSS(tabId, request.css) });
+          break;
+        case 'browser.getLocalStorage':
+          sendResponse({ success: true, data: await this.getLocalStorage(tabId, request.key) });
+          break;
+        case 'browser.setLocalStorage':
+          sendResponse({ success: await this.setLocalStorage(tabId, request.key, request.value) });
+          break;
+        case 'browser.getCookies':
+          sendResponse({ success: true, cookies: await this.getCookies(tabId) });
           break;
         default:
           sendResponse({ success: false, error: `Unknown action: ${request.action}` });
