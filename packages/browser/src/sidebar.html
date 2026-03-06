@@ -83,7 +83,7 @@
               </span>
             </div>
             <div class="status-row">
-              <span>MCP Server</span>
+              <span>Hanzo Bot</span>
               <span id="hanzo-mcp-status" class="status-value">
                 <span class="status-indicator disconnected"></span>
                 Checking...
@@ -108,21 +108,34 @@
               </svg>
               Start Node
             </button>
-            <button class="action-btn small" id="start-hanzo-mcp" title="Start hanzo mcp serve">
+            <button class="action-btn small" id="start-hanzo-mcp" title="Start hanzo bot">
               <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12">
                 <path d="M4 2l10 6-10 6V2z"/>
               </svg>
-              Start MCP
+              Start Bot
             </button>
           </div>
         </div>
 
-        <!-- MCP Tools -->
+        <!-- Connected MCP Servers -->
         <div class="panel">
           <div class="panel-header">
-            <h3>Discovered Tools</h3>
+            <h3>MCP Servers</h3>
+            <span id="mcp-server-count" class="badge">0</span>
           </div>
-          <div id="mcp-tool-list" class="tool-list">No tools discovered yet.</div>
+          <div id="mcp-server-list" class="mcp-server-list">
+            <div class="empty-state">No MCP servers connected</div>
+          </div>
+        </div>
+
+        <!-- Built-in + Discovered Tools -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Available Tools</h3>
+            <span id="tool-count-badge" class="badge">0</span>
+          </div>
+          <div id="builtin-tool-list" class="tool-list"></div>
+          <div id="mcp-tool-list" class="tool-list"></div>
         </div>
 
         <!-- Usage -->
@@ -191,8 +204,8 @@
     <!-- Settings Tab -->
     <div id="tab-settings" class="tab-content hidden">
       <div class="settings-scroll">
-        <!-- Account -->
-        <div class="panel" id="account-panel">
+        <!-- Account (shown when authenticated) -->
+        <div class="panel hidden" id="account-panel">
           <h3>Account</h3>
           <div class="user-profile">
             <img id="user-avatar" class="user-avatar" src="" alt="">
