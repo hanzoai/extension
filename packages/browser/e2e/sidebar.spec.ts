@@ -131,7 +131,8 @@ test.describe('Sidebar', () => {
     await expect(page.locator('#mcp-tool-list')).toBeAttached();
     await expect(page.locator('#agent-count')).toBeAttached();
     await expect(page.locator('#tab-fs')).toBeAttached();
-    await expect(page.locator('#gpu-status')).toBeAttached();
+    await expect(page.locator('#hanzo-node-status')).toBeAttached();
+    await expect(page.locator('#hanzo-mcp-status')).toBeAttached();
   });
 
   test('settings tab has account and connection config', async ({ context, extensionId }) => {
