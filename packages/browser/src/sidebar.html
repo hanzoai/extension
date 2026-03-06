@@ -35,35 +35,35 @@
           <p>Ask anything. Powered by Hanzo Cloud.</p>
         </div>
       </div>
-      <div id="chat-composer" class="chat-input-area">
-        <div class="model-selector">
-          <select id="model-select">
-            <option value="auto">Auto (cost-aware)</option>
-            <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-            <option value="claude-opus-4-20250514">Claude Opus 4</option>
-            <option value="gpt-4o">GPT-4o</option>
-            <option value="zen-coder-flash">Zen Coder Flash</option>
-            <option value="zen-max">Zen Max</option>
-          </select>
-        </div>
-        <div class="chat-flags">
-          <label class="flag-toggle">
-            <input type="checkbox" id="rag-enabled" checked>
-            <span>RAG</span>
-          </label>
-          <label class="flag-toggle">
-            <input type="checkbox" id="tab-context-enabled" checked>
-            <span>Tab Context</span>
-          </label>
-          <span id="rag-status" class="rag-status">Ready</span>
-        </div>
-        <div class="input-row">
+      <div id="chat-composer" class="composer">
+        <div class="composer-box">
           <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-          <button id="send-btn" class="send-btn" title="Send">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor">
-              <path d="M4 10l12-6-6 12-2-6-4-2z" stroke-width="1.5" fill="currentColor"/>
-            </svg>
-          </button>
+          <div class="composer-bar">
+            <div class="composer-controls">
+              <select id="model-select" class="composer-model">
+                <option value="auto">Auto</option>
+                <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="zen-coder-flash">Zen Coder Flash</option>
+                <option value="zen-max">Zen Max</option>
+              </select>
+              <label class="composer-toggle" title="RAG context">
+                <input type="checkbox" id="rag-enabled" checked>
+                <span>RAG</span>
+              </label>
+              <label class="composer-toggle" title="Include active tab">
+                <input type="checkbox" id="tab-context-enabled" checked>
+                <span>Tab</span>
+              </label>
+              <span id="rag-status" class="composer-status">Ready</span>
+            </div>
+            <button id="send-btn" class="composer-send" title="Send (Enter)">
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M3 13V3l10 5-10 5z" fill="currentColor"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
