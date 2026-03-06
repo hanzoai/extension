@@ -19,7 +19,10 @@ import { test, expect } from './fixtures';
 const TEST_USER = 'z';
 const TEST_EMAIL = 'z@hanzo.ai';
 
-test.describe('Auth + Chat', () => {
+// These tests require live IAM/LLM access — skip in CI
+const descFn = process.env.CI ? test.describe.skip : test.describe;
+
+descFn('Auth + Chat', () => {
   test('login via tab-based OAuth flow and verify user stored', async ({ context, extensionId }) => {
     const sidebar = await context.newPage();
     await sidebar.goto(`chrome-extension://${extensionId}/sidebar.html`);
