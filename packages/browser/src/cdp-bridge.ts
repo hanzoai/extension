@@ -452,6 +452,15 @@ export class CDPBridge {
           break;
 
         // High-level hanzo.* commands — forward to BrowserControl via executeScript
+        // Forward hanzo.* commands to BrowserControl via chrome.runtime
+        // (hanzo.click, hanzo.fill, hanzo.screenshot handled above with overlay)
+        case 'hanzo.dblclick':
+        case 'hanzo.hover':
+        case 'hanzo.type':
+        case 'hanzo.clear':
+        case 'hanzo.select':
+        case 'hanzo.check':
+        case 'hanzo.uncheck':
         case 'hanzo.getHTML':
         case 'hanzo.setHTML':
         case 'hanzo.getText':
@@ -475,7 +484,12 @@ export class CDPBridge {
         case 'hanzo.getHistory':
         case 'hanzo.fetch': {
           // Map hanzo.X → browser.X and forward via chrome.runtime message
-          const action = 'browser.' + method.replace('hanzo.', '');
+          const cmd = method.replace('hanzo.', '');
+          // Normalize naming: hanzo.select → browser.select, hanzo.dblclick → browser.dblclick, etc.
+          const actionMap: Record<string, string> = {
+            'url': 'getURL', 'title': 'getTitle', 'tabInfo': 'getTabInfo',
+          };
+          const action = 'browser.' + (actionMap[cmd] || cmd);
           result = await new Promise((resolve) => {
             chrome.runtime.sendMessage({ action, tabId, ...params }, (response) => {
               resolve(response || { error: chrome.runtime.lastError?.message });
