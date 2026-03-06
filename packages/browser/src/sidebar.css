@@ -868,7 +868,7 @@ html {
 }
 
 .tool-list {
-  max-height: 120px;
+  max-height: 200px;
   overflow-y: auto;
   font-size: 11px;
   line-height: 1.4;
@@ -878,6 +878,74 @@ html {
   word-break: break-all;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+
+.tool-category {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tool-category:last-child {
+  border-bottom: none;
+}
+
+.tool-category-name {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-family: inherit;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.tool-category-tools {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+/* MCP Server List */
+.mcp-server-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mcp-server-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  transition: border-color 0.2s;
+}
+
+.mcp-server-item:hover {
+  border-color: var(--border-strong);
+}
+
+.mcp-server-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mcp-server-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mcp-server-tools {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ==================== User Profile ==================== */
