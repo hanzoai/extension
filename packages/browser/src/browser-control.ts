@@ -994,8 +994,32 @@ export class BrowserControl {
         case 'browser.scroll':
           sendResponse({ success: await this.scroll(tabId, request.x, request.y, request.selector) });
           break;
+        case 'browser.dblclick':
+          sendResponse({ success: await this.doubleClick(tabId, request.selector) });
+          break;
         case 'browser.hover':
           sendResponse({ success: await this.hover(tabId, request.selector) });
+          break;
+        case 'browser.clear':
+          sendResponse({ success: await this.fill(tabId, request.selector, '') });
+          break;
+        case 'browser.check':
+          sendResponse({ success: await this.check(tabId, request.selector, true) });
+          break;
+        case 'browser.uncheck':
+          sendResponse({ success: await this.check(tabId, request.selector, false) });
+          break;
+        case 'browser.focus':
+          sendResponse({ success: await this.focus(tabId, request.selector) });
+          break;
+        case 'browser.blur':
+          sendResponse({ success: await this.blur(tabId, request.selector) });
+          break;
+        case 'browser.drag':
+          sendResponse({ success: await this.drag(tabId, request.from || request.selector, request.to) });
+          break;
+        case 'browser.scrollIntoView':
+          sendResponse({ success: await this.scrollIntoView(tabId, request.selector) });
           break;
         case 'browser.pressKey':
           sendResponse({ success: await this.pressKey(tabId, request.key, request.modifiers) });
