@@ -461,6 +461,10 @@ export class CDPBridge {
         case 'hanzo.select':
         case 'hanzo.check':
         case 'hanzo.uncheck':
+        case 'hanzo.waitForSelector':
+        case 'hanzo.querySelectorAll':
+        case 'hanzo.getElementInfo':
+        case 'hanzo.getPageInfo':
         case 'hanzo.getHTML':
         case 'hanzo.setHTML':
         case 'hanzo.getText':
