@@ -781,15 +781,11 @@ class HanzoSidebar {
 
   // Built-in @hanzo/mcp tool categories (always available)
   static BUILTIN_TOOLS = [
-    { category: 'File Operations', tools: ['read_file', 'write_file', 'list_files', 'get_file_info', 'directory_tree'] },
-    { category: 'Search', tools: ['grep', 'find_files', 'search'] },
-    { category: 'Shell', tools: ['bash', 'run_command', 'run_background', 'list_processes', 'kill_process'] },
-    { category: 'Edit', tools: ['edit_file', 'multi_edit', 'create_file', 'delete_file', 'move_file'] },
-    { category: 'AI Tools', tools: ['think', 'critic', 'consensus', 'agent'] },
-    { category: 'AST Search', tools: ['ast_search', 'find_symbol', 'analyze_dependencies'] },
-    { category: 'Vector Search', tools: ['vector_index', 'vector_search', 'vector_stats'] },
-    { category: 'Todo', tools: ['todo_add', 'todo_list', 'todo_update', 'todo_delete', 'todo_stats'] },
-    { category: 'Modes', tools: ['mode_switch', 'mode_list', 'preset_select', 'preset_list', 'shortcut'] },
+    { category: 'Core', tools: ['read', 'write', 'list', 'info', 'tree', 'create', 'delete', 'move', 'edit', 'patch', 'grep', 'find', 'search', 'bash', 'bg', 'ps', 'logs', 'kill'] },
+    { category: 'Intelligence', tools: ['ai', 'ast', 'vector'] },
+    { category: 'Workflow', tools: ['todo', 'plan', 'memory', 'mode'] },
+    { category: 'Dev', tools: ['vcs', 'refactor'] },
+    { category: 'Cloud', tools: ['iam', 'kms', 'paas', 'commerce', 'storage', 'auth', 'api'] },
   ];
 
   renderBuiltinTools() {
