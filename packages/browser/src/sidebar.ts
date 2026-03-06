@@ -53,8 +53,6 @@ class HanzoSidebar {
       authSection: document.getElementById('auth-section'),
       authBtn: document.getElementById('auth-btn'),
       tabBar: document.getElementById('tab-bar'),
-      userBadge: document.getElementById('user-badge'),
-      headerAvatar: document.getElementById('header-avatar'),
 
       // Chat
       tabChat: document.getElementById('tab-chat'),
@@ -71,6 +69,10 @@ class HanzoSidebar {
       mcpStatus: document.getElementById('mcp-status'),
       mcpTools: document.getElementById('mcp-tools'),
       mcpToolList: document.getElementById('mcp-tool-list'),
+      builtinToolList: document.getElementById('builtin-tool-list'),
+      toolCountBadge: document.getElementById('tool-count-badge'),
+      mcpServerList: document.getElementById('mcp-server-list'),
+      mcpServerCount: document.getElementById('mcp-server-count'),
       agentCount: document.getElementById('agent-count'),
       agentList: document.getElementById('agent-list'),
       tabFs: document.getElementById('tab-fs'),
@@ -88,6 +90,7 @@ class HanzoSidebar {
 
       // Settings
       tabSettings: document.getElementById('tab-settings'),
+      accountPanel: document.getElementById('account-panel'),
       userAvatar: document.getElementById('user-avatar'),
       userName: document.getElementById('user-name'),
       userEmail: document.getElementById('user-email'),
@@ -145,7 +148,7 @@ class HanzoSidebar {
     this.el.refreshTabs.addEventListener('click', () => this.refreshTabFilesystem());
     this.el.launchAgent.addEventListener('click', () => this.showAgentLauncher());
     this.el.startHanzoNode?.addEventListener('click', () => this.startHanzoService('node'));
-    this.el.startHanzoMcp?.addEventListener('click', () => this.startHanzoService('mcp'));
+    this.el.startHanzoMcp?.addEventListener('click', () => this.startHanzoService('bot'));
 
     // Settings
     this.el.logoutBtn.addEventListener('click', () => this.logout());
@@ -229,9 +232,10 @@ class HanzoSidebar {
 
   async logout() {
     await chrome.runtime.sendMessage({ action: 'auth.logout' });
-    this.el.userBadge.classList.add('hidden');
-    this.el.userName.textContent = '';
-    this.el.userEmail.textContent = '';
+    if (this.el.userName) this.el.userName.textContent = '';
+    if (this.el.userEmail) this.el.userEmail.textContent = '';
+    if (this.el.userAvatar) this.el.userAvatar.src = '';
+    if (this.el.accountPanel) this.el.accountPanel.classList.add('hidden');
     this.showChatLoginPrompt();
     this.switchTab('tools');
   }
@@ -240,13 +244,20 @@ class HanzoSidebar {
     this.authenticated = true;
     if (user) {
       const avatar = user.picture || user.avatar || '';
-      if (avatar) {
-        this.el.headerAvatar.src = avatar;
-        this.el.userBadge.classList.remove('hidden');
+      if (avatar && this.el.userAvatar) {
         this.el.userAvatar.src = avatar;
+        this.el.userAvatar.style.display = '';
       }
-      this.el.userName.textContent = user.name || user.displayName || 'User';
-      this.el.userEmail.textContent = user.email || '';
+      if (this.el.userName) {
+        this.el.userName.textContent = user.name || user.displayName || user.sub || 'User';
+      }
+      if (this.el.userEmail) {
+        this.el.userEmail.textContent = user.email || '';
+      }
+      // Show the account panel
+      if (this.el.accountPanel) {
+        this.el.accountPanel.classList.remove('hidden');
+      }
     }
     this.loadModels();
     this.loadConversation();
@@ -259,6 +270,8 @@ class HanzoSidebar {
     if (chatLogin) chatLogin.classList.remove('hidden');
     const chatComposer = document.getElementById('chat-composer');
     if (chatComposer) chatComposer.classList.add('hidden');
+    // Hide account panel when not authenticated
+    if (this.el.accountPanel) this.el.accountPanel.classList.add('hidden');
   }
 
   hideChatLoginPrompt() {
@@ -319,6 +332,7 @@ class HanzoSidebar {
   ensureToolsInitialized() {
     if (this.toolsInitialized) return;
     this.toolsInitialized = true;
+    this.renderBuiltinTools();
     void this.connectToMCP();
     void this.refreshTabFilesystem();
     void this.checkHanzoServices();
@@ -755,17 +769,75 @@ class HanzoSidebar {
     this.el.mcpTools.textContent = toolCount;
   }
 
+  // Built-in @hanzo/mcp tool categories (always available)
+  static BUILTIN_TOOLS = [
+    { category: 'File Operations', tools: ['read_file', 'write_file', 'list_files', 'get_file_info', 'directory_tree'] },
+    { category: 'Search', tools: ['grep', 'find_files', 'search'] },
+    { category: 'Shell', tools: ['bash', 'run_command', 'run_background', 'list_processes', 'kill_process'] },
+    { category: 'Edit', tools: ['edit_file', 'multi_edit', 'create_file', 'delete_file', 'move_file'] },
+    { category: 'AI Tools', tools: ['think', 'critic', 'consensus', 'agent'] },
+    { category: 'AST Search', tools: ['ast_search', 'find_symbol', 'analyze_dependencies'] },
+    { category: 'Vector Search', tools: ['vector_index', 'vector_search', 'vector_stats'] },
+    { category: 'Todo', tools: ['todo_add', 'todo_list', 'todo_update', 'todo_delete', 'todo_stats'] },
+    { category: 'Modes', tools: ['mode_switch', 'mode_list', 'preset_select', 'preset_list', 'shortcut'] },
+  ];
+
+  renderBuiltinTools() {
+    if (!this.el.builtinToolList) return;
+
+    const totalBuiltin = HanzoSidebar.BUILTIN_TOOLS.reduce((sum, c) => sum + c.tools.length, 0);
+
+    this.el.builtinToolList.innerHTML = HanzoSidebar.BUILTIN_TOOLS.map(cat =>
+      `<div class="tool-category">` +
+      `<span class="tool-category-name">${this.escapeHtml(cat.category)}</span> ` +
+      `<span class="tool-category-tools">${cat.tools.join(', ')}</span>` +
+      `</div>`
+    ).join('');
+
+    this.updateToolCount(totalBuiltin);
+  }
+
+  updateToolCount(builtinCount: number) {
+    const zapCount = parseInt(this.el.mcpTools?.textContent || '0') || 0;
+    const total = builtinCount + zapCount;
+    if (this.el.toolCountBadge) this.el.toolCountBadge.textContent = String(total);
+  }
+
   updateMCPToolList(tools) {
     if (!this.el.mcpToolList) return;
     if (!tools || !tools.length) {
-      this.el.mcpToolList.textContent = 'No tools discovered yet.';
+      this.el.mcpToolList.textContent = '';
       return;
     }
 
     const names = Array.from(new Set(tools.map((tool) => tool.name))).sort();
     const preview = names.slice(0, 20);
     const suffix = names.length > preview.length ? `\n... +${names.length - preview.length} more` : '';
-    this.el.mcpToolList.textContent = `${preview.join('\n')}${suffix}`;
+    this.el.mcpToolList.textContent = `ZAP: ${preview.join(', ')}${suffix}`;
+
+    // Update total count
+    const builtinCount = HanzoSidebar.BUILTIN_TOOLS.reduce((sum, c) => sum + c.tools.length, 0);
+    this.updateToolCount(builtinCount);
+  }
+
+  updateMCPServerList(mcps) {
+    if (!this.el.mcpServerList) return;
+    if (this.el.mcpServerCount) this.el.mcpServerCount.textContent = String(mcps?.length || 0);
+
+    if (!mcps || !mcps.length) {
+      this.el.mcpServerList.innerHTML = '<div class="empty-state">No MCP servers connected</div>';
+      return;
+    }
+
+    this.el.mcpServerList.innerHTML = mcps.map(mcp => `
+      <div class="mcp-server-item">
+        <div class="mcp-server-info">
+          <span class="status-indicator connected"></span>
+          <span class="mcp-server-name">${this.escapeHtml(mcp.name || mcp.id)}</span>
+        </div>
+        <span class="mcp-server-tools">${(mcp.tools?.length || 0)} tools</span>
+      </div>
+    `).join('');
   }
 
   async refreshUsageMetrics() {
@@ -813,19 +885,18 @@ class HanzoSidebar {
     try {
       const resp = await fetch(`http://localhost:${nodePort}/health`, { signal: AbortSignal.timeout(2000) });
       if (resp.ok) {
-        this.el.hanzoNodeStatus.innerHTML = `<span class="status-indicator connected"></span> Running`;
-        this.el.startHanzoNode.textContent = 'Running';
-        this.el.startHanzoNode.disabled = true;
+        if (this.el.hanzoNodeStatus) this.el.hanzoNodeStatus.innerHTML = `<span class="status-indicator connected"></span> Running`;
+        if (this.el.startHanzoNode) { this.el.startHanzoNode.textContent = 'Running'; this.el.startHanzoNode.disabled = true; }
       } else {
-        this.el.hanzoNodeStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
-        this.el.startHanzoNode.disabled = false;
+        if (this.el.hanzoNodeStatus) this.el.hanzoNodeStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
+        if (this.el.startHanzoNode) this.el.startHanzoNode.disabled = false;
       }
     } catch {
-      this.el.hanzoNodeStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
+      if (this.el.hanzoNodeStatus) this.el.hanzoNodeStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
       if (this.el.startHanzoNode) this.el.startHanzoNode.disabled = false;
     }
 
-    // Check hanzo MCP server (via ZAP status which already probes MCP)
+    // Check hanzo bot/MCP via ZAP status
     try {
       const zapResp = await chrome.runtime.sendMessage({ action: 'zap.status' });
       const hasTools = zapResp?.success && zapResp.zap?.connected;
@@ -838,39 +909,49 @@ class HanzoSidebar {
         this.el.startHanzoMcp.disabled = !!hasTools;
         if (hasTools) this.el.startHanzoMcp.textContent = 'Running';
       }
+
+      // Update connected MCP servers list
+      if (zapResp?.success && zapResp.zap?.mcps?.length) {
+        this.updateMCPServerList(zapResp.zap.mcps);
+      } else {
+        this.updateMCPServerList([]);
+      }
     } catch {
       if (this.el.hanzoMcpStatus) {
         this.el.hanzoMcpStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
       }
+      this.updateMCPServerList([]);
     }
   }
 
   async startHanzoService(service: string) {
-    // Open a new tab with instructions to start the service via terminal
     const commands = {
       node: 'hanzo node --port 52415',
-      mcp: 'hanzo mcp serve',
+      bot: 'npx @hanzo/mcp serve',
     };
+    const labels = { node: 'Hanzo Node', bot: 'Hanzo Bot' };
     const cmd = commands[service] || commands.node;
+    const label = labels[service] || service;
 
-    // Try sending command to CDP bridge (if running, it can spawn processes)
+    // Try native messaging or CDP bridge first
     try {
       const response = await chrome.runtime.sendMessage({
         action: 'cdp.exec',
         command: cmd,
       });
       if (response?.success) {
-        this.showNotification(`Starting ${service}...`);
-        // Re-check after a short delay
+        this.showNotification(`Starting ${label}...`);
         setTimeout(() => this.checkHanzoServices(), 3000);
         return;
       }
     } catch {}
 
-    // Fallback: open docs page with terminal command
-    const url = `https://docs.hanzo.ai/cli#${service}`;
-    chrome.tabs.create({ url });
-    this.showNotification(`Run: ${cmd}`);
+    // Fallback: show the command to run with a copy-friendly notification
+    this.showNotification(`Run in terminal: ${cmd}`);
+
+    // Also try to open docs
+    const docsSection = service === 'bot' ? 'mcp' : service;
+    chrome.tabs.create({ url: `https://docs.hanzo.ai/cli#${docsSection}` });
   }
 
   updateAgentList() {
