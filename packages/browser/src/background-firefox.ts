@@ -527,7 +527,7 @@ async function firefoxLogin(): Promise<any> {
   const state = generateRandomString(32);
   const redirectUri = 'https://hanzo.ai/callback';
 
-  const authorizeUrl = new URL(`${IAM_LOGIN}/login/oauth/authorize`);
+  const authorizeUrl = new URL(`${IAM_LOGIN}/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', CLIENT_ID);
   authorizeUrl.searchParams.set('response_type', 'code');
   authorizeUrl.searchParams.set('redirect_uri', redirectUri);
@@ -582,7 +582,7 @@ async function firefoxLogin(): Promise<any> {
     await browser.storage.local.set(data);
   } else if (code) {
     // Authorization code flow — exchange code for tokens via PKCE
-    const tokenResponse = await fetch(`${IAM_API}/api/login/oauth/access_token`, {
+    const tokenResponse = await fetch(`${IAM_API}/oauth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

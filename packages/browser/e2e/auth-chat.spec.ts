@@ -34,7 +34,7 @@ descFn('Auth + Chat', () => {
     await expect(loginPrompt).toBeVisible();
 
     // Click "Sign in" — this sends auth.login to the background,
-    // which opens a new tab to hanzo.id/login/oauth/authorize
+    // which opens a new tab to hanzo.id/oauth/authorize
     const [authPage] = await Promise.all([
       context.waitForEvent('page'),
       sidebar.locator('#auth-btn').click(),
