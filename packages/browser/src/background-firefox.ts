@@ -529,10 +529,8 @@ async function firefoxLogin(): Promise<any> {
 
   const authorizeUrl = new URL(`${IAM_LOGIN}/login/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', CLIENT_ID);
-  authorizeUrl.searchParams.set('response_type', 'code');
+  authorizeUrl.searchParams.set('response_type', 'token');
   authorizeUrl.searchParams.set('redirect_uri', redirectUri);
-  authorizeUrl.searchParams.set('code_challenge', codeChallenge);
-  authorizeUrl.searchParams.set('code_challenge_method', 'S256');
   authorizeUrl.searchParams.set('scope', SCOPES);
   authorizeUrl.searchParams.set('state', state);
 
@@ -612,8 +610,22 @@ async function firefoxLogin(): Promise<any> {
   const accessToken = stored[STORAGE_KEYS.accessToken];
   if (!accessToken) throw new Error('Login succeeded but no token was stored');
 
-  const userResp = await fetch(`${IAM_API}/api/userinfo`, { headers: { Authorization: `Bearer ${accessToken}` } });
-  const user = userResp.ok ? await userResp.json() : {};
+  // /api/userinfo only returns sub/iss/aud; /api/get-account has full profile
+  let user: any = {};
+  try {
+    const acctResp = await fetch(`${IAM_API}/api/get-account`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (acctResp.ok) {
+      const acctJson = await acctResp.json();
+      const acct = acctJson.data || acctJson;
+      if (acct.name || acct.email) {
+        user = { sub: acct.id || acct.sub, name: acct.displayName || acct.name, email: acct.email, picture: acct.avatar || undefined };
+      }
+    }
+  } catch { /* fall through */ }
+  if (!user.name && !user.email) {
+    const userResp = await fetch(`${IAM_API}/api/userinfo`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (userResp.ok) user = await userResp.json();
+  }
   await browser.storage.local.set({ [STORAGE_KEYS.user]: user });
   return user;
 }
