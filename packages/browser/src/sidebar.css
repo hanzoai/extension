@@ -39,9 +39,16 @@ body {
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.6;
-  overflow-x: hidden;
+  overflow: hidden;
+  width: 100%;
+  height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  overflow: hidden;
+  height: 100vh;
 }
 
 .hidden { display: none !important; }
@@ -86,13 +93,15 @@ body {
 /* ==================== Layout ==================== */
 
 .sidebar-container {
-  width: 320px;
+  width: 100%;
+  min-width: 0;
   height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
   border-left: 1px solid var(--border);
   position: relative;
+  overflow: hidden;
 }
 
 /* Ambient glow behind sidebar */
@@ -353,6 +362,7 @@ body {
 
 .tab-content {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -362,22 +372,30 @@ body {
 .tools-scroll,
 .settings-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
 }
 
 /* ==================== Chat ==================== */
 
 .chat-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
 }
 
 .chat-welcome {
@@ -498,14 +516,19 @@ body {
 .model-selector select {
   width: 100%;
   padding: 6px 10px;
-  background: var(--glass-strong);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 12px;
   cursor: pointer;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%23A0A0A0' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
   transition: border-color 0.2s;
 }
 
@@ -551,7 +574,7 @@ body {
 .input-row textarea {
   flex: 1;
   padding: 10px 14px;
-  background: var(--glass-strong);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text-primary);
@@ -562,8 +585,6 @@ body {
   outline: none;
   max-height: 120px;
   transition: border-color 0.2s, box-shadow 0.2s;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .input-row textarea:focus {
@@ -681,21 +702,19 @@ body {
 .secondary-btn {
   width: 100%;
   padding: 8px 16px;
-  background: var(--glass-strong);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 12px;
+  font-family: inherit;
   cursor: pointer;
   transition: all 0.2s;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .secondary-btn:hover {
-  background: var(--glass);
+  background: var(--bg-hover);
   border-color: var(--border-strong);
-  box-shadow: 0 0 8px rgba(255,255,255,0.05);
 }
 
 .action-btn {
@@ -705,22 +724,20 @@ body {
   justify-content: center;
   gap: 8px;
   padding: 10px;
-  background: var(--glass-strong);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
   transition: all 0.25s ease;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .action-btn:hover {
-  background: var(--glass);
+  background: var(--bg-hover);
   border-color: var(--border-strong);
-  box-shadow: 0 0 12px rgba(255,255,255,0.06);
 }
 
 .action-btn svg {
@@ -731,15 +748,13 @@ body {
 /* ==================== Glass Panels ==================== */
 
 .panel {
-  background: var(--glass-strong);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px;
-  transition: border-color 0.3s, box-shadow 0.3s;
+  transition: border-color 0.3s;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* Subtle top highlight on glass panels */
@@ -853,12 +868,16 @@ body {
 }
 
 .tool-list {
-  max-height: 90px;
+  max-height: 120px;
   overflow-y: auto;
   font-size: 11px;
   line-height: 1.4;
   color: var(--text-tertiary);
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
 }
 
 /* ==================== User Profile ==================== */
@@ -932,10 +951,12 @@ body {
 /* ==================== Tab Filesystem ==================== */
 
 .tab-filesystem {
-  max-height: 200px;
+  max-height: 240px;
   overflow-y: auto;
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
   font-size: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
 }
 
 .tab-item {
@@ -961,12 +982,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 8px 0;
 }
 
-.setting-item span {
+.setting-item > span {
   font-size: 12px;
   color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .setting-item input[type="text"],
@@ -974,12 +998,24 @@ body {
 .setting-item select {
   width: 140px;
   padding: 6px 10px;
-  background: var(--glass-strong);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 12px;
+  font-family: inherit;
   transition: border-color 0.2s;
+}
+
+.setting-item select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%23A0A0A0' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+  cursor: pointer;
 }
 
 .setting-item input:focus,
@@ -1002,12 +1038,19 @@ body {
 .setting-item input[type="number"] {
   width: 70px;
   padding: 6px 10px;
-  background: var(--glass-strong);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 12px;
+  font-family: inherit;
+  -moz-appearance: textfield;
   transition: border-color 0.2s;
+}
+
+.setting-item input[type="number"]::-webkit-inner-spin-button,
+.setting-item input[type="number"]::-webkit-outer-spin-button {
+  opacity: 0.5;
 }
 
 .setting-item input[type="number"]:focus {
@@ -1018,9 +1061,21 @@ body {
 .setting-item input[type="checkbox"] {
   width: 16px;
   height: 16px;
+  min-width: 16px;
   cursor: pointer;
   accent-color: var(--accent);
+  flex-shrink: 0;
 }
+
+/* Firefox: style option elements in dropdowns */
+select option {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 4px 8px;
+}
+
+/* Color scheme hint for native widgets */
+:root { color-scheme: dark; }
 
 .settings-links {
   display: flex;
@@ -1083,6 +1138,13 @@ body {
 
 /* ==================== Scrollbar ==================== */
 
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+
+/* Chrome / Safari */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
@@ -1194,7 +1256,7 @@ body {
 
 .modal-body textarea {
   width: 100%;
-  background: var(--glass-strong);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
@@ -1202,6 +1264,11 @@ body {
   font-family: inherit;
   font-size: 12px;
   resize: vertical;
+  outline: none;
+}
+
+.modal-body textarea:focus {
+  border-color: var(--border-strong);
 }
 
 .modal-footer {
