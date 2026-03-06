@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/cli-tools",
-  "version": "1.7.11",
+  "version": "1.7.12",
   "description": "Hanzo AI CLI Tools Integration",
   "main": "dist/index.js",
   "scripts": {
