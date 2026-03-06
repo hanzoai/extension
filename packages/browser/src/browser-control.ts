@@ -646,6 +646,202 @@ export class BrowserControl {
     });
   }
 
+  async setCookie(tabId: number, cookie: { name: string; value: string; domain?: string; path?: string; secure?: boolean; httpOnly?: boolean; expirationDate?: number }): Promise<boolean> {
+    return new Promise((resolve) => {
+      chrome.tabs.get(tabId, (tab) => {
+        if (!tab?.url) { resolve(false); return; }
+        chrome.cookies.set({ url: tab.url, ...cookie }, (c) => resolve(!!c));
+      });
+    });
+  }
+
+  async deleteCookie(tabId: number, name: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      chrome.tabs.get(tabId, (tab) => {
+        if (!tab?.url) { resolve(false); return; }
+        chrome.cookies.remove({ url: tab.url, name }, () => resolve(true));
+      });
+    });
+  }
+
+  async getSessionStorage(tabId: number, key?: string): Promise<any> {
+    if (key) {
+      return this.executeScript(tabId, `sessionStorage.getItem(${JSON.stringify(key)})`);
+    }
+    return this.executeScript(tabId, `JSON.parse(JSON.stringify(sessionStorage))`);
+  }
+
+  async setSessionStorage(tabId: number, key: string, value: string): Promise<boolean> {
+    return this.executeScript(tabId, `
+      (() => { sessionStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(value)}); return true; })()
+    `);
+  }
+
+  async getIndexedDBDatabases(tabId: number): Promise<any[]> {
+    return this.executeScript(tabId, `
+      (async () => {
+        const dbs = await indexedDB.databases();
+        return dbs.map(db => ({ name: db.name, version: db.version }));
+      })()
+    `);
+  }
+
+  async queryIndexedDB(tabId: number, dbName: string, storeName: string, query?: { key?: string; index?: string; count?: number }): Promise<any[]> {
+    const count = query?.count || 100;
+    return this.executeScript(tabId, `
+      new Promise((resolve, reject) => {
+        const req = indexedDB.open(${JSON.stringify(dbName)});
+        req.onerror = () => reject(new Error(req.error?.message || 'Failed to open DB'));
+        req.onsuccess = () => {
+          const db = req.result;
+          try {
+            const tx = db.transaction(${JSON.stringify(storeName)}, 'readonly');
+            const store = tx.objectStore(${JSON.stringify(storeName)});
+            const src = ${query?.index ? `store.index(${JSON.stringify(query.index)})` : 'store'};
+            const getReq = ${query?.key ? `src.get(${JSON.stringify(query.key)})` : `src.getAll(null, ${count})`};
+            getReq.onsuccess = () => resolve(${query?.key ? '[getReq.result]' : 'getReq.result'});
+            getReq.onerror = () => reject(new Error(getReq.error?.message || 'Query failed'));
+          } catch(e) { reject(e); }
+        };
+      })
+    `);
+  }
+
+  async getIndexedDBStores(tabId: number, dbName: string): Promise<string[]> {
+    return this.executeScript(tabId, `
+      new Promise((resolve, reject) => {
+        const req = indexedDB.open(${JSON.stringify(dbName)});
+        req.onerror = () => reject(new Error(req.error?.message || 'Failed to open DB'));
+        req.onsuccess = () => {
+          resolve(Array.from(req.result.objectStoreNames));
+        };
+      })
+    `);
+  }
+
+  async clearSiteData(tabId: number, what: ('cookies' | 'localStorage' | 'sessionStorage' | 'indexedDB' | 'cache' | 'all')[] = ['all']): Promise<Record<string, boolean>> {
+    const doAll = what.includes('all');
+    const results: Record<string, boolean> = {};
+
+    if (doAll || what.includes('cookies')) {
+      await new Promise<void>((resolve) => {
+        chrome.tabs.get(tabId, (tab) => {
+          if (!tab?.url) { results.cookies = false; resolve(); return; }
+          chrome.cookies.getAll({ url: tab.url }, (cookies) => {
+            Promise.all((cookies || []).map(c =>
+              new Promise<void>(r => chrome.cookies.remove({ url: tab.url!, name: c.name }, () => r()))
+            )).then(() => { results.cookies = true; resolve(); });
+          });
+        });
+      });
+    }
+
+    if (doAll || what.includes('localStorage')) {
+      results.localStorage = await this.executeScript(tabId, `(() => { localStorage.clear(); return true; })()`);
+    }
+    if (doAll || what.includes('sessionStorage')) {
+      results.sessionStorage = await this.executeScript(tabId, `(() => { sessionStorage.clear(); return true; })()`);
+    }
+    if (doAll || what.includes('indexedDB')) {
+      results.indexedDB = await this.executeScript(tabId, `
+        (async () => {
+          const dbs = await indexedDB.databases();
+          await Promise.all(dbs.map(db => new Promise((r, j) => {
+            const req = indexedDB.deleteDatabase(db.name);
+            req.onsuccess = () => r(true);
+            req.onerror = () => r(false);
+          })));
+          return true;
+        })()
+      `);
+    }
+    if (doAll || what.includes('cache')) {
+      results.cache = await this.executeScript(tabId, `
+        (async () => {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+          return true;
+        })()
+      `);
+    }
+    return results;
+  }
+
+  async getCacheStorageKeys(tabId: number): Promise<string[]> {
+    return this.executeScript(tabId, `caches.keys()`);
+  }
+
+  async checkWebGPU(tabId: number): Promise<{ available: boolean; adapter?: string; features?: string[]; limits?: Record<string, number> }> {
+    return this.executeScript(tabId, `
+      (async () => {
+        if (!navigator.gpu) return { available: false, reason: 'WebGPU not supported' };
+        try {
+          const adapter = await navigator.gpu.requestAdapter();
+          if (!adapter) return { available: false, reason: 'No GPU adapter' };
+          const info = await adapter.requestAdapterInfo();
+          return {
+            available: true,
+            adapter: info.description || info.device || info.vendor || 'Unknown',
+            vendor: info.vendor,
+            architecture: info.architecture,
+            features: [...adapter.features].sort(),
+            limits: {
+              maxBufferSize: adapter.limits.maxBufferSize,
+              maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
+              maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
+              maxBindGroups: adapter.limits.maxBindGroups,
+              maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+            },
+          };
+        } catch(e) { return { available: false, reason: e.message }; }
+      })()
+    `);
+  }
+
+  async hardReload(tabId: number): Promise<void> {
+    chrome.tabs.reload(tabId, { bypassCache: true });
+  }
+
+  async getServiceWorkers(tabId: number): Promise<any[]> {
+    return this.executeScript(tabId, `
+      (async () => {
+        const regs = await navigator.serviceWorker?.getRegistrations() || [];
+        return regs.map(r => ({
+          scope: r.scope,
+          active: r.active ? { state: r.active.state, scriptURL: r.active.scriptURL } : null,
+          waiting: r.waiting ? { state: r.waiting.state } : null,
+          installing: r.installing ? { state: r.installing.state } : null,
+        }));
+      })()
+    `);
+  }
+
+  async getPerformanceMetrics(tabId: number): Promise<any> {
+    return this.executeScript(tabId, `
+      (() => {
+        const nav = performance.getEntriesByType('navigation')[0] || {};
+        const paint = performance.getEntriesByType('paint');
+        const resources = performance.getEntriesByType('resource');
+        return {
+          timing: {
+            domContentLoaded: Math.round(nav.domContentLoadedEventEnd - nav.startTime),
+            load: Math.round(nav.loadEventEnd - nav.startTime),
+            ttfb: Math.round(nav.responseStart - nav.startTime),
+            domInteractive: Math.round(nav.domInteractive - nav.startTime),
+          },
+          paint: Object.fromEntries(paint.map(p => [p.name, Math.round(p.startTime)])),
+          resourceCount: resources.length,
+          transferSize: resources.reduce((s, r) => s + (r.transferSize || 0), 0),
+          memory: performance.memory ? {
+            usedJSHeapSize: performance.memory.usedJSHeapSize,
+            totalJSHeapSize: performance.memory.totalJSHeapSize,
+            jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+          } : null,
+        };
+      })()
+    `);
+  }
+
   // ===========================================================================
   // Navigation
   // ===========================================================================
