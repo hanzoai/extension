@@ -172,15 +172,15 @@ export class HanzoAuth extends EventEmitter {
             });
             
             this.server.listen(port, () => {
-                // Build authorization URL
-                // Use response_type=token (implicit flow) — Casdoor returns the JWT
-                // directly in the redirect URL, avoiding the empty grant_type issue.
+                // Authorization Code + PKCE (OAuth 2.1 standard)
                 const authUrl = new URL('/login/oauth/authorize', this.config.iamLoginUrl);
                 authUrl.searchParams.set('client_id', this.config.clientId);
-                authUrl.searchParams.set('response_type', 'token');
+                authUrl.searchParams.set('response_type', 'code');
                 authUrl.searchParams.set('redirect_uri', `http://localhost:${port}/callback`);
                 authUrl.searchParams.set('scope', this.config.scope);
                 authUrl.searchParams.set('state', state);
+                authUrl.searchParams.set('code_challenge', codeChallenge);
+                authUrl.searchParams.set('code_challenge_method', 'S256');
                 
                 // Open browser
                 this.openBrowser(authUrl.toString());
