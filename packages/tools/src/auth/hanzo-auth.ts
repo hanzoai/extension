@@ -102,9 +102,8 @@ export class HanzoAuth extends EventEmitter {
                 const url = new URL(req.url!, `http://localhost:${port}`);
                 
                 if (url.pathname === '/callback') {
-                    const code = url.searchParams.get('code');
                     const returnedState = url.searchParams.get('state');
-                    
+
                     if (returnedState !== state) {
                         res.writeHead(400);
                         res.end('Invalid state parameter');
@@ -112,62 +111,76 @@ export class HanzoAuth extends EventEmitter {
                         reject(new Error('Invalid state parameter'));
                         return;
                     }
-                    
-                    if (code) {
-                        // Exchange code for tokens
-                        try {
-                            await this.exchangeCodeForTokens(code, codeVerifier);
-                            
-                            // Success response
-                            res.writeHead(200, { 'Content-Type': 'text/html' });
-                            res.end(`
-                                <html>
-                                <head>
-                                    <title>Hanzo Dev - Login Successful</title>
-                                    <style>
-                                        body { font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: white; }
-                                        .container { text-align: center; }
-                                        .success { color: #4ade80; font-size: 48px; margin-bottom: 20px; }
-                                    </style>
-                                </head>
-                                <body>
-                                    <div class="container">
-                                        <div class="success">✓</div>
-                                        <h1>Login Successful!</h1>
-                                        <p>You can now close this window and return to your terminal.</p>
-                                    </div>
-                                    <script>setTimeout(() => window.close(), 3000);</script>
-                                </body>
-                                </html>
-                            `);
-                            
-                            this.server?.close();
-                            resolve(true);
-                        } catch (error) {
-                            res.writeHead(500);
-                            res.end('Failed to exchange code for tokens');
-                            this.server?.close();
-                            reject(error);
-                        }
+
+                    // Implicit flow: access_token comes directly in URL params
+                    const accessToken = url.searchParams.get('access_token');
+                    // Code flow fallback
+                    const code = url.searchParams.get('code');
+
+                    const successHtml = `<html><head><title>Hanzo Dev - Login Successful</title>
+                        <style>body{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#1a1a1a;color:white}.container{text-align:center}.success{color:#4ade80;font-size:48px;margin-bottom:20px}</style>
+                        </head><body><div class="container"><div class="success">✓</div><h1>Login Successful!</h1>
+                        <p>You can now close this window.</p></div>
+                        <script>setTimeout(()=>window.close(),3000)</script></body></html>`;
+
+                    if (accessToken) {
+                        // Implicit flow — token received directly
+                        const refreshToken = url.searchParams.get('refresh_token');
+                        const expiresIn = url.searchParams.get('expires_in');
+
+                        this.credentials = {
+                            accessToken,
+                            refreshToken: refreshToken || undefined,
+                            expiresAt: expiresIn ? Date.now() + parseInt(expiresIn, 10) * 1000 : Date.now() + 168 * 3600 * 1000,
+                            ...this.credentials,
+                        };
+
+                        res.writeHead(200, { 'Content-Type': 'text/html' });
+                        res.end(successHtml);
+                        this.server?.close();
+
+                        // Fetch user info and save
+                        this.fetchUserInfo().then(() => this.syncAPIKeys()).then(() => {
+                            this.saveCredentials();
+                            this.emit('login:success', this.credentials);
+                        }).catch(() => {});
+
+                        resolve(true);
+                    } else if (code) {
+                        // Authorization code flow fallback
+                        (async () => {
+                            try {
+                                await this.exchangeCodeForTokens(code, codeVerifier);
+                                res.writeHead(200, { 'Content-Type': 'text/html' });
+                                res.end(successHtml);
+                                this.server?.close();
+                                resolve(true);
+                            } catch (error) {
+                                res.writeHead(500);
+                                res.end('Failed to exchange code for tokens');
+                                this.server?.close();
+                                reject(error);
+                            }
+                        })();
                     } else {
                         res.writeHead(400);
-                        res.end('No authorization code received');
+                        res.end('No token or authorization code received');
                         this.server?.close();
-                        reject(new Error('No authorization code received'));
+                        reject(new Error('No token received'));
                     }
                 }
             });
             
             this.server.listen(port, () => {
                 // Build authorization URL
+                // Use response_type=token (implicit flow) — Casdoor returns the JWT
+                // directly in the redirect URL, avoiding the empty grant_type issue.
                 const authUrl = new URL('/login/oauth/authorize', this.config.iamLoginUrl);
                 authUrl.searchParams.set('client_id', this.config.clientId);
-                authUrl.searchParams.set('response_type', 'code');
+                authUrl.searchParams.set('response_type', 'token');
                 authUrl.searchParams.set('redirect_uri', `http://localhost:${port}/callback`);
                 authUrl.searchParams.set('scope', this.config.scope);
                 authUrl.searchParams.set('state', state);
-                authUrl.searchParams.set('code_challenge', codeChallenge);
-                authUrl.searchParams.set('code_challenge_method', 'S256');
                 
                 // Open browser
                 this.openBrowser(authUrl.toString());
@@ -226,16 +239,26 @@ export class HanzoAuth extends EventEmitter {
 
     private async fetchUserInfo(): Promise<void> {
         if (!this.credentials?.accessToken) return;
-        
-        const response = await fetch(`${this.config.iamUrl}/api/userinfo`, {
-            headers: {
-                'Authorization': `Bearer ${this.credentials.accessToken}`
+        const headers = { 'Authorization': `Bearer ${this.credentials.accessToken}` };
+
+        // /api/get-account returns full profile; /api/userinfo only returns sub
+        try {
+            const acctResp = await fetch(`${this.config.iamUrl}/api/get-account`, { headers });
+            if (acctResp.ok) {
+                const acctJson = await acctResp.json() as any;
+                const acct = acctJson.data || acctJson;
+                if (acct.name || acct.email) {
+                    this.credentials.userId = acct.id || acct.sub;
+                    this.credentials.email = acct.email;
+                    return;
+                }
             }
-        });
-        
+        } catch { /* fall through */ }
+
+        const response = await fetch(`${this.config.iamUrl}/api/userinfo`, { headers });
         if (response.ok) {
             const user = await response.json() as any;
-            this.credentials.userId = user.id;
+            this.credentials.userId = user.id || user.sub;
             this.credentials.email = user.email;
         }
     }
