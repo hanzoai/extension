@@ -137,7 +137,7 @@ export async function login(): Promise<UserInfo> {
   const redirectUri = getRedirectUri();
 
   // Authorization Code + PKCE (OAuth 2.1 standard for public clients)
-  const authorizeUrl = new URL(`${IAM_LOGIN}/login/oauth/authorize`);
+  const authorizeUrl = new URL(`${IAM_LOGIN}/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', CLIENT_ID);
   authorizeUrl.searchParams.set('response_type', 'code');
   authorizeUrl.searchParams.set('redirect_uri', redirectUri);
@@ -168,7 +168,7 @@ export async function login(): Promise<UserInfo> {
     await storeTokens(tokens);
   } else if (code) {
     // Authorization code flow — exchange code for tokens via PKCE
-    const tokenResponse = await fetch(`${IAM_API}/api/login/oauth/access_token`, {
+    const tokenResponse = await fetch(`${IAM_API}/oauth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -309,7 +309,7 @@ export async function getValidAccessToken(): Promise<string | null> {
  * Refresh access token using refresh_token grant.
  */
 async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const response = await fetch(`${IAM_API}/api/login/oauth/access_token`, {
+  const response = await fetch(`${IAM_API}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
