@@ -173,7 +173,7 @@ export class HanzoAuth extends EventEmitter {
             
             this.server.listen(port, () => {
                 // Authorization Code + PKCE (OAuth 2.1 standard)
-                const authUrl = new URL('/login/oauth/authorize', this.config.iamLoginUrl);
+                const authUrl = new URL('/oauth/authorize', this.config.iamLoginUrl);
                 authUrl.searchParams.set('client_id', this.config.clientId);
                 authUrl.searchParams.set('response_type', 'code');
                 authUrl.searchParams.set('redirect_uri', `http://localhost:${port}/callback`);
@@ -200,7 +200,7 @@ export class HanzoAuth extends EventEmitter {
     }
 
     private async exchangeCodeForTokens(code: string, codeVerifier: string): Promise<void> {
-        const response = await fetch(`${this.config.iamUrl}/api/login/oauth/access_token`, {
+        const response = await fetch(`${this.config.iamUrl}/oauth/token`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -318,7 +318,7 @@ export class HanzoAuth extends EventEmitter {
         }
         
         try {
-            const response = await fetch(`${this.config.iamUrl}/api/login/oauth/access_token`, {
+            const response = await fetch(`${this.config.iamUrl}/oauth/token`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
