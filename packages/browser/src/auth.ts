@@ -136,14 +136,13 @@ export async function login(): Promise<UserInfo> {
   const state = generateState();
   const redirectUri = getRedirectUri();
 
-  // Use response_type=token (implicit flow) — Casdoor returns the JWT
-  // directly in the redirect URL. The code flow (response_type=code) requires
-  // an empty-string grant_type that Casdoor's grant check doesn't support.
-  // We still generate PKCE params in case code flow is ever re-enabled.
+  // Authorization Code + PKCE (OAuth 2.1 standard for public clients)
   const authorizeUrl = new URL(`${IAM_LOGIN}/login/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', CLIENT_ID);
-  authorizeUrl.searchParams.set('response_type', 'token');
+  authorizeUrl.searchParams.set('response_type', 'code');
   authorizeUrl.searchParams.set('redirect_uri', redirectUri);
+  authorizeUrl.searchParams.set('code_challenge', codeChallenge);
+  authorizeUrl.searchParams.set('code_challenge_method', 'S256');
   authorizeUrl.searchParams.set('scope', SCOPES);
   authorizeUrl.searchParams.set('state', state);
 
