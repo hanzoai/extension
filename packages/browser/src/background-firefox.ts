@@ -386,6 +386,10 @@ class HanzoFirefoxExtension {
       .replace(/'/g, "\\'")
       .replace(/\n/g, '\\n');
   }
+
+  isBridgeConnected(): boolean {
+    return this.wsConnection !== null && this.wsConnection.readyState === WebSocket.OPEN;
+  }
 }
 
 // =============================================================================
@@ -753,6 +757,47 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
       }
 
       // --- AI Control Overlay (forwarded to content script) ---
+      // --- Bridge & ZAP status (for sidebar MCP detection) ---
+      case 'bridge.status': {
+        const bridgeConnected = hanzoExtension.isBridgeConnected();
+        sendResponse({
+          success: true,
+          connected: bridgeConnected,
+          browsers: bridgeConnected ? ['firefox'] : [],
+        });
+        break;
+      }
+
+      case 'zap.status': {
+        // Firefox doesn't have ZAP discovery yet — return empty
+        sendResponse({
+          success: true,
+          zap: { connected: false, mcps: [] },
+        });
+        break;
+      }
+
+      case 'zap.discover': {
+        sendResponse({ success: true, mcps: [] });
+        break;
+      }
+
+      case 'zap.listTools': {
+        sendResponse({ success: true, tools: [] });
+        break;
+      }
+
+      case 'usage.metrics': {
+        sendResponse({ success: true, metrics: { chatRequests: 0, inputTokens: 0, outputTokens: 0, dedupeHits: 0, canceledRequests: 0 } });
+        break;
+      }
+
+      case 'inspector.pickResult': {
+        // Forward to sidebar — broadcast to all extension pages
+        sendResponse({ success: true });
+        break;
+      }
+
       case 'ai.control.start':
       case 'ai.control.cursor':
       case 'ai.control.highlight':
