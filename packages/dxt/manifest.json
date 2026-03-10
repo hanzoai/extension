@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "hanzo-ai",
   "display_name": "Hanzo AI",
-  "version": "1.5.4",
+  "version": "1.7.18",
   "description": "Powerful development tools and AI assistance for Claude. Features file operations, search, shell commands, git integration, and more.",
   "long_description": "# Hanzo AI Extension\n\nPowerful development tools and AI assistance for Claude, built on the Model Context Protocol (MCP).\n\n## Features\n\n- **File Operations**: read, write, edit, multi_edit, directory_tree, find_files\n- **Search & Analysis**: grep, search, ast (code symbols), git_search\n- **Shell & System**: run_command, bash, open\n- **Development**: todo (task management), think, critic\n- **Database**: sql queries and schemas, vector store operations\n- **Jupyter**: notebook reading, editing, and execution\n- **Configuration**: rules management for different IDEs\n- **Web**: fetch and analyze web content\n\n## Authentication\n\nBy default, Hanzo AI requires authentication with your Hanzo account to access cloud features like SQL databases and vector stores. You can run in anonymous mode by setting the `anonymous` option to true in settings for local-only features.\n\n## Configuration\n\nAll settings can be configured through the extension settings UI or environment variables. Set your workspace directory, enable/disable specific tools, and configure security settings.",
   "author": {

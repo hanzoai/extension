@@ -7,6 +7,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { MCPTools } from './mcp/tools/index';
 // Dummy schema to bypass Zod version mismatch issues in bundle
 const DummySchema = {
     _def: {},
