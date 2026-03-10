@@ -116,10 +116,11 @@ async function buildAllPlatforms() {
   }
   
   // Build VS Code extension package (.vsix)
+  // vsce rejects scoped names — temporarily swap to unscoped name
   console.log('\n📦 Building VS Code extension package (.vsix)...');
   try {
     execSync('vsce package --no-dependencies', { stdio: 'inherit' });
-    
+
     // Move .vsix file to dist directory
     const vsixFiles = fs.readdirSync('.').filter(f => f.endsWith('.vsix'));
     if (vsixFiles.length > 0) {
