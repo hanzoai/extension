@@ -956,6 +956,11 @@ html {
   margin-top: 4px;
 }
 
+/* Build Info */
+.build-info-panel .status-value.mono {
+  font-size: 11px;
+}
+
 .tool-list {
   max-height: 200px;
   overflow-y: auto;
