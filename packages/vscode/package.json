@@ -2,7 +2,7 @@
   "name": "hanzo-ide",
   "displayName": "Hanzo AI",
   "description": "The ultimate meta AI development platform. Manage and run all LLMs and CLI tools (Claude, Codex, Gemini, OpenHands, Aider) in one unified interface. Features MCP integration, async execution, git worktrees, and universal context sync.",
-  "version": "1.7.21",
+  "version": "1.7.22",
   "publisher": "hanzo-ai",
   "private": false,
   "license": "MIT",
