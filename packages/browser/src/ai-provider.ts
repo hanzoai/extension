@@ -48,14 +48,14 @@ export interface AIProvider {
 }
 
 // ---------------------------------------------------------------------------
-// Hanzo Cloud Provider (api.hanzo.ai / llm.hanzo.ai)
+// Hanzo Cloud Provider (api.hanzo.ai / api.hanzo.ai)
 // ---------------------------------------------------------------------------
 
 export class HanzoCloudProvider implements AIProvider {
   id = 'hanzo-cloud';
   name = 'Hanzo Cloud';
   type = 'cloud' as const;
-  private baseUrl = 'https://llm.hanzo.ai/v1';
+  private baseUrl = 'https://api.hanzo.ai/v1';
   private token: string | null = null;
   private models: AIModel[] = [];
   private available = false;
@@ -454,6 +454,268 @@ export class AIProviderRegistry {
 }
 
 // ---------------------------------------------------------------------------
+// Anthropic-Compatible Provider (messages API)
+// ---------------------------------------------------------------------------
+
+export class AnthropicProvider implements AIProvider {
+  id: string;
+  name: string;
+  type: 'cloud' | 'local';
+  private baseUrl: string;
+  private apiKey: string;
+  private models: AIModel[] = [];
+  private available = false;
+
+  constructor(id: string, name: string, baseUrl: string, apiKey: string, type: 'cloud' | 'local' = 'cloud') {
+    this.id = id;
+    this.name = name;
+    this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.apiKey = apiKey;
+    this.type = type;
+  }
+
+  async discover(): Promise<boolean> {
+    try {
+      // Anthropic doesn't have a /models endpoint — test with a minimal request
+      const resp = await fetch(`${this.baseUrl}/v1/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1,
+          messages: [{ role: 'user', content: 'hi' }],
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      // Any response (even 400) means the API is reachable
+      this.available = resp.status !== 0 && resp.status < 500;
+      if (this.available && !this.models.length) {
+        this.models = [
+          { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: this.id },
+          { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: this.id },
+          { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: this.id },
+        ];
+      }
+      return this.available;
+    } catch {
+      this.available = false;
+      return false;
+    }
+  }
+
+  async listModels(): Promise<AIModel[]> {
+    if (!this.models.length) await this.discover();
+    return this.models;
+  }
+
+  async chat(model: string, messages: AIMessage[], options?: AICompletionOptions): Promise<string> {
+    // Anthropic messages API: system is separate from messages
+    const systemMsg = messages.find(m => m.role === 'system');
+    const chatMsgs = messages.filter(m => m.role !== 'system').map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }));
+
+    const body: any = {
+      model,
+      max_tokens: options?.max_tokens || 4096,
+      messages: chatMsgs,
+    };
+    if (systemMsg) body.system = systemMsg.content;
+    if (options?.temperature !== undefined) body.temperature = options.temperature;
+    if (options?.top_p !== undefined) body.top_p = options.top_p;
+    if (options?.stop) body.stop_sequences = options.stop;
+
+    const resp = await fetch(`${this.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(120000),
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Anthropic: ${resp.status} ${text}`);
+    }
+    const data = await resp.json();
+    return data.content?.[0]?.text || '';
+  }
+
+  async chatStream(model: string, messages: AIMessage[], onToken: (token: string) => void, options?: AICompletionOptions): Promise<string> {
+    const systemMsg = messages.find(m => m.role === 'system');
+    const chatMsgs = messages.filter(m => m.role !== 'system').map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }));
+
+    const body: any = {
+      model,
+      max_tokens: options?.max_tokens || 4096,
+      messages: chatMsgs,
+      stream: true,
+    };
+    if (systemMsg) body.system = systemMsg.content;
+    if (options?.temperature !== undefined) body.temperature = options.temperature;
+
+    const resp = await fetch(`${this.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) throw new Error(`Anthropic stream: ${resp.status}`);
+
+    const reader = resp.body?.getReader();
+    if (!reader) throw new Error('No body');
+    const decoder = new TextDecoder();
+    let buffer = '', full = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6);
+        if (payload === '[DONE]') continue;
+        try {
+          const json = JSON.parse(payload);
+          if (json.type === 'content_block_delta' && json.delta?.text) {
+            onToken(json.delta.text);
+            full += json.delta.text;
+          }
+        } catch { /* skip */ }
+      }
+    }
+    return full;
+  }
+
+  getStatus(): AIProviderStatus {
+    return {
+      id: this.id, name: this.name, type: this.type,
+      available: this.available, url: this.baseUrl,
+      models: this.models, requiresAuth: true, authenticated: !!this.apiKey,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hanzo Node Provider (gRPC/REST node with OpenAI-compatible inference)
+// ---------------------------------------------------------------------------
+
+export class HanzoNodeProvider implements AIProvider {
+  id = 'hanzo-node';
+  name = 'Hanzo Node';
+  type = 'local' as const;
+  private baseUrl = 'http://localhost:3690';
+  private models: AIModel[] = [];
+  private available = false;
+
+  async discover(): Promise<boolean> {
+    // Hanzo Node: REST on 3690, gRPC on 9090, HTTP health on 8080
+    const ports = [3690, 8080, 9090];
+    for (const port of ports) {
+      try {
+        const url = `http://localhost:${port}`;
+        const endpoint = port === 3690 ? `${url}/v2/health` : `${url}/health`;
+        const resp = await fetch(endpoint, { signal: AbortSignal.timeout(2000) });
+        if (resp.ok) {
+          this.baseUrl = url;
+          this.available = true;
+          return true;
+        }
+      } catch { /* next */ }
+    }
+    this.available = false;
+    return false;
+  }
+
+  async listModels(): Promise<AIModel[]> {
+    try {
+      // Hanzo Node v2 API
+      const resp = await fetch(`${this.baseUrl}/v2/models`, { signal: AbortSignal.timeout(5000) });
+      if (resp.ok) {
+        const data = await resp.json();
+        this.models = (data.data || data.models || data || []).map((m: any) => ({
+          id: m.id || m.name || m.model,
+          name: m.id || m.name || m.model,
+          provider: this.id,
+        }));
+        return this.models;
+      }
+      // Fallback: OpenAI-compat /v1/models
+      const resp2 = await fetch(`${this.baseUrl}/v1/models`, { signal: AbortSignal.timeout(5000) });
+      if (resp2.ok) {
+        const data = await resp2.json();
+        this.models = (data.data || []).map((m: any) => ({
+          id: m.id, name: m.id, provider: this.id,
+        }));
+      }
+      return this.models;
+    } catch {
+      return [];
+    }
+  }
+
+  async chat(model: string, messages: AIMessage[], options?: AICompletionOptions): Promise<string> {
+    // Try OpenAI-compat first, then Hanzo Node v2 inference
+    const body: any = { model, messages, stream: false };
+    if (options?.temperature !== undefined) body.temperature = options.temperature;
+    if (options?.max_tokens !== undefined) body.max_tokens = options.max_tokens;
+
+    try {
+      const resp = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(120000),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        return data.choices?.[0]?.message?.content || '';
+      }
+    } catch { /* try fallback */ }
+
+    // Fallback: Hanzo Node v2 inference endpoint
+    const inferBody: any = {
+      prompt: messages.map(m => `${m.role}: ${m.content}`).join('\n'),
+      model,
+      max_tokens: options?.max_tokens || 2048,
+      temperature: options?.temperature ?? 0.7,
+    };
+    const resp = await fetch(`${this.baseUrl}/v1/inference`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inferBody),
+      signal: AbortSignal.timeout(120000),
+    });
+    if (!resp.ok) throw new Error(`Hanzo Node: ${resp.status}`);
+    const data = await resp.json();
+    return data.choices?.[0]?.text || data.response || '';
+  }
+
+  getStatus(): AIProviderStatus {
+    return {
+      id: this.id, name: this.name, type: this.type,
+      available: this.available, url: this.baseUrl,
+      models: this.models, requiresAuth: false,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Default registry with built-in providers
 // ---------------------------------------------------------------------------
 
@@ -467,6 +729,7 @@ export function createDefaultRegistry(): AIProviderRegistry {
   registry.register(new OllamaNativeProvider());
   registry.register(new OpenAICompatibleProvider('lmstudio', 'LM Studio', 'http://localhost:1234/v1'));
   registry.register(new OpenAICompatibleProvider('hanzo-desktop', 'Hanzo Desktop', 'http://localhost:11435/v1'));
+  registry.register(new HanzoNodeProvider());
 
   return registry;
 }
