@@ -1017,16 +1017,64 @@ class HanzoSidebar {
       return;
     }
 
-    const tag = `<span class="element-tag">&lt;${this.escapeHtml(info.tag)}&gt;</span>`;
-    const id = info.id ? `<span class="element-id">#${this.escapeHtml(info.id)}</span>` : '';
-    const cls = info.classes?.length ? `<span class="element-class">.${info.classes.map((c: string) => this.escapeHtml(c)).join('.')}</span>` : '';
-    const size = `<span class="element-size">${info.rect?.w}x${info.rect?.h} @ (${info.rect?.x}, ${info.rect?.y})</span>`;
-    const selector = info.selector ? `\nSelector: ${this.escapeHtml(info.selector)}` : '';
-    const text = info.text ? `\nText: "${this.escapeHtml(info.text.substring(0, 60))}"` : '';
-    const styles = info.styles ? `\nFont: ${info.styles.fontSize} ${info.styles.fontWeight}\nColor: ${info.styles.color}\nBg: ${info.styles.backgroundColor}` : '';
+    // Build clickable lines — each line copies its value on click
+    const copyLine = (label: string, value: string, cssClass?: string) => {
+      const escaped = this.escapeHtml(value);
+      const cls = cssClass ? ` class="${cssClass}"` : '';
+      return `<span${cls} class="copy-line${cssClass ? ' ' + cssClass : ''}" data-copy="${this.escapeHtml(value)}" title="Click to copy">${label ? '<span class="info-label">' + label + '</span>' : ''}${escaped}</span>`;
+    };
 
-    el.innerHTML = `${tag}${id}${cls}\n${size}${selector}${text}${styles}`;
+    const tagStr = `<${info.tag}>`;
+    const fullSelector = (info.tag || '') +
+      (info.id ? '#' + info.id : '') +
+      (info.classes?.length ? '.' + info.classes.join('.') : '');
+
+    const lines: string[] = [];
+
+    // Element tag + id + classes (copies full selector)
+    const tagHtml = `<span class="element-tag">&lt;${this.escapeHtml(info.tag)}&gt;</span>`;
+    const idHtml = info.id ? `<span class="element-id">#${this.escapeHtml(info.id)}</span>` : '';
+    const clsHtml = info.classes?.length ? `<span class="element-class">.${info.classes.map((c: string) => this.escapeHtml(c)).join('.')}</span>` : '';
+    lines.push(`<span class="copy-line" data-copy="${this.escapeHtml(fullSelector)}" title="Click to copy selector">${tagHtml}${idHtml}${clsHtml}</span>`);
+
+    // Size
+    if (info.rect) {
+      lines.push(copyLine('', `${info.rect.w}x${info.rect.h} @ (${info.rect.x}, ${info.rect.y})`, 'element-size'));
+    }
+
+    // Selector
+    if (info.selector) {
+      lines.push(copyLine('Selector: ', info.selector));
+    }
+
+    // Text
+    if (info.text) {
+      lines.push(copyLine('Text: ', `"${info.text.substring(0, 60)}"`));
+    }
+
+    // Styles
+    if (info.styles) {
+      lines.push(copyLine('Font: ', `${info.styles.fontSize} ${info.styles.fontWeight}`));
+      lines.push(copyLine('Color: ', info.styles.color));
+      lines.push(copyLine('Bg: ', info.styles.backgroundColor));
+    }
+
+    el.innerHTML = lines.join('\n');
     el.classList.remove('hidden');
+
+    // Attach click-to-copy handlers
+    el.querySelectorAll('.copy-line').forEach((line: Element) => {
+      line.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const text = (line as HTMLElement).dataset.copy || line.textContent || '';
+        navigator.clipboard.writeText(text).then(() => {
+          const original = line.classList.contains('copied');
+          line.classList.add('copied');
+          setTimeout(() => line.classList.remove('copied'), 800);
+          this.showNotification(`Copied: ${text.slice(0, 50)}`);
+        }).catch(() => {});
+      });
+    });
   }
 
   async takeScreenshot() {

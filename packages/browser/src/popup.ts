@@ -166,39 +166,60 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- Status ---
+  function setStatus(dot: HTMLElement, detail: HTMLElement, connected: boolean, text: string) {
+    dot.classList.toggle('connected', connected);
+    dot.classList.toggle('disconnected', !connected);
+    detail.textContent = text;
+  }
+
   function refreshStatus() {
-    // ZAP status
+    // ZAP Bridge
     chrome.runtime.sendMessage({ action: 'zap.status' }, (response) => {
       if (chrome.runtime.lastError) return;
       if (response?.success) {
         const zap = response.zap;
         if (zap.connected) {
-          zapStatus.classList.add('connected');
-          zapStatus.classList.remove('disconnected');
           const mcpCount = zap.mcps?.length || 0;
-          const toolCount = zap.mcps?.reduce((sum, m) => sum + (m.tools?.length || 0), 0) || 0;
-          zapDetail.textContent = `${mcpCount} MCP(s), ${toolCount} tools`;
+          const toolCount = zap.mcps?.reduce((sum: number, m: any) => sum + (m.tools?.length || 0), 0) || 0;
+          setStatus(zapStatus, zapDetail, true, `${mcpCount} MCP, ${toolCount} tools`);
         } else {
-          zapStatus.classList.remove('connected');
-          zapStatus.classList.add('disconnected');
-          zapDetail.textContent = 'Not connected';
+          setStatus(zapStatus, zapDetail, false, 'Not connected');
         }
       }
     });
 
-    // GPU status
-    chrome.runtime.sendMessage({ action: 'runLocalAI', prompt: '' }, (response) => {
+    // CDP Bridge
+    chrome.runtime.sendMessage({ action: 'bridge.status' }, (response) => {
       if (chrome.runtime.lastError) return;
-      gpuStatus.classList.add(response?.success ? 'connected' : 'disconnected');
-      gpuStatus.classList.remove(response?.success ? 'disconnected' : 'connected');
-      gpuDetail.textContent = response?.success ? 'Available' : 'Not available';
+      if (response?.success && response.connected) {
+        const browsers = response.browsers || [];
+        setStatus(cdpStatus, cdpDetail, true, browsers.length ? `Connected` : 'Connected');
+      } else {
+        setStatus(cdpStatus, cdpDetail, false, 'Not connected');
+      }
     });
 
-    // MCP/CDP — set as active for now (checked via ZAP)
-    mcpStatus.classList.add('connected');
-    mcpPort.textContent = 'Fallback';
-    cdpStatus.classList.add('connected');
-    cdpDetail.textContent = 'Active';
+    // MCP Bridge (:9224)
+    try {
+      fetch('http://localhost:9224', { signal: AbortSignal.timeout(2000) })
+        .then(r => r.json())
+        .then(data => {
+          if (data?.service === 'hanzo.browser') {
+            setStatus(mcpStatus, mcpPort, true, `:9224 OK`);
+          } else {
+            setStatus(mcpStatus, mcpPort, false, ':9224 N/A');
+          }
+        })
+        .catch(() => setStatus(mcpStatus, mcpPort, false, ':9224 offline'));
+    } catch {
+      setStatus(mcpStatus, mcpPort, false, ':9224 offline');
+    }
+
+    // WebGPU
+    chrome.runtime.sendMessage({ action: 'runLocalAI', prompt: '' }, (response) => {
+      if (chrome.runtime.lastError) return;
+      setStatus(gpuStatus, gpuDetail, !!response?.success, response?.success ? 'Available' : 'Not available');
+    });
   }
 
   // --- Settings ---
