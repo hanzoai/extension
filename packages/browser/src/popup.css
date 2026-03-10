@@ -119,7 +119,8 @@ h3 {
   animation: fadeIn 0.3s ease;
 }
 
-.section.hidden {
+.section.hidden,
+.hidden {
   display: none;
 }
 
