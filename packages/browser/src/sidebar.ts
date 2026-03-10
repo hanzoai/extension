@@ -108,6 +108,14 @@ class HanzoSidebar {
       ragKb: document.getElementById('rag-kb'),
       ragEndpoint: document.getElementById('rag-endpoint'),
       ragApiKey: document.getElementById('rag-api-key'),
+
+      // Build info
+      buildExtVersion: document.getElementById('build-ext-version'),
+      buildBrowser: document.getElementById('build-browser'),
+      buildManifest: document.getElementById('build-manifest'),
+      buildCdpStatus: document.getElementById('build-cdp-status'),
+      buildMcpStatus: document.getElementById('build-mcp-status'),
+      footerVersion: document.getElementById('footer-version'),
     };
   }
 
@@ -1452,6 +1460,71 @@ class HanzoSidebar {
       if (this.el.tabContextEnabled) this.el.tabContextEnabled.checked = result.hanzo_chat_tab_context_enabled !== false;
       this.setRagStatus(this.el.ragEnabled?.checked ? 'Ready' : 'RAG disabled');
     });
+
+    this.populateBuildInfo();
+  }
+
+  async populateBuildInfo() {
+    // Extension version from manifest
+    const manifest = chrome.runtime.getManifest();
+    const version = manifest.version || 'unknown';
+    const manifestVersion = `MV${manifest.manifest_version}`;
+
+    if (this.el.buildExtVersion) this.el.buildExtVersion.textContent = `v${version}`;
+    if (this.el.buildManifest) this.el.buildManifest.textContent = manifestVersion;
+
+    // Browser detection
+    const ua = navigator.userAgent;
+    let browser = 'Unknown';
+    if (ua.includes('Firefox/')) {
+      const match = ua.match(/Firefox\/([\d.]+)/);
+      browser = `Firefox ${match?.[1] || ''}`;
+    } else if (ua.includes('Edg/')) {
+      const match = ua.match(/Edg\/([\d.]+)/);
+      browser = `Edge ${match?.[1] || ''}`;
+    } else if (ua.includes('Chrome/')) {
+      const match = ua.match(/Chrome\/([\d.]+)/);
+      browser = `Chrome ${match?.[1] || ''}`;
+    } else if (ua.includes('Safari/')) {
+      const match = ua.match(/Version\/([\d.]+)/);
+      browser = `Safari ${match?.[1] || ''}`;
+    }
+    if (this.el.buildBrowser) this.el.buildBrowser.textContent = browser;
+
+    // Footer version
+    if (this.el.footerVersion) this.el.footerVersion.textContent = `hanzo.ai v${version}`;
+
+    // CDP bridge status
+    try {
+      const bridgeResp = await chrome.runtime.sendMessage({ action: 'bridge.status' });
+      if (this.el.buildCdpStatus) {
+        this.el.buildCdpStatus.innerHTML = bridgeResp?.connected
+          ? `<span class="status-indicator connected"></span> Connected`
+          : `<span class="status-indicator disconnected"></span> Disconnected`;
+      }
+    } catch {
+      if (this.el.buildCdpStatus) this.el.buildCdpStatus.innerHTML = `<span class="status-indicator disconnected"></span> Unavailable`;
+    }
+
+    // MCP HTTP bridge (port 9224)
+    try {
+      const resp = await fetch('http://localhost:9224', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status' }),
+        signal: AbortSignal.timeout(2000),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (this.el.buildMcpStatus) {
+          this.el.buildMcpStatus.innerHTML = `<span class="status-indicator connected"></span> :9224 OK`;
+        }
+      } else {
+        if (this.el.buildMcpStatus) this.el.buildMcpStatus.innerHTML = `<span class="status-indicator disconnected"></span> :9224 Error`;
+      }
+    } catch {
+      if (this.el.buildMcpStatus) this.el.buildMcpStatus.innerHTML = `<span class="status-indicator disconnected"></span> :9224 Offline`;
+    }
   }
 
   async saveSettings() {
