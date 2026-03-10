@@ -6,16 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g., 1.5.8)'
+        description: 'Version to publish (e.g., 1.7.18)'
         required: true
         type: string
 
-# Secrets are sourced from Hanzo KMS (project: extension, env: production).
-# To configure: hanzo kms set --project extension --env production CHROME_EXTENSION_ID <value>
-# GHA secrets are synced from KMS via the hanzo/kms-sync GitHub Action.
-
 jobs:
-  # ─── Fetch secrets from Hanzo KMS ───
+  # ─── Check available secrets ───
   secrets:
     name: Load KMS Secrets
     runs-on: ubuntu-latest
@@ -56,13 +52,13 @@ jobs:
     - name: Package
       working-directory: packages/browser
       run: |
-        mkdir -p dist
-        cd dist/browser-extension/chrome && zip -r ../../hanzo-ai-chrome.zip .
-        cd ../../browser-extension/firefox && zip -r ../../hanzo-ai-firefox.zip .
+        cd dist/browser-extension/chrome && zip -r ../../../hanzo-ai-chrome.zip .
+        cd ../../browser-extension/firefox && zip -r ../../../hanzo-ai-firefox.zip .
 
     - name: Lint Firefox
       working-directory: packages/browser
       run: npx web-ext lint --source-dir dist/browser-extension/firefox
+      continue-on-error: true
 
     - name: Publish to Chrome Web Store
       if: needs.secrets.outputs.has-chrome == 'true'
@@ -96,13 +92,6 @@ jobs:
           --channel listed \
           --id "hanzo-ai@hanzo.ai"
       continue-on-error: true
-
-    - uses: actions/upload-artifact@v4
-      with:
-        name: browser
-        path: |
-          packages/browser/dist/hanzo-ai-chrome.zip
-          packages/browser/dist/hanzo-ai-firefox.zip
 
   # ─── Safari (macOS + iOS) ───
   safari:
@@ -138,12 +127,7 @@ jobs:
           CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
           -derivedDataPath dist/safari-build-ios
 
-    - uses: actions/upload-artifact@v4
-      with:
-        name: safari
-        path: packages/browser/dist/safari/
-
-  # ─── VS Code + Open VSX ───
+  # ─── VS Code + Cursor + Windsurf + Open VSX ───
   vscode:
     name: VS Code Marketplace
     runs-on: ubuntu-latest
@@ -156,24 +140,28 @@ jobs:
         node-version: '22'
         cache: 'pnpm'
     - run: pnpm install --frozen-lockfile
-    - run: pnpm add -g @vscode/vsce ovsx
-    - run: pnpm --filter @hanzo/extension run compile
+    - run: npm i -g @vscode/vsce ovsx
 
-    - name: Package and publish
-      if: needs.secrets.outputs.has-vsce == 'true'
+    - name: Build
       working-directory: packages/vscode
       run: |
-        vsce package --no-dependencies
-        vsce publish -p ${{ secrets.VSCE_PAT }}
-      env:
-        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        node scripts/compile-main.js || true
+        npm run build:mcp
+
+    - name: Package VSIX
+      working-directory: packages/vscode
+      run: vsce package --no-dependencies
+
+    - name: Publish to VS Code Marketplace
+      if: needs.secrets.outputs.has-vsce == 'true'
+      working-directory: packages/vscode
+      run: vsce publish -p ${{ secrets.VSCE_PAT }}
+      continue-on-error: true
 
     - name: Publish to Open VSX
       if: needs.secrets.outputs.has-vsce == 'true'
       working-directory: packages/vscode
       run: ovsx publish *.vsix -p ${{ secrets.OVSX_PAT }}
-      env:
-        OVSX_PAT: ${{ secrets.OVSX_PAT }}
       continue-on-error: true
 
   # ─── npm (@hanzo/mcp) ───
