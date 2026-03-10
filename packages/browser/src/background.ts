@@ -1538,32 +1538,57 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         if (provider === 'ollama' && !endpoint) {
           result = await ollamaClient.chat(model, messages, options);
         } else {
-          // LM Studio, Hanzo Desktop, or custom endpoint — all use OpenAI-compatible API
-          const baseUrl = endpoint || (
-            provider === 'lmstudio' ? 'http://localhost:1234/v1' :
-            provider === 'hanzo-desktop' ? 'http://localhost:11435/v1' :
-            'http://localhost:8080/v1'
-          );
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (request.apiKey) headers['Authorization'] = `Bearer ${request.apiKey}`;
+          if (provider === 'anthropic') {
+            // Anthropic Messages API
+            const baseUrl = endpoint || 'https://api.anthropic.com';
+            const systemMsg = messages.find((m: any) => m.role === 'system');
+            const chatMsgs = messages.filter((m: any) => m.role !== 'system');
+            const body: any = { model, max_tokens: options.num_predict || 4096, messages: chatMsgs, stream: false };
+            if (systemMsg) body.system = systemMsg.content;
+            if (options.temperature !== undefined) body.temperature = options.temperature;
 
-          const body: any = { model, messages, stream: false };
-          if (options.temperature !== undefined) body.temperature = options.temperature;
-          if (options.top_p !== undefined) body.top_p = options.top_p;
-          if (options.num_predict !== undefined) body.max_tokens = options.num_predict;
+            const resp = await fetch(`${baseUrl}/v1/messages`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': request.apiKey || '',
+                'anthropic-version': '2023-06-01',
+              },
+              body: JSON.stringify(body),
+              signal: AbortSignal.timeout(120000),
+            });
+            if (!resp.ok) { const text = await resp.text(); throw new Error(`Anthropic: ${resp.status} ${text}`); }
+            const data = await resp.json();
+            result = data.content?.[0]?.text || '';
+          } else {
+            // OpenAI-compatible: LM Studio, Hanzo Desktop, Hanzo Node, custom
+            const baseUrl = endpoint || (
+              provider === 'lmstudio' ? 'http://localhost:1234/v1' :
+              provider === 'hanzo-desktop' ? 'http://localhost:11435/v1' :
+              provider === 'hanzo-node' ? 'http://localhost:3690/v1' :
+              'http://localhost:8080/v1'
+            );
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (request.apiKey) headers['Authorization'] = `Bearer ${request.apiKey}`;
 
-          const resp = await fetch(`${baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(body),
-            signal: AbortSignal.timeout(120000),
-          });
-          if (!resp.ok) {
-            const text = await resp.text();
-            throw new Error(`${provider} error: ${resp.status} ${text}`);
+            const body: any = { model, messages, stream: false };
+            if (options.temperature !== undefined) body.temperature = options.temperature;
+            if (options.top_p !== undefined) body.top_p = options.top_p;
+            if (options.num_predict !== undefined) body.max_tokens = options.num_predict;
+
+            const resp = await fetch(`${baseUrl}/chat/completions`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body),
+              signal: AbortSignal.timeout(120000),
+            });
+            if (!resp.ok) {
+              const text = await resp.text();
+              throw new Error(`${provider} error: ${resp.status} ${text}`);
+            }
+            const data = await resp.json();
+            result = data.choices?.[0]?.message?.content || '';
           }
-          const data = await resp.json();
-          result = data.choices?.[0]?.message?.content || '';
         }
 
         sendResponse({ success: true, content: result });
@@ -1645,6 +1670,23 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       }
       if (!providers.find(p => p.name === 'hanzo-desktop')) {
         providers.push({ name: 'hanzo-desktop', url: 'http://localhost:11435', available: false });
+      }
+
+      // Hanzo Node (standalone Rust node, REST API on :3690 or :8080)
+      let hanzoNodeFound = false;
+      for (const port of [3690, 8080]) {
+        try {
+          const endpoint = port === 3690 ? `http://localhost:${port}/v2/health` : `http://localhost:${port}/health`;
+          const resp = await fetch(endpoint, { signal: AbortSignal.timeout(2000) });
+          if (resp.ok) {
+            providers.push({ name: 'hanzo-node', url: `http://localhost:${port}`, available: true });
+            hanzoNodeFound = true;
+            break;
+          }
+        } catch { /* next */ }
+      }
+      if (!hanzoNodeFound) {
+        providers.push({ name: 'hanzo-node', url: 'http://localhost:3690', available: false });
       }
 
       // Check for custom endpoints saved in storage
@@ -1738,6 +1780,178 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         sendResponse({ success: true, models: (data.data || data.models || []).map((m: any) => m.id || m.name) });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    // --- Settings Sync (unified chrome.storage + ~/.hanzo via CDP bridge) ---
+    case 'settings.get': {
+      try {
+        const keys = request.keys || [
+          'selectedProvider', 'selectedModel', 'customLLMEndpoints', 'ollamaUrl',
+          'anthropicApiKey', 'openaiApiKey', 'hanzoApiKey',
+          'mcpPort', 'cdpPort', 'zapPorts',
+          'source-maps', 'webgpu-ai', 'browser-control', 'tab-filesystem',
+          'activeOrgId', 'browserBackend',
+        ];
+        const result = await chrome.storage.local.get(keys);
+        sendResponse({ success: true, settings: result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'settings.set': {
+      try {
+        await chrome.storage.local.set(request.settings);
+        // Also persist to ~/.hanzo/extension/config.json via CDP bridge if connected
+        try {
+          const bridge = getCDPBridge();
+          if (bridge.isConnected()) {
+            for (const [key, value] of Object.entries(request.settings)) {
+              bridge.sendConfig(key, value);
+            }
+          }
+        } catch { /* bridge not connected, local-only save is fine */ }
+        sendResponse({ success: true });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'settings.export': {
+      // Export all settings as JSON
+      try {
+        const all = await chrome.storage.local.get(null);
+        // Filter out tokens and sensitive data
+        const safe: Record<string, any> = {};
+        for (const [k, v] of Object.entries(all)) {
+          if (k.startsWith('hanzo_iam_')) continue; // skip tokens
+          safe[k] = v;
+        }
+        sendResponse({ success: true, settings: safe });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'settings.import': {
+      try {
+        const settings = request.settings || {};
+        // Don't import token data
+        delete settings.hanzo_iam_access_token;
+        delete settings.hanzo_iam_refresh_token;
+        delete settings.hanzo_iam_id_token;
+        await chrome.storage.local.set(settings);
+        sendResponse({ success: true });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    // --- Organization Switcher ---
+    case 'org.list': {
+      // Fetch user's organizations from Hanzo IAM
+      try {
+        const token = await auth.getValidAccessToken();
+        if (!token) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
+
+        const resp = await fetch('https://iam.hanzo.ai/api/get-account', {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!resp.ok) throw new Error(`IAM: ${resp.status}`);
+        const data = await resp.json();
+        const user = data.data || data;
+
+        // Casdoor stores org memberships in user.groups or via org API
+        const orgs: { id: string; name: string; displayName?: string }[] = [];
+
+        // Primary org from user's owner field
+        if (user.owner) {
+          orgs.push({ id: user.owner, name: user.owner, displayName: user.owner });
+        }
+
+        // Fetch orgs the user belongs to
+        try {
+          const orgsResp = await fetch('https://iam.hanzo.ai/api/get-organizations', {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(5000),
+          });
+          if (orgsResp.ok) {
+            const orgsData = await orgsResp.json();
+            for (const org of (orgsData.data || orgsData || [])) {
+              if (!orgs.find(o => o.id === org.name)) {
+                orgs.push({ id: org.name, name: org.name, displayName: org.displayName || org.name });
+              }
+            }
+          }
+        } catch { /* user may not have permission to list all orgs */ }
+
+        // Get active org from storage
+        const stored = await chrome.storage.local.get(['activeOrgId']);
+        sendResponse({
+          success: true,
+          orgs,
+          activeOrgId: stored.activeOrgId || orgs[0]?.id || null,
+          user: { name: user.displayName || user.name, email: user.email, avatar: user.avatar },
+        });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'org.switch': {
+      try {
+        await chrome.storage.local.set({ activeOrgId: request.orgId });
+        sendResponse({ success: true, activeOrgId: request.orgId });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    // --- API Key Management ---
+    case 'apikey.save': {
+      try {
+        const keyMap: Record<string, string> = {};
+        keyMap[`apikey_${request.provider}`] = request.apiKey;
+        await chrome.storage.local.set(keyMap);
+        sendResponse({ success: true });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'apikey.get': {
+      try {
+        const key = `apikey_${request.provider}`;
+        const stored = await chrome.storage.local.get([key]);
+        sendResponse({ success: true, apiKey: stored[key] || null });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'apikey.list': {
+      try {
+        const all = await chrome.storage.local.get(null);
+        const keys: { provider: string; hasKey: boolean }[] = [];
+        for (const [k] of Object.entries(all)) {
+          if (k.startsWith('apikey_')) {
+            keys.push({ provider: k.replace('apikey_', ''), hasKey: true });
+          }
+        }
+        sendResponse({ success: true, keys });
       } catch (e: any) {
         sendResponse({ success: false, error: e.message });
       }
