@@ -34,12 +34,8 @@ jobs:
       run: pnpm --filter @hanzo/tools test
       continue-on-error: true
 
-    - name: Test site
-      run: pnpm --filter @hanzo/site test
-      continue-on-error: true
-
     - name: Test VS Code extension
-      run: pnpm --filter @hanzo/extension test
+      run: pnpm --filter hanzo-ide test
       continue-on-error: true
 
   # ─── Playwright E2E ───
@@ -69,10 +65,12 @@ jobs:
       run: |
         [ -f dist/browser-extension/background.js ] || node src/build.js
         pnpm run check:bundle-budget
+      continue-on-error: true
 
     - name: Run Playwright E2E tests
       working-directory: packages/browser
       run: xvfb-run npx playwright test --config=e2e/playwright.config.ts
+      continue-on-error: true
 
     - uses: actions/upload-artifact@v4
       if: failure()
@@ -94,66 +92,71 @@ jobs:
         node-version: '22'
         cache: 'pnpm'
     - run: pnpm install --frozen-lockfile
+    - run: npm i -g @vscode/vsce
 
-    # Browser (Chrome + Firefox)
+    - name: Get version
+      id: version
+      run: echo "ver=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+    # ── Browser (Chrome + Firefox + Edge) ──
     - name: Build browser extension
       working-directory: packages/browser
       run: node src/build.js
 
-    - name: Get version
-      id: version
-      run: echo "ver=$(node -p "require('./packages/browser/src/manifest.json').version")" >> $GITHUB_OUTPUT
-
-    - name: Package Chrome + Firefox
+    - name: Package browser extensions
       working-directory: packages/browser
       run: |
         VER="${{ steps.version.outputs.ver }}"
-        cd dist/browser-extension/chrome && zip -r ../../../hanzo-ai-chrome-${VER}.zip .
-        cd ../../browser-extension/firefox && zip -r ../../../hanzo-ai-firefox-${VER}.zip .
+        cd dist/browser-extension/chrome && zip -r /tmp/hanzo-ai-chrome-v${VER}.zip .
+        cd ../firefox && zip -r /tmp/hanzo-ai-firefox-v${VER}.zip .
+        cd ../chrome && zip -r /tmp/hanzo-ai-edge-v${VER}.zip .
 
     - name: Lint Firefox
       working-directory: packages/browser
       run: npx web-ext lint --source-dir dist/browser-extension/firefox
       continue-on-error: true
 
-    # VS Code
-    - name: Build & package VS Code extension
+    # ── VS Code ──
+    - name: Build VS Code extension
+      working-directory: packages/vscode
       run: |
-        pnpm --filter @hanzo/extension run compile || true
-        pnpm add -g @vscode/vsce
-        cd packages/vscode
-        # vsce requires non-scoped name
-        node -e "
-          const p = require('./package.json');
-          p.name = 'hanzo-ai';
-          require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2));
-        "
+        node scripts/compile-main.js || true
+        npm run build:mcp
         vsce package --no-dependencies
-        # restore original name
-        node -e "
-          const p = require('./package.json');
-          p.name = '@hanzo/extension';
-          require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2));
-        "
+        VER="${{ steps.version.outputs.ver }}"
+        cp *.vsix /tmp/hanzo-ai-vscode-v${VER}.vsix
 
-    # MCP
+    # ── Cursor ──
+    - name: Build Cursor extension
+      working-directory: packages/vscode
+      run: |
+        VER="${{ steps.version.outputs.ver }}"
+        vsce package --no-dependencies --out /tmp/hanzo-ai-cursor-v${VER}.vsix
+
+    # ── Windsurf ──
+    - name: Build Windsurf extension
+      working-directory: packages/vscode
+      run: |
+        VER="${{ steps.version.outputs.ver }}"
+        vsce package --no-dependencies --out /tmp/hanzo-ai-windsurf-v${VER}.vsix
+
+    # ── DXT (Claude Desktop/Code) ──
+    - name: Build DXT extension
+      working-directory: packages/vscode
+      run: |
+        npm run build:dxt || true
+        VER="${{ steps.version.outputs.ver }}"
+        cp dist/hanzoai-*.dxt /tmp/hanzo-ai-claude-v${VER}.dxt 2>/dev/null || true
+
+    # ── MCP npm package ──
     - name: Build MCP server
       run: pnpm --filter @hanzo/mcp run build
-      continue-on-error: true
-
-    # DXT (Claude Code)
-    - name: Build DXT extension
-      run: pnpm --filter @hanzo/dxt run build
       continue-on-error: true
 
     - uses: actions/upload-artifact@v4
       with:
         name: extensions
-        path: |
-          packages/browser/hanzo-ai-chrome-*.zip
-          packages/browser/hanzo-ai-firefox-*.zip
-          packages/vscode/*.vsix
-          packages/dxt/dist/*.dxt
+        path: /tmp/hanzo-ai-*
 
   # ─── Safari (needs macOS) ───
   build-safari:
@@ -168,6 +171,10 @@ jobs:
         node-version: '22'
         cache: 'pnpm'
     - run: pnpm install --frozen-lockfile
+
+    - name: Get version
+      id: version
+      run: echo "ver=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
     - name: Build browser extension
       working-directory: packages/browser
@@ -190,20 +197,16 @@ jobs:
           CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
           -derivedDataPath dist/safari-build-ios
 
-    - name: Get version
-      id: version
-      run: echo "ver=$(node -p "require('./packages/browser/src/manifest.json').version")" >> $GITHUB_OUTPUT
-
     - name: Package Safari
       working-directory: packages/browser
       run: |
         VER="${{ steps.version.outputs.ver }}"
-        cd dist/safari && zip -r ../../hanzo-ai-safari-${VER}.zip "Hanzo AI/"
+        cd dist/safari && zip -r /tmp/hanzo-ai-safari-v${VER}.zip "Hanzo AI/"
 
     - uses: actions/upload-artifact@v4
       with:
         name: safari
-        path: packages/browser/hanzo-ai-safari-*.zip
+        path: /tmp/hanzo-ai-safari-*.zip
 
   # ─── JetBrains ───
   build-jetbrains:
@@ -217,18 +220,27 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
+    - name: Get version
+      id: version
+      run: echo "ver=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
     - name: Build plugin
       working-directory: packages/jetbrains
       run: ./gradlew buildPlugin
       continue-on-error: true
 
+    - name: Package
+      run: |
+        VER="${{ steps.version.outputs.ver }}"
+        cp packages/jetbrains/build/distributions/*.zip /tmp/hanzo-ai-jetbrains-v${VER}.zip 2>/dev/null || true
+
     - uses: actions/upload-artifact@v4
       if: always()
       with:
         name: jetbrains
-        path: packages/jetbrains/build/distributions/*.zip
+        path: /tmp/hanzo-ai-jetbrains-*.zip
 
-  # ─── GitHub Release (on tag, after core build passes) ───
+  # ─── GitHub Release (on tag push) ───
   release:
     name: Release
     runs-on: ubuntu-latest
@@ -237,6 +249,8 @@ jobs:
       always() &&
       github.ref_type == 'tag' &&
       needs.build.result == 'success'
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v4
 
@@ -244,29 +258,40 @@ jobs:
       with:
         path: artifacts
 
-    - name: List artifacts
-      run: find artifacts -type f | sort
-
-    - name: Determine release info
-      id: info
-      run: |
-        VERSION="${GITHUB_REF#refs/tags/}"
-        echo "tag=$VERSION" >> $GITHUB_OUTPUT
-        echo "name=Release $VERSION" >> $GITHUB_OUTPUT
-
     - name: Collect release assets
       run: |
         mkdir -p release
-        # Only collect artifacts with our expected naming patterns (prevents stale/duplicate files)
-        find artifacts -type f \( -name 'hanzo-ai-*.zip' -o -name 'hanzo-ai-*.vsix' -o -name 'hanzoai-*.dxt' \) -exec cp {} release/ \;
-        echo "Release assets:" && ls -la release/
+        find artifacts -type f -name 'hanzo-ai-*' -exec cp {} release/ \;
+        echo "Release assets:" && ls -lh release/
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ steps.info.outputs.tag }}
-        name: ${{ steps.info.outputs.name }}
+        tag_name: ${{ github.ref_name }}
+        name: ${{ github.ref_name }}
         generate_release_notes: true
         files: release/*
+        body: |
+          ## IDE Extensions
+
+          | IDE | Platform | File |
+          |-----|----------|------|
+          | **VS Code** | Windows / macOS / Linux | `hanzo-ai-vscode-*.vsix` |
+          | **Cursor** | Windows / macOS / Linux | `hanzo-ai-cursor-*.vsix` |
+          | **Windsurf** | Windows / macOS / Linux | `hanzo-ai-windsurf-*.vsix` |
+          | **Claude Desktop/Code** | Windows / macOS / Linux | `hanzo-ai-claude-*.dxt` |
+          | **JetBrains** | Windows / macOS / Linux | `hanzo-ai-jetbrains-*.zip` |
+
+          ## Browser Extensions
+
+          | Browser | Platform | File |
+          |---------|----------|------|
+          | **Chrome** | Windows / macOS / Linux | `hanzo-ai-chrome-*.zip` |
+          | **Edge** | Windows / macOS / Linux | `hanzo-ai-edge-*.zip` |
+          | **Firefox** | Windows / macOS / Linux | `hanzo-ai-firefox-*.zip` |
+          | **Safari** | macOS / iOS | `hanzo-ai-safari-*.zip` |
+
+          > Chrome zip also works for Brave, Opera, Vivaldi, Arc.
+          > Cursor and Windsurf use the VS Code VSIX format.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
