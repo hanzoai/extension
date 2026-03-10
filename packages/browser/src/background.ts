@@ -16,6 +16,21 @@ import {
 } from './audit-runner';
 import { ollamaClient } from './ollama-client';
 import {
+  searchHuggingFace,
+  getHuggingFaceModel,
+  searchGGUF,
+  searchMLX,
+  getModelCard,
+  getModelStats,
+  getRecommendedModels,
+  searchOllamaLibrary,
+  downloadToOllama,
+  downloadFromHuggingFace,
+  formatSize,
+  type HubModel,
+  type DownloadProgress,
+} from './model-hub';
+import {
   ActionRateLimiter,
   CHAT_BUDGETS,
   InFlightRequestDeduper,
@@ -1428,7 +1443,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     case 'ollama.discover':
       try {
         const found = await ollamaClient.discover();
-        sendResponse({ success: true, connected: found, ...ollamaClient.getStatus() });
+        sendResponse({ success: true, discovered: found, ...ollamaClient.getStatus() });
       } catch (e: any) {
         sendResponse({ success: false, error: e.message });
       }
@@ -1716,7 +1731,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     case 'models.list': {
       // List all available models from Hanzo Cloud
       try {
-        const token = await auth.getToken();
+        const token = await auth.getValidAccessToken();
         if (!token) {
           // Return free/public models
           sendResponse({
@@ -1810,7 +1825,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         // Also persist to ~/.hanzo/extension/config.json via CDP bridge if connected
         try {
           const bridge = getCDPBridge();
-          if (bridge.isConnected()) {
+          if (bridge.isBridgeConnected()) {
             for (const [key, value] of Object.entries(request.settings)) {
               bridge.sendConfig(key, value);
             }
@@ -1955,6 +1970,197 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       } catch (e: any) {
         sendResponse({ success: false, error: e.message });
       }
+      break;
+    }
+
+    // =========================================================================
+    // Model Hub — Browse, search, download models
+    // =========================================================================
+
+    case 'hub.search': {
+      (async () => {
+        try {
+          const models = await searchHuggingFace(request.query || '', {
+            filter: request.filter,
+            sort: request.sort,
+            limit: request.limit,
+            author: request.author,
+          });
+          sendResponse({ success: true, models });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    case 'hub.searchGGUF': {
+      (async () => {
+        try {
+          const models = await searchGGUF(request.query || '', request.limit);
+          sendResponse({ success: true, models });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    case 'hub.model': {
+      (async () => {
+        try {
+          const model = await getHuggingFaceModel(request.modelId);
+          sendResponse({ success: true, model });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    case 'hub.recommended': {
+      sendResponse({ success: true, models: getRecommendedModels() });
+      break;
+    }
+
+    case 'hub.searchOllama': {
+      (async () => {
+        try {
+          const models = await searchOllamaLibrary(request.query || '');
+          sendResponse({ success: true, models });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    case 'hub.downloadOllama': {
+      (async () => {
+        try {
+          await downloadToOllama(
+            request.modelName,
+            request.ollamaUrl || undefined,
+            (progress: DownloadProgress) => {
+              // Broadcast progress to all extension views
+              chrome.runtime.sendMessage({
+                type: 'hub.downloadProgress',
+                progress,
+              }).catch(() => {});
+            }
+          );
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    case 'hub.downloadHF': {
+      (async () => {
+        try {
+          const buffer = await downloadFromHuggingFace(
+            request.downloadUrl,
+            (progress: DownloadProgress) => {
+              chrome.runtime.sendMessage({
+                type: 'hub.downloadProgress',
+                progress,
+              }).catch(() => {});
+            }
+          );
+          sendResponse({ success: true, size: buffer.byteLength });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    case 'hub.searchMLX': {
+      (async () => {
+        try {
+          const models = await searchMLX(request.query || '', request.limit);
+          sendResponse({ success: true, models });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    case 'hub.modelCard': {
+      (async () => {
+        try {
+          const card = await getModelCard(request.modelId);
+          sendResponse({ success: true, card });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    case 'hub.modelStats': {
+      (async () => {
+        try {
+          const stats = await getModelStats(request.modelId);
+          sendResponse({ success: true, stats });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    // Unified model listing: combine cloud + local + hub recommended
+    case 'hub.allModels': {
+      (async () => {
+        try {
+          const results: { cloud: any[]; local: any[]; recommended: HubModel[] } = {
+            cloud: [],
+            local: [],
+            recommended: getRecommendedModels(),
+          };
+
+          // Cloud models from Hanzo
+          try {
+            const { hanzo_iam_token } = await chrome.storage.local.get('hanzo_iam_token');
+            if (hanzo_iam_token) {
+              const resp = await fetch('https://api.hanzo.ai/v1/models', {
+                headers: { Authorization: `Bearer ${hanzo_iam_token}` },
+                signal: AbortSignal.timeout(5000),
+              });
+              if (resp.ok) {
+                const data = await resp.json();
+                results.cloud = (data.data || []).map((m: any) => ({
+                  id: m.id,
+                  name: m.id,
+                  provider: 'hanzo-cloud',
+                  owned_by: m.owned_by || 'hanzo',
+                }));
+              }
+            }
+          } catch { /* cloud unavailable */ }
+
+          // Local models from Ollama
+          try {
+            const ollamaModels = await ollamaClient.listModels();
+            results.local = ollamaModels.map((m: any) => ({
+              id: m.name || m.model,
+              name: m.name || m.model,
+              provider: 'ollama',
+              size: m.size,
+              format: m.details?.format,
+              quantization: m.details?.quantization_level,
+            }));
+          } catch { /* ollama unavailable */ }
+
+          sendResponse({ success: true, ...results });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
       break;
     }
 
