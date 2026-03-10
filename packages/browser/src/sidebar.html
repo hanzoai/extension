@@ -199,30 +199,88 @@
           </div>
         </div>
 
-        <!-- Usage -->
+        <!-- Usage & Billing -->
         <div class="panel">
-          <h3>Usage (1h)</h3>
-          <div class="mcp-status">
-            <div class="status-row">
-              <span>Chat Requests</span>
-              <span id="usage-chat-requests" class="status-value mono">0</span>
+          <div class="panel-header">
+            <h3>Usage & Billing</h3>
+            <a href="https://billing.hanzo.ai" target="_blank" class="badge badge-link" title="Manage billing">Billing ↗</a>
+          </div>
+
+          <!-- Balance card -->
+          <div id="balance-card" class="balance-card hidden">
+            <div class="balance-row">
+              <span class="balance-label">Balance</span>
+              <span id="balance-amount" class="balance-amount">$0.00</span>
             </div>
-            <div class="status-row">
-              <span>Input Tokens</span>
-              <span id="usage-input-tokens" class="status-value mono">0</span>
+            <div id="balance-tier" class="balance-tier hidden">
+              <span class="tier-badge" id="tier-name">Free</span>
             </div>
-            <div class="status-row">
-              <span>Output Tokens</span>
-              <span id="usage-output-tokens" class="status-value mono">0</span>
+            <div class="usage-bar-group" id="balance-bar-wrap">
+              <div class="usage-bar-track"><div id="balance-bar" class="usage-bar-fill" style="width:0%"></div></div>
+              <div class="usage-bar-labels">
+                <span id="balance-used-label">$0.00 used</span>
+                <span id="balance-pct-label">0%</span>
+              </div>
             </div>
-            <div class="status-row">
-              <span>Dedupe Hits</span>
-              <span id="usage-dedupe" class="status-value mono">0</span>
+          </div>
+
+          <!-- Session usage bars -->
+          <div class="usage-meters">
+            <div class="usage-meter">
+              <div class="usage-meter-header">
+                <span>Session Requests</span>
+                <span id="usage-chat-requests" class="mono">0</span>
+              </div>
+              <div class="usage-bar-track"><div id="bar-requests" class="usage-bar-fill bar-blue" style="width:0%"></div></div>
             </div>
-            <div class="status-row">
-              <span>Canceled</span>
-              <span id="usage-canceled" class="status-value mono">0</span>
+            <div class="usage-meter">
+              <div class="usage-meter-header">
+                <span>Input Tokens</span>
+                <span id="usage-input-tokens" class="mono">0</span>
+              </div>
+              <div class="usage-bar-track"><div id="bar-input" class="usage-bar-fill bar-violet" style="width:0%"></div></div>
             </div>
+            <div class="usage-meter">
+              <div class="usage-meter-header">
+                <span>Output Tokens</span>
+                <span id="usage-output-tokens" class="mono">0</span>
+              </div>
+              <div class="usage-bar-track"><div id="bar-output" class="usage-bar-fill bar-emerald" style="width:0%"></div></div>
+            </div>
+            <div class="usage-meter">
+              <div class="usage-meter-header">
+                <span>Est. Cost</span>
+                <span id="usage-est-cost" class="mono">$0.00</span>
+              </div>
+              <div class="usage-bar-track"><div id="bar-cost" class="usage-bar-fill bar-amber" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <div class="usage-meta">
+            <span id="usage-dedupe" class="mono" title="Deduplication hits">0 dedup</span>
+            <span>·</span>
+            <span id="usage-canceled" class="mono" title="Canceled requests">0 canceled</span>
+            <span>·</span>
+            <span id="usage-window" class="mono">1h window</span>
+          </div>
+        </div>
+
+        <!-- Model Hub -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Model Hub</h3>
+            <button class="icon-btn small" id="refresh-models" title="Refresh models">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                <path d="M14 2v5h-5M2 7a6 6 0 0111.5-2.5L14 5M2 14v-5h5M14 9a6 6 0 01-11.5 2.5L2 11" stroke-width="1.5"/>
+              </svg>
+            </button>
+          </div>
+          <div id="model-hub-list" class="model-hub-list">
+            <div class="empty-state">Loading models...</div>
+          </div>
+          <div class="model-hub-actions">
+            <input type="text" id="model-search" class="model-search" placeholder="Search models (HF, Ollama)...">
+            <button class="action-btn small" id="search-models-btn">Search</button>
           </div>
         </div>
 
