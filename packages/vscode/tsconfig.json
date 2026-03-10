@@ -22,6 +22,7 @@
     "resolveJsonModule": true,
     "lib": ["ES2020"],
     "skipLibCheck": true,
+    "noEmitOnError": false,
     "types": ["node", "vscode", "mocha", "sinon", "ws", "lodash"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
