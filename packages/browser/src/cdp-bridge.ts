@@ -129,34 +129,49 @@ export class CDPBridge {
     clip?: { x: number; y: number; width: number; height: number };
     fullPage?: boolean;
   }): Promise<string> {
-    // Enable Page domain first
-    await this.send(tabId, 'Page.enable');
-    
-    const params: any = {
-      format: options?.format || 'png',
-    };
-    
-    if (options?.quality) {
-      params.quality = options.quality;
-    }
-    
-    if (options?.fullPage) {
-      // Get full page metrics
-      const metrics = await this.send(tabId, 'Page.getLayoutMetrics');
-      params.clip = {
-        x: 0,
-        y: 0,
-        width: metrics.contentSize.width,
-        height: metrics.contentSize.height,
-        scale: 1
+    try {
+      // Enable Page domain first
+      await this.send(tabId, 'Page.enable');
+
+      const params: any = {
+        format: options?.format || 'png',
       };
-      params.captureBeyondViewport = true;
-    } else if (options?.clip) {
-      params.clip = { ...options.clip, scale: 1 };
+
+      if (options?.quality) {
+        params.quality = options.quality;
+      }
+
+      if (options?.fullPage) {
+        // Get full page metrics
+        const metrics = await this.send(tabId, 'Page.getLayoutMetrics');
+        params.clip = {
+          x: 0,
+          y: 0,
+          width: metrics.contentSize.width,
+          height: metrics.contentSize.height,
+          scale: 1
+        };
+        params.captureBeyondViewport = true;
+      } else if (options?.clip) {
+        params.clip = { ...options.clip, scale: 1 };
+      }
+
+      const result = await this.send(tabId, 'Page.captureScreenshot', params);
+      if (result?.data) {
+        return result.data; // Base64 encoded
+      }
+    } catch (e) {
+      debugLog(`[CDP] Page.captureScreenshot failed, using captureVisibleTab fallback: ${e}`);
     }
-    
-    const result = await this.send(tabId, 'Page.captureScreenshot', params);
-    return result.data; // Base64 encoded
+
+    // Fallback: use chrome.tabs.captureVisibleTab (no debugger needed)
+    const tab = await chrome.tabs.get(tabId);
+    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+      format: options?.format === 'jpeg' ? 'jpeg' : 'png',
+      quality: options?.quality,
+    });
+    // Strip data:image/png;base64, prefix
+    return dataUrl.replace(/^data:image\/\w+;base64,/, '');
   }
   
   async click(tabId: number, x: number, y: number): Promise<void> {
@@ -372,7 +387,12 @@ export class CDPBridge {
           break;
 
         case 'Runtime.evaluate':
-          result = await this.send(tabId, method, params);
+          // Must enable Runtime domain and set returnByValue for actual values
+          await this.send(tabId, 'Runtime.enable');
+          result = await this.send(tabId, method, {
+            ...params,
+            returnByValue: true,
+          });
           break;
 
         case 'DOM.getDocument':
