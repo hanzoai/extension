@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveSettings = document.getElementById('save-settings');
   const testConnection = document.getElementById('test-connection');
 
+  const userInfoSection = document.getElementById('user-info-section');
+
   // --- Auth via background ---
   function checkAuth() {
     // Always show main section and status (tools work without login)
@@ -40,8 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (chrome.runtime.lastError) return;
       if (response?.success && response.authenticated) {
         loginSection.classList.add('hidden');
+        userInfoSection?.classList.remove('hidden');
         if (response.user) {
-          const avatar = document.getElementById('user-avatar');
+          const avatar = document.getElementById('user-avatar') as HTMLImageElement;
           const name = document.getElementById('user-name');
           const email = document.getElementById('user-email');
           avatar.src = response.user.picture || response.user.avatar || 'icon48.png';
@@ -50,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } else {
         loginSection.classList.remove('hidden');
+        userInfoSection?.classList.add('hidden');
       }
     });
   }
@@ -68,8 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   logoutBtn?.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'auth.logout' }, () => {
-      mainSection.classList.add('hidden');
       loginSection.classList.remove('hidden');
+      userInfoSection?.classList.add('hidden');
     });
   });
 

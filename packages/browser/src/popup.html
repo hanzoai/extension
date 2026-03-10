@@ -32,20 +32,21 @@
 
     <!-- Main Section (shown after login) -->
     <div id="main-section" class="section hidden">
-      <div class="user-info">
-        <img id="user-avatar" class="avatar" src="" alt="">
-        <div>
-          <div id="user-name" class="user-name"></div>
-          <div id="user-email" class="user-email"></div>
+      <div id="user-info-section" class="hidden">
+        <div class="user-info">
+          <img id="user-avatar" class="avatar" src="" alt="">
+          <div>
+            <div id="user-name" class="user-name"></div>
+            <div id="user-email" class="user-email"></div>
+          </div>
+          <button id="logout-btn" class="btn-icon" title="Sign out">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+          </button>
         </div>
-        <button id="logout-btn" class="btn-icon" title="Sign out">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
-          </svg>
-        </button>
+        <div class="divider"></div>
       </div>
-
-      <div class="divider"></div>
 
       <!-- Open Chat Panel -->
       <button id="open-panel" class="btn btn-primary" style="margin-bottom: 16px;">
