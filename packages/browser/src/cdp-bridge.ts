@@ -314,6 +314,22 @@ export class CDPBridge {
       this.wsServer.onmessage = async (event) => {
         try {
           const message = JSON.parse(event.data);
+
+          // Handle extension-request from bridge server (monitor/audit calls)
+          if (message.type === 'extension-request' && message.action) {
+            chrome.runtime.sendMessage(
+              { action: message.action, ...(message.params || {}) },
+              (result) => {
+                this.wsServer?.send(JSON.stringify({
+                  type: 'extension-response',
+                  id: message.id,
+                  result: result || { error: chrome.runtime.lastError?.message },
+                }));
+              }
+            );
+            return;
+          }
+
           const response = await this.handleBridgeMessage(message);
           this.wsServer?.send(JSON.stringify(response));
         } catch (error: any) {
