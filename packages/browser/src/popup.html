@@ -25,7 +25,7 @@
       <p class="subtitle">Connect to your Hanzo AI account</p>
       <button id="login-btn" class="btn btn-primary">Sign in with Hanzo</button>
       <p class="help-text">
-        <a href="https://hanzo.id/register" target="_blank">Create account</a> •
+        <a href="https://hanzo.id/register" target="_blank">Create account</a> &middot;
         <a href="https://hanzo.id/forgot" target="_blank">Forgot password?</a>
       </p>
     </div>
@@ -48,21 +48,24 @@
         <div class="divider"></div>
       </div>
 
-      <!-- Open Chat Panel -->
-      <button id="open-panel" class="btn btn-primary" style="margin-bottom: 16px;">
+      <!-- Actions -->
+      <button id="open-panel" class="btn btn-secondary" style="margin-bottom: 8px;">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
         Open Chat Panel
       </button>
-      <button id="open-page-overlay" class="btn btn-secondary" style="margin-bottom: 16px;">
+      <button id="open-page-overlay" class="btn btn-ghost" style="margin-bottom: 12px;">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M4 4h16v12H8l-4 4V4z"/>
         </svg>
         Toggle On-Page Overlay
       </button>
 
+      <div class="divider"></div>
+
       <!-- Features -->
+      <h3>Features</h3>
       <div class="features">
         <div class="feature-toggle">
           <label>
@@ -113,7 +116,7 @@
 
       <!-- Browser Backend -->
       <div class="setting-group backend-picker">
-        <h3>Browser Backend</h3>
+        <h3>Backend</h3>
         <div class="backend-select-wrapper">
           <select id="browser-backend">
             <option value="auto">Auto (default)</option>
@@ -132,6 +135,7 @@
       <div class="divider"></div>
 
       <!-- Connection Status -->
+      <h3>Status</h3>
       <div class="status">
         <div class="status-item">
           <span class="status-dot" id="zap-status"></span>
@@ -159,15 +163,15 @@
 
       <!-- Actions -->
       <div class="actions">
-        <button id="test-connection" class="btn btn-secondary">Test Connection</button>
-        <button id="open-settings" class="btn btn-secondary">Settings</button>
+        <button id="test-connection" class="btn btn-ghost">Test Connection</button>
+        <button id="open-settings" class="btn btn-ghost">Settings</button>
       </div>
 
       <!-- Quick Guide -->
-      <div class="guide" style="margin-top: 16px;">
-        <h3>Quick Guide</h3>
-        <p><kbd>Alt</kbd> + <kbd>Click</kbd> any element to navigate to source</p>
-        <p><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>H</kbd> to open Hanzo AI panel</p>
+      <div class="guide" style="margin-top: 12px;">
+        <h3 style="text-transform: none; letter-spacing: 0; color: var(--text);">Shortcuts</h3>
+        <p><kbd>Alt</kbd> + <kbd>Click</kbd> any element to jump to source</p>
+        <p><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>H</kbd> open Hanzo panel</p>
       </div>
     </div>
 
@@ -228,13 +232,15 @@
         </div>
 
         <button id="save-settings" class="btn btn-primary">Save Settings</button>
-
-        <p class="help-text" style="margin-top: 16px;">
-          <a href="https://console.hanzo.ai" target="_blank">Console</a> •
-          <a href="https://billing.hanzo.ai" target="_blank">Billing</a> •
-          <a href="https://docs.hanzo.ai" target="_blank">Docs</a>
-        </p>
       </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer-links">
+      <a href="https://docs.hanzo.ai" target="_blank">Docs</a>
+      <a href="https://console.hanzo.ai" target="_blank">Console</a>
+      <a href="https://github.com/hanzoai/extension" target="_blank">GitHub</a>
+      <a href="https://hanzo.ai" target="_blank">hanzo.ai</a>
     </div>
   </div>
 
