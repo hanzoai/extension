@@ -340,6 +340,233 @@ export async function runBestPracticesAudit(tabId: number): Promise<AuditResult>
   }
 }
 
+// --- Next.js Audit ---
+
+export async function runNextJSAudit(tabId: number): Promise<AuditResult> {
+  const url = await evaluate(tabId, 'window.location.href')
+  const issues: AuditIssue[] = []
+
+  // Detect Next.js
+  const isNextJS = await evaluate(
+    tabId,
+    `!!(window.__NEXT_DATA__ || document.querySelector('script[src*="/_next/"]') || document.querySelector('script#__NEXT_DATA__'))`
+  )
+
+  if (!isNextJS) {
+    return {
+      score: -1,
+      category: 'nextjs',
+      timestamp: Date.now(),
+      url,
+      issues: [],
+      summary: 'Not a Next.js application',
+    }
+  }
+
+  // Next.js metadata
+  const nextData = await evaluate(
+    tabId,
+    `(()=>{const nd=window.__NEXT_DATA__;if(!nd)return null;return{page:nd.page,buildId:nd.buildId,runtimeConfig:!!nd.runtimeConfig,locale:nd.locale,props:!!nd.props}})()`,
+  )
+
+  // Full meta tag check
+  const meta = await evaluate(
+    tabId,
+    `(()=>{const gm=(n,a)=>{const s=a||'name';const e=document.querySelector('meta['+s+'="'+n+'"]');return e?e.getAttribute('content'):null};return{title:document.title,titleLen:document.title?.length||0,desc:gm('description'),descLen:(gm('description')||'').length,keywords:gm('keywords'),robots:gm('robots'),viewport:gm('viewport'),charset:!!document.querySelector('meta[charset]'),ogSiteName:gm('og:site_name','property'),ogLocale:gm('og:locale','property'),ogTitle:gm('og:title','property'),ogDesc:gm('og:description','property'),ogImage:gm('og:image','property'),ogUrl:gm('og:url','property'),ogType:gm('og:type','property'),twCard:gm('twitter:card'),twTitle:gm('twitter:title'),twDesc:gm('twitter:description'),twImage:gm('twitter:image'),canonical:document.querySelector('link[rel="canonical"]')?.href||null,jsonld:Array.from(document.querySelectorAll('script[type="application/ld+json"]')).map(s=>{try{return JSON.parse(s.textContent)}catch{return null}}).filter(Boolean)}})()`
+  )
+
+  // Title
+  if (!meta.title) issues.push({ severity: 'critical', message: 'Missing page title', recommendation: 'Add title via next/head or metadata API' })
+  else if (meta.titleLen < 10) issues.push({ severity: 'moderate', message: `Title too short (${meta.titleLen} chars)`, recommendation: 'Use 10-60 characters' })
+  else if (meta.titleLen > 60) issues.push({ severity: 'minor', message: `Title long (${meta.titleLen} chars)`, recommendation: 'Keep under 60 chars' })
+
+  // Description
+  if (!meta.desc) issues.push({ severity: 'serious', message: 'Missing meta description', recommendation: 'Add description via metadata API or next/head' })
+  else if (meta.descLen < 50) issues.push({ severity: 'moderate', message: `Description short (${meta.descLen} chars)`, recommendation: '50-160 characters recommended' })
+  else if (meta.descLen > 160) issues.push({ severity: 'minor', message: `Description long (${meta.descLen} chars)`, recommendation: 'Keep under 160 chars' })
+
+  if (!meta.keywords) issues.push({ severity: 'minor', message: 'Missing meta keywords', recommendation: 'Add keywords meta tag' })
+  if (!meta.robots) issues.push({ severity: 'moderate', message: 'Missing robots meta', recommendation: 'Add robots meta tag (index, follow)' })
+  if (!meta.viewport) issues.push({ severity: 'serious', message: 'Missing viewport meta', recommendation: 'Add viewport meta tag' })
+  if (!meta.charset) issues.push({ severity: 'moderate', message: 'Missing charset', recommendation: 'Add <meta charset="UTF-8">' })
+
+  // Open Graph
+  if (!meta.ogTitle) issues.push({ severity: 'moderate', message: 'Missing og:title', recommendation: 'Add Open Graph title' })
+  if (!meta.ogDesc) issues.push({ severity: 'moderate', message: 'Missing og:description', recommendation: 'Add OG description' })
+  if (!meta.ogImage) issues.push({ severity: 'moderate', message: 'Missing og:image', recommendation: 'Add OG image (1200x630 recommended)' })
+  if (!meta.ogUrl) issues.push({ severity: 'minor', message: 'Missing og:url', recommendation: 'Add og:url for canonical sharing URL' })
+  if (!meta.ogType) issues.push({ severity: 'minor', message: 'Missing og:type', recommendation: 'Add og:type (website, article, etc.)' })
+  if (!meta.ogSiteName) issues.push({ severity: 'minor', message: 'Missing og:site_name', recommendation: 'Add site name for branding' })
+  if (!meta.ogLocale) issues.push({ severity: 'minor', message: 'Missing og:locale', recommendation: 'Add og:locale (e.g., en_US)' })
+
+  // Twitter Card
+  if (!meta.twCard) issues.push({ severity: 'moderate', message: 'Missing twitter:card', recommendation: 'Add twitter:card (summary_large_image)' })
+  if (!meta.twTitle) issues.push({ severity: 'minor', message: 'Missing twitter:title', recommendation: 'Add twitter:title' })
+  if (!meta.twDesc) issues.push({ severity: 'minor', message: 'Missing twitter:description', recommendation: 'Add twitter:description' })
+  if (!meta.twImage) issues.push({ severity: 'minor', message: 'Missing twitter:image', recommendation: 'Add twitter:image' })
+
+  // Canonical
+  if (!meta.canonical) issues.push({ severity: 'moderate', message: 'Missing canonical URL', recommendation: 'Add <link rel="canonical"> or use metadata API' })
+
+  // JSON-LD
+  if (!meta.jsonld || !meta.jsonld.length) {
+    issues.push({ severity: 'moderate', message: 'No JSON-LD structured data', recommendation: 'Add structured data for rich search results' })
+  }
+
+  // Sitemap check (try /sitemap.xml)
+  const origin = await evaluate(tabId, 'window.location.origin')
+  let hasSitemap = false
+  let hasRobots = false
+  try {
+    const sitemapResp = await fetch(`${origin}/sitemap.xml`, { signal: AbortSignal.timeout(3000) })
+    hasSitemap = sitemapResp.ok && (sitemapResp.headers.get('content-type') || '').includes('xml')
+  } catch { /* unreachable from extension */ }
+  if (!hasSitemap) {
+    // Check via page eval
+    hasSitemap = await evaluate(tabId,
+      `fetch('/sitemap.xml',{method:'HEAD'}).then(r=>r.ok).catch(()=>false)`
+    ).catch(() => false)
+  }
+  if (!hasSitemap) issues.push({ severity: 'moderate', message: 'No sitemap.xml found', recommendation: 'Generate sitemap via next-sitemap or metadata API' })
+
+  try {
+    hasRobots = await evaluate(tabId,
+      `fetch('/robots.txt',{method:'HEAD'}).then(r=>r.ok).catch(()=>false)`
+    ).catch(() => false)
+  } catch { /* */ }
+  if (!hasRobots) issues.push({ severity: 'moderate', message: 'No robots.txt found', recommendation: 'Add robots.txt in public/ directory' })
+
+  const score = scoreFromIssues(issues)
+  return {
+    score,
+    category: 'nextjs',
+    timestamp: Date.now(),
+    url,
+    issues,
+    metrics: {
+      ...meta,
+      nextData,
+      hasSitemap,
+      hasRobots,
+    },
+    summary: `Next.js SEO: ${score}/100. ${issues.length} issue(s). Page: ${nextData?.page || 'unknown'}`,
+  }
+}
+
+// --- Debugger Mode ---
+
+export interface DebugReport {
+  possibleSources: string[]
+  consoleErrors: { level: string; text: string; url?: string }[]
+  networkErrors: { url: string; status: number; method: string; error?: string }[]
+  performanceIssues: string[]
+  recommendations: string[]
+  timestamp: number
+  pageUrl: string
+}
+
+export async function runDebuggerMode(tabId: number): Promise<DebugReport> {
+  const pageUrl = await evaluate(tabId, 'window.location.href')
+
+  // Collect console errors via Runtime
+  const consoleErrors: DebugReport['consoleErrors'] = []
+  const jsErrors = await evaluate(
+    tabId,
+    `(()=>{const e=[];const orig=console.error;return e})()` // Can't retroactively get console - use page error events
+  )
+  // Check for JS errors via error event and page errors
+  const pageErrors = await evaluate(
+    tabId,
+    `(()=>{const r=[];for(const e of performance.getEntriesByType('resource'))if(e.transferSize===0&&e.duration>0)r.push({url:e.name.slice(0,200),type:'failed-resource'});return r.slice(0,20)})()`
+  )
+
+  // Check for uncaught errors
+  const errorElements = await evaluate(
+    tabId,
+    `(()=>{const errors=[];const ow=document.querySelector('#__next-error,#__next-error-overlay,.nextjs-container-errors-header,[data-nextjs-error]');if(ow)errors.push({level:'error',text:'Next.js error overlay detected'});const re=document.querySelector('[class*="error"],[class*="Error"],[id*="error"]');if(re&&re.textContent)errors.push({level:'error',text:re.textContent.slice(0,200)});return errors})()`
+  )
+  consoleErrors.push(...(errorElements || []))
+
+  // Network errors - check for failed resources
+  const networkErrors: DebugReport['networkErrors'] = []
+  const failedResources = await evaluate(
+    tabId,
+    `(()=>{const r=[];for(const e of performance.getEntriesByType('resource')){if(e.responseStatus&&e.responseStatus>=400)r.push({url:e.name.slice(0,200),status:e.responseStatus,method:'GET'})}return r.slice(0,20)})()`
+  )
+  networkErrors.push(...(failedResources || []))
+
+  // Failed fetch requests visible in page
+  for (const pe of pageErrors || []) {
+    if (pe.type === 'failed-resource') {
+      networkErrors.push({ url: pe.url, status: 0, method: 'GET', error: 'Transfer failed' })
+    }
+  }
+
+  // Performance issues
+  const performanceIssues: string[] = []
+  const perfData = await evaluate(
+    tabId,
+    `(()=>{const n=performance.getEntriesByType('navigation')[0];const r={};if(n){if(n.domContentLoadedEventEnd-n.startTime>3000)r.slowDCL=Math.round(n.domContentLoadedEventEnd-n.startTime)+'ms';if(n.loadEventEnd-n.startTime>5000)r.slowLoad=Math.round(n.loadEventEnd-n.startTime)+'ms';if(n.responseStart-n.requestStart>800)r.slowTTFB=Math.round(n.responseStart-n.requestStart)+'ms'}const res=performance.getEntriesByType('resource');const slow=res.filter(e=>e.duration>2000).length;if(slow>0)r.slowResources=slow;const large=res.filter(e=>e.transferSize>500000).length;if(large>0)r.largeResources=large;r.totalResources=res.length;r.domNodes=document.querySelectorAll('*').length;return r})()`
+  )
+  if (perfData?.slowDCL) performanceIssues.push(`Slow DOM Content Loaded: ${perfData.slowDCL}`)
+  if (perfData?.slowLoad) performanceIssues.push(`Slow page load: ${perfData.slowLoad}`)
+  if (perfData?.slowTTFB) performanceIssues.push(`Slow TTFB: ${perfData.slowTTFB}`)
+  if (perfData?.slowResources) performanceIssues.push(`${perfData.slowResources} resources took > 2s to load`)
+  if (perfData?.largeResources) performanceIssues.push(`${perfData.largeResources} resources > 500KB`)
+  if (perfData?.domNodes > 2000) performanceIssues.push(`Large DOM: ${perfData.domNodes} nodes`)
+
+  // Build possible sources based on collected data
+  const possibleSources: string[] = []
+  if (consoleErrors.length) possibleSources.push(`JavaScript errors detected (${consoleErrors.length} found)`)
+  if (networkErrors.length) possibleSources.push(`Failed network requests (${networkErrors.length} found)`)
+  if (performanceIssues.length) possibleSources.push(`Performance bottlenecks (${performanceIssues.length} found)`)
+
+  // Check for common issues
+  const commonIssues = await evaluate(
+    tabId,
+    `(()=>{const r=[];if(!document.doctype)r.push('Missing DOCTYPE');if(!document.querySelector('meta[charset]'))r.push('Missing charset');if(document.querySelectorAll('script:not([async]):not([defer]):not([type="module"])[src]').length>2)r.push('Multiple render-blocking scripts');if(document.querySelectorAll('link[rel="stylesheet"]').length>5)r.push('Many external stylesheets ('+document.querySelectorAll('link[rel="stylesheet"]').length+')');const mixed=document.querySelectorAll('img[src^="http:"],script[src^="http:"]').length;if(mixed>0)r.push('Mixed content ('+mixed+' HTTP resources on HTTPS)');if(!document.querySelector('meta[name="viewport"]'))r.push('Missing viewport meta tag');return r})()`
+  )
+  possibleSources.push(...(commonIssues || []))
+
+  // Pad to at least 5 suggestions
+  const generic = [
+    'Check browser console for runtime errors',
+    'Inspect network tab for failed API calls',
+    'Look for CORS issues in cross-origin requests',
+    'Check for unhandled promise rejections',
+    'Verify API endpoints return expected data',
+    'Check for CSS layout issues causing visual bugs',
+    'Look for event listener conflicts or race conditions',
+  ]
+  while (possibleSources.length < 5) {
+    possibleSources.push(generic[possibleSources.length] || 'Review application logs')
+  }
+
+  // Recommendations
+  const recommendations: string[] = []
+  if (consoleErrors.length) recommendations.push('Fix JavaScript errors first — they often cascade into other failures')
+  if (networkErrors.length) recommendations.push('Investigate failed network requests — check API endpoints, CORS config, and auth tokens')
+  if (performanceIssues.length) recommendations.push('Address performance issues — slow loads compound debugging difficulty')
+  recommendations.push('Add targeted console.log statements near suspected problem areas')
+  recommendations.push('Use browser DevTools Network tab to trace request/response cycles')
+  if (networkErrors.some(e => e.status === 401 || e.status === 403)) {
+    recommendations.push('Auth errors detected — verify tokens and session state')
+  }
+  if (networkErrors.some(e => e.status >= 500)) {
+    recommendations.push('Server errors detected — check server logs for stack traces')
+  }
+
+  return {
+    possibleSources: possibleSources.slice(0, 7),
+    consoleErrors,
+    networkErrors,
+    performanceIssues,
+    recommendations,
+    timestamp: Date.now(),
+    pageUrl,
+  }
+}
+
 // --- Full Audit ---
 
 export async function runFullAudit(
@@ -352,10 +579,26 @@ export async function runFullAudit(
     runBestPracticesAudit(tabId),
   ])
 
-  const overall = Math.round((a11y.score + perf.score + seo.score + bp.score) / 4)
+  const audits = [a11y, perf, seo, bp]
+  let scoreSum = a11y.score + perf.score + seo.score + bp.score
+  let count = 4
+
+  // Include Next.js audit if applicable
+  try {
+    const nextjs = await runNextJSAudit(tabId)
+    if (nextjs.score >= 0) {
+      audits.push(nextjs)
+      scoreSum += nextjs.score
+      count++
+    }
+  } catch {
+    // Not a Next.js app or audit failed
+  }
+
+  const overall = Math.round(scoreSum / count)
   return {
     overall,
-    audits: [a11y, perf, seo, bp],
-    summary: `Overall: ${overall}/100 | A11y: ${a11y.score} | Perf: ${perf.score} | SEO: ${seo.score} | Best Practices: ${bp.score}`,
+    audits,
+    summary: audits.map(a => `${a.category}: ${a.score}`).join(' | ') + ` | Overall: ${overall}/100`,
   }
 }
