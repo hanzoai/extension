@@ -65,7 +65,7 @@ export class AiderCLI extends BaseCLITool {
 
     private async commandExists(command: string): Promise<boolean> {
         try {
-            execSync(`which ${command}`, { stdio: 'ignore' });
+            execSync(process.platform === 'win32' ? `where ${command}` : `which ${command}`, { stdio: 'ignore' });
             return true;
         } catch {
             return false;
