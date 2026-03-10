@@ -374,6 +374,7 @@ html {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  padding-bottom: 8px;
   overflow-x: hidden;
   padding: 16px;
   display: flex;
@@ -662,6 +663,12 @@ html {
 .icon-btn svg {
   width: 18px;
   height: 18px;
+}
+
+.settings-scroll > .primary-btn {
+  margin-top: 4px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .primary-btn {
