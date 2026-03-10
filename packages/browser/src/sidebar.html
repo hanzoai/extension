@@ -71,7 +71,80 @@
     <!-- Tools Tab -->
     <div id="tab-tools" class="tab-content hidden">
       <div class="tools-scroll">
-        <!-- Hanzo Services -->
+        <!-- Element Inspector (top priority for frontend work) -->
+        <div class="panel inspector-panel">
+          <div class="inspector-actions">
+            <button class="action-btn inspector-btn" id="pick-element" title="Select element on page">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" width="14" height="14">
+                <path d="M3 3l4 10 2-4 4-2L3 3z" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M9 9l4 4" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              Pick Element
+            </button>
+            <button class="action-btn inspector-btn" id="take-screenshot" title="Capture screenshot">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" width="14" height="14">
+                <rect x="2" y="3" width="12" height="10" rx="1" stroke-width="1.5"/>
+                <circle cx="8" cy="8" r="2" stroke-width="1.5"/>
+              </svg>
+              Screenshot
+            </button>
+            <button class="action-btn inspector-btn" id="run-audit" title="Accessibility & performance audit">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" width="14" height="14">
+                <path d="M8 2v4l3 2" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="8" cy="8" r="6" stroke-width="1.5"/>
+              </svg>
+              Audit
+            </button>
+          </div>
+          <div id="inspector-result" class="inspector-result hidden"></div>
+        </div>
+
+        <!-- Connected MCP Servers -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>MCP Servers</h3>
+            <span id="mcp-server-count" class="badge">0</span>
+          </div>
+          <div id="mcp-server-list" class="mcp-server-list">
+            <div class="empty-state">No MCP servers connected</div>
+          </div>
+        </div>
+
+        <!-- Built-in + Discovered Tools -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Available Tools</h3>
+            <span id="tool-count-badge" class="badge">0</span>
+          </div>
+          <div id="builtin-tool-list" class="tool-list"></div>
+          <div id="mcp-tool-list" class="tool-list"></div>
+        </div>
+
+        <!-- Active Agents -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Active Agents</h3>
+            <span id="agent-count" class="badge">0</span>
+          </div>
+          <div id="agent-list" class="agent-list">
+            <div class="empty-state">No active agents</div>
+          </div>
+        </div>
+
+        <!-- Tab Filesystem -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Tab Filesystem</h3>
+            <button class="icon-btn small" id="refresh-tabs" title="Refresh">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                <path d="M14 2v5h-5M2 7a6 6 0 0111.5-2.5L14 5M2 14v-5h5M14 9a6 6 0 01-11.5 2.5L2 11" stroke-width="1.5"/>
+              </svg>
+            </button>
+          </div>
+          <div id="tab-fs" class="tab-filesystem"></div>
+        </div>
+
+        <!-- Hanzo Services (moved to bottom) -->
         <div class="panel">
           <h3>Hanzo Services</h3>
           <div class="mcp-status">
@@ -117,27 +190,6 @@
           </div>
         </div>
 
-        <!-- Connected MCP Servers -->
-        <div class="panel">
-          <div class="panel-header">
-            <h3>MCP Servers</h3>
-            <span id="mcp-server-count" class="badge">0</span>
-          </div>
-          <div id="mcp-server-list" class="mcp-server-list">
-            <div class="empty-state">No MCP servers connected</div>
-          </div>
-        </div>
-
-        <!-- Built-in + Discovered Tools -->
-        <div class="panel">
-          <div class="panel-header">
-            <h3>Available Tools</h3>
-            <span id="tool-count-badge" class="badge">0</span>
-          </div>
-          <div id="builtin-tool-list" class="tool-list"></div>
-          <div id="mcp-tool-list" class="tool-list"></div>
-        </div>
-
         <!-- Usage -->
         <div class="panel">
           <h3>Usage (1h)</h3>
@@ -163,30 +215,6 @@
               <span id="usage-canceled" class="status-value mono">0</span>
             </div>
           </div>
-        </div>
-
-        <!-- Active Agents -->
-        <div class="panel">
-          <div class="panel-header">
-            <h3>Active Agents</h3>
-            <span id="agent-count" class="badge">0</span>
-          </div>
-          <div id="agent-list" class="agent-list">
-            <div class="empty-state">No active agents</div>
-          </div>
-        </div>
-
-        <!-- Tab Filesystem -->
-        <div class="panel">
-          <div class="panel-header">
-            <h3>Tab Filesystem</h3>
-            <button class="icon-btn small" id="refresh-tabs" title="Refresh">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor">
-                <path d="M14 2v5h-5M2 7a6 6 0 0111.5-2.5L14 5M2 14v-5h5M14 9a6 6 0 01-11.5 2.5L2 11" stroke-width="1.5"/>
-              </svg>
-            </button>
-          </div>
-          <div id="tab-fs" class="tab-filesystem"></div>
         </div>
 
         <!-- Actions -->
