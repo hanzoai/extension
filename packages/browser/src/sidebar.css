@@ -950,6 +950,27 @@ html {
   color: var(--text-tertiary);
 }
 
+.inspector-result .copy-line {
+  display: block;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+.inspector-result .copy-line:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.inspector-result .copy-line.copied {
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.inspector-result .info-label {
+  color: var(--text-tertiary);
+  user-select: none;
+}
+
 .inspector-result img {
   max-width: 100%;
   border-radius: 4px;

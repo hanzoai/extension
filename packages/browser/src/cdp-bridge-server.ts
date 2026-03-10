@@ -52,6 +52,7 @@ class CDPBridgeServer {
   private wss: WebSocketServer;
   private clients: Map<WebSocket, CDPClient> = new Map();
   private pendingCommands: Map<number, { resolve: Function; reject: Function }> = new Map();
+  private pendingExtensionRequests: Map<string, { resolve: Function; timeout: ReturnType<typeof setTimeout> }> = new Map();
   private commandId = 0;
   private httpPort: number;
 
@@ -97,6 +98,17 @@ class CDPBridgeServer {
 
     if (message.type === 'config') {
       this.saveConfig(message.key, message.value);
+      return;
+    }
+
+    // Handle responses from extension for sendToExtension() calls
+    if (message.type === 'extension-response' && message.id) {
+      const pending = this.pendingExtensionRequests.get(message.id);
+      if (pending) {
+        clearTimeout(pending.timeout);
+        this.pendingExtensionRequests.delete(message.id);
+        pending.resolve(message.result || message);
+      }
       return;
     }
 
@@ -444,13 +456,52 @@ class CDPBridgeServer {
       case 'select_tab':
         return this.sendRaw('Target.activateTarget', { targetId: rest.tabId });
 
-      // Console/Network
+      // Console/Network — routed to PageMonitor via extension background
       case 'console_messages':
       case 'console':
-        return this.sendRaw('Console.getMessages');
+      case 'console_logs':
+        return this.sendToExtension('monitor.consoleLogs', { tabId: rest.tabId });
+
+      case 'console_errors':
+        return this.sendToExtension('monitor.consoleErrors', { tabId: rest.tabId });
 
       case 'network_requests':
-        return this.sendRaw('Network.getResponseBodies');
+      case 'network_logs':
+        return this.sendToExtension('monitor.networkLogs', { tabId: rest.tabId });
+
+      case 'network_errors':
+        return this.sendToExtension('monitor.networkErrors', { tabId: rest.tabId });
+
+      case 'network_success':
+        return this.sendToExtension('monitor.networkSuccess', { tabId: rest.tabId });
+
+      case 'wipe_logs':
+        return this.sendToExtension('monitor.wipeLogs', { tabId: rest.tabId });
+
+      case 'start_monitoring':
+        return this.sendToExtension('monitor.start', { tabId: rest.tabId });
+
+      case 'stop_monitoring':
+        return this.sendToExtension('monitor.stop', { tabId: rest.tabId });
+
+      case 'monitor_status':
+        return this.sendToExtension('monitor.status', {});
+
+      // Audits — routed to AuditRunner via extension background
+      case 'accessibility_audit':
+        return this.sendToExtension('audit.accessibility', { tabId: rest.tabId });
+
+      case 'performance_audit':
+        return this.sendToExtension('audit.performance', { tabId: rest.tabId });
+
+      case 'seo_audit':
+        return this.sendToExtension('audit.seo', { tabId: rest.tabId });
+
+      case 'best_practices_audit':
+        return this.sendToExtension('audit.bestPractices', { tabId: rest.tabId });
+
+      case 'full_audit':
+        return this.sendToExtension('audit.full', { tabId: rest.tabId });
 
       // Status
       case 'status':
@@ -464,6 +515,33 @@ class CDPBridgeServer {
         // Pass through as raw CDP command
         return this.sendRaw(action, rest);
     }
+  }
+
+  // Send a message to the extension background and wait for response
+  private sendToExtension(action: string, params: any): Promise<any> {
+    return new Promise((resolve) => {
+      // Route through the first connected WebSocket client (the extension)
+      const client = this.clients.values().next().value;
+      if (!client) {
+        resolve({ error: 'No browser extension connected' });
+        return;
+      }
+
+      const id = `ext-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const timeout = setTimeout(() => {
+        this.pendingExtensionRequests.delete(id);
+        resolve({ error: 'Extension request timed out' });
+      }, 30000);
+
+      this.pendingExtensionRequests.set(id, { resolve, timeout });
+
+      client.send(JSON.stringify({
+        type: 'extension-request',
+        id,
+        action,
+        params,
+      }));
+    });
   }
 
   isConnected(): boolean {
@@ -520,7 +598,9 @@ async function startJSONRPCServer(bridgeServer: CDPBridgeServer) {
           'local_storage', 'cookies',
           'wait', 'wait_for_load',
           'tabs', 'new_tab', 'close_tab', 'select_tab',
-          'console', 'network_requests',
+          'console_logs', 'console_errors', 'network_logs', 'network_errors', 'network_success',
+          'start_monitoring', 'stop_monitoring', 'monitor_status', 'wipe_logs',
+          'accessibility_audit', 'performance_audit', 'seo_audit', 'best_practices_audit', 'full_audit',
           'takeover.start', 'takeover.end', 'takeover.cursor',
           'status'
         ]

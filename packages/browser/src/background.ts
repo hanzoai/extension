@@ -4,6 +4,14 @@ import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './cdp-bridge';
 import * as auth from './auth';
 import { listModels, chatCompletion, ChatMessage } from './chat-client';
+import { PageMonitor } from './page-monitor';
+import {
+  runAccessibilityAudit,
+  runPerformanceAudit,
+  runSEOAudit,
+  runBestPracticesAudit,
+  runFullAudit,
+} from './audit-runner';
 import {
   ActionRateLimiter,
   CHAT_BUDGETS,
@@ -21,9 +29,31 @@ import {
 // Initialize browser control
 const browserControl = new BrowserControl();
 const webgpuAI = new WebGPUAI();
+const pageMonitor = new PageMonitor();
 
 // Initialize CDP bridge for hanzo-mcp integration
 const cdpBridge: CDPBridge = getCDPBridge();
+
+// Route CDP events to PageMonitor
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (source.tabId) {
+    pageMonitor.handleCDPEvent(source.tabId, method, params);
+  }
+});
+
+// Clean up monitoring on tab close
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (pageMonitor.isMonitoring(tabId)) {
+    pageMonitor.stopMonitoring(tabId);
+  }
+});
+
+// Wipe logs on navigation (like browser-tools-mcp)
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId === 0 && pageMonitor.isMonitoring(details.tabId)) {
+    pageMonitor.wipeLogs(details.tabId);
+  }
+});
 
 // =============================================================================
 // ZAP Protocol Integration
@@ -1234,6 +1264,125 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       }
       sendResponse({ success: true });
       break;
+
+    // --- Page Monitor: Console & Network Capture ---
+    case 'monitor.start': {
+      const monTabId = request.tabId || sender.tab?.id;
+      if (!monTabId) { sendResponse({ success: false, error: 'No tab' }); break; }
+      try {
+        await pageMonitor.startMonitoring(monTabId);
+        sendResponse({ success: true });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'monitor.stop': {
+      const monTabId = request.tabId || sender.tab?.id;
+      if (monTabId) pageMonitor.stopMonitoring(monTabId);
+      sendResponse({ success: true });
+      break;
+    }
+
+    case 'monitor.consoleLogs':
+      sendResponse({ success: true, logs: pageMonitor.getConsoleLogs(request.tabId) });
+      break;
+
+    case 'monitor.consoleErrors':
+      sendResponse({ success: true, logs: pageMonitor.getConsoleErrors(request.tabId) });
+      break;
+
+    case 'monitor.networkLogs':
+      sendResponse({ success: true, logs: pageMonitor.getNetworkLogs(request.tabId) });
+      break;
+
+    case 'monitor.networkErrors':
+      sendResponse({ success: true, logs: pageMonitor.getNetworkErrors(request.tabId) });
+      break;
+
+    case 'monitor.networkSuccess':
+      sendResponse({ success: true, logs: pageMonitor.getNetworkSuccesses(request.tabId) });
+      break;
+
+    case 'monitor.allNetwork':
+      sendResponse({ success: true, logs: pageMonitor.getNetworkLogs(request.tabId) });
+      break;
+
+    case 'monitor.wipeLogs':
+      pageMonitor.wipeLogs(request.tabId);
+      sendResponse({ success: true });
+      break;
+
+    case 'monitor.config':
+      if (request.config) pageMonitor.updateConfig(request.config);
+      sendResponse({ success: true });
+      break;
+
+    case 'monitor.status':
+      sendResponse({ success: true, tabs: pageMonitor.getMonitoredTabs() });
+      break;
+
+    // --- Page Audits ---
+    case 'audit.accessibility': {
+      const auditTabId = request.tabId || sender.tab?.id;
+      if (!auditTabId) { sendResponse({ success: false, error: 'No tab' }); break; }
+      try {
+        const result = await runAccessibilityAudit(auditTabId);
+        sendResponse({ success: true, result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'audit.performance': {
+      const auditTabId = request.tabId || sender.tab?.id;
+      if (!auditTabId) { sendResponse({ success: false, error: 'No tab' }); break; }
+      try {
+        const result = await runPerformanceAudit(auditTabId);
+        sendResponse({ success: true, result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'audit.seo': {
+      const auditTabId = request.tabId || sender.tab?.id;
+      if (!auditTabId) { sendResponse({ success: false, error: 'No tab' }); break; }
+      try {
+        const result = await runSEOAudit(auditTabId);
+        sendResponse({ success: true, result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'audit.bestPractices': {
+      const auditTabId = request.tabId || sender.tab?.id;
+      if (!auditTabId) { sendResponse({ success: false, error: 'No tab' }); break; }
+      try {
+        const result = await runBestPracticesAudit(auditTabId);
+        sendResponse({ success: true, result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'audit.full': {
+      const auditTabId = request.tabId || sender.tab?.id;
+      if (!auditTabId) { sendResponse({ success: false, error: 'No tab' }); break; }
+      try {
+        const result = await runFullAudit(auditTabId);
+        sendResponse({ success: true, result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
 
   }
 }
