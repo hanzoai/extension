@@ -288,6 +288,9 @@ class HanzoSidebar {
     if (chatLogin) chatLogin.classList.remove('hidden');
     const chatComposer = document.getElementById('chat-composer');
     if (chatComposer) chatComposer.classList.add('hidden');
+    // Hide chat messages / welcome when not authenticated
+    const chatMessages = document.getElementById('chat-messages');
+    if (chatMessages) chatMessages.classList.add('hidden');
     // Hide account panel when not authenticated
     if (this.el.accountPanel) this.el.accountPanel.classList.add('hidden');
   }
@@ -298,6 +301,8 @@ class HanzoSidebar {
     if (chatLogin) chatLogin.classList.add('hidden');
     const chatComposer = document.getElementById('chat-composer');
     if (chatComposer) chatComposer.classList.remove('hidden');
+    const chatMessages = document.getElementById('chat-messages');
+    if (chatMessages) chatMessages.classList.remove('hidden');
   }
 
   // ===========================================================================
