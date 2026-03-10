@@ -1,6 +1,7 @@
 import { BaseCLITool, CLIToolConfig } from '../common/base-cli';
 import * as vscode from 'vscode';
 import { execSync } from 'child_process';
+import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -35,7 +36,7 @@ export class OpenHandsCLI extends BaseCLITool {
                 await this.runCommand('pip3', ['install', 'openhands']);
             } else {
                 // Clone and install from source
-                const installDir = path.join(process.env.HOME || '', '.hanzo-dev', 'tools');
+                const installDir = path.join(os.homedir(), '.hanzo-dev', 'tools');
                 fs.mkdirSync(installDir, { recursive: true });
                 
                 await this.runCommand('git', [
@@ -58,7 +59,7 @@ export class OpenHandsCLI extends BaseCLITool {
 
     async checkInstallation(): Promise<boolean> {
         return this.commandExists('openhands') || 
-               fs.existsSync(path.join(process.env.HOME || '', '.hanzo-dev', 'tools', 'openhands'));
+               fs.existsSync(path.join(os.homedir(), '.hanzo-dev', 'tools', 'openhands'));
     }
 
     generatePrompt(task: string, context?: any): string {
@@ -85,7 +86,7 @@ export class OpenHandsCLI extends BaseCLITool {
 
     private async commandExists(command: string): Promise<boolean> {
         try {
-            execSync(`which ${command}`, { stdio: 'ignore' });
+            execSync(process.platform === 'win32' ? `where ${command}` : `which ${command}`, { stdio: 'ignore' });
             return true;
         } catch {
             return false;
