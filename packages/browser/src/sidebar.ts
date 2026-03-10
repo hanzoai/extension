@@ -168,6 +168,25 @@ class HanzoSidebar {
     this.el.takeScreenshot?.addEventListener('click', () => this.takeScreenshot());
     this.el.runAudit?.addEventListener('click', () => this.runAudit());
 
+    // Model Hub
+    const searchModelsBtn = document.getElementById('search-models-btn');
+    const refreshModelsBtn = document.getElementById('refresh-models');
+    const modelSearchInput = document.getElementById('model-search') as HTMLInputElement | null;
+
+    searchModelsBtn?.addEventListener('click', () => {
+      const q = modelSearchInput?.value?.trim();
+      if (q) void this.searchModels(q);
+    });
+    refreshModelsBtn?.addEventListener('click', () => void this.refreshModelHub());
+    modelSearchInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const q = modelSearchInput.value?.trim();
+        if (q) void this.searchModels(q);
+        else void this.refreshModelHub();
+      }
+    });
+
     // Settings
     this.el.logoutBtn.addEventListener('click', () => this.logout());
     this.el.saveSettings.addEventListener('click', () => this.saveSettings());
@@ -279,6 +298,8 @@ class HanzoSidebar {
     }
     this.loadModels();
     this.loadConversation();
+    void this.refreshBalance();
+    void this.refreshModelHub();
   }
 
   showChatLoginPrompt() {
@@ -360,6 +381,8 @@ class HanzoSidebar {
     void this.refreshTabFilesystem();
     void this.checkHanzoServices();
     void this.refreshUsageMetrics();
+    void this.refreshBalance();
+    void this.refreshModelHub();
   }
 
   // ===========================================================================
@@ -1181,14 +1204,254 @@ class HanzoSidebar {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'usage.metrics' });
       if (!response?.success || !response.metrics) return;
-      const metrics = response.metrics;
-      if (this.el.usageChatRequests) this.el.usageChatRequests.textContent = String(metrics.chatRequests || 0);
-      if (this.el.usageInputTokens) this.el.usageInputTokens.textContent = String(metrics.inputTokens || 0);
-      if (this.el.usageOutputTokens) this.el.usageOutputTokens.textContent = String(metrics.outputTokens || 0);
-      if (this.el.usageDedupe) this.el.usageDedupe.textContent = String(metrics.dedupeHits || 0);
-      if (this.el.usageCanceled) this.el.usageCanceled.textContent = String(metrics.canceledRequests || 0);
+      const m = response.metrics;
+      const requests = m.chatRequests || 0;
+      const inputTok = m.inputTokens || 0;
+      const outputTok = m.outputTokens || 0;
+
+      // Update counters
+      const setText = (id: string, val: string) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+      setText('usage-chat-requests', String(requests));
+      setText('usage-input-tokens', this.formatTokens(inputTok));
+      setText('usage-output-tokens', this.formatTokens(outputTok));
+      setText('usage-dedupe', `${m.dedupeHits || 0} dedup`);
+      setText('usage-canceled', `${m.canceledRequests || 0} canceled`);
+
+      // Estimate cost (rough: $3/MTok input, $12/MTok output avg)
+      const estCost = (inputTok / 1_000_000) * 3 + (outputTok / 1_000_000) * 12;
+      setText('usage-est-cost', `$${estCost.toFixed(4)}`);
+
+      // Update progress bars (scale to reasonable session maxes)
+      const setBar = (id: string, pct: number) => {
+        const el = document.getElementById(id);
+        if (el) el.style.width = `${Math.min(pct, 100)}%`;
+      };
+      setBar('bar-requests', Math.min(requests / 50 * 100, 100));
+      setBar('bar-input', Math.min(inputTok / 500_000 * 100, 100));
+      setBar('bar-output', Math.min(outputTok / 200_000 * 100, 100));
+      setBar('bar-cost', Math.min(estCost / 5 * 100, 100));
     } catch (error) {
       debugLog('Failed to fetch usage metrics:', error);
+    }
+  }
+
+  formatTokens(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return String(n);
+  }
+
+  async refreshBalance() {
+    try {
+      const { hanzo_iam_token } = await chrome.storage.local.get('hanzo_iam_token');
+      if (!hanzo_iam_token) return;
+
+      const card = document.getElementById('balance-card');
+      const amountEl = document.getElementById('balance-amount');
+      const tierEl = document.getElementById('balance-tier');
+      const tierName = document.getElementById('tier-name');
+      const bar = document.getElementById('balance-bar');
+      const usedLabel = document.getElementById('balance-used-label');
+      const pctLabel = document.getElementById('balance-pct-label');
+
+      // Try fetching from Hanzo Cloud balance API
+      const resp = await fetch('https://api.hanzo.ai/v1/balance', {
+        headers: { Authorization: `Bearer ${hanzo_iam_token}` },
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => null);
+
+      if (resp?.ok) {
+        const data = await resp.json();
+        const credits = data.tokenCredits || 0;
+        const usd = credits / 1_000_000;
+        const tier = data.tierId || 'free';
+        const startBalance = data.startBalance || credits || 5_000_000;
+        const startUsd = startBalance / 1_000_000;
+        const usedUsd = Math.max(0, startUsd - usd);
+        const pct = startUsd > 0 ? Math.min((usedUsd / startUsd) * 100, 100) : 0;
+
+        if (card) card.classList.remove('hidden');
+        if (amountEl) amountEl.textContent = `$${usd.toFixed(2)}`;
+        if (tierEl && tier && tier !== 'unknown') {
+          tierEl.classList.remove('hidden');
+          if (tierName) tierName.textContent = tier;
+        }
+        if (bar) bar.style.width = `${pct}%`;
+        if (usedLabel) usedLabel.textContent = `$${usedUsd.toFixed(2)} used`;
+        if (pctLabel) pctLabel.textContent = `${Math.round(pct)}%`;
+
+        // Color the bar based on usage
+        if (bar) {
+          bar.className = `usage-bar-fill ${pct >= 90 ? 'bar-red' : pct >= 70 ? 'bar-amber' : 'bar-blue'}`;
+        }
+      }
+    } catch (error) {
+      debugLog('Failed to fetch balance:', error);
+    }
+  }
+
+  async refreshModelHub() {
+    try {
+      const listEl = document.getElementById('model-hub-list');
+      if (!listEl) return;
+
+      const response = await chrome.runtime.sendMessage({ action: 'hub.allModels' });
+      if (!response?.success) return;
+
+      const items: string[] = [];
+
+      // Cloud models
+      for (const m of (response.cloud || []).slice(0, 10)) {
+        items.push(`
+          <div class="model-hub-item" data-model-id="${this.escapeHtml(m.id)}" data-provider="cloud">
+            <div class="model-hub-item-info">
+              <div class="model-hub-item-name">${this.escapeHtml(m.name || m.id)}</div>
+              <div class="model-hub-item-meta">
+                <span>${this.escapeHtml(m.owned_by || 'hanzo')}</span>
+              </div>
+            </div>
+            <span class="model-hub-item-badge badge-cloud">Cloud</span>
+          </div>
+        `);
+      }
+
+      // Local models
+      for (const m of (response.local || [])) {
+        const size = m.size ? ` · ${this.formatBytes(m.size)}` : '';
+        items.push(`
+          <div class="model-hub-item" data-model-id="${this.escapeHtml(m.id)}" data-provider="local">
+            <div class="model-hub-item-info">
+              <div class="model-hub-item-name">${this.escapeHtml(m.name || m.id)}</div>
+              <div class="model-hub-item-meta">
+                <span>${this.escapeHtml(m.provider || 'ollama')}${size}</span>
+              </div>
+            </div>
+            <span class="model-hub-item-badge badge-local">Local</span>
+          </div>
+        `);
+      }
+
+      // Recommended (HF)
+      for (const m of (response.recommended || []).slice(0, 4)) {
+        items.push(`
+          <div class="model-hub-item" data-model-id="${this.escapeHtml(m.id)}" data-provider="hub">
+            <div class="model-hub-item-info">
+              <div class="model-hub-item-name">${this.escapeHtml(m.name)}</div>
+              <div class="model-hub-item-meta">
+                <span>${this.escapeHtml(m.author)}</span>
+              </div>
+            </div>
+            <span class="model-hub-item-badge badge-hub">HF</span>
+          </div>
+        `);
+      }
+
+      listEl.innerHTML = items.length > 0
+        ? items.join('')
+        : '<div class="empty-state">No models found</div>';
+
+      // Also update the model-select dropdown dynamically
+      this.updateModelSelect(response.cloud || [], response.local || []);
+    } catch (error) {
+      debugLog('Failed to refresh model hub:', error);
+    }
+  }
+
+  updateModelSelect(cloud: any[], local: any[]) {
+    const select = this.el.modelSelect as HTMLSelectElement;
+    if (!select) return;
+
+    // Save current selection
+    const currentVal = select.value;
+
+    // Clear except "Auto"
+    while (select.options.length > 1) select.remove(1);
+
+    // Add cloud models
+    if (cloud.length > 0) {
+      const group = document.createElement('optgroup');
+      group.label = 'Cloud';
+      for (const m of cloud.slice(0, 20)) {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.name || m.id;
+        group.appendChild(opt);
+      }
+      select.appendChild(group);
+    }
+
+    // Add local models
+    if (local.length > 0) {
+      const group = document.createElement('optgroup');
+      group.label = 'Local';
+      for (const m of local) {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.name || m.id;
+        group.appendChild(opt);
+      }
+      select.appendChild(group);
+    }
+
+    // Restore selection
+    if (currentVal) select.value = currentVal;
+  }
+
+  formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
+    if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(0)} MB`;
+    return `${(bytes / 1073741824).toFixed(1)} GB`;
+  }
+
+  async searchModels(query: string) {
+    const listEl = document.getElementById('model-hub-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="empty-state">Searching...</div>';
+
+    try {
+      const [hfResp, ollamaResp] = await Promise.all([
+        chrome.runtime.sendMessage({ action: 'hub.searchGGUF', query, limit: 8 }),
+        chrome.runtime.sendMessage({ action: 'hub.searchOllama', query }),
+      ]);
+
+      const items: string[] = [];
+      for (const m of (hfResp?.models || [])) {
+        items.push(`
+          <div class="model-hub-item" data-model-id="${this.escapeHtml(m.id)}" data-provider="hub">
+            <div class="model-hub-item-info">
+              <div class="model-hub-item-name">${this.escapeHtml(m.name)}</div>
+              <div class="model-hub-item-meta">
+                <span>${this.escapeHtml(m.author)}</span>
+                <span>↓ ${m.downloads || 0}</span>
+              </div>
+            </div>
+            <span class="model-hub-item-badge badge-hub">HF</span>
+          </div>
+        `);
+      }
+      for (const m of (ollamaResp?.models || [])) {
+        items.push(`
+          <div class="model-hub-item" data-model-id="${this.escapeHtml(m.id)}" data-provider="ollama">
+            <div class="model-hub-item-info">
+              <div class="model-hub-item-name">${this.escapeHtml(m.name)}</div>
+              <div class="model-hub-item-meta">
+                <span>${this.escapeHtml(m.description || '')}</span>
+              </div>
+            </div>
+            <span class="model-hub-item-badge badge-local">Ollama</span>
+          </div>
+        `);
+      }
+
+      listEl.innerHTML = items.length > 0
+        ? items.join('')
+        : '<div class="empty-state">No models found</div>';
+    } catch (error) {
+      listEl.innerHTML = '<div class="empty-state">Search failed</div>';
     }
   }
 

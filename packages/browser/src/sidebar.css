@@ -1549,3 +1549,202 @@ select option {
   padding: 6px 16px;
   font-size: 12px;
 }
+
+/* ================================================================
+   Usage & Billing
+   ================================================================ */
+
+.balance-card {
+  background: var(--glass-strong);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.balance-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-secondary);
+}
+
+.balance-amount {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-tier {
+  margin-top: 4px;
+}
+
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.badge-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.badge-link:hover {
+  background: var(--glass-strong);
+}
+
+/* Usage bar system */
+.usage-meters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.usage-meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+}
+
+.usage-meter-header .mono {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+.usage-bar-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+.usage-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease-out;
+  min-width: 0;
+}
+
+.bar-blue { background: #3B82F6; }
+.bar-violet { background: #8B5CF6; }
+.bar-emerald { background: #10B981; }
+.bar-amber { background: #F59E0B; }
+.bar-red { background: #EF4444; }
+
+.usage-bar-group {
+  margin-top: 8px;
+}
+
+.usage-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.usage-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* Model Hub */
+.model-hub-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.model-hub-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  gap: 8px;
+}
+.model-hub-item:hover {
+  background: var(--glass-strong);
+}
+
+.model-hub-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-hub-item-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.model-hub-item-meta {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  display: flex;
+  gap: 6px;
+}
+
+.model-hub-item-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.badge-cloud { background: rgba(59,130,246,0.15); color: #60A5FA; }
+.badge-local { background: rgba(16,185,129,0.15); color: #34D399; }
+.badge-hub { background: rgba(139,92,246,0.15); color: #A78BFA; }
+
+.model-hub-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.model-search {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: var(--text-primary);
+  outline: none;
+}
+.model-search::placeholder { color: var(--text-tertiary); }
+.model-search:focus { border-color: var(--border-strong); }
