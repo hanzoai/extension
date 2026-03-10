@@ -78,6 +78,11 @@ class HanzoSidebar {
       tabFs: document.getElementById('tab-fs'),
       refreshTabs: document.getElementById('refresh-tabs'),
       launchAgent: document.getElementById('launch-agent'),
+      // Inspector
+      pickElement: document.getElementById('pick-element'),
+      takeScreenshot: document.getElementById('take-screenshot'),
+      runAudit: document.getElementById('run-audit'),
+      inspectorResult: document.getElementById('inspector-result'),
       hanzoNodeStatus: document.getElementById('hanzo-node-status'),
       hanzoMcpStatus: document.getElementById('hanzo-mcp-status'),
       startHanzoNode: document.getElementById('start-hanzo-node'),
@@ -149,6 +154,11 @@ class HanzoSidebar {
     this.el.launchAgent.addEventListener('click', () => this.showAgentLauncher());
     this.el.startHanzoNode?.addEventListener('click', () => this.startHanzoService('node'));
     this.el.startHanzoMcp?.addEventListener('click', () => this.startHanzoService('bot'));
+
+    // Inspector
+    this.el.pickElement?.addEventListener('click', () => this.pickElement());
+    this.el.takeScreenshot?.addEventListener('click', () => this.takeScreenshot());
+    this.el.runAudit?.addEventListener('click', () => this.runAudit());
 
     // Settings
     this.el.logoutBtn.addEventListener('click', () => this.logout());
@@ -846,6 +856,266 @@ class HanzoSidebar {
     `).join('');
   }
 
+  // ===========================================================================
+  // Element Inspector
+  // ===========================================================================
+
+  async pickElement() {
+    const btn = this.el.pickElement;
+    if (!btn) return;
+    btn.classList.toggle('active');
+
+    if (btn.classList.contains('active')) {
+      // Inject picker script into active tab
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) return;
+
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            // Remove any existing picker
+            document.getElementById('__hanzo_picker_overlay')?.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = '__hanzo_picker_overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;cursor:crosshair;';
+
+            const highlight = document.createElement('div');
+            highlight.style.cssText = 'position:fixed;border:2px solid #4CAF50;background:rgba(76,175,80,0.1);pointer-events:none;transition:all 0.1s;z-index:2147483647;border-radius:2px;';
+            overlay.appendChild(highlight);
+
+            const label = document.createElement('div');
+            label.style.cssText = 'position:fixed;background:#222;color:#fff;font:11px/1.4 monospace;padding:4px 8px;border-radius:4px;z-index:2147483647;pointer-events:none;max-width:300px;word-break:break-all;';
+            overlay.appendChild(label);
+
+            let lastTarget: Element | null = null;
+
+            overlay.addEventListener('mousemove', (e) => {
+              overlay.style.pointerEvents = 'none';
+              const el = document.elementFromPoint(e.clientX, e.clientY);
+              overlay.style.pointerEvents = '';
+              if (!el || el === overlay) return;
+              lastTarget = el;
+              const rect = el.getBoundingClientRect();
+              highlight.style.left = rect.left + 'px';
+              highlight.style.top = rect.top + 'px';
+              highlight.style.width = rect.width + 'px';
+              highlight.style.height = rect.height + 'px';
+
+              const tag = el.tagName.toLowerCase();
+              const id = el.id ? `#${el.id}` : '';
+              const cls = el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '';
+              const size = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+              label.textContent = `<${tag}${id}${cls}> ${size}`;
+              label.style.left = Math.min(e.clientX + 12, window.innerWidth - 310) + 'px';
+              label.style.top = Math.min(e.clientY + 12, window.innerHeight - 30) + 'px';
+            });
+
+            overlay.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              overlay.remove();
+
+              if (!lastTarget) return;
+              const el = lastTarget;
+              const rect = el.getBoundingClientRect();
+              const computed = getComputedStyle(el);
+              const info = {
+                tag: el.tagName.toLowerCase(),
+                id: el.id || null,
+                classes: el.className && typeof el.className === 'string' ? el.className.trim().split(/\s+/) : [],
+                text: (el.textContent || '').trim().substring(0, 100),
+                href: (el as HTMLAnchorElement).href || null,
+                src: (el as HTMLImageElement).src || null,
+                rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height) },
+                styles: {
+                  color: computed.color,
+                  backgroundColor: computed.backgroundColor,
+                  fontSize: computed.fontSize,
+                  fontWeight: computed.fontWeight,
+                  display: computed.display,
+                  position: computed.position,
+                },
+                selector: (() => {
+                  if (el.id) return `#${el.id}`;
+                  let s = el.tagName.toLowerCase();
+                  if (el.className && typeof el.className === 'string') s += '.' + el.className.trim().split(/\s+/).join('.');
+                  return s;
+                })(),
+              };
+
+              // Send back to extension
+              window.postMessage({ type: '__hanzo_pick_result', info }, '*');
+            });
+
+            document.body.appendChild(overlay);
+
+            // ESC to cancel
+            const escHandler = (e: KeyboardEvent) => {
+              if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); window.postMessage({ type: '__hanzo_pick_result', info: null }, '*'); }
+            };
+            document.addEventListener('keydown', escHandler);
+          },
+        });
+
+        // Listen for result from content script
+        const resultHandler = (message: any) => {
+          if (message.action === 'inspector.pickResult') {
+            chrome.runtime.onMessage.removeListener(resultHandler);
+            btn.classList.remove('active');
+            this.showInspectorResult(message.info);
+          }
+        };
+        chrome.runtime.onMessage.addListener(resultHandler);
+
+        // Also inject a message relay
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            window.addEventListener('message', (e) => {
+              if (e.data?.type === '__hanzo_pick_result') {
+                chrome.runtime.sendMessage({ action: 'inspector.pickResult', info: e.data.info });
+              }
+            }, { once: true });
+          },
+        });
+
+      } catch (error) {
+        debugLog('Pick element failed:', error);
+        btn.classList.remove('active');
+        this.showNotification('Cannot inspect this page');
+      }
+    } else {
+      // Cancel picker — remove overlay from active tab
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => document.getElementById('__hanzo_picker_overlay')?.remove(),
+          });
+        }
+      } catch {}
+    }
+  }
+
+  showInspectorResult(info: any) {
+    const el = this.el.inspectorResult;
+    if (!el) return;
+
+    if (!info) {
+      el.classList.add('hidden');
+      return;
+    }
+
+    const tag = `<span class="element-tag">&lt;${this.escapeHtml(info.tag)}&gt;</span>`;
+    const id = info.id ? `<span class="element-id">#${this.escapeHtml(info.id)}</span>` : '';
+    const cls = info.classes?.length ? `<span class="element-class">.${info.classes.map((c: string) => this.escapeHtml(c)).join('.')}</span>` : '';
+    const size = `<span class="element-size">${info.rect?.w}x${info.rect?.h} @ (${info.rect?.x}, ${info.rect?.y})</span>`;
+    const selector = info.selector ? `\nSelector: ${this.escapeHtml(info.selector)}` : '';
+    const text = info.text ? `\nText: "${this.escapeHtml(info.text.substring(0, 60))}"` : '';
+    const styles = info.styles ? `\nFont: ${info.styles.fontSize} ${info.styles.fontWeight}\nColor: ${info.styles.color}\nBg: ${info.styles.backgroundColor}` : '';
+
+    el.innerHTML = `${tag}${id}${cls}\n${size}${selector}${text}${styles}`;
+    el.classList.remove('hidden');
+  }
+
+  async takeScreenshot() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
+
+      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+      const el = this.el.inspectorResult;
+      if (el) {
+        el.innerHTML = `<img src="${dataUrl}" alt="Screenshot" />\n<span class="element-size">Captured ${new Date().toLocaleTimeString()}</span>`;
+        el.classList.remove('hidden');
+      }
+
+      // Also copy to clipboard
+      try {
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        this.showNotification('Screenshot copied to clipboard');
+      } catch {
+        this.showNotification('Screenshot captured');
+      }
+    } catch (error) {
+      debugLog('Screenshot failed:', error);
+      this.showNotification('Cannot capture this page');
+    }
+  }
+
+  async runAudit() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
+
+      const el = this.el.inspectorResult;
+      if (el) {
+        el.textContent = 'Running audit...';
+        el.classList.remove('hidden');
+      }
+
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          const audit: any = {};
+
+          // Images without alt
+          const imgs = document.querySelectorAll('img:not([alt])');
+          audit.missingAlt = imgs.length;
+
+          // Buttons without labels
+          const btns = document.querySelectorAll('button:not([aria-label]):not([title])');
+          const unlabeledBtns = Array.from(btns).filter(b => !(b.textContent || '').trim());
+          audit.unlabeledButtons = unlabeledBtns.length;
+
+          // Links without href
+          const emptyLinks = document.querySelectorAll('a:not([href]), a[href=""], a[href="#"]');
+          audit.emptyLinks = emptyLinks.length;
+
+          // Form inputs without labels
+          const inputs = document.querySelectorAll('input:not([type=hidden]):not([aria-label]):not([title])');
+          const unlabeled = Array.from(inputs).filter(i => !document.querySelector(`label[for="${i.id}"]`));
+          audit.unlabeledInputs = unlabeled.length;
+
+          // Contrast — check text readability
+          audit.totalElements = document.querySelectorAll('*').length;
+          audit.headings = document.querySelectorAll('h1,h2,h3,h4,h5,h6').length;
+          audit.forms = document.querySelectorAll('form').length;
+
+          // Performance hints
+          audit.scripts = document.querySelectorAll('script').length;
+          audit.stylesheets = document.querySelectorAll('link[rel=stylesheet]').length;
+          audit.inlineStyles = document.querySelectorAll('[style]').length;
+
+          return audit;
+        },
+      });
+
+      if (el && result?.result) {
+        const a = result.result;
+        const issues: string[] = [];
+        if (a.missingAlt) issues.push(`${a.missingAlt} images missing alt text`);
+        if (a.unlabeledButtons) issues.push(`${a.unlabeledButtons} buttons without labels`);
+        if (a.emptyLinks) issues.push(`${a.emptyLinks} empty/hash links`);
+        if (a.unlabeledInputs) issues.push(`${a.unlabeledInputs} inputs without labels`);
+
+        el.innerHTML =
+          `<b>Page Audit</b>\n` +
+          `Elements: ${a.totalElements} | Headings: ${a.headings} | Forms: ${a.forms}\n` +
+          `Scripts: ${a.scripts} | Stylesheets: ${a.stylesheets} | Inline styles: ${a.inlineStyles}\n\n` +
+          (issues.length ? `<b>Issues (${issues.length})</b>\n` + issues.map(i => `  - ${i}`).join('\n') : '<span style="color:var(--success)">No accessibility issues found</span>');
+      }
+    } catch (error) {
+      debugLog('Audit failed:', error);
+      this.showNotification('Cannot audit this page');
+    }
+  }
+
   async refreshUsageMetrics() {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'usage.metrics' });
@@ -903,6 +1173,8 @@ class HanzoSidebar {
     }
 
     // Check hanzo bot/MCP via ZAP status
+    const mcpServers: Array<{ id: string; name: string; tools: string[] }> = [];
+
     try {
       const zapResp = await chrome.runtime.sendMessage({ action: 'zap.status' });
       const hasTools = zapResp?.success && zapResp.zap?.connected;
@@ -916,18 +1188,49 @@ class HanzoSidebar {
         if (hasTools) this.el.startHanzoMcp.textContent = 'Running';
       }
 
-      // Update connected MCP servers list
+      // Collect ZAP-discovered MCP servers
       if (zapResp?.success && zapResp.zap?.mcps?.length) {
-        this.updateMCPServerList(zapResp.zap.mcps);
-      } else {
-        this.updateMCPServerList([]);
+        mcpServers.push(...zapResp.zap.mcps);
       }
     } catch {
       if (this.el.hanzoMcpStatus) {
         this.el.hanzoMcpStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
       }
-      this.updateMCPServerList([]);
     }
+
+    // Check CDP bridge (hanzo-mcp browser tools connection)
+    try {
+      const bridgeResp = await chrome.runtime.sendMessage({ action: 'bridge.status' });
+      if (bridgeResp?.success && bridgeResp.connected) {
+        mcpServers.push({
+          id: 'cdp-bridge',
+          name: 'Hanzo MCP (CDP Bridge)',
+          tools: ['browser', 'navigate', 'screenshot', 'click', 'evaluate', 'fill', 'url', 'title'],
+        });
+      }
+    } catch {}
+
+    // Also probe hanzo-mcp HTTP bridge directly (port 9224)
+    try {
+      const bridgeHttp = await fetch('http://localhost:9224', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status' }),
+        signal: AbortSignal.timeout(2000),
+      });
+      if (bridgeHttp.ok) {
+        const data = await bridgeHttp.json();
+        if (data.success && !mcpServers.find(m => m.id === 'cdp-bridge')) {
+          mcpServers.push({
+            id: 'hanzo-mcp-http',
+            name: 'Hanzo MCP (HTTP :9224)',
+            tools: ['browser', 'navigate', 'screenshot', 'evaluate', 'click'],
+          });
+        }
+      }
+    } catch {}
+
+    this.updateMCPServerList(mcpServers);
   }
 
   async startHanzoService(service: string) {
