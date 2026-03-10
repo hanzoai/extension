@@ -503,6 +503,29 @@ class CDPBridgeServer {
       case 'full_audit':
         return this.sendToExtension('audit.full', { tabId: rest.tabId });
 
+      case 'nextjs_audit':
+        return this.sendToExtension('audit.nextjs', { tabId: rest.tabId });
+
+      case 'debugger_mode':
+      case 'debug':
+        return this.sendToExtension('debugger.mode', { tabId: rest.tabId });
+
+      // Ollama / Local LLM
+      case 'ollama_models':
+        return this.sendToExtension('ollama.models', {});
+
+      case 'ollama_chat':
+        return this.sendToExtension('ollama.chat', { model: rest.model, messages: rest.messages, options: rest.options });
+
+      case 'local_chat':
+        return this.sendToExtension('local.chat', { provider: rest.provider, endpoint: rest.endpoint, model: rest.model, messages: rest.messages, options: rest.options, apiKey: rest.apiKey });
+
+      case 'local_models':
+        return this.sendToExtension('local.models', { provider: rest.provider, endpoint: rest.endpoint, apiKey: rest.apiKey });
+
+      case 'local_discover':
+        return this.sendToExtension('local.discover', {});
+
       // Status
       case 'status':
         return {
@@ -601,6 +624,8 @@ async function startJSONRPCServer(bridgeServer: CDPBridgeServer) {
           'console_logs', 'console_errors', 'network_logs', 'network_errors', 'network_success',
           'start_monitoring', 'stop_monitoring', 'monitor_status', 'wipe_logs',
           'accessibility_audit', 'performance_audit', 'seo_audit', 'best_practices_audit', 'full_audit',
+          'nextjs_audit', 'debugger_mode',
+          'ollama_models', 'ollama_chat', 'local_chat', 'local_models', 'local_discover',
           'takeover.start', 'takeover.end', 'takeover.cursor',
           'status'
         ]

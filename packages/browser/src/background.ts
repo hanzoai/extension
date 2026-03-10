@@ -11,7 +11,10 @@ import {
   runSEOAudit,
   runBestPracticesAudit,
   runFullAudit,
+  runNextJSAudit,
+  runDebuggerMode,
 } from './audit-runner';
+import { ollamaClient } from './ollama-client';
 import {
   ActionRateLimiter,
   CHAT_BUDGETS,
@@ -643,13 +646,14 @@ async function stopControlSession(): Promise<void> {
 
 void loadDebugFlagFromStorage();
 
-// Initialize WebGPU and CDP on install
+// Initialize WebGPU, Ollama, and CDP on install
 chrome.runtime.onInstalled.addListener(async () => {
   debugLog('[Hanzo] Extension installed, initializing...');
 
+  // WebGPU init
   const gpuAvailable = await webgpuAI.initialize();
   if (gpuAvailable) {
-    debugLog('[Hanzo] WebGPU available, loading local models...');
+    debugLog('[Hanzo] WebGPU available');
     try {
       await webgpuAI.loadModel({
         name: 'hanzo-browser-control',
@@ -658,9 +662,20 @@ chrome.runtime.onInstalled.addListener(async () => {
         maxTokens: 512
       });
     } catch (error) {
-      console.error('[Hanzo] Failed to load local model:', error);
+      // Model file not bundled yet — will use Ollama/LM Studio/cloud instead
+      debugLog('[Hanzo] Local model not bundled, using remote providers');
     }
   }
+
+  // Auto-discover local LLM providers (Ollama, LM Studio, Hanzo Desktop)
+  ollamaClient.discover().then((found) => {
+    if (found) debugLog('[Hanzo] Ollama discovered: ' + ollamaClient.getStatus().url);
+  }).catch(() => {});
+
+  // Restore custom Ollama URL from storage
+  chrome.storage.local.get(['ollamaUrl'], (result) => {
+    if (result.ollamaUrl) ollamaClient.setBaseUrl(result.ollamaUrl);
+  });
 });
 
 // Handle messages from content scripts and popup
@@ -1378,6 +1393,351 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       try {
         const result = await runFullAudit(auditTabId);
         sendResponse({ success: true, result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'audit.nextjs': {
+      const auditTabId = request.tabId || sender.tab?.id;
+      if (!auditTabId) { sendResponse({ success: false, error: 'No tab' }); break; }
+      try {
+        const result = await runNextJSAudit(auditTabId);
+        sendResponse({ success: true, result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'audit.debugger':
+    case 'debugger.mode': {
+      const auditTabId = request.tabId || sender.tab?.id;
+      if (!auditTabId) { sendResponse({ success: false, error: 'No tab' }); break; }
+      try {
+        const result = await runDebuggerMode(auditTabId);
+        sendResponse({ success: true, result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    // --- Ollama / Local LLM ---
+    case 'ollama.discover':
+      try {
+        const found = await ollamaClient.discover();
+        sendResponse({ success: true, connected: found, ...ollamaClient.getStatus() });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'ollama.health':
+      try {
+        const health = await ollamaClient.healthCheck();
+        sendResponse({ success: true, ...health });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'ollama.models':
+      try {
+        const models = await ollamaClient.listModels();
+        sendResponse({ success: true, models });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'ollama.pull':
+      try {
+        // Pull is long-running — we track progress via storage
+        ollamaClient.pullModel(request.model, (status, completed, total) => {
+          chrome.storage.local.set({
+            'ollama.pull.progress': { model: request.model, status, completed, total, timestamp: Date.now() },
+          });
+        }).then(() => {
+          chrome.storage.local.set({ 'ollama.pull.progress': { model: request.model, status: 'done', timestamp: Date.now() } });
+        }).catch((e) => {
+          chrome.storage.local.set({ 'ollama.pull.progress': { model: request.model, status: 'error', error: e.message, timestamp: Date.now() } });
+        });
+        sendResponse({ success: true, started: true });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'ollama.delete':
+      try {
+        await ollamaClient.deleteModel(request.model);
+        sendResponse({ success: true });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'ollama.chat':
+      try {
+        const result = await ollamaClient.chat(
+          request.model,
+          request.messages,
+          request.options
+        );
+        sendResponse({ success: true, content: result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'ollama.generate':
+      try {
+        const result = await ollamaClient.generate(
+          request.model,
+          request.prompt,
+          request.options
+        );
+        sendResponse({ success: true, content: result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'ollama.embed':
+      try {
+        const embedding = await ollamaClient.embed(request.model, request.input);
+        sendResponse({ success: true, embedding });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+
+    case 'ollama.status':
+      sendResponse({ success: true, ...ollamaClient.getStatus() });
+      break;
+
+    case 'ollama.setUrl':
+      ollamaClient.setBaseUrl(request.url);
+      sendResponse({ success: true });
+      break;
+
+    // --- Local LLM Provider (Ollama / LM Studio / Hanzo Desktop / Custom) ---
+    case 'local.chat': {
+      // Unified local LLM chat — routes to the configured local provider
+      try {
+        const provider = request.provider || 'ollama';
+        const endpoint = request.endpoint;
+        const model = request.model;
+        const messages = request.messages;
+        const options = request.options || {};
+
+        let result: string;
+
+        if (provider === 'ollama' && !endpoint) {
+          result = await ollamaClient.chat(model, messages, options);
+        } else {
+          // LM Studio, Hanzo Desktop, or custom endpoint — all use OpenAI-compatible API
+          const baseUrl = endpoint || (
+            provider === 'lmstudio' ? 'http://localhost:1234/v1' :
+            provider === 'hanzo-desktop' ? 'http://localhost:11435/v1' :
+            'http://localhost:8080/v1'
+          );
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (request.apiKey) headers['Authorization'] = `Bearer ${request.apiKey}`;
+
+          const body: any = { model, messages, stream: false };
+          if (options.temperature !== undefined) body.temperature = options.temperature;
+          if (options.top_p !== undefined) body.top_p = options.top_p;
+          if (options.num_predict !== undefined) body.max_tokens = options.num_predict;
+
+          const resp = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(120000),
+          });
+          if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(`${provider} error: ${resp.status} ${text}`);
+          }
+          const data = await resp.json();
+          result = data.choices?.[0]?.message?.content || '';
+        }
+
+        sendResponse({ success: true, content: result });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'local.models': {
+      // List models from any OpenAI-compatible local provider
+      try {
+        const endpoint = request.endpoint || (
+          request.provider === 'lmstudio' ? 'http://localhost:1234/v1' :
+          request.provider === 'hanzo-desktop' ? 'http://localhost:11435/v1' :
+          request.provider === 'ollama' ? null :
+          request.endpoint || 'http://localhost:8080/v1'
+        );
+
+        if (!endpoint) {
+          // Use Ollama native
+          const models = await ollamaClient.listModels();
+          sendResponse({ success: true, models: models.map(m => ({ id: m.name, name: m.name, size: m.size, details: m.details })) });
+          break;
+        }
+
+        const headers: Record<string, string> = {};
+        if (request.apiKey) headers['Authorization'] = `Bearer ${request.apiKey}`;
+
+        const resp = await fetch(`${endpoint}/models`, {
+          headers,
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        sendResponse({ success: true, models: data.data || data.models || [] });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'local.discover': {
+      // Auto-discover all local LLM providers
+      const providers: { name: string; url: string; available: boolean; models?: string[] }[] = [];
+
+      // Ollama
+      const ollamaFound = await ollamaClient.discover();
+      if (ollamaFound) {
+        const models = await ollamaClient.listModels();
+        providers.push({ name: 'ollama', url: ollamaClient.getStatus().url, available: true, models: models.map(m => m.name) });
+      } else {
+        providers.push({ name: 'ollama', url: 'http://localhost:11434', available: false });
+      }
+
+      // LM Studio (OpenAI-compatible on :1234)
+      try {
+        const resp = await fetch('http://localhost:1234/v1/models', { signal: AbortSignal.timeout(2000) });
+        if (resp.ok) {
+          const data = await resp.json();
+          providers.push({ name: 'lmstudio', url: 'http://localhost:1234/v1', available: true, models: (data.data || []).map((m: any) => m.id) });
+        } else {
+          providers.push({ name: 'lmstudio', url: 'http://localhost:1234/v1', available: false });
+        }
+      } catch {
+        providers.push({ name: 'lmstudio', url: 'http://localhost:1234/v1', available: false });
+      }
+
+      // Hanzo Desktop (Ollama embedded, typically :11435 or node API)
+      for (const port of [11435, 9550]) {
+        try {
+          const resp = await fetch(`http://localhost:${port}/api/tags`, { signal: AbortSignal.timeout(2000) });
+          if (resp.ok) {
+            const data = await resp.json();
+            providers.push({ name: 'hanzo-desktop', url: `http://localhost:${port}`, available: true, models: (data.models || []).map((m: any) => m.name) });
+            break;
+          }
+        } catch { /* next */ }
+      }
+      if (!providers.find(p => p.name === 'hanzo-desktop')) {
+        providers.push({ name: 'hanzo-desktop', url: 'http://localhost:11435', available: false });
+      }
+
+      // Check for custom endpoints saved in storage
+      const stored = await chrome.storage.local.get(['customLLMEndpoints']);
+      const customs: { name: string; url: string; apiKey?: string }[] = stored.customLLMEndpoints || [];
+      for (const c of customs) {
+        try {
+          const headers: Record<string, string> = {};
+          if (c.apiKey) headers['Authorization'] = `Bearer ${c.apiKey}`;
+          const resp = await fetch(`${c.url}/models`, { headers, signal: AbortSignal.timeout(3000) });
+          if (resp.ok) {
+            const data = await resp.json();
+            providers.push({ name: c.name || 'custom', url: c.url, available: true, models: (data.data || data.models || []).map((m: any) => m.id || m.name) });
+          } else {
+            providers.push({ name: c.name || 'custom', url: c.url, available: false });
+          }
+        } catch {
+          providers.push({ name: c.name || 'custom', url: c.url, available: false });
+        }
+      }
+
+      sendResponse({ success: true, providers });
+      break;
+    }
+
+    // --- Hanzo Cloud Models ---
+    case 'models.list': {
+      // List all available models from Hanzo Cloud
+      try {
+        const token = await auth.getToken();
+        if (!token) {
+          // Return free/public models
+          sendResponse({
+            success: true,
+            models: [
+              { id: 'zen-coder-flash', name: 'Zen Coder Flash', provider: 'hanzo', free: true },
+              { id: 'zen-max', name: 'Zen Max', provider: 'hanzo', free: false },
+            ],
+            authenticated: false,
+          });
+          break;
+        }
+        const cloudModels = await listModels(token);
+        sendResponse({ success: true, models: cloudModels, authenticated: true });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'provider.save': {
+      // Save a custom LLM endpoint
+      try {
+        const stored = await chrome.storage.local.get(['customLLMEndpoints']);
+        const endpoints: any[] = stored.customLLMEndpoints || [];
+        const existing = endpoints.findIndex(e => e.name === request.name || e.url === request.url);
+        const entry = { name: request.name, url: request.url, apiKey: request.apiKey };
+        if (existing >= 0) {
+          endpoints[existing] = entry;
+        } else {
+          endpoints.push(entry);
+        }
+        await chrome.storage.local.set({ customLLMEndpoints: endpoints });
+        sendResponse({ success: true });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'provider.remove': {
+      try {
+        const stored = await chrome.storage.local.get(['customLLMEndpoints']);
+        const endpoints: any[] = (stored.customLLMEndpoints || []).filter(
+          (e: any) => e.name !== request.name && e.url !== request.url
+        );
+        await chrome.storage.local.set({ customLLMEndpoints: endpoints });
+        sendResponse({ success: true });
+      } catch (e: any) {
+        sendResponse({ success: false, error: e.message });
+      }
+      break;
+    }
+
+    case 'provider.test': {
+      // Test connection to any OpenAI-compatible endpoint
+      try {
+        const headers: Record<string, string> = {};
+        if (request.apiKey) headers['Authorization'] = `Bearer ${request.apiKey}`;
+        const resp = await fetch(`${request.url}/models`, { headers, signal: AbortSignal.timeout(5000) });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        sendResponse({ success: true, models: (data.data || data.models || []).map((m: any) => m.id || m.name) });
       } catch (e: any) {
         sendResponse({ success: false, error: e.message });
       }
