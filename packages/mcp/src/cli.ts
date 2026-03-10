@@ -15,6 +15,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -89,7 +90,9 @@ program
   .action(async () => {
     console.log('Installing Hanzo MCP for Claude Desktop...');
     
-    const configDir = path.join(process.env.HOME || '', 'Library', 'Application Support', 'Claude');
+    const configDir = process.platform === 'win32'
+      ? path.join(process.env.APPDATA || os.homedir(), 'Claude')
+      : path.join(os.homedir(), 'Library', 'Application Support', 'Claude');
     const configFile = path.join(configDir, 'claude_desktop_config.json');
     
     try {
