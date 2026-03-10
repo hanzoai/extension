@@ -526,6 +526,40 @@ class CDPBridgeServer {
       case 'local_discover':
         return this.sendToExtension('local.discover', {});
 
+      // Model Hub — browse, search, download
+      case 'hub_search':
+        return this.sendToExtension('hub.search', { query: rest.query, filter: rest.filter, sort: rest.sort, limit: rest.limit, author: rest.author });
+
+      case 'hub_search_gguf':
+        return this.sendToExtension('hub.searchGGUF', { query: rest.query, limit: rest.limit });
+
+      case 'hub_model':
+        return this.sendToExtension('hub.model', { modelId: rest.modelId });
+
+      case 'hub_recommended':
+        return this.sendToExtension('hub.recommended', {});
+
+      case 'hub_search_ollama':
+        return this.sendToExtension('hub.searchOllama', { query: rest.query });
+
+      case 'hub_download_ollama':
+        return this.sendToExtension('hub.downloadOllama', { modelName: rest.modelName, ollamaUrl: rest.ollamaUrl });
+
+      case 'hub_download_hf':
+        return this.sendToExtension('hub.downloadHF', { downloadUrl: rest.downloadUrl });
+
+      case 'hub_all_models':
+        return this.sendToExtension('hub.allModels', {});
+
+      case 'hub_search_mlx':
+        return this.sendToExtension('hub.searchMLX', { query: rest.query, limit: rest.limit });
+
+      case 'hub_model_card':
+        return this.sendToExtension('hub.modelCard', { modelId: rest.modelId });
+
+      case 'hub_model_stats':
+        return this.sendToExtension('hub.modelStats', { modelId: rest.modelId });
+
       // Status
       case 'status':
         return {
@@ -626,6 +660,9 @@ async function startJSONRPCServer(bridgeServer: CDPBridgeServer) {
           'accessibility_audit', 'performance_audit', 'seo_audit', 'best_practices_audit', 'full_audit',
           'nextjs_audit', 'debugger_mode',
           'ollama_models', 'ollama_chat', 'local_chat', 'local_models', 'local_discover',
+          'hub_search', 'hub_search_gguf', 'hub_search_mlx', 'hub_model', 'hub_model_card',
+          'hub_model_stats', 'hub_recommended',
+          'hub_search_ollama', 'hub_download_ollama', 'hub_download_hf', 'hub_all_models',
           'takeover.start', 'takeover.end', 'takeover.cursor',
           'status'
         ]
