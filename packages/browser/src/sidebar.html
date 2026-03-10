@@ -330,6 +330,33 @@
 
         <button id="save-settings" class="primary-btn">Save Settings</button>
 
+        <!-- Build Info -->
+        <div class="panel build-info-panel">
+          <h3>Build Info</h3>
+          <div class="mcp-status">
+            <div class="status-row">
+              <span>Extension</span>
+              <span id="build-ext-version" class="status-value mono">--</span>
+            </div>
+            <div class="status-row">
+              <span>Browser</span>
+              <span id="build-browser" class="status-value mono">--</span>
+            </div>
+            <div class="status-row">
+              <span>Manifest</span>
+              <span id="build-manifest" class="status-value mono">--</span>
+            </div>
+            <div class="status-row">
+              <span>CDP Bridge</span>
+              <span id="build-cdp-status" class="status-value mono">--</span>
+            </div>
+            <div class="status-row">
+              <span>MCP Bridge</span>
+              <span id="build-mcp-status" class="status-value mono">--</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Links -->
         <div class="settings-links">
           <a href="https://console.hanzo.ai" target="_blank">Console</a>
@@ -349,7 +376,7 @@
           <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z" fill="currentColor"/>
           <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z" fill="currentColor"/>
         </svg>
-        <span>hanzo.ai</span>
+        <span id="footer-version">hanzo.ai</span>
       </a>
     </footer>
   </div>
