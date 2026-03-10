@@ -2,6 +2,7 @@ import { BaseCLITool, CLIToolConfig } from '../common/base-cli';
 import * as vscode from 'vscode';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 export class GeminiCLI extends BaseCLITool {
@@ -45,7 +46,7 @@ if len(sys.argv) > 1:
     response = model.generate_content(prompt)
     print(response.text)
 `;
-                const wrapperPath = path.join(process.env.HOME || '', '.local', 'bin', 'gemini');
+                const wrapperPath = path.join(os.homedir(), '.local', 'bin', 'gemini');
                 fs.mkdirSync(path.dirname(wrapperPath), { recursive: true });
                 fs.writeFileSync(wrapperPath, wrapperScript);
                 fs.chmodSync(wrapperPath, '755');
@@ -88,7 +89,7 @@ if len(sys.argv) > 1:
 
     private async commandExists(command: string): Promise<boolean> {
         try {
-            execSync(`which ${command}`, { stdio: 'ignore' });
+            execSync(process.platform === 'win32' ? `where ${command}` : `which ${command}`, { stdio: 'ignore' });
             return true;
         } catch {
             return false;
