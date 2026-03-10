@@ -261,37 +261,50 @@ jobs:
     - name: Collect release assets
       run: |
         mkdir -p release
-        find artifacts -type f -name 'hanzo-ai-*' -exec cp {} release/ \;
+        VERSION="${{ github.ref_name }}"
+        # Only keep assets matching this exact version tag
+        find artifacts -type f -name "hanzo-ai-*-${VERSION}.*" -exec cp {} release/ \;
+        # Fallback: if version-tagged names not found, copy all
+        if [ -z "$(ls release/ 2>/dev/null)" ]; then
+          find artifacts -type f -name 'hanzo-ai-*' -exec cp {} release/ \;
+        fi
         echo "Release assets:" && ls -lh release/
+
+    - name: Delete existing release (clean slate)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release delete "${{ github.ref_name }}" --yes --repo "${{ github.repository }}" 2>/dev/null || true
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref_name }}
         name: ${{ github.ref_name }}
-        generate_release_notes: true
         files: release/*
         body: |
           ## IDE Extensions
 
-          | IDE | Platform | File |
-          |-----|----------|------|
-          | **VS Code** | Windows / macOS / Linux | `hanzo-ai-vscode-*.vsix` |
-          | **Cursor** | Windows / macOS / Linux | `hanzo-ai-cursor-*.vsix` |
-          | **Windsurf** | Windows / macOS / Linux | `hanzo-ai-windsurf-*.vsix` |
-          | **Claude Desktop/Code** | Windows / macOS / Linux | `hanzo-ai-claude-*.dxt` |
-          | **JetBrains** | Windows / macOS / Linux | `hanzo-ai-jetbrains-*.zip` |
+          | IDE | Platform | Download |
+          |-----|----------|----------|
+          | **VS Code** | Windows / macOS / Linux | [`hanzo-ai-vscode-${{ github.ref_name }}.vsix`](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hanzo-ai-vscode-${{ github.ref_name }}.vsix) |
+          | **Cursor** | Windows / macOS / Linux | [`hanzo-ai-cursor-${{ github.ref_name }}.vsix`](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hanzo-ai-cursor-${{ github.ref_name }}.vsix) |
+          | **Windsurf** | Windows / macOS / Linux | [`hanzo-ai-windsurf-${{ github.ref_name }}.vsix`](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hanzo-ai-windsurf-${{ github.ref_name }}.vsix) |
+          | **Claude Desktop/Code** | Windows / macOS / Linux | [`hanzo-ai-claude-${{ github.ref_name }}.dxt`](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hanzo-ai-claude-${{ github.ref_name }}.dxt) |
+          | **JetBrains** | Windows / macOS / Linux | [`hanzo-ai-jetbrains-${{ github.ref_name }}.zip`](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hanzo-ai-jetbrains-${{ github.ref_name }}.zip) |
 
           ## Browser Extensions
 
-          | Browser | Platform | File |
-          |---------|----------|------|
-          | **Chrome** | Windows / macOS / Linux | `hanzo-ai-chrome-*.zip` |
-          | **Edge** | Windows / macOS / Linux | `hanzo-ai-edge-*.zip` |
-          | **Firefox** | Windows / macOS / Linux | `hanzo-ai-firefox-*.zip` |
-          | **Safari** | macOS / iOS | `hanzo-ai-safari-*.zip` |
+          | Browser | Platform | Download |
+          |---------|----------|----------|
+          | **Chrome** | Windows / macOS / Linux | [`hanzo-ai-chrome-${{ github.ref_name }}.zip`](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hanzo-ai-chrome-${{ github.ref_name }}.zip) |
+          | **Edge** | Windows / macOS / Linux | [`hanzo-ai-edge-${{ github.ref_name }}.zip`](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hanzo-ai-edge-${{ github.ref_name }}.zip) |
+          | **Firefox** | Windows / macOS / Linux | [`hanzo-ai-firefox-${{ github.ref_name }}.zip`](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hanzo-ai-firefox-${{ github.ref_name }}.zip) |
+          | **Safari** | macOS / iOS | [`hanzo-ai-safari-${{ github.ref_name }}.zip`](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/hanzo-ai-safari-${{ github.ref_name }}.zip) |
 
           > Chrome zip also works for Brave, Opera, Vivaldi, Arc.
           > Cursor and Windsurf use the VS Code VSIX format.
+
+          **Install**: `code --install-extension hanzo-ai-vscode-${{ github.ref_name }}.vsix`
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
