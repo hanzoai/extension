@@ -1,0 +1,12 @@
+src/**
+test/**
+scripts/**
+node_modules/**
+dist/**
+!dist/mcp-server.js
+out/mcp-server-standalone*.js
+.vscode/**
+.vscode-test/**
+tsconfig*.json
+vitest.config.ts
+**/*.map
