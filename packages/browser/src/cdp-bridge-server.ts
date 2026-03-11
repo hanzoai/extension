@@ -592,7 +592,7 @@ class CDPBridgeServer {
 
       this.pendingExtensionRequests.set(id, { resolve, timeout });
 
-      client.send(JSON.stringify({
+      client.ws.send(JSON.stringify({
         type: 'extension-request',
         id,
         action,
