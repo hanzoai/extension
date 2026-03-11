@@ -1,0 +1,178 @@
+name: Cross-Platform E2E
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'packages/browser/src/**'
+      - 'packages/browser/e2e/**'
+      - '.github/workflows/cross-platform-e2e.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/browser/src/**'
+      - 'packages/browser/e2e/**'
+  workflow_dispatch:
+  schedule:
+    # Daily at 06:00 UTC
+    - cron: '0 6 * * *'
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════
+  # Cross-browser parity matrix
+  # Tests core browser tool actions across Chrome, Firefox, WebKit
+  # on Linux, macOS, and Windows.
+  # ═══════════════════════════════════════════════════════════════════
+  e2e-matrix:
+    name: ${{ matrix.browser }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        browser: [chromium, firefox, webkit]
+        exclude:
+          # WebKit on Windows is not supported by Playwright
+          - os: windows-latest
+            browser: webkit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright ${{ matrix.browser }}
+        working-directory: packages/browser
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Build browser extension
+        working-directory: packages/browser
+        run: node src/build.js
+
+      - name: Start xvfb (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          Xvfb :99 -screen 0 1920x1080x24 &
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+
+      - name: Run parity tests (${{ matrix.browser }})
+        working-directory: packages/browser
+        run: |
+          npx playwright test \
+            --config=e2e/cross-platform.config.ts \
+            --project=${{ matrix.browser }} \
+            e2e/browser-tool-parity.spec.ts
+        env:
+          CI: true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.os }}-${{ matrix.browser }}
+          path: |
+            packages/browser/playwright-report/
+            packages/browser/e2e/cross-platform-results.json
+            packages/browser/test-results/
+          retention-days: 14
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Extension-specific E2E (Chrome + Firefox)
+  # Tests extension popup, sidebar, overlay, CDP bridge
+  # ═══════════════════════════════════════════════════════════════════
+  extension-e2e:
+    name: Extension E2E (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: packages/browser
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Build browser extension
+        working-directory: packages/browser
+        run: node src/build.js
+
+      - name: Run extension E2E (${{ matrix.browser }})
+        working-directory: packages/browser
+        run: |
+          xvfb-run npx playwright test \
+            --config=e2e/playwright.config.ts \
+            e2e/popup.spec.ts e2e/sidebar.spec.ts
+        env:
+          CI: true
+          EXTENSION_BROWSER: ${{ matrix.browser }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extension-report-${{ matrix.browser }}
+          path: packages/browser/playwright-report/
+          retention-days: 14
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Summary — aggregate results from all matrix jobs
+  # ═══════════════════════════════════════════════════════════════════
+  summary:
+    name: Parity Summary
+    runs-on: ubuntu-latest
+    needs: [e2e-matrix, extension-e2e]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate parity report
+        run: |
+          echo "## Cross-Platform E2E Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| OS | Browser | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|---------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          for dir in artifacts/results-*; do
+            [ -d "$dir" ] || continue
+            name=$(basename "$dir" | sed 's/results-//')
+            os=$(echo "$name" | cut -d- -f1-2)
+            browser=$(echo "$name" | cut -d- -f3-)
+
+            if [ -f "$dir/cross-platform-results.json" ]; then
+              passed=$(cat "$dir/cross-platform-results.json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(sum(1 for s in d.get('suites',[]) for t in s.get('specs',[]) if all(r.get('status')=='passed' for r in t.get('tests',[]))))" 2>/dev/null || echo "?")
+              failed=$(cat "$dir/cross-platform-results.json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(sum(1 for s in d.get('suites',[]) for t in s.get('specs',[]) if any(r.get('status')=='failed' for r in t.get('tests',[]))))" 2>/dev/null || echo "?")
+              echo "| $os | $browser | ${passed} passed / ${failed} failed |" >> $GITHUB_STEP_SUMMARY
+            else
+              status="${{ needs.e2e-matrix.result == 'success' && '✅' || '❌' }}"
+              echo "| $os | $browser | $status |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Extension E2E" >> $GITHUB_STEP_SUMMARY
+          echo "| Browser | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          for dir in artifacts/extension-report-*; do
+            [ -d "$dir" ] || continue
+            browser=$(basename "$dir" | sed 's/extension-report-//')
+            echo "| $browser | ${{ needs.extension-e2e.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          done
