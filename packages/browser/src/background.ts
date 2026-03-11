@@ -1,4 +1,29 @@
 // Background Service Worker for Browser Extension
+import type { ZapState, ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
+import {
+  createZapManager,
+  encodeZapMessage,
+  discoverZapServers,
+  handleZapMessage,
+  MSG_REQUEST,
+  DEFAULT_ZAP_PORTS as SHARED_ZAP_PORTS,
+  type ZapManager,
+} from './shared/zap.js';
+import {
+  getRagConfig as getSharedRagConfig,
+  normalizeRagSnippets,
+  queryRagFromZap,
+  queryRagFromEndpoint,
+} from './shared/rag.js';
+import {
+  IAM_API_URL, IAM_LOGIN_URL, API_BASE_URL,
+  DEFAULT_MCP_PORT as CFG_MCP_PORT,
+  DEFAULT_CDP_PORT as CFG_CDP_PORT,
+  DEFAULT_RAG_TOP_K as CFG_RAG_TOP_K,
+  MODEL_CACHE_TTL_MS as CFG_MODEL_CACHE_TTL,
+  LOCAL_PROVIDER_DEFAULTS,
+  loadRuntimeConfig,
+} from './shared/config.js';
 import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './cdp-bridge';
@@ -74,51 +99,11 @@ chrome.webNavigation.onCommitted.addListener((details) => {
 });
 
 // =============================================================================
-// ZAP Protocol Integration
+// ZAP Protocol Integration (shared module)
 // =============================================================================
 
-/** ZAP connection state */
-interface ZapState {
-  connected: boolean;
-  mcps: Array<{ id: string; name: string; url: string; tools: string[] }>;
-  extensionId: string;
-}
-
-interface ControlSession {
-  active: boolean;
-  tabId: number | null;
-  task: string | null;
-  startedAt: number | null;
-}
-
-interface RagSnippet {
-  content: string;
-  title?: string;
-  source?: string;
-  score?: number;
-  url?: string;
-}
-
-interface RagQueryParams {
-  query: string;
-  topK: number;
-  knowledgeBase: string;
-  includeTabContext: boolean;
-  useZapMemory: boolean;
-  endpoint: string;
-  apiKey: string;
-  mcpId?: string;
-  pageContext?: {
-    url?: string;
-    title?: string;
-  };
-}
-
-const zapState: ZapState = {
-  connected: false,
-  mcps: [],
-  extensionId: `hanzo-ext-${Date.now().toString(36)}`,
-};
+const zapMgr: ZapManager = createZapManager();
+const zapState = zapMgr.state;
 
 const controlSession: ControlSession = {
   active: false,
@@ -128,13 +113,11 @@ const controlSession: ControlSession = {
 };
 
 // Default ports (overridable via chrome.storage.local settings)
-const DEFAULT_ZAP_PORTS = [9999, 9998, 9997, 9996, 9995];
-const DEFAULT_MCP_PORT = 3001;
-const DEFAULT_CDP_PORT = 9223;
-const ZAP_RECONNECT_DELAY = 3000;
-const ZAP_DISCOVERY_TIMEOUT = 2000;
-const DEFAULT_RAG_TOP_K = 5;
-const MODEL_CACHE_TTL_MS = 60 * 1000;
+const DEFAULT_ZAP_PORTS = SHARED_ZAP_PORTS;
+const DEFAULT_MCP_PORT = CFG_MCP_PORT;
+const DEFAULT_CDP_PORT = CFG_CDP_PORT;
+const DEFAULT_RAG_TOP_K = CFG_RAG_TOP_K;
+const MODEL_CACHE_TTL_MS = CFG_MODEL_CACHE_TTL;
 
 let cachedModels: { at: number; models: Array<{ id: string; name?: string; description?: string }> } = {
   at: 0,
@@ -159,34 +142,8 @@ async function getPortConfig(): Promise<{ zapPorts: number[]; mcpPort: number; c
   });
 }
 
-async function getRagConfig(): Promise<{
-  endpoint: string;
-  apiKey: string;
-  knowledgeBase: string;
-  topK: number;
-  includeTabContext: boolean;
-  useZapMemory: boolean;
-}> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([
-      'hanzo_rag_endpoint',
-      'hanzo_rag_api_key',
-      'hanzo_rag_kb',
-      'hanzo_rag_top_k',
-      'hanzo_rag_include_tab_context',
-      'hanzo_rag_use_zap',
-    ], (result) => {
-      const parsedTopK = Number.parseInt(String(result.hanzo_rag_top_k ?? DEFAULT_RAG_TOP_K), 10);
-      resolve({
-        endpoint: String(result.hanzo_rag_endpoint || '').trim(),
-        apiKey: String(result.hanzo_rag_api_key || '').trim(),
-        knowledgeBase: String(result.hanzo_rag_kb || '').trim(),
-        topK: Number.isFinite(parsedTopK) ? Math.max(1, Math.min(parsedTopK, 20)) : DEFAULT_RAG_TOP_K,
-        includeTabContext: result.hanzo_rag_include_tab_context !== false,
-        useZapMemory: result.hanzo_rag_use_zap !== false,
-      });
-    });
-  });
+function getRagConfig() {
+  return getSharedRagConfig(chrome.storage.local);
 }
 
 function getSenderKey(sender: chrome.runtime.MessageSender): string {
@@ -230,360 +187,11 @@ function getCachedModelIds(): string[] {
     .filter((id) => !!id);
 }
 
-/** Active ZAP WebSocket connections keyed by MCP id */
-const zapConnections = new Map<string, WebSocket>();
-
-/**
- * ZAP Protocol handshake message
- * Binary format: [ZAP\x01][type:1][length:4][payload]
- */
-const ZAP_MAGIC = new Uint8Array([0x5A, 0x41, 0x50, 0x01]); // "ZAP\x01"
-const MSG_HANDSHAKE    = 0x01;
-const MSG_HANDSHAKE_OK = 0x02;
-const MSG_REQUEST      = 0x10;
-const MSG_RESPONSE     = 0x11;
-const MSG_PING         = 0xFE;
-const MSG_PONG         = 0xFF;
-
-function encodeZapMessage(type: number, payload: object): ArrayBuffer {
-  const json = JSON.stringify(payload);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(json);
-  const buf = new ArrayBuffer(4 + 1 + 4 + data.length);
-  const view = new DataView(buf);
-  // Magic
-  new Uint8Array(buf, 0, 4).set(ZAP_MAGIC);
-  // Type
-  view.setUint8(4, type);
-  // Length (big-endian)
-  view.setUint32(5, data.length, false);
-  // Payload
-  new Uint8Array(buf, 9).set(data);
-  return buf;
-}
-
-function decodeZapMessage(buf: ArrayBuffer): { type: number; payload: any } | null {
-  if (buf.byteLength < 9) return null;
-  const view = new DataView(buf);
-  const magic = new Uint8Array(buf, 0, 4);
-  if (magic[0] !== 0x5A || magic[1] !== 0x41 || magic[2] !== 0x50 || magic[3] !== 0x01) {
-    return null; // Not a ZAP message — try JSON fallback
-  }
-  const type = view.getUint8(4);
-  const length = view.getUint32(5, false);
-  const decoder = new TextDecoder();
-  const json = decoder.decode(new Uint8Array(buf, 9, length));
-  return { type, payload: JSON.parse(json) };
-}
-
-/**
- * Probe a ZAP server on given port
- */
-function probeZapServer(port: number): Promise<string | null> {
-  return new Promise((resolve) => {
-    const url = `ws://localhost:${port}`;
-    const ws = new WebSocket(url);
-    const timer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
-
-    ws.binaryType = 'arraybuffer';
-    ws.onopen = () => {
-      clearTimeout(timer);
-      // Send handshake
-      ws.send(encodeZapMessage(MSG_HANDSHAKE, {
-        clientId: zapState.extensionId,
-        clientType: 'browser_extension',
-        browser: detectBrowser(),
-        version: chrome.runtime.getManifest().version,
-        capabilities: ['tabs', 'navigate', 'screenshot', 'evaluate', 'cookies', 'storage'],
-      }));
-
-      // Wait for handshake response
-      const hsTimer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
-      ws.onmessage = (ev) => {
-        clearTimeout(hsTimer);
-        ws.close();
-        resolve(url);
-      };
-    };
-    ws.onerror = () => { clearTimeout(timer); resolve(null); };
-  });
-}
-
-/**
- * Connect to a ZAP server and set up message handling
- */
-async function connectZap(url: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    const ws = new WebSocket(url);
-    ws.binaryType = 'arraybuffer';
-
-    const connTimer = setTimeout(() => { ws.close(); resolve(null); }, 10000);
-
-    ws.onopen = () => {
-      // Send handshake
-      ws.send(encodeZapMessage(MSG_HANDSHAKE, {
-        clientId: zapState.extensionId,
-        clientType: 'browser_extension',
-        browser: detectBrowser(),
-        version: chrome.runtime.getManifest().version,
-        capabilities: ['tabs', 'navigate', 'screenshot', 'evaluate', 'cookies', 'storage'],
-      }));
-    };
-
-    ws.onmessage = (ev) => {
-      // Handle both binary ZAP and JSON fallback
-      let msg: { type: number; payload: any } | null = null;
-      if (ev.data instanceof ArrayBuffer) {
-        msg = decodeZapMessage(ev.data);
-      }
-      if (!msg && typeof ev.data === 'string') {
-        // JSON fallback for MCP servers that don't speak binary ZAP
-        try {
-          const json = JSON.parse(ev.data);
-          handleMCPMessage(json);
-          return;
-        } catch { return; }
-      }
-      if (!msg) return;
-
-      switch (msg.type) {
-        case MSG_HANDSHAKE_OK: {
-          clearTimeout(connTimer);
-          const info = msg.payload;
-          const mcpId = info.serverId || `mcp-${Date.now().toString(36)}`;
-          zapConnections.set(mcpId, ws);
-          zapState.connected = true;
-          zapState.mcps.push({
-            id: mcpId,
-            name: info.name || `MCP@${url}`,
-            url,
-            tools: (info.tools || []).map((t: any) => t.name),
-          });
-          debugLog(`[Hanzo/ZAP] Connected to ${info.name || url} (${(info.tools || []).length} tools)`);
-          resolve(mcpId);
-          break;
-        }
-        case MSG_RESPONSE: {
-          // Route responses to pending requests
-          const { id, result, error } = msg.payload;
-          const pending = pendingRequests.get(id);
-          if (pending) {
-            pendingRequests.delete(id);
-            if (error) pending.reject(new Error(error.message || error));
-            else pending.resolve(result);
-          }
-          break;
-        }
-        case MSG_PING:
-          ws.send(encodeZapMessage(MSG_PONG, {}));
-          break;
-      }
-    };
-
-    ws.onclose = () => {
-      // Remove from connections
-      for (const [id, conn] of zapConnections) {
-        if (conn === ws) {
-          zapConnections.delete(id);
-          zapState.mcps = zapState.mcps.filter(m => m.id !== id);
-          break;
-        }
-      }
-      zapState.connected = zapConnections.size > 0;
-      debugLog(`[Hanzo/ZAP] Disconnected from ${url}, reconnecting in ${ZAP_RECONNECT_DELAY}ms...`);
-      setTimeout(() => connectZap(url), ZAP_RECONNECT_DELAY);
-    };
-
-    ws.onerror = () => {
-      clearTimeout(connTimer);
-      resolve(null);
-    };
-  });
-}
-
-/** Pending ZAP RPC requests */
-const pendingRequests = new Map<string, { resolve: Function; reject: Function }>();
-let requestIdCounter = 0;
-
-/**
- * Send a ZAP RPC request to an MCP server
- */
-function zapRequest(mcpId: string, method: string, params: any = {}): Promise<any> {
-  const ws = zapConnections.get(mcpId);
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    return Promise.reject(new Error(`MCP ${mcpId} not connected`));
-  }
-
-  const id = `req-${++requestIdCounter}`;
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pendingRequests.delete(id);
-      reject(new Error(`ZAP request timeout: ${method}`));
-    }, 30000);
-
-    pendingRequests.set(id, {
-      resolve: (r: any) => { clearTimeout(timer); resolve(r); },
-      reject:  (e: any) => { clearTimeout(timer); reject(e); },
-    });
-
-    ws.send(encodeZapMessage(MSG_REQUEST, { id, method, params }));
-  });
-}
-
-/**
- * Call a tool via ZAP on the first MCP that has it
- */
-async function zapCallTool(name: string, args: Record<string, unknown> = {}, targetMcpId?: string): Promise<any> {
-  if (targetMcpId) {
-    return zapRequest(targetMcpId, 'tools/call', { name, arguments: args });
-  }
-  // Find first MCP that has the tool
-  for (const mcp of zapState.mcps) {
-    if (mcp.tools.includes(name)) {
-      return zapRequest(mcp.id, 'tools/call', { name, arguments: args });
-    }
-  }
-  throw new Error(`Tool not found on any ZAP-connected MCP: ${name}`);
-}
-
-function hasZapTool(name: string): boolean {
-  return zapState.mcps.some((mcp) => mcp.tools.includes(name));
-}
-
-function normalizeRagSnippets(raw: any): RagSnippet[] {
-  if (!raw) return [];
-
-  const candidates: any[] = [];
-  if (Array.isArray(raw)) candidates.push(...raw);
-  if (Array.isArray(raw?.snippets)) candidates.push(...raw.snippets);
-  if (Array.isArray(raw?.documents)) candidates.push(...raw.documents);
-  if (Array.isArray(raw?.items)) candidates.push(...raw.items);
-  if (Array.isArray(raw?.results)) candidates.push(...raw.results);
-  if (Array.isArray(raw?.memories)) candidates.push(...raw.memories);
-  if (Array.isArray(raw?.matches)) candidates.push(...raw.matches);
-
-  if (!candidates.length && typeof raw?.content === 'string') {
-    candidates.push({ content: raw.content, source: raw.source || 'memory' });
-  }
-
-  const snippets = candidates
-    .map((item) => {
-      const content = String(
-        item?.content ??
-        item?.text ??
-        item?.snippet ??
-        item?.body ??
-        item?.value ??
-        '',
-      ).trim();
-      if (!content) return null;
-
-      return {
-        content,
-        title: item?.title ? String(item.title) : undefined,
-        source: item?.source ? String(item.source) : undefined,
-        score: typeof item?.score === 'number' ? item.score : undefined,
-        url: item?.url ? String(item.url) : undefined,
-      } as RagSnippet;
-    })
-    .filter((item): item is RagSnippet => !!item);
-
-  return snippets.slice(0, 20);
-}
-
-async function queryRagFromZap(params: RagQueryParams): Promise<RagSnippet[]> {
-  if (!params.useZapMemory || !zapState.connected || !hasZapTool('memory')) {
-    return [];
-  }
-
-  const payloads: Record<string, unknown>[] = [
-    {
-      action: 'query',
-      query: params.query,
-      top_k: params.topK,
-      limit: params.topK,
-      kb: params.knowledgeBase || undefined,
-      page_context: params.pageContext,
-    },
-    {
-      query: params.query,
-      topK: params.topK,
-      limit: params.topK,
-      knowledge_base: params.knowledgeBase || undefined,
-      context: params.pageContext,
-    },
-  ];
-
-  for (const payload of payloads) {
-    try {
-      const raw = await zapCallTool('memory', payload, params.mcpId);
-      const snippets = normalizeRagSnippets(raw);
-      if (snippets.length) {
-        return snippets.map((snippet) => ({
-          ...snippet,
-          source: snippet.source || 'zap-memory',
-        }));
-      }
-    } catch {
-      // Try alternative payload shape before giving up.
-    }
-  }
-
-  return [];
-}
-
-async function queryRagFromEndpoint(params: RagQueryParams): Promise<RagSnippet[]> {
-  if (!params.endpoint) return [];
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (params.apiKey) {
-    headers.Authorization = `Bearer ${params.apiKey}`;
-  }
-
-  const response = await fetch(params.endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      query: params.query,
-      top_k: params.topK,
-      knowledge_base: params.knowledgeBase || undefined,
-      page_context: params.includeTabContext ? params.pageContext : undefined,
-      source: 'hanzo-browser-extension',
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`RAG endpoint error ${response.status}: ${text || 'Unknown error'}`);
-  }
-
-  const raw = await response.json();
-  return normalizeRagSnippets(raw).map((snippet) => ({
-    ...snippet,
-    source: snippet.source || 'rag-endpoint',
-  }));
-}
-
-/**
- * Discover and connect to ZAP servers on startup
- */
-async function discoverZapServers() {
-  debugLog('[Hanzo/ZAP] Discovering MCP servers...');
-  const { zapPorts } = await getPortConfig();
-  const results = await Promise.all(zapPorts.map(p => probeZapServer(p)));
-  const available = results.filter(Boolean) as string[];
-
-  if (available.length === 0) {
-    debugLog('[Hanzo/ZAP] No servers found, retrying in 10s...');
-    setTimeout(discoverZapServers, 10000);
-    return;
-  }
-
-  debugLog(`[Hanzo/ZAP] Found ${available.length} server(s): ${available.join(', ')}`);
-  await Promise.all(available.map(url => connectZap(url)));
-}
+// Browser identity for ZAP handshake
+const BROWSER_NAME = (typeof navigator !== 'undefined'
+  ? (navigator.userAgent.includes('Edg/') ? 'edge' : navigator.userAgent.includes('Chrome') ? 'chrome' : navigator.userAgent.includes('Safari') ? 'safari' : 'unknown')
+  : 'unknown');
+const VERSION = chrome.runtime.getManifest().version;
 
 function detectBrowser(): string {
   if (typeof navigator === 'undefined') return 'unknown';
@@ -701,36 +309,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleMessage(request: any, sender: chrome.runtime.MessageSender, sendResponse: Function) {
   switch (request.action) {
-    // --- ZAP Protocol actions ---
+    // --- ZAP Protocol actions (delegated to shared module) ---
     case 'zap.status':
-      sendResponse({ success: true, zap: zapState });
-      break;
-
     case 'zap.discover':
-      discoverZapServers().then(() => sendResponse({ success: true, mcps: zapState.mcps }));
-      break;
-
     case 'zap.connect':
-      try {
-        const mcpId = await connectZap(request.url);
-        sendResponse({ success: !!mcpId, mcpId });
-      } catch (e: any) {
-        sendResponse({ success: false, error: e.message });
-      }
-      break;
-
     case 'zap.callTool':
-      try {
-        const result = await zapCallTool(request.name, request.args, request.mcpId);
-        sendResponse({ success: true, result });
-      } catch (e: any) {
-        sendResponse({ success: false, error: e.message });
-      }
-      break;
-
     case 'zap.listTools': {
-      const tools = zapState.mcps.flatMap(m => m.tools.map(t => ({ name: t, mcpId: m.id, mcpName: m.name })));
-      sendResponse({ success: true, tools });
+      handleZapMessage(request.action, request, sendResponse, zapMgr, BROWSER_NAME, VERSION);
       break;
     }
 
@@ -948,11 +533,11 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     case 'ai.control.cancel':
       // User clicked Stop — notify ZAP/MCP to cancel current task
       await stopControlSession();
-      if (zapState.connected) {
-        for (const [, conn] of zapConnections) {
+      if (zapMgr.state.connected) {
+        for (const [, conn] of zapMgr.connections) {
           if (conn.readyState === WebSocket.OPEN) {
             conn.send(encodeZapMessage(MSG_REQUEST, {
-              id: `cancel-${++requestIdCounter}`,
+              id: `cancel-${++zapMgr.requestIdCounter}`,
               method: 'notifications/controlCancelled',
               params: {},
             }));
@@ -1060,7 +645,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
           break;
         }
 
-        let snippets = await queryRagFromZap(params);
+        let snippets = await queryRagFromZap(params, zapMgr);
         let source = snippets.length ? 'zap-memory' : 'none';
 
         if (!snippets.length && params.endpoint) {
@@ -1211,7 +796,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       try {
         const token = await auth.getValidAccessToken();
         if (token) {
-          fetch('https://hanzo.id/api/update-user', {
+          fetch(`${IAM_LOGIN_URL}/api/update-user`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1274,11 +859,11 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     // --- Content script element selection (routed from content script) ---
     case 'elementSelected':
       // Forward to ZAP-connected MCPs (primary)
-      if (zapState.connected) {
-        for (const [, conn] of zapConnections) {
+      if (zapMgr.state.connected) {
+        for (const [, conn] of zapMgr.connections) {
           if (conn.readyState === WebSocket.OPEN) {
             conn.send(encodeZapMessage(MSG_REQUEST, {
-              id: `evt-${++requestIdCounter}`,
+              id: `evt-${++zapMgr.requestIdCounter}`,
               method: 'notifications/elementSelected',
               params: request.data,
             }));
@@ -1574,12 +1159,8 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
             result = data.content?.[0]?.text || '';
           } else {
             // OpenAI-compatible: LM Studio, Hanzo Desktop, Hanzo Node, custom
-            const baseUrl = endpoint || (
-              provider === 'lmstudio' ? 'http://localhost:1234/v1' :
-              provider === 'hanzo-desktop' ? 'http://localhost:11435/v1' :
-              provider === 'hanzo-node' ? 'http://localhost:3690/v1' :
-              'http://localhost:8080/v1'
-            );
+            const providerConfig = LOCAL_PROVIDER_DEFAULTS[provider as keyof typeof LOCAL_PROVIDER_DEFAULTS];
+            const baseUrl = endpoint || (providerConfig ? `${providerConfig.url}/v1` : 'http://localhost:8080/v1');
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (request.apiKey) headers['Authorization'] = `Bearer ${request.apiKey}`;
 
@@ -1613,10 +1194,10 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     case 'local.models': {
       // List models from any OpenAI-compatible local provider
       try {
+        const providerCfg = LOCAL_PROVIDER_DEFAULTS[request.provider as keyof typeof LOCAL_PROVIDER_DEFAULTS];
         const endpoint = request.endpoint || (
-          request.provider === 'lmstudio' ? 'http://localhost:1234/v1' :
-          request.provider === 'hanzo-desktop' ? 'http://localhost:11435/v1' :
           request.provider === 'ollama' ? null :
+          providerCfg ? `${providerCfg.url}/v1` :
           request.endpoint || 'http://localhost:8080/v1'
         );
 
@@ -1648,29 +1229,32 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       const providers: { name: string; url: string; available: boolean; models?: string[] }[] = [];
 
       // Ollama
+      const ollamaDefaults = LOCAL_PROVIDER_DEFAULTS.ollama;
       const ollamaFound = await ollamaClient.discover();
       if (ollamaFound) {
         const models = await ollamaClient.listModels();
         providers.push({ name: 'ollama', url: ollamaClient.getStatus().url, available: true, models: models.map(m => m.name) });
       } else {
-        providers.push({ name: 'ollama', url: 'http://localhost:11434', available: false });
+        providers.push({ name: 'ollama', url: ollamaDefaults.url, available: false });
       }
 
-      // LM Studio (OpenAI-compatible on :1234)
+      // LM Studio (OpenAI-compatible)
+      const lmsDefaults = LOCAL_PROVIDER_DEFAULTS.lmstudio;
       try {
-        const resp = await fetch('http://localhost:1234/v1/models', { signal: AbortSignal.timeout(2000) });
+        const resp = await fetch(`${lmsDefaults.url}/models`, { signal: AbortSignal.timeout(2000) });
         if (resp.ok) {
           const data = await resp.json();
-          providers.push({ name: 'lmstudio', url: 'http://localhost:1234/v1', available: true, models: (data.data || []).map((m: any) => m.id) });
+          providers.push({ name: 'lmstudio', url: lmsDefaults.url, available: true, models: (data.data || []).map((m: any) => m.id) });
         } else {
-          providers.push({ name: 'lmstudio', url: 'http://localhost:1234/v1', available: false });
+          providers.push({ name: 'lmstudio', url: lmsDefaults.url, available: false });
         }
       } catch {
-        providers.push({ name: 'lmstudio', url: 'http://localhost:1234/v1', available: false });
+        providers.push({ name: 'lmstudio', url: lmsDefaults.url, available: false });
       }
 
-      // Hanzo Desktop (Ollama embedded, typically :11435 or node API)
-      for (const port of [11435, 9550]) {
+      // Hanzo Desktop (Ollama embedded, configurable probe ports)
+      const hdDefaults = LOCAL_PROVIDER_DEFAULTS['hanzo-desktop'];
+      for (const port of hdDefaults.probePorts) {
         try {
           const resp = await fetch(`http://localhost:${port}/api/tags`, { signal: AbortSignal.timeout(2000) });
           if (resp.ok) {
@@ -1681,14 +1265,15 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         } catch { /* next */ }
       }
       if (!providers.find(p => p.name === 'hanzo-desktop')) {
-        providers.push({ name: 'hanzo-desktop', url: 'http://localhost:11435', available: false });
+        providers.push({ name: 'hanzo-desktop', url: hdDefaults.url, available: false });
       }
 
-      // Hanzo Node (standalone Rust node, REST API on :3690 or :8080)
+      // Hanzo Node (standalone Rust node, configurable probe ports)
+      const hnDefaults = LOCAL_PROVIDER_DEFAULTS['hanzo-node'];
       let hanzoNodeFound = false;
-      for (const port of [3690, 8080]) {
+      for (const port of hnDefaults.probePorts) {
         try {
-          const endpoint = port === 3690 ? `http://localhost:${port}/v2/health` : `http://localhost:${port}/health`;
+          const endpoint = port === hnDefaults.probePorts[0] ? `http://localhost:${port}/v2/health` : `http://localhost:${port}/health`;
           const resp = await fetch(endpoint, { signal: AbortSignal.timeout(2000) });
           if (resp.ok) {
             providers.push({ name: 'hanzo-node', url: `http://localhost:${port}`, available: true });
@@ -1698,7 +1283,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         } catch { /* next */ }
       }
       if (!hanzoNodeFound) {
-        providers.push({ name: 'hanzo-node', url: 'http://localhost:3690', available: false });
+        providers.push({ name: 'hanzo-node', url: hnDefaults.url, available: false });
       }
 
       // Check for custom endpoints saved in storage
@@ -1730,15 +1315,13 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       try {
         const token = await auth.getValidAccessToken();
         if (!token) {
-          // Return free/public models
-          sendResponse({
-            success: true,
-            models: [
-              { id: 'zen-coder-flash', name: 'Zen Coder Flash', provider: 'hanzo', free: true },
-              { id: 'zen-max', name: 'Zen Max', provider: 'hanzo', free: false },
-            ],
-            authenticated: false,
-          });
+          // Not authenticated — try fetching public model list from API
+          try {
+            const publicModels = await listModels();
+            sendResponse({ success: true, models: publicModels || [], authenticated: false });
+          } catch {
+            sendResponse({ success: true, models: [], authenticated: false });
+          }
           break;
         }
         const cloudModels = await listModels(token);
@@ -1874,7 +1457,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         const token = await auth.getValidAccessToken();
         if (!token) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
 
-        const resp = await fetch('https://iam.hanzo.ai/api/get-account', {
+        const resp = await fetch(`${IAM_API_URL}/api/get-account`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: AbortSignal.timeout(5000),
         });
@@ -1892,7 +1475,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 
         // Fetch orgs the user belongs to
         try {
-          const orgsResp = await fetch('https://iam.hanzo.ai/api/get-organizations', {
+          const orgsResp = await fetch(`${IAM_API_URL}/api/get-organizations`, {
             headers: { Authorization: `Bearer ${token}` },
             signal: AbortSignal.timeout(5000),
           });
@@ -2124,7 +1707,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
           try {
             const { hanzo_iam_token } = await chrome.storage.local.get('hanzo_iam_token');
             if (hanzo_iam_token) {
-              const resp = await fetch('https://api.hanzo.ai/v1/models', {
+              const resp = await fetch(`${API_BASE_URL}/v1/models`, {
                 headers: { Authorization: `Bearer ${hanzo_iam_token}` },
                 signal: AbortSignal.timeout(5000),
               });
@@ -2221,7 +1804,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 // 1. Primary: Discover ZAP servers (high-performance binary protocol)
-discoverZapServers();
+getPortConfig().then(({ zapPorts }) => {
+  discoverZapServers(zapMgr, BROWSER_NAME, VERSION, zapPorts, debugLog);
+});
 
 // 2. Fallback: Connect to legacy MCP WebSocket
 connectToMCP();
@@ -2237,4 +1822,4 @@ getPortConfig().then(({ cdpPort }) => {
 });
 
 // Export for testing
-export { browserControl, webgpuAI, zapState, zapCallTool };
+export { browserControl, webgpuAI, zapMgr, zapState };

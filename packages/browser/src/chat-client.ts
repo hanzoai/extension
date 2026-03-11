@@ -5,7 +5,9 @@
  * without React/Recoil overhead.
  */
 
-const API_BASE = 'https://api.hanzo.ai';
+import { API_BASE_URL } from './shared/config.js';
+
+const API_BASE = API_BASE_URL;
 
 // ---------------------------------------------------------------------------
 // Types
