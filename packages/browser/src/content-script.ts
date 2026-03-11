@@ -86,6 +86,27 @@ class HanzoContentScript {
         case 'page.overlay.status':
           sendResponse({ success: true, open: pageOverlay.isOpen() });
           return true;
+
+        // --- Popup Tool Actions ---
+        case 'tool.picker.start':
+          elementPicker.start();
+          sendResponse({ success: true });
+          return true;
+        case 'tool.picker.stop':
+          elementPicker.stop();
+          sendResponse({ success: true });
+          return true;
+        case 'tool.pageinfo':
+          sendResponse({ success: true, info: gatherPageInfo() });
+          return true;
+        case 'tool.console.start':
+          inlineConsole.show();
+          sendResponse({ success: true });
+          return true;
+        case 'tool.console.hide':
+          inlineConsole.hide();
+          sendResponse({ success: true });
+          return true;
       }
 
       // Tab filesystem support
@@ -1425,6 +1446,249 @@ class HanzoPageOverlay {
 }
 
 const pageOverlay = new HanzoPageOverlay();
+
+// =============================================================================
+// Element Picker Tool — pick any element, copy its CSS selector
+// =============================================================================
+
+const elementPicker = (() => {
+  let active = false;
+  let overlay: HTMLDivElement | null = null;
+  let label: HTMLDivElement | null = null;
+  let hoveredEl: HTMLElement | null = null;
+
+  function getSelector(el: HTMLElement): string {
+    if (el.id) return `#${el.id}`;
+    const tag = el.tagName.toLowerCase();
+    const classes = Array.from(el.classList).filter(c => !c.startsWith('hanzo-')).slice(0, 3);
+    let selector = tag;
+    if (classes.length) selector += `.${classes.join('.')}`;
+    // Ensure uniqueness
+    const matches = document.querySelectorAll(selector);
+    if (matches.length > 1) {
+      const parent = el.parentElement;
+      if (parent) {
+        const idx = Array.from(parent.children).indexOf(el) + 1;
+        selector += `:nth-child(${idx})`;
+      }
+    }
+    return selector;
+  }
+
+  function getFullPath(el: HTMLElement): string {
+    const parts: string[] = [];
+    let cur: HTMLElement | null = el;
+    while (cur && cur !== document.documentElement) {
+      parts.unshift(getSelector(cur));
+      cur = cur.parentElement;
+    }
+    return parts.join(' > ');
+  }
+
+  function ensureOverlay() {
+    if (overlay) return;
+    overlay = document.createElement('div');
+    overlay.id = 'hanzo-picker-overlay';
+    overlay.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483646;border:2px solid #fff;border-radius:3px;background:rgba(255,255,255,0.06);transition:all 0.1s ease;display:none;';
+    label = document.createElement('div');
+    label.id = 'hanzo-picker-label';
+    label.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;background:#000;color:#fff;font:11px/1.4 SF Mono,Menlo,monospace;padding:3px 8px;border-radius:4px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.4);';
+    document.body.appendChild(overlay);
+    document.body.appendChild(label);
+  }
+
+  function onMove(e: MouseEvent) {
+    if (!active) return;
+    const target = e.target as HTMLElement;
+    if (!target || target === overlay || target === label) return;
+    if (target.id?.startsWith('hanzo-picker')) return;
+    hoveredEl = target;
+    const rect = target.getBoundingClientRect();
+    if (overlay) {
+      overlay.style.display = 'block';
+      overlay.style.top = rect.top + 'px';
+      overlay.style.left = rect.left + 'px';
+      overlay.style.width = rect.width + 'px';
+      overlay.style.height = rect.height + 'px';
+    }
+    if (label) {
+      label.style.display = 'block';
+      label.textContent = getSelector(target);
+      const labelTop = rect.top - 28;
+      label.style.top = (labelTop > 0 ? labelTop : rect.bottom + 4) + 'px';
+      label.style.left = rect.left + 'px';
+    }
+  }
+
+  function onClick(e: MouseEvent) {
+    if (!active) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    const el = hoveredEl || e.target as HTMLElement;
+    if (!el) return;
+
+    const selector = getSelector(el);
+    const fullPath = getFullPath(el);
+    const tag = el.tagName.toLowerCase();
+    const text = (el.textContent || '').trim().slice(0, 80);
+    const rect = el.getBoundingClientRect();
+
+    const info = [
+      `Selector: ${selector}`,
+      `Path: ${fullPath}`,
+      `Tag: ${tag}`,
+      `Size: ${Math.round(rect.width)}x${Math.round(rect.height)}`,
+      el.id ? `ID: ${el.id}` : '',
+      el.className ? `Classes: ${el.className}` : '',
+      text ? `Text: "${text}"` : '',
+    ].filter(Boolean).join('\n');
+
+    navigator.clipboard.writeText(info).catch(() => {});
+    // Also send to background for MCP tools
+    chrome.runtime.sendMessage({ action: 'elementSelected', data: { selector, fullPath, tag, text, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } } });
+    stop();
+  }
+
+  function onKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      stop();
+    }
+  }
+
+  function start() {
+    if (active) return;
+    active = true;
+    ensureOverlay();
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('click', onClick, true);
+    document.addEventListener('keydown', onKey, true);
+    document.body.style.cursor = 'crosshair';
+  }
+
+  function stop() {
+    active = false;
+    document.removeEventListener('mousemove', onMove, true);
+    document.removeEventListener('click', onClick, true);
+    document.removeEventListener('keydown', onKey, true);
+    document.body.style.cursor = '';
+    if (overlay) overlay.style.display = 'none';
+    if (label) label.style.display = 'none';
+    hoveredEl = null;
+  }
+
+  return { start, stop };
+})();
+
+// =============================================================================
+// Page Info Gatherer
+// =============================================================================
+
+function gatherPageInfo(): string {
+  const meta = (name: string) => document.querySelector(`meta[name="${name}"], meta[property="${name}"]`)?.getAttribute('content') || '';
+  const lines = [
+    `Title: ${document.title}`,
+    `URL: ${location.href}`,
+    `Description: ${meta('description') || meta('og:description')}`,
+    `Charset: ${document.characterSet}`,
+    `Language: ${document.documentElement.lang || 'unknown'}`,
+    `Viewport: ${meta('viewport')}`,
+  ];
+
+  // Framework detection
+  const frameworks: string[] = [];
+  if ((window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__) frameworks.push('React');
+  if ((window as any).__VUE_DEVTOOLS_GLOBAL_HOOK__) frameworks.push('Vue');
+  if ((window as any).__svelte) frameworks.push('Svelte');
+  if ((window as any).__NEXT_DATA__) frameworks.push('Next.js');
+  if ((window as any).__NUXT__) frameworks.push('Nuxt');
+  if (document.querySelector('[ng-version]')) frameworks.push('Angular');
+  if (frameworks.length) lines.push(`Frameworks: ${frameworks.join(', ')}`);
+
+  // Page metrics
+  const scripts = document.querySelectorAll('script[src]').length;
+  const styles = document.querySelectorAll('link[rel="stylesheet"]').length;
+  const images = document.querySelectorAll('img').length;
+  const links = document.querySelectorAll('a[href]').length;
+  lines.push(`Resources: ${scripts} scripts, ${styles} stylesheets, ${images} images, ${links} links`);
+
+  // Performance timing
+  const perf = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+  if (perf) {
+    lines.push(`Load: ${Math.round(perf.loadEventEnd - perf.startTime)}ms (DOM: ${Math.round(perf.domContentLoadedEventEnd - perf.startTime)}ms)`);
+  }
+
+  return lines.filter(l => !l.endsWith(': ')).join('\n');
+}
+
+// =============================================================================
+// Inline Console Tool — quick JS eval on the page
+// =============================================================================
+
+const inlineConsole = (() => {
+  let root: HTMLDivElement | null = null;
+  let input: HTMLInputElement | null = null;
+  let output: HTMLDivElement | null = null;
+  let visible = false;
+
+  function ensureMount() {
+    if (root) return;
+    root = document.createElement('div');
+    root.id = 'hanzo-console-root';
+    root.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;z-index:2147483646;font-family:SF Mono,Menlo,Consolas,monospace;font-size:12px;display:none;';
+    root.innerHTML = `
+      <div style="background:rgba(0,0,0,0.92);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.15);border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+        <div id="hanzo-console-output" style="max-height:200px;overflow-y:auto;padding:8px 12px;color:#ccc;white-space:pre-wrap;word-break:break-all;"></div>
+        <div style="display:flex;align-items:center;border-top:1px solid rgba(255,255,255,0.1);padding:0 12px;">
+          <span style="color:#666;margin-right:6px;">&gt;</span>
+          <input id="hanzo-console-input" type="text" placeholder="eval(...)" style="flex:1;background:transparent;border:none;color:#fff;font:inherit;padding:10px 0;outline:none;">
+          <span style="color:#444;font-size:10px;margin-left:8px;">Esc to close</span>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(root);
+    input = root.querySelector('#hanzo-console-input');
+    output = root.querySelector('#hanzo-console-output');
+
+    input?.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { hide(); return; }
+      if (e.key !== 'Enter' || !input?.value.trim()) return;
+      const expr = input.value.trim();
+      input.value = '';
+      appendLine(`> ${expr}`, '#888');
+      try {
+        const result = (0, eval)(expr);
+        appendLine(String(result), '#4CAF50');
+      } catch (err: any) {
+        appendLine(err?.message || String(err), '#F44336');
+      }
+    });
+  }
+
+  function appendLine(text: string, color: string) {
+    if (!output) return;
+    const line = document.createElement('div');
+    line.style.color = color;
+    line.textContent = text;
+    output.appendChild(line);
+    output.scrollTop = output.scrollHeight;
+  }
+
+  function show() {
+    ensureMount();
+    if (root) root.style.display = 'block';
+    visible = true;
+    setTimeout(() => input?.focus(), 50);
+  }
+
+  function hide() {
+    if (root) root.style.display = 'none';
+    visible = false;
+  }
+
+  return { show, hide, isVisible: () => visible };
+})();
 
 // Initialize
 new HanzoContentScript();

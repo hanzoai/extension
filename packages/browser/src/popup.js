@@ -78,10 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           chrome.sidePanel.open({ tabId: tabs[0].id });
+          window.close();
         }
       });
+    } else if (typeof browser !== 'undefined' && browser.sidebarAction) {
+      browser.sidebarAction.open();
+      window.close();
     } else {
-      // Firefox: sidebar_action is automatic
+      chrome.tabs.create({ url: chrome.runtime.getURL('sidebar.html') });
       window.close();
     }
   });

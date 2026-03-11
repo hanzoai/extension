@@ -1,6 +1,14 @@
 // Hanzo AI — Popup Script
 // Uses background message passing for auth (not direct storage access).
 
+declare const browser: typeof chrome & {
+  sidebarAction?: {
+    open(): Promise<void>;
+    close(): Promise<void>;
+    toggle(): Promise<void>;
+  };
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   const loginSection = document.getElementById('login-section');
   const mainSection = document.getElementById('main-section');
@@ -80,13 +88,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Open side panel ---
   openPanel?.addEventListener('click', () => {
     if (chrome.sidePanel) {
+      // Chrome / Edge: use sidePanel API
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
           chrome.sidePanel.open({ tabId: tabs[0].id });
+          window.close();
         }
       });
+    } else if (typeof browser !== 'undefined' && browser.sidebarAction) {
+      // Firefox: use sidebarAction API
+      browser.sidebarAction.open();
+      window.close();
     } else {
-      // Firefox: sidebar_action is automatic
+      // Fallback: try opening sidebar.html as a new tab
+      chrome.tabs.create({ url: chrome.runtime.getURL('sidebar.html') });
       window.close();
     }
   });
@@ -334,6 +349,166 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadBackendPreference();
   refreshBridgeStatus();
+
+  // --- Tools ---
+
+  function showToolFeedback(btn: HTMLElement, text: string, duration = 1200) {
+    const fb = document.createElement('div');
+    fb.className = 'tool-feedback';
+    fb.textContent = text;
+    btn.style.position = 'relative';
+    btn.appendChild(fb);
+    setTimeout(() => fb.remove(), duration);
+  }
+
+  function getActiveTab(): Promise<chrome.tabs.Tab | null> {
+    return new Promise((resolve) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        resolve(tabs[0] && isInjectableTab(tabs[0]) ? tabs[0] : null);
+      });
+    });
+  }
+
+  // Element Picker / Selector tool
+  const toolPicker = document.getElementById('tool-picker');
+  toolPicker?.addEventListener('click', async () => {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      showToolFeedback(toolPicker, 'No page');
+      return;
+    }
+    // Send message to content script to start picker mode
+    chrome.tabs.sendMessage(tab.id, { action: 'tool.picker.start' }, (response) => {
+      if (chrome.runtime.lastError || !response?.success) {
+        showToolFeedback(toolPicker, 'N/A');
+        return;
+      }
+      showToolFeedback(toolPicker, 'Pick...');
+      // Close popup so user can interact with the page
+      setTimeout(() => window.close(), 400);
+    });
+  });
+
+  // Screenshot tool
+  const toolScreenshot = document.getElementById('tool-screenshot');
+  toolScreenshot?.addEventListener('click', async () => {
+    toolScreenshot.setAttribute('disabled', 'true');
+    try {
+      chrome.tabs.captureVisibleTab(null as any, { format: 'png' }, (dataUrl) => {
+        if (chrome.runtime.lastError || !dataUrl) {
+          showToolFeedback(toolScreenshot, 'Failed');
+          toolScreenshot.removeAttribute('disabled');
+          return;
+        }
+        // Copy to clipboard as image
+        fetch(dataUrl)
+          .then(r => r.blob())
+          .then(blob => {
+            const item = new ClipboardItem({ 'image/png': blob });
+            return navigator.clipboard.write([item]);
+          })
+          .then(() => {
+            showToolFeedback(toolScreenshot, 'Copied!');
+          })
+          .catch(() => {
+            // Fallback: open in new tab
+            chrome.tabs.create({ url: dataUrl });
+            showToolFeedback(toolScreenshot, 'Opened');
+          })
+          .finally(() => {
+            toolScreenshot.removeAttribute('disabled');
+          });
+      });
+    } catch {
+      showToolFeedback(toolScreenshot, 'Error');
+      toolScreenshot.removeAttribute('disabled');
+    }
+  });
+
+  // Page Info tool
+  const toolPageInfo = document.getElementById('tool-pageinfo');
+  toolPageInfo?.addEventListener('click', async () => {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      showToolFeedback(toolPageInfo, 'No page');
+      return;
+    }
+    chrome.tabs.sendMessage(tab.id, { action: 'tool.pageinfo' }, (response) => {
+      if (chrome.runtime.lastError || !response?.success) {
+        // Fallback: basic info from tab object
+        const info = `Title: ${tab.title}\nURL: ${tab.url}`;
+        navigator.clipboard.writeText(info).then(() => {
+          showToolFeedback(toolPageInfo, 'Copied!');
+        });
+        return;
+      }
+      navigator.clipboard.writeText(response.info).then(() => {
+        showToolFeedback(toolPageInfo, 'Copied!');
+      }).catch(() => {
+        showToolFeedback(toolPageInfo, 'Failed');
+      });
+    });
+  });
+
+  // Accessibility Audit tool
+  const toolA11y = document.getElementById('tool-accessibility');
+  toolA11y?.addEventListener('click', async () => {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      showToolFeedback(toolA11y, 'No page');
+      return;
+    }
+    toolA11y.setAttribute('disabled', 'true');
+    showToolFeedback(toolA11y, 'Running...');
+    chrome.runtime.sendMessage({ action: 'audit.accessibility', tabId: tab.id }, (response) => {
+      toolA11y.removeAttribute('disabled');
+      if (chrome.runtime.lastError || !response?.success) {
+        showToolFeedback(toolA11y, 'Failed');
+        return;
+      }
+      const count = response.issues?.length || 0;
+      showToolFeedback(toolA11y, count ? `${count} issues` : 'Clean!');
+    });
+  });
+
+  // Performance Audit tool
+  const toolPerf = document.getElementById('tool-performance');
+  toolPerf?.addEventListener('click', async () => {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      showToolFeedback(toolPerf, 'No page');
+      return;
+    }
+    toolPerf.setAttribute('disabled', 'true');
+    showToolFeedback(toolPerf, 'Running...');
+    chrome.runtime.sendMessage({ action: 'audit.performance', tabId: tab.id }, (response) => {
+      toolPerf.removeAttribute('disabled');
+      if (chrome.runtime.lastError || !response?.success) {
+        showToolFeedback(toolPerf, 'Failed');
+        return;
+      }
+      showToolFeedback(toolPerf, 'Done');
+    });
+  });
+
+  // Console tool — evaluate JS
+  const toolConsole = document.getElementById('tool-console');
+  toolConsole?.addEventListener('click', async () => {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      showToolFeedback(toolConsole, 'No page');
+      return;
+    }
+    // Send to content script to start an inline eval prompt
+    chrome.tabs.sendMessage(tab.id, { action: 'tool.console.start' }, (response) => {
+      if (chrome.runtime.lastError || !response?.success) {
+        showToolFeedback(toolConsole, 'N/A');
+        return;
+      }
+      showToolFeedback(toolConsole, 'Open');
+      setTimeout(() => window.close(), 400);
+    });
+  });
 
   // Init
   checkAuth();
