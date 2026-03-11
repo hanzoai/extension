@@ -1,6 +1,8 @@
 // AI Provider — Pluggable backend for chat/completion/embeddings
 // Supports: Hanzo Cloud, Ollama, LM Studio, Hanzo Desktop, custom OpenAI-compatible endpoints
 
+import { API_BASE_URL } from './shared/config.js';
+
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -55,7 +57,7 @@ export class HanzoCloudProvider implements AIProvider {
   id = 'hanzo-cloud';
   name = 'Hanzo Cloud';
   type = 'cloud' as const;
-  private baseUrl = 'https://api.hanzo.ai/v1';
+  private baseUrl = API_BASE_URL + '/v1';
   private token: string | null = null;
   private models: AIModel[] = [];
   private available = false;
