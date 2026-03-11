@@ -1756,12 +1756,24 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         break;
       }
 
-      case 'zap.listTools': {
-        const allTools: string[] = [];
-        for (const mcp of zapState.mcps) {
-          allTools.push(...mcp.tools);
+      case 'zap.connect': {
+        if (!request.url) {
+          sendResponse({ success: false, error: 'Missing url' });
+          break;
         }
-        sendResponse({ success: true, tools: [...new Set(allTools)] });
+        connectZap(request.url).then((mcpId: string | null) => {
+          sendResponse({ success: !!mcpId, mcpId });
+        }).catch((e: any) => {
+          sendResponse({ success: false, error: e.message });
+        });
+        break;
+      }
+
+      case 'zap.listTools': {
+        const tools = zapState.mcps.flatMap(m =>
+          m.tools.map(t => ({ name: t, mcpId: m.id, mcpName: m.name }))
+        );
+        sendResponse({ success: true, tools });
         break;
       }
 
