@@ -471,10 +471,20 @@ html {
 }
 
 .chat-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
   text-align: center;
   color: var(--text-tertiary);
   padding: 40px 20px;
-  font-size: 13px;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  gap: 8px;
+}
+
+.chat-welcome p {
   animation: breathe 4s infinite ease-in-out;
 }
 
@@ -562,41 +572,45 @@ html {
 .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
 .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
 
-/* ==================== Composer (Grok-style) ==================== */
+/* ==================== Composer (Modern Chat Input) ==================== */
 
 .composer {
-  padding: 12px;
+  padding: 8px 10px 10px;
   flex-shrink: 0;
   position: relative;
   z-index: 10;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .composer-box {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 14px;
   overflow: hidden;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .composer-box:focus-within {
-  border-color: var(--border-strong);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.3);
+  border-color: rgba(255,255,255,0.2);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.4);
 }
 
 .composer-box textarea {
   width: 100%;
-  padding: 14px 16px 8px;
+  padding: 12px 14px 6px;
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   font-family: inherit;
   line-height: 1.5;
   resize: none;
   outline: none;
-  min-height: 44px;
-  max-height: 160px;
+  min-height: 38px;
+  max-height: 120px;
 }
 
 .composer-box textarea::placeholder {
@@ -607,26 +621,26 @@ html {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 8px 8px 12px;
-  gap: 8px;
+  padding: 4px 6px 6px 10px;
+  gap: 6px;
 }
 
 .composer-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
+  flex-wrap: wrap;
 }
 
 .composer-model {
-  padding: 3px 22px 3px 8px;
+  padding: 2px 20px 2px 6px;
   background: var(--glass-strong);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 10px;
   font-family: inherit;
   cursor: pointer;
   -webkit-appearance: none;
@@ -634,10 +648,15 @@ html {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M2.5 4l2.5 2.5 2.5-2.5' stroke='%236B6B6B' stroke-width='1.2'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 6px center;
+  background-position: right 4px center;
   white-space: nowrap;
-  max-width: 140px;
+  max-width: 130px;
   transition: border-color 0.2s;
+  height: 22px;
+}
+
+.composer-model:hover {
+  border-color: var(--border-strong);
 }
 
 .composer-model:focus {
@@ -648,17 +667,24 @@ html {
 .composer-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 11px;
+  gap: 2px;
+  font-size: 10px;
   color: var(--text-tertiary);
   user-select: none;
   cursor: pointer;
   white-space: nowrap;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.composer-toggle:hover {
+  background: var(--glass);
 }
 
 .composer-toggle input[type="checkbox"] {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   accent-color: var(--text-secondary);
   cursor: pointer;
 }
@@ -668,15 +694,17 @@ html {
 }
 
 .composer-status {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-tertiary);
   white-space: nowrap;
-  margin-left: auto;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--glass);
 }
 
 .composer-send {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -691,18 +719,24 @@ html {
 
 .composer-send:hover {
   background: var(--accent-hover);
-  box-shadow: 0 0 12px rgba(255,255,255,0.12);
+  box-shadow: 0 0 12px rgba(255,255,255,0.15);
+  transform: scale(1.05);
+}
+
+.composer-send:active {
+  transform: scale(0.95);
 }
 
 .composer-send:disabled {
-  opacity: 0.2;
+  opacity: 0.15;
   cursor: not-allowed;
   box-shadow: none;
+  transform: none;
 }
 
 .composer-send svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 /* ==================== Buttons ==================== */
