@@ -48,6 +48,238 @@ const controlSession: ControlSession = {
   startedAt: null,
 };
 
+// =============================================================================
+// ZAP Protocol Integration (ported from Chrome background.ts)
+// =============================================================================
+
+interface ZapState {
+  connected: boolean;
+  mcps: Array<{ id: string; name: string; url: string; tools: string[] }>;
+  extensionId: string;
+}
+
+const zapState: ZapState = {
+  connected: false,
+  mcps: [],
+  extensionId: `hanzo-ext-${Date.now().toString(36)}`,
+};
+
+const DEFAULT_ZAP_PORTS = [9999, 9998, 9997, 9996, 9995];
+const ZAP_RECONNECT_DELAY = 3000;
+const ZAP_DISCOVERY_TIMEOUT = 2000;
+
+/** Active ZAP WebSocket connections keyed by MCP id */
+const zapConnections = new Map<string, WebSocket>();
+const pendingZapRequests = new Map<string, { resolve: Function; reject: Function }>();
+let zapRequestIdCounter = 0;
+
+// ZAP binary protocol constants
+const ZAP_MAGIC = new Uint8Array([0x5A, 0x41, 0x50, 0x01]);
+const MSG_HANDSHAKE    = 0x01;
+const MSG_HANDSHAKE_OK = 0x02;
+const MSG_REQUEST      = 0x10;
+const MSG_RESPONSE     = 0x11;
+const MSG_PING         = 0xFE;
+const MSG_PONG         = 0xFF;
+
+function encodeZapMessage(type: number, payload: object): ArrayBuffer {
+  const json = JSON.stringify(payload);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(json);
+  const buf = new ArrayBuffer(4 + 1 + 4 + data.length);
+  const view = new DataView(buf);
+  new Uint8Array(buf, 0, 4).set(ZAP_MAGIC);
+  view.setUint8(4, type);
+  view.setUint32(5, data.length, false);
+  new Uint8Array(buf, 9).set(data);
+  return buf;
+}
+
+function decodeZapMessage(buf: ArrayBuffer): { type: number; payload: any } | null {
+  if (buf.byteLength < 9) return null;
+  const magic = new Uint8Array(buf, 0, 4);
+  if (magic[0] !== 0x5A || magic[1] !== 0x41 || magic[2] !== 0x50 || magic[3] !== 0x01) {
+    return null;
+  }
+  const view = new DataView(buf);
+  const type = view.getUint8(4);
+  const length = view.getUint32(5, false);
+  const decoder = new TextDecoder();
+  const json = decoder.decode(new Uint8Array(buf, 9, length));
+  return { type, payload: JSON.parse(json) };
+}
+
+function detectBrowserType(): string {
+  if (typeof browser !== 'undefined' && browser.runtime?.getBrowserInfo) {
+    return 'firefox';
+  }
+  return 'firefox'; // This file is only loaded in Firefox
+}
+
+/** Probe a ZAP server on given port */
+function probeZapServer(port: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const url = `ws://localhost:${port}`;
+    const ws = new WebSocket(url);
+    const timer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
+
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => {
+      clearTimeout(timer);
+      ws.send(encodeZapMessage(MSG_HANDSHAKE, {
+        clientId: zapState.extensionId,
+        clientType: 'browser_extension',
+        browser: detectBrowserType(),
+        version: browser.runtime.getManifest().version,
+        capabilities: ['tabs', 'navigate', 'screenshot', 'evaluate', 'cookies', 'storage'],
+      }));
+
+      const hsTimer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
+      ws.onmessage = () => {
+        clearTimeout(hsTimer);
+        ws.close();
+        resolve(url);
+      };
+    };
+    ws.onerror = () => { clearTimeout(timer); resolve(null); };
+  });
+}
+
+/** Connect to a ZAP server and set up message handling */
+async function connectZap(url: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer';
+
+    const connTimer = setTimeout(() => { ws.close(); resolve(null); }, 10000);
+
+    ws.onopen = () => {
+      ws.send(encodeZapMessage(MSG_HANDSHAKE, {
+        clientId: zapState.extensionId,
+        clientType: 'browser_extension',
+        browser: detectBrowserType(),
+        version: browser.runtime.getManifest().version,
+        capabilities: ['tabs', 'navigate', 'screenshot', 'evaluate', 'cookies', 'storage'],
+      }));
+    };
+
+    ws.onmessage = (ev) => {
+      let msg: { type: number; payload: any } | null = null;
+      if (ev.data instanceof ArrayBuffer) {
+        msg = decodeZapMessage(ev.data);
+      }
+      if (!msg) return;
+
+      switch (msg.type) {
+        case MSG_HANDSHAKE_OK: {
+          clearTimeout(connTimer);
+          const info = msg.payload;
+          const mcpId = info.serverId || `mcp-${Date.now().toString(36)}`;
+          zapConnections.set(mcpId, ws);
+          zapState.connected = true;
+          zapState.mcps.push({
+            id: mcpId,
+            name: info.name || `MCP@${url}`,
+            url,
+            tools: (info.tools || []).map((t: any) => t.name),
+          });
+          console.log(`[Hanzo/ZAP] Connected to ${info.name || url} (${(info.tools || []).length} tools)`);
+          resolve(mcpId);
+          break;
+        }
+        case MSG_RESPONSE: {
+          const { id, result, error } = msg.payload;
+          const pending = pendingZapRequests.get(id);
+          if (pending) {
+            pendingZapRequests.delete(id);
+            if (error) pending.reject(new Error(error.message || error));
+            else pending.resolve(result);
+          }
+          break;
+        }
+        case MSG_PING:
+          ws.send(encodeZapMessage(MSG_PONG, {}));
+          break;
+      }
+    };
+
+    ws.onclose = () => {
+      for (const [id, conn] of zapConnections) {
+        if (conn === ws) {
+          zapConnections.delete(id);
+          zapState.mcps = zapState.mcps.filter(m => m.id !== id);
+          break;
+        }
+      }
+      zapState.connected = zapConnections.size > 0;
+      console.log(`[Hanzo/ZAP] Disconnected from ${url}, reconnecting in ${ZAP_RECONNECT_DELAY}ms...`);
+      setTimeout(() => connectZap(url), ZAP_RECONNECT_DELAY);
+    };
+
+    ws.onerror = () => {
+      clearTimeout(connTimer);
+      resolve(null);
+    };
+  });
+}
+
+/** Send a ZAP RPC request to an MCP server */
+function zapRequest(mcpId: string, method: string, params: any = {}): Promise<any> {
+  const ws = zapConnections.get(mcpId);
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    return Promise.reject(new Error(`MCP ${mcpId} not connected`));
+  }
+
+  const id = `req-${++zapRequestIdCounter}`;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingZapRequests.delete(id);
+      reject(new Error(`ZAP request timeout: ${method}`));
+    }, 30000);
+
+    pendingZapRequests.set(id, {
+      resolve: (r: any) => { clearTimeout(timer); resolve(r); },
+      reject:  (e: any) => { clearTimeout(timer); reject(e); },
+    });
+
+    ws.send(encodeZapMessage(MSG_REQUEST, { id, method, params }));
+  });
+}
+
+/** Call a tool via ZAP on the first MCP that has it */
+async function zapCallTool(name: string, args: Record<string, unknown> = {}, targetMcpId?: string): Promise<any> {
+  if (targetMcpId) {
+    return zapRequest(targetMcpId, 'tools/call', { name, arguments: args });
+  }
+  for (const mcp of zapState.mcps) {
+    if (mcp.tools.includes(name)) {
+      return zapRequest(mcp.id, 'tools/call', { name, arguments: args });
+    }
+  }
+  throw new Error(`Tool not found on any ZAP-connected MCP: ${name}`);
+}
+
+/** Discover and connect to ZAP servers */
+async function discoverZapServers() {
+  console.log('[Hanzo/ZAP] Discovering MCP servers...');
+  const results = await Promise.all(DEFAULT_ZAP_PORTS.map(p => probeZapServer(p)));
+  const available = results.filter(Boolean) as string[];
+
+  if (available.length === 0) {
+    console.log('[Hanzo/ZAP] No servers found, retrying in 10s...');
+    setTimeout(discoverZapServers, 10000);
+    return;
+  }
+
+  console.log(`[Hanzo/ZAP] Found ${available.length} server(s): ${available.join(', ')}`);
+  await Promise.all(available.map(url => connectZap(url)));
+}
+
+// Start ZAP discovery on load
+discoverZapServers();
+
+// =============================================================================
+
 class HanzoFirefoxExtension {
   private wsConnection: WebSocket | null = null;
   private cdpPort: number = 9223;
@@ -1492,21 +1724,58 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
       }
 
       case 'zap.status': {
-        // Firefox doesn't have ZAP discovery yet — return empty
         sendResponse({
           success: true,
-          zap: { connected: false, mcps: [] },
+          zap: {
+            connected: zapState.connected,
+            mcps: zapState.mcps.map(m => ({
+              id: m.id,
+              name: m.name,
+              url: m.url,
+              toolCount: m.tools.length,
+            })),
+          },
         });
         break;
       }
 
       case 'zap.discover': {
-        sendResponse({ success: true, mcps: [] });
+        discoverZapServers().then(() => {
+          sendResponse({
+            success: true,
+            mcps: zapState.mcps.map(m => ({
+              id: m.id,
+              name: m.name,
+              url: m.url,
+              tools: m.tools,
+            })),
+          });
+        }).catch((e: any) => {
+          sendResponse({ success: false, error: e.message });
+        });
         break;
       }
 
       case 'zap.listTools': {
-        sendResponse({ success: true, tools: [] });
+        const allTools: string[] = [];
+        for (const mcp of zapState.mcps) {
+          allTools.push(...mcp.tools);
+        }
+        sendResponse({ success: true, tools: [...new Set(allTools)] });
+        break;
+      }
+
+      case 'zap.callTool': {
+        const { tool: toolName, args: toolArgs, mcpId } = request;
+        if (!toolName) {
+          sendResponse({ success: false, error: 'Missing tool name' });
+          break;
+        }
+        zapCallTool(toolName, toolArgs || {}, mcpId).then((result: any) => {
+          sendResponse({ success: true, result });
+        }).catch((e: any) => {
+          sendResponse({ success: false, error: e.message });
+        });
         break;
       }
 
