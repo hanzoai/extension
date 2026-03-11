@@ -64,11 +64,8 @@ jobs:
 
       - name: Run parity tests (${{ matrix.browser }})
         working-directory: packages/browser
-        run: |
-          npx playwright test \
-            --config=e2e/cross-platform.config.ts \
-            --project=${{ matrix.browser }} \
-            e2e/browser-tool-parity.spec.ts
+        shell: bash
+        run: npx playwright test --config=e2e/cross-platform.config.ts --project=${{ matrix.browser }} e2e/browser-tool-parity.spec.ts
         env:
           CI: true
 
@@ -114,10 +111,8 @@ jobs:
 
       - name: Run extension E2E (${{ matrix.browser }})
         working-directory: packages/browser
-        run: |
-          xvfb-run npx playwright test \
-            --config=e2e/playwright.config.ts \
-            e2e/popup.spec.ts e2e/sidebar.spec.ts
+        shell: bash
+        run: xvfb-run npx playwright test --config=e2e/playwright.config.ts e2e/popup.spec.ts e2e/sidebar.spec.ts
         env:
           CI: true
           EXTENSION_BROWSER: ${{ matrix.browser }}
