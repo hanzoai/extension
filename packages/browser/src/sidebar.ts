@@ -9,6 +9,7 @@ import {
   recordUsageDelta,
   trimMessagesToBudget,
 } from './runtime-guard';
+import { API_BASE_URL as HANZO_API_BASE } from './shared/config.js';
 
 // Hanzo AI Browser Extension Sidebar — Chat + Tools + Settings
 
@@ -532,7 +533,7 @@ class HanzoSidebar {
 
     try {
       // Stream via direct fetch (sidebar has access via CSP)
-      const response = await fetch('https://api.hanzo.ai/v1/chat/completions', {
+      const response = await fetch(`${HANZO_API_BASE}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1258,7 +1259,7 @@ class HanzoSidebar {
       const pctLabel = document.getElementById('balance-pct-label');
 
       // Try fetching from Hanzo Cloud balance API
-      const resp = await fetch('https://api.hanzo.ai/v1/balance', {
+      const resp = await fetch(`${HANZO_API_BASE}/v1/balance`, {
         headers: { Authorization: `Bearer ${hanzo_iam_token}` },
         signal: AbortSignal.timeout(5000),
       }).catch(() => null);
