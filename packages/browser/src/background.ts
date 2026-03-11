@@ -205,7 +205,7 @@ function isSenderGenerationCurrent(key: string, generation: number): boolean {
   return senderRequestGeneration.get(key) === generation;
 }
 
-async function listModelsCached(token: string): Promise<Array<{ id: string; name?: string; description?: string }>> {
+async function listModelsCached(token?: string): Promise<Array<{ id: string; name?: string; description?: string }>> {
   if (Date.now() - cachedModels.at < MODEL_CACHE_TTL_MS && cachedModels.models.length) {
     return cachedModels.models;
   }
@@ -1081,12 +1081,9 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     // --- Cloud Chat ---
     case 'chat.listModels':
       try {
-        const token = await auth.getValidAccessToken();
-        if (!token) {
-          sendResponse({ success: false, error: 'Not authenticated' });
-          break;
-        }
-        const models = await listModelsCached(token);
+        // Models endpoint is public — pass token if available for user-specific access
+        const token = await auth.getValidAccessToken().catch(() => undefined);
+        const models = await listModelsCached(token || undefined);
         sendResponse({ success: true, models });
       } catch (error: any) {
         sendResponse({ success: false, error: error.message });

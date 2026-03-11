@@ -106,18 +106,25 @@ test.describe('Sidebar', () => {
     await expect(page.locator('#send-btn')).toBeAttached();
   });
 
-  test('model selector exists and has options', async ({ context, extensionId }) => {
+  test('model selector has models (public API, no auth required)', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
 
     const select = page.locator('#model-select');
     await expect(select).toBeAttached();
 
-    // At minimum there should be a default option;
-    // full model list requires API access (not available in CI)
+    // Wait for models to load from public API (or fall back to hardcoded defaults)
+    await page.waitForTimeout(2000);
+
     const options = page.locator('#model-select option');
     const count = await options.count();
-    expect(count).toBeGreaterThanOrEqual(1);
+    // Hardcoded defaults provide 6 options; API fetch should provide more
+    expect(count).toBeGreaterThanOrEqual(3);
+
+    // Should include at least Zen models (always available)
+    const values = await options.allTextContents();
+    const allText = values.join(' ');
+    expect(allText).toMatch(/Zen|zen|auto|Auto/i);
   });
 
   test('tools tab has ZAP status and MCP info', async ({ context, extensionId }) => {
