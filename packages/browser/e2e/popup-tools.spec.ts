@@ -110,8 +110,8 @@ test.describe('Popup Tools', () => {
     await target.goto('https://example.com', { waitUntil: 'domcontentloaded' });
     await expect(target.locator('body')).toBeVisible();
 
-    // Wait for content script to load
-    await target.waitForTimeout(1000);
+    // Wait for content script to fully load
+    await target.waitForTimeout(2000);
 
     const popup = await context.newPage();
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
@@ -121,18 +121,20 @@ test.describe('Popup Tools', () => {
     await expect(pickerBtn).toBeVisible();
     await pickerBtn.click();
 
-    // Popup closes after starting picker, switch to target
-    await target.bringToFront();
-    await target.waitForTimeout(500);
+    // Wait for message to propagate before popup closes
+    await popup.waitForTimeout(800);
 
-    // Picker overlay should be injected
+    // Switch to target and wait for picker to mount
+    await target.bringToFront();
+    await target.waitForTimeout(1000);
+
+    // Picker overlay should be injected (may take a moment)
     const pickerOverlay = target.locator('#hanzo-picker-overlay');
-    // The picker should be present (display:block or display:none)
-    await expect(pickerOverlay).toBeAttached();
+    await expect(pickerOverlay).toBeAttached({ timeout: 5000 });
 
     // Pressing Escape should cancel picker mode
     await target.keyboard.press('Escape');
-    await target.waitForTimeout(300);
+    await target.waitForTimeout(500);
     const display = await pickerOverlay.evaluate((el) => el.style.display);
     expect(display).toBe('none');
   });
@@ -142,7 +144,8 @@ test.describe('Popup Tools', () => {
     await target.goto('https://example.com', { waitUntil: 'domcontentloaded' });
     await expect(target.locator('body')).toBeVisible();
 
-    await target.waitForTimeout(1000);
+    // Wait for content script to fully load
+    await target.waitForTimeout(2000);
 
     const popup = await context.newPage();
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
@@ -152,18 +155,21 @@ test.describe('Popup Tools', () => {
     await expect(consoleBtn).toBeVisible();
     await consoleBtn.click();
 
-    await target.bringToFront();
-    await target.waitForTimeout(500);
+    // Wait for message to propagate before popup closes
+    await popup.waitForTimeout(800);
 
-    // Console root should be visible
+    await target.bringToFront();
+    await target.waitForTimeout(1000);
+
+    // Console root should be visible (with extended timeout for CI)
     const consoleRoot = target.locator('#hanzo-console-root');
-    await expect(consoleRoot).toBeVisible();
+    await expect(consoleRoot).toBeVisible({ timeout: 5000 });
 
     // Type an expression and press Enter
     const input = target.locator('#hanzo-console-input');
     await input.fill('1 + 1');
     await input.press('Enter');
-    await target.waitForTimeout(300);
+    await target.waitForTimeout(500);
 
     // Output should contain the result
     const output = target.locator('#hanzo-console-output');
@@ -172,7 +178,7 @@ test.describe('Popup Tools', () => {
 
     // Escape closes it
     await input.press('Escape');
-    await target.waitForTimeout(300);
+    await target.waitForTimeout(500);
     const display = await consoleRoot.evaluate((el) => el.style.display);
     expect(display).toBe('none');
   });
