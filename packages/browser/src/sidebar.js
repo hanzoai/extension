@@ -116,6 +116,7 @@ class HanzoSidebar {
     this.switchTab('tools'); // Default to tools (always works)
 
     // Initialize features that work without auth
+    this.loadModels(); // Public API — no auth required
     this.connectToMCP();
     this.refreshTabFilesystem();
     this.checkWebGPU();

@@ -43,11 +43,16 @@ export interface ChatDelta {
 
 /**
  * List available models from Hanzo Cloud.
+ * The /v1/models endpoint is public — token is optional but provides
+ * user-specific model access when present.
  */
-export async function listModels(token: string): Promise<ChatModel[]> {
-  const response = await fetch(`${API_BASE}/v1/models`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export async function listModels(token?: string): Promise<ChatModel[]> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE}/v1/models`, { headers });
 
   if (!response.ok) {
     throw new Error(`Failed to list models: ${response.status}`);
