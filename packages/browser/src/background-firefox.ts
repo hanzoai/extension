@@ -11,6 +11,33 @@
  * - Uses `browser.tabs.executeScript` instead of `chrome.debugger`
  */
 
+import type { ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
+import {
+  createZapManager,
+  discoverZapServers,
+  connectZap,
+  zapRequest,
+  zapCallTool,
+  hasZapTool,
+  handleZapMessage,
+  type ZapManager,
+} from './shared/zap.js';
+import {
+  getRagConfig,
+  normalizeRagSnippets,
+  queryRagFromZap,
+  queryRagFromEndpoint,
+} from './shared/rag.js';
+import {
+  login as sharedLogin,
+  signup as sharedSignup,
+  logout as sharedLogout,
+  getValidAccessToken as sharedGetValidAccessToken,
+  getAuthStatus as sharedGetAuthStatus,
+  firefoxAdapter,
+  type BrowserAdapter,
+} from './shared/auth.js';
+
 // Declare browser API for TypeScript
 declare const browser: typeof chrome;
 
@@ -26,20 +53,11 @@ interface CDPResponse {
   error?: { code: number; message: string };
 }
 
-interface ControlSession {
-  active: boolean;
-  tabId: number | null;
-  task: string | null;
-  startedAt: number | null;
-}
+const BROWSER_NAME = 'firefox';
+const VERSION = typeof browser !== 'undefined' ? browser.runtime.getManifest().version : '0';
 
-interface RagSnippet {
-  content: string;
-  title?: string;
-  source?: string;
-  score?: number;
-  url?: string;
-}
+// Shared ZAP manager (replaces inline ZAP protocol code)
+const zapMgr: ZapManager = createZapManager();
 
 const controlSession: ControlSession = {
   active: false,
@@ -48,235 +66,8 @@ const controlSession: ControlSession = {
   startedAt: null,
 };
 
-// =============================================================================
-// ZAP Protocol Integration (ported from Chrome background.ts)
-// =============================================================================
-
-interface ZapState {
-  connected: boolean;
-  mcps: Array<{ id: string; name: string; url: string; tools: string[] }>;
-  extensionId: string;
-}
-
-const zapState: ZapState = {
-  connected: false,
-  mcps: [],
-  extensionId: `hanzo-ext-${Date.now().toString(36)}`,
-};
-
-const DEFAULT_ZAP_PORTS = [9999, 9998, 9997, 9996, 9995];
-const ZAP_RECONNECT_DELAY = 3000;
-const ZAP_DISCOVERY_TIMEOUT = 2000;
-
-/** Active ZAP WebSocket connections keyed by MCP id */
-const zapConnections = new Map<string, WebSocket>();
-const pendingZapRequests = new Map<string, { resolve: Function; reject: Function }>();
-let zapRequestIdCounter = 0;
-
-// ZAP binary protocol constants
-const ZAP_MAGIC = new Uint8Array([0x5A, 0x41, 0x50, 0x01]);
-const MSG_HANDSHAKE    = 0x01;
-const MSG_HANDSHAKE_OK = 0x02;
-const MSG_REQUEST      = 0x10;
-const MSG_RESPONSE     = 0x11;
-const MSG_PING         = 0xFE;
-const MSG_PONG         = 0xFF;
-
-function encodeZapMessage(type: number, payload: object): ArrayBuffer {
-  const json = JSON.stringify(payload);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(json);
-  const buf = new ArrayBuffer(4 + 1 + 4 + data.length);
-  const view = new DataView(buf);
-  new Uint8Array(buf, 0, 4).set(ZAP_MAGIC);
-  view.setUint8(4, type);
-  view.setUint32(5, data.length, false);
-  new Uint8Array(buf, 9).set(data);
-  return buf;
-}
-
-function decodeZapMessage(buf: ArrayBuffer): { type: number; payload: any } | null {
-  if (buf.byteLength < 9) return null;
-  const magic = new Uint8Array(buf, 0, 4);
-  if (magic[0] !== 0x5A || magic[1] !== 0x41 || magic[2] !== 0x50 || magic[3] !== 0x01) {
-    return null;
-  }
-  const view = new DataView(buf);
-  const type = view.getUint8(4);
-  const length = view.getUint32(5, false);
-  const decoder = new TextDecoder();
-  const json = decoder.decode(new Uint8Array(buf, 9, length));
-  return { type, payload: JSON.parse(json) };
-}
-
-function detectBrowserType(): string {
-  if (typeof browser !== 'undefined' && browser.runtime?.getBrowserInfo) {
-    return 'firefox';
-  }
-  return 'firefox'; // This file is only loaded in Firefox
-}
-
-/** Probe a ZAP server on given port */
-function probeZapServer(port: number): Promise<string | null> {
-  return new Promise((resolve) => {
-    const url = `ws://localhost:${port}`;
-    const ws = new WebSocket(url);
-    const timer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
-
-    ws.binaryType = 'arraybuffer';
-    ws.onopen = () => {
-      clearTimeout(timer);
-      ws.send(encodeZapMessage(MSG_HANDSHAKE, {
-        clientId: zapState.extensionId,
-        clientType: 'browser_extension',
-        browser: detectBrowserType(),
-        version: browser.runtime.getManifest().version,
-        capabilities: ['tabs', 'navigate', 'screenshot', 'evaluate', 'cookies', 'storage'],
-      }));
-
-      const hsTimer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
-      ws.onmessage = () => {
-        clearTimeout(hsTimer);
-        ws.close();
-        resolve(url);
-      };
-    };
-    ws.onerror = () => { clearTimeout(timer); resolve(null); };
-  });
-}
-
-/** Connect to a ZAP server and set up message handling */
-async function connectZap(url: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    const ws = new WebSocket(url);
-    ws.binaryType = 'arraybuffer';
-
-    const connTimer = setTimeout(() => { ws.close(); resolve(null); }, 10000);
-
-    ws.onopen = () => {
-      ws.send(encodeZapMessage(MSG_HANDSHAKE, {
-        clientId: zapState.extensionId,
-        clientType: 'browser_extension',
-        browser: detectBrowserType(),
-        version: browser.runtime.getManifest().version,
-        capabilities: ['tabs', 'navigate', 'screenshot', 'evaluate', 'cookies', 'storage'],
-      }));
-    };
-
-    ws.onmessage = (ev) => {
-      let msg: { type: number; payload: any } | null = null;
-      if (ev.data instanceof ArrayBuffer) {
-        msg = decodeZapMessage(ev.data);
-      }
-      if (!msg) return;
-
-      switch (msg.type) {
-        case MSG_HANDSHAKE_OK: {
-          clearTimeout(connTimer);
-          const info = msg.payload;
-          const mcpId = info.serverId || `mcp-${Date.now().toString(36)}`;
-          zapConnections.set(mcpId, ws);
-          zapState.connected = true;
-          zapState.mcps.push({
-            id: mcpId,
-            name: info.name || `MCP@${url}`,
-            url,
-            tools: (info.tools || []).map((t: any) => t.name),
-          });
-          console.log(`[Hanzo/ZAP] Connected to ${info.name || url} (${(info.tools || []).length} tools)`);
-          resolve(mcpId);
-          break;
-        }
-        case MSG_RESPONSE: {
-          const { id, result, error } = msg.payload;
-          const pending = pendingZapRequests.get(id);
-          if (pending) {
-            pendingZapRequests.delete(id);
-            if (error) pending.reject(new Error(error.message || error));
-            else pending.resolve(result);
-          }
-          break;
-        }
-        case MSG_PING:
-          ws.send(encodeZapMessage(MSG_PONG, {}));
-          break;
-      }
-    };
-
-    ws.onclose = () => {
-      for (const [id, conn] of zapConnections) {
-        if (conn === ws) {
-          zapConnections.delete(id);
-          zapState.mcps = zapState.mcps.filter(m => m.id !== id);
-          break;
-        }
-      }
-      zapState.connected = zapConnections.size > 0;
-      console.log(`[Hanzo/ZAP] Disconnected from ${url}, reconnecting in ${ZAP_RECONNECT_DELAY}ms...`);
-      setTimeout(() => connectZap(url), ZAP_RECONNECT_DELAY);
-    };
-
-    ws.onerror = () => {
-      clearTimeout(connTimer);
-      resolve(null);
-    };
-  });
-}
-
-/** Send a ZAP RPC request to an MCP server */
-function zapRequest(mcpId: string, method: string, params: any = {}): Promise<any> {
-  const ws = zapConnections.get(mcpId);
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    return Promise.reject(new Error(`MCP ${mcpId} not connected`));
-  }
-
-  const id = `req-${++zapRequestIdCounter}`;
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pendingZapRequests.delete(id);
-      reject(new Error(`ZAP request timeout: ${method}`));
-    }, 30000);
-
-    pendingZapRequests.set(id, {
-      resolve: (r: any) => { clearTimeout(timer); resolve(r); },
-      reject:  (e: any) => { clearTimeout(timer); reject(e); },
-    });
-
-    ws.send(encodeZapMessage(MSG_REQUEST, { id, method, params }));
-  });
-}
-
-/** Call a tool via ZAP on the first MCP that has it */
-async function zapCallTool(name: string, args: Record<string, unknown> = {}, targetMcpId?: string): Promise<any> {
-  if (targetMcpId) {
-    return zapRequest(targetMcpId, 'tools/call', { name, arguments: args });
-  }
-  for (const mcp of zapState.mcps) {
-    if (mcp.tools.includes(name)) {
-      return zapRequest(mcp.id, 'tools/call', { name, arguments: args });
-    }
-  }
-  throw new Error(`Tool not found on any ZAP-connected MCP: ${name}`);
-}
-
-/** Discover and connect to ZAP servers */
-async function discoverZapServers() {
-  console.log('[Hanzo/ZAP] Discovering MCP servers...');
-  const results = await Promise.all(DEFAULT_ZAP_PORTS.map(p => probeZapServer(p)));
-  const available = results.filter(Boolean) as string[];
-
-  if (available.length === 0) {
-    console.log('[Hanzo/ZAP] No servers found, retrying in 10s...');
-    setTimeout(discoverZapServers, 10000);
-    return;
-  }
-
-  console.log(`[Hanzo/ZAP] Found ${available.length} server(s): ${available.join(', ')}`);
-  await Promise.all(available.map(url => connectZap(url)));
-}
-
-// Start ZAP discovery on load
-discoverZapServers();
+// Start ZAP discovery on load (using shared module)
+discoverZapServers(zapMgr, BROWSER_NAME, VERSION);
 
 // =============================================================================
 
@@ -1352,251 +1143,42 @@ class HanzoFirefoxExtension {
 // Uses browser.identity.launchWebAuthFlow for OAuth
 // =============================================================================
 
-// Login UI lives on hanzo.id; Casdoor API is on iam.hanzo.ai
-const IAM_LOGIN = 'https://hanzo.id';
-const IAM_API = 'https://iam.hanzo.ai';
-const API_BASE = 'https://api.hanzo.ai';
-const CLIENT_ID = 'app-hanzo';
-const SCOPES = 'openid profile email';
+// Config from shared module (single source of truth)
+import {
+  IAM_LOGIN_URL as IAM_LOGIN,
+  IAM_API_URL as IAM_API,
+  API_BASE_URL as API_BASE,
+  STORAGE_KEYS,
+  LOCAL_PROVIDER_DEFAULTS,
+} from './shared/config.js';
 
-const STORAGE_KEYS = {
-  accessToken: 'hanzo_iam_access_token',
-  refreshToken: 'hanzo_iam_refresh_token',
-  idToken: 'hanzo_iam_id_token',
-  expiresAt: 'hanzo_iam_expires_at',
-  user: 'hanzo_iam_user',
-};
+// Auth: all PKCE, token storage, and IAM logic lives in shared/auth.ts
+const ffAdapter: BrowserAdapter = firefoxAdapter();
 
-// PKCE helpers
-function generateRandomString(length: number): string {
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-  return Array.from(array, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, length);
+async function getValidAccessToken(): Promise<string | null> {
+  return sharedGetValidAccessToken(ffAdapter.storage);
 }
 
-async function sha256(plain: string): Promise<ArrayBuffer> {
-  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(plain));
-}
-
-function base64UrlEncode(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function getRagConfig(): Promise<{
-  endpoint: string;
-  apiKey: string;
-  knowledgeBase: string;
-  topK: number;
-  includeTabContext: boolean;
-}> {
-  const result = await browser.storage.local.get([
-    'hanzo_rag_endpoint',
-    'hanzo_rag_api_key',
-    'hanzo_rag_kb',
-    'hanzo_rag_top_k',
-    'hanzo_rag_include_tab_context',
-  ]);
-
-  const topKParsed = Number.parseInt(String(result.hanzo_rag_top_k ?? 5), 10);
-  return {
-    endpoint: String(result.hanzo_rag_endpoint || '').trim(),
-    apiKey: String(result.hanzo_rag_api_key || '').trim(),
-    knowledgeBase: String(result.hanzo_rag_kb || '').trim(),
-    topK: Number.isFinite(topKParsed) ? Math.max(1, Math.min(topKParsed, 20)) : 5,
-    includeTabContext: result.hanzo_rag_include_tab_context !== false,
-  };
-}
-
-function normalizeRagSnippets(raw: any): RagSnippet[] {
-  if (!raw) return [];
-
-  const candidates: any[] = [];
-  if (Array.isArray(raw)) candidates.push(...raw);
-  if (Array.isArray(raw?.snippets)) candidates.push(...raw.snippets);
-  if (Array.isArray(raw?.documents)) candidates.push(...raw.documents);
-  if (Array.isArray(raw?.items)) candidates.push(...raw.items);
-  if (Array.isArray(raw?.results)) candidates.push(...raw.results);
-
-  if (!candidates.length && typeof raw?.content === 'string') {
-    candidates.push({ content: raw.content, source: raw.source || 'rag-endpoint' });
-  }
-
-  return candidates
-    .map((item) => {
-      const content = String(item?.content ?? item?.text ?? item?.snippet ?? item?.body ?? '').trim();
-      if (!content) return null;
-      return {
-        content,
-        title: item?.title ? String(item.title) : undefined,
-        source: item?.source ? String(item.source) : undefined,
-        score: typeof item?.score === 'number' ? item.score : undefined,
-        url: item?.url ? String(item.url) : undefined,
-      } as RagSnippet;
-    })
-    .filter((item): item is RagSnippet => !!item)
-    .slice(0, 20);
-}
-
-async function queryRagEndpoint(params: {
-  endpoint: string;
-  apiKey: string;
-  query: string;
-  topK: number;
-  knowledgeBase: string;
-  includeTabContext: boolean;
-  pageContext?: { url?: string; title?: string };
-}): Promise<RagSnippet[]> {
-  if (!params.endpoint) return [];
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (params.apiKey) headers.Authorization = `Bearer ${params.apiKey}`;
-
-  const response = await fetch(params.endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      query: params.query,
-      top_k: params.topK,
-      knowledge_base: params.knowledgeBase || undefined,
-      page_context: params.includeTabContext ? params.pageContext : undefined,
-      source: 'hanzo-browser-extension-firefox',
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`RAG endpoint error ${response.status}: ${text || 'Unknown error'}`);
-  }
-
-  const raw = await response.json();
-  return normalizeRagSnippets(raw).map((snippet) => ({
-    ...snippet,
-    source: snippet.source || 'rag-endpoint',
-  }));
-}
-
-async function firefoxLogin(): Promise<any> {
-  const codeVerifier = generateRandomString(64);
-  const codeChallenge = base64UrlEncode(await sha256(codeVerifier));
-  const state = generateRandomString(32);
-  const redirectUri = 'https://hanzo.ai/callback';
-
-  const authorizeUrl = new URL(`${IAM_LOGIN}/oauth/authorize`);
-  authorizeUrl.searchParams.set('client_id', CLIENT_ID);
-  authorizeUrl.searchParams.set('response_type', 'code');
-  authorizeUrl.searchParams.set('redirect_uri', redirectUri);
-  authorizeUrl.searchParams.set('code_challenge', codeChallenge);
-  authorizeUrl.searchParams.set('code_challenge_method', 'S256');
-  authorizeUrl.searchParams.set('scope', SCOPES);
-  authorizeUrl.searchParams.set('state', state);
-
-  // Tab-based auth: open a real browser tab for login
-  const callbackUrl = await new Promise<string>((resolve, reject) => {
-    let authTabId: number | undefined;
-    const timeout = setTimeout(() => { cleanup(); reject(new Error('Login timed out')); }, 300_000);
-
-    function cleanup() {
-      clearTimeout(timeout);
-      browser.tabs.onUpdated.removeListener(onUpdated);
-      browser.tabs.onRemoved.removeListener(onRemoved);
-    }
-    function onUpdated(tabId: number, changeInfo: any) {
-      if (tabId !== authTabId || !changeInfo.url) return;
-      if (changeInfo.url.startsWith(redirectUri)) {
-        cleanup();
-        browser.tabs.remove(tabId).catch(() => {});
-        resolve(changeInfo.url);
-      }
-    }
-    function onRemoved(tabId: number) {
-      if (tabId !== authTabId) return;
-      cleanup();
-      reject(new Error('Login cancelled'));
-    }
-
-    browser.tabs.onUpdated.addListener(onUpdated);
-    browser.tabs.onRemoved.addListener(onRemoved);
-    browser.tabs.create({ url: authorizeUrl.toString() }).then((tab: any) => {
-      authTabId = tab.id;
-    });
-  });
-
-  const url = new URL(callbackUrl);
-  if (url.searchParams.get('state') !== state) throw new Error('State mismatch');
-
-  // Handle both code flow and implicit token flow responses
-  const code = url.searchParams.get('code');
-  const directToken = url.searchParams.get('access_token');
-
-  if (directToken) {
-    // Implicit flow — tokens returned directly in redirect URL
-    const data: any = { [STORAGE_KEYS.accessToken]: directToken };
-    const refreshToken = url.searchParams.get('refresh_token');
-    if (refreshToken) data[STORAGE_KEYS.refreshToken] = refreshToken;
-    await browser.storage.local.set(data);
-  } else if (code) {
-    // Authorization code flow — exchange code for tokens via PKCE
-    const tokenResponse = await fetch(`${IAM_API}/oauth/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        client_id: CLIENT_ID,
-        code,
-        redirect_uri: redirectUri,
-        code_verifier: codeVerifier,
-      }),
-    });
-
-    if (!tokenResponse.ok) throw new Error(`Token exchange failed: ${await tokenResponse.text()}`);
-    const tokens = await tokenResponse.json();
-
-    const data: any = { [STORAGE_KEYS.accessToken]: tokens.access_token };
-    if (tokens.refresh_token) data[STORAGE_KEYS.refreshToken] = tokens.refresh_token;
-    if (tokens.id_token) data[STORAGE_KEYS.idToken] = tokens.id_token;
-    if (tokens.expires_in) data[STORAGE_KEYS.expiresAt] = Date.now() + tokens.expires_in * 1000;
-    await browser.storage.local.set(data);
-  } else {
-    const error = url.searchParams.get('error_description') || url.searchParams.get('error') || 'No authorization code or token';
-    throw new Error(error);
-  }
-
-  // Fetch user info
-  const stored = await browser.storage.local.get([STORAGE_KEYS.accessToken]);
-  const accessToken = stored[STORAGE_KEYS.accessToken];
-  if (!accessToken) throw new Error('Login succeeded but no token was stored');
-
-  // /api/userinfo only returns sub/iss/aud; /api/get-account has full profile
-  let user: any = {};
-  try {
-    const acctResp = await fetch(`${IAM_API}/api/get-account`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (acctResp.ok) {
-      const acctJson = await acctResp.json();
-      const acct = acctJson.data || acctJson;
-      if (acct.name || acct.email) {
-        user = { sub: acct.id || acct.sub, name: acct.displayName || acct.name, email: acct.email, picture: acct.avatar || undefined };
-      }
-    }
-  } catch { /* fall through */ }
-  if (!user.name && !user.email) {
-    const userResp = await fetch(`${IAM_API}/api/userinfo`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (userResp.ok) user = await userResp.json();
-  }
-  await browser.storage.local.set({ [STORAGE_KEYS.user]: user });
-  return user;
-}
+// =============================================================================
+// Message Handler
+// =============================================================================
 
 browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
   (async () => {
+    // --- ZAP Protocol (handled by shared module) ---
+    if (typeof request.action === 'string' && request.action.startsWith('zap.')) {
+      if (handleZapMessage(request.action, request, sendResponse, zapMgr, BROWSER_NAME, VERSION)) {
+        return;
+      }
+    }
+
     switch (request.action) {
+      // =======================================================================
+      // Auth (Hanzo IAM OAuth2 + PKCE)
+      // =======================================================================
       case 'auth.login':
         try {
-          const user = await firefoxLogin();
+          const user = await sharedLogin(ffAdapter);
           sendResponse({ success: true, user });
         } catch (e: any) {
           sendResponse({ success: false, error: e.message });
@@ -1605,7 +1187,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
 
       case 'auth.signup':
         try {
-          await browser.tabs.create({ url: `${IAM_LOGIN}/signup` });
+          await sharedSignup(ffAdapter);
           sendResponse({ success: true });
         } catch (e: any) {
           sendResponse({ success: false, error: e.message });
@@ -1613,16 +1195,16 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         break;
 
       case 'auth.logout':
-        await browser.storage.local.remove(Object.values(STORAGE_KEYS));
+        await sharedLogout(ffAdapter.storage);
         sendResponse({ success: true });
         break;
 
       case 'auth.status': {
-        const result = await browser.storage.local.get([STORAGE_KEYS.accessToken, STORAGE_KEYS.user]);
+        const status = await sharedGetAuthStatus(ffAdapter.storage);
         sendResponse({
           success: true,
-          authenticated: !!result[STORAGE_KEYS.accessToken],
-          user: result[STORAGE_KEYS.user] || null,
+          authenticated: status.authenticated,
+          user: status.user,
         });
         break;
       }
@@ -1633,18 +1215,157 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         break;
       }
 
-      case 'chat.listModels': {
-        const t = await browser.storage.local.get([STORAGE_KEYS.accessToken]);
-        if (!t[STORAGE_KEYS.accessToken]) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
-        const resp = await fetch(`${API_BASE}/v1/models`, { headers: { Authorization: `Bearer ${t[STORAGE_KEYS.accessToken]}` } });
-        const data = await resp.json();
-        sendResponse({ success: true, models: data.data || data.models || data || [] });
+      // =======================================================================
+      // RAG (uses shared module — now with ZAP memory support)
+      // =======================================================================
+      case 'rag.query': {
+        try {
+          const config = await getRagConfig(browser.storage.local);
+          const topKInput = Number.parseInt(String(request.topK ?? config.topK), 10);
+          const params: RagQueryParams = {
+            query: String(request.query || '').trim(),
+            topK: Number.isFinite(topKInput) ? Math.max(1, Math.min(topKInput, 20)) : 5,
+            knowledgeBase: String(request.knowledgeBase ?? config.knowledgeBase ?? '').trim(),
+            includeTabContext: request.includeTabContext !== undefined
+              ? !!request.includeTabContext
+              : config.includeTabContext,
+            useZapMemory: request.useZapMemory !== undefined
+              ? !!request.useZapMemory
+              : config.useZapMemory,
+            endpoint: String(request.endpoint ?? config.endpoint ?? '').trim(),
+            apiKey: String(request.apiKey ?? config.apiKey ?? '').trim(),
+            mcpId: request.mcpId ? String(request.mcpId) : undefined,
+            pageContext: request.pageContext && typeof request.pageContext === 'object'
+              ? {
+                  url: request.pageContext.url ? String(request.pageContext.url) : undefined,
+                  title: request.pageContext.title ? String(request.pageContext.title) : undefined,
+                }
+              : undefined,
+          };
+
+          if (!params.query) {
+            sendResponse({ success: false, error: 'Query is required' });
+            break;
+          }
+
+          // Try ZAP memory first (via shared module), then HTTP endpoint
+          let snippets = await queryRagFromZap(params, zapMgr);
+          let source = snippets.length ? 'zap-memory' : 'none';
+
+          if (!snippets.length && params.endpoint) {
+            snippets = await queryRagFromEndpoint(params);
+            source = snippets.length ? 'rag-endpoint' : source;
+          }
+
+          sendResponse({
+            success: true,
+            source,
+            snippets: snippets.slice(0, params.topK),
+          });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
         break;
       }
 
+      // =======================================================================
+      // Cloud Chat
+      // =======================================================================
+      case 'chat.listModels': {
+        try {
+          const token = await getValidAccessToken();
+          if (!token) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
+          const resp = await fetch(`${API_BASE}/v1/models`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(10000),
+          });
+          const data = await resp.json();
+          sendResponse({ success: true, models: data.data || data.models || data || [] });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'chat.complete': {
+        try {
+          const token = await getValidAccessToken();
+          if (!token) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
+
+          const messages = (Array.isArray(request.messages) ? request.messages : [])
+            .filter((m: any) => m && typeof m.content === 'string' && typeof m.role === 'string')
+            .map((m: any) => ({
+              role: (m.role === 'system' || m.role === 'assistant') ? m.role : 'user',
+              content: String(m.content),
+            }));
+          if (!messages.length) { sendResponse({ success: false, error: 'messages are required' }); break; }
+
+          const model = String(request.model || 'auto');
+          const body: any = { model, messages, stream: false };
+          if (typeof request.temperature === 'number') body.temperature = request.temperature;
+          if (typeof request.max_tokens === 'number') body.max_tokens = Math.max(64, Math.min(request.max_tokens, 16384));
+
+          const resp = await fetch(`${API_BASE}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(120000),
+          });
+          if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(`Chat API error ${resp.status}: ${text}`);
+          }
+          const data = await resp.json();
+          const content = data.choices?.[0]?.message?.content || '';
+          sendResponse({ success: true, content, model: data.model || model });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'chat.cancel':
+        sendResponse({ success: true });
+        break;
+
+      // =======================================================================
+      // Models
+      // =======================================================================
+      case 'models.list': {
+        try {
+          const token = await getValidAccessToken();
+          if (!token) {
+            // Not authenticated — try public model list from API
+            try {
+              const pubResp = await fetch(`${API_BASE}/v1/models`, { signal: AbortSignal.timeout(5000) });
+              const pubData = await pubResp.json();
+              sendResponse({ success: true, models: pubData.data || [], authenticated: false });
+            } catch {
+              sendResponse({ success: true, models: [], authenticated: false });
+            }
+            break;
+          }
+          const resp = await fetch(`${API_BASE}/v1/models`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(10000),
+          });
+          const data = await resp.json();
+          sendResponse({ success: true, models: data.data || data.models || [], authenticated: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      // =======================================================================
+      // WebGPU / Local AI
+      // =======================================================================
       case 'checkWebGPU': {
         try {
-          if (!navigator.gpu) {
+          if (typeof navigator === 'undefined' || !navigator.gpu) {
             sendResponse({ available: false });
             break;
           }
@@ -1660,59 +1381,713 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         break;
       }
 
+      case 'runLocalAI':
+        sendResponse({ success: false, error: 'WebGPU inference not available in Firefox background' });
+        break;
+
       case 'listAgents':
         sendResponse({ success: true, agents: [] });
         break;
 
       case 'stopAgent':
-        sendResponse({ success: false, error: 'Agent workers are not available in Firefox background mode yet' });
+        sendResponse({ success: false, error: 'Agent workers are not available in Firefox background mode' });
         break;
 
       case 'launchAIWorker':
-        sendResponse({ success: false, error: 'launchAIWorker is not implemented in Firefox background mode yet' });
+        sendResponse({ success: false, error: 'launchAIWorker not implemented in Firefox background mode' });
         break;
 
-      case 'rag.query': {
+      // =======================================================================
+      // Ollama / Local LLM (portable — pure HTTP)
+      // =======================================================================
+      case 'ollama.discover': {
         try {
-          const config = await getRagConfig();
-          const topKInput = Number.parseInt(String(request.topK ?? config.topK), 10);
-          const params = {
-            endpoint: String(request.endpoint ?? config.endpoint ?? '').trim(),
-            apiKey: String(request.apiKey ?? config.apiKey ?? '').trim(),
-            query: String(request.query || '').trim(),
-            topK: Number.isFinite(topKInput) ? Math.max(1, Math.min(topKInput, 20)) : 5,
-            knowledgeBase: String(request.knowledgeBase ?? config.knowledgeBase ?? '').trim(),
-            includeTabContext: request.includeTabContext !== undefined
-              ? !!request.includeTabContext
-              : config.includeTabContext,
-            pageContext: request.pageContext && typeof request.pageContext === 'object'
-              ? {
-                  url: request.pageContext.url ? String(request.pageContext.url) : undefined,
-                  title: request.pageContext.title ? String(request.pageContext.title) : undefined,
-                }
-              : undefined,
-          };
-
-          if (!params.query) {
-            sendResponse({ success: false, error: 'Query is required' });
-            break;
+          const urls = ['http://localhost:11434', 'http://127.0.0.1:11434'];
+          let found = false;
+          let ollamaUrl = '';
+          for (const u of urls) {
+            try {
+              const resp = await fetch(u, { signal: AbortSignal.timeout(2000) });
+              if (resp.ok) { found = true; ollamaUrl = u; break; }
+            } catch { /* next */ }
           }
-
-          if (!params.endpoint) {
-            sendResponse({ success: true, source: 'none', snippets: [] });
-            break;
-          }
-
-          const snippets = await queryRagEndpoint(params);
-          sendResponse({ success: true, source: snippets.length ? 'rag-endpoint' : 'none', snippets });
+          sendResponse({ success: true, discovered: found, url: ollamaUrl, available: found });
         } catch (e: any) {
           sendResponse({ success: false, error: e.message });
         }
         break;
       }
 
-      // --- AI Control Overlay (forwarded to content script) ---
-      // --- Bridge & ZAP status (for sidebar MCP detection) ---
+      case 'ollama.health': {
+        try {
+          const stored = await browser.storage.local.get(['ollamaUrl']);
+          const url = stored.ollamaUrl || 'http://localhost:11434';
+          const resp = await fetch(url, { signal: AbortSignal.timeout(3000) });
+          sendResponse({ success: true, available: resp.ok, url });
+        } catch (e: any) {
+          sendResponse({ success: false, available: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'ollama.models': {
+        try {
+          const stored = await browser.storage.local.get(['ollamaUrl']);
+          const url = stored.ollamaUrl || 'http://localhost:11434';
+          const resp = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(5000) });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          sendResponse({ success: true, models: data.models || [] });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'ollama.chat': {
+        try {
+          const stored = await browser.storage.local.get(['ollamaUrl']);
+          const url = stored.ollamaUrl || 'http://localhost:11434';
+          const resp = await fetch(`${url}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: request.model,
+              messages: request.messages,
+              stream: false,
+              ...(request.options || {}),
+            }),
+            signal: AbortSignal.timeout(120000),
+          });
+          if (!resp.ok) throw new Error(`Ollama ${resp.status}`);
+          const data = await resp.json();
+          sendResponse({ success: true, content: data.message?.content || '' });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'ollama.generate': {
+        try {
+          const stored = await browser.storage.local.get(['ollamaUrl']);
+          const url = stored.ollamaUrl || 'http://localhost:11434';
+          const resp = await fetch(`${url}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: request.model,
+              prompt: request.prompt,
+              stream: false,
+              ...(request.options || {}),
+            }),
+            signal: AbortSignal.timeout(120000),
+          });
+          if (!resp.ok) throw new Error(`Ollama ${resp.status}`);
+          const data = await resp.json();
+          sendResponse({ success: true, content: data.response || '' });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'ollama.embed': {
+        try {
+          const stored = await browser.storage.local.get(['ollamaUrl']);
+          const url = stored.ollamaUrl || 'http://localhost:11434';
+          const resp = await fetch(`${url}/api/embeddings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: request.model, prompt: request.input }),
+            signal: AbortSignal.timeout(30000),
+          });
+          if (!resp.ok) throw new Error(`Ollama ${resp.status}`);
+          const data = await resp.json();
+          sendResponse({ success: true, embedding: data.embedding || [] });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'ollama.status': {
+        const stored = await browser.storage.local.get(['ollamaUrl']);
+        sendResponse({ success: true, url: stored.ollamaUrl || 'http://localhost:11434', available: false });
+        break;
+      }
+
+      case 'ollama.setUrl': {
+        await browser.storage.local.set({ ollamaUrl: request.url });
+        sendResponse({ success: true });
+        break;
+      }
+
+      case 'ollama.pull': {
+        try {
+          const stored = await browser.storage.local.get(['ollamaUrl']);
+          const url = stored.ollamaUrl || 'http://localhost:11434';
+          // Start pull — non-streaming for simplicity in Firefox
+          fetch(`${url}/api/pull`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: request.model, stream: false }),
+          }).then(() => {
+            browser.storage.local.set({ 'ollama.pull.progress': { model: request.model, status: 'done', timestamp: Date.now() } });
+          }).catch((e: any) => {
+            browser.storage.local.set({ 'ollama.pull.progress': { model: request.model, status: 'error', error: e.message, timestamp: Date.now() } });
+          });
+          sendResponse({ success: true, started: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'ollama.delete': {
+        try {
+          const stored = await browser.storage.local.get(['ollamaUrl']);
+          const url = stored.ollamaUrl || 'http://localhost:11434';
+          await fetch(`${url}/api/delete`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: request.model }),
+          });
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      // =======================================================================
+      // Local LLM Provider (unified — Ollama / LM Studio / Hanzo Desktop)
+      // =======================================================================
+      case 'local.chat': {
+        try {
+          const provider = request.provider || 'ollama';
+          const endpoint = request.endpoint;
+          const model = request.model;
+          const messages = request.messages;
+          const options = request.options || {};
+          let result: string;
+
+          if (provider === 'ollama' && !endpoint) {
+            const stored = await browser.storage.local.get(['ollamaUrl']);
+            const url = stored.ollamaUrl || 'http://localhost:11434';
+            const resp = await fetch(`${url}/api/chat`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model, messages, stream: false, ...options }),
+              signal: AbortSignal.timeout(120000),
+            });
+            if (!resp.ok) throw new Error(`Ollama ${resp.status}`);
+            const data = await resp.json();
+            result = data.message?.content || '';
+          } else if (provider === 'anthropic') {
+            const baseUrl = endpoint || 'https://api.anthropic.com';
+            const systemMsg = messages.find((m: any) => m.role === 'system');
+            const chatMsgs = messages.filter((m: any) => m.role !== 'system');
+            const body: any = { model, max_tokens: options.num_predict || 4096, messages: chatMsgs, stream: false };
+            if (systemMsg) body.system = systemMsg.content;
+            if (options.temperature !== undefined) body.temperature = options.temperature;
+            const resp = await fetch(`${baseUrl}/v1/messages`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': request.apiKey || '', 'anthropic-version': '2023-06-01' },
+              body: JSON.stringify(body),
+              signal: AbortSignal.timeout(120000),
+            });
+            if (!resp.ok) throw new Error(`Anthropic: ${resp.status} ${await resp.text()}`);
+            const data = await resp.json();
+            result = data.content?.[0]?.text || '';
+          } else {
+            const lpCfg = LOCAL_PROVIDER_DEFAULTS[provider as keyof typeof LOCAL_PROVIDER_DEFAULTS];
+            const baseUrl = endpoint || (lpCfg ? `${lpCfg.url}/v1` : 'http://localhost:8080/v1');
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (request.apiKey) headers['Authorization'] = `Bearer ${request.apiKey}`;
+            const body: any = { model, messages, stream: false };
+            if (options.temperature !== undefined) body.temperature = options.temperature;
+            if (options.num_predict !== undefined) body.max_tokens = options.num_predict;
+            const resp = await fetch(`${baseUrl}/chat/completions`, {
+              method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(120000),
+            });
+            if (!resp.ok) throw new Error(`${provider}: ${resp.status} ${await resp.text()}`);
+            const data = await resp.json();
+            result = data.choices?.[0]?.message?.content || '';
+          }
+
+          sendResponse({ success: true, content: result });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'local.models': {
+        try {
+          const lpCfg2 = LOCAL_PROVIDER_DEFAULTS[request.provider as keyof typeof LOCAL_PROVIDER_DEFAULTS];
+          const endpoint = request.endpoint || (
+            request.provider === 'ollama' ? null :
+            lpCfg2 ? `${lpCfg2.url}/v1` :
+            request.endpoint || 'http://localhost:8080/v1'
+          );
+          if (!endpoint) {
+            const stored = await browser.storage.local.get(['ollamaUrl']);
+            const url = stored.ollamaUrl || LOCAL_PROVIDER_DEFAULTS.ollama.url;
+            const resp = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(5000) });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            sendResponse({ success: true, models: (data.models || []).map((m: any) => ({ id: m.name, name: m.name, size: m.size, details: m.details })) });
+            break;
+          }
+          const headers: Record<string, string> = {};
+          if (request.apiKey) headers['Authorization'] = `Bearer ${request.apiKey}`;
+          const resp = await fetch(`${endpoint}/models`, { headers, signal: AbortSignal.timeout(5000) });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          sendResponse({ success: true, models: data.data || data.models || [] });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'local.discover': {
+        const providers: { name: string; url: string; available: boolean; models?: string[] }[] = [];
+        // Ollama (configurable URL from storage, fallback from shared config)
+        try {
+          const stored = await browser.storage.local.get(['ollamaUrl']);
+          const url = stored.ollamaUrl || LOCAL_PROVIDER_DEFAULTS.ollama.url;
+          const resp = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(2000) });
+          if (resp.ok) {
+            const data = await resp.json();
+            providers.push({ name: 'ollama', url, available: true, models: (data.models || []).map((m: any) => m.name) });
+          } else {
+            providers.push({ name: 'ollama', url, available: false });
+          }
+        } catch {
+          providers.push({ name: 'ollama', url: LOCAL_PROVIDER_DEFAULTS.ollama.url, available: false });
+        }
+        // LM Studio (configurable from shared config)
+        {
+          const lmsCfg = LOCAL_PROVIDER_DEFAULTS.lmstudio;
+          try {
+            const resp = await fetch(`${lmsCfg.url}/models`, { signal: AbortSignal.timeout(2000) });
+            if (resp.ok) {
+              const data = await resp.json();
+              providers.push({ name: 'lmstudio', url: lmsCfg.url, available: true, models: (data.data || []).map((m: any) => m.id) });
+            } else {
+              providers.push({ name: 'lmstudio', url: lmsCfg.url, available: false });
+            }
+          } catch {
+            providers.push({ name: 'lmstudio', url: lmsCfg.url, available: false });
+          }
+        }
+        // Hanzo Desktop (configurable probe ports from shared config)
+        {
+          const hdCfg = LOCAL_PROVIDER_DEFAULTS['hanzo-desktop'];
+          for (const port of hdCfg.probePorts) {
+            try {
+              const resp = await fetch(`http://localhost:${port}/api/tags`, { signal: AbortSignal.timeout(2000) });
+              if (resp.ok) {
+                const data = await resp.json();
+                providers.push({ name: 'hanzo-desktop', url: `http://localhost:${port}`, available: true, models: (data.models || []).map((m: any) => m.name) });
+                break;
+              }
+            } catch { /* next */ }
+          }
+          if (!providers.find(p => p.name === 'hanzo-desktop')) {
+            providers.push({ name: 'hanzo-desktop', url: hdCfg.url, available: false });
+          }
+        }
+        // Custom endpoints
+        const stored = await browser.storage.local.get(['customLLMEndpoints']);
+        const customs: { name: string; url: string; apiKey?: string }[] = stored.customLLMEndpoints || [];
+        for (const c of customs) {
+          try {
+            const headers: Record<string, string> = {};
+            if (c.apiKey) headers['Authorization'] = `Bearer ${c.apiKey}`;
+            const resp = await fetch(`${c.url}/models`, { headers, signal: AbortSignal.timeout(3000) });
+            if (resp.ok) {
+              const data = await resp.json();
+              providers.push({ name: c.name || 'custom', url: c.url, available: true, models: (data.data || data.models || []).map((m: any) => m.id || m.name) });
+            } else {
+              providers.push({ name: c.name || 'custom', url: c.url, available: false });
+            }
+          } catch {
+            providers.push({ name: c.name || 'custom', url: c.url, available: false });
+          }
+        }
+        sendResponse({ success: true, providers });
+        break;
+      }
+
+      // =======================================================================
+      // Provider Management
+      // =======================================================================
+      case 'provider.save': {
+        try {
+          const stored = await browser.storage.local.get(['customLLMEndpoints']);
+          const endpoints: any[] = stored.customLLMEndpoints || [];
+          const existing = endpoints.findIndex((e: any) => e.name === request.name || e.url === request.url);
+          const entry = { name: request.name, url: request.url, apiKey: request.apiKey };
+          if (existing >= 0) endpoints[existing] = entry;
+          else endpoints.push(entry);
+          await browser.storage.local.set({ customLLMEndpoints: endpoints });
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'provider.remove': {
+        try {
+          const stored = await browser.storage.local.get(['customLLMEndpoints']);
+          const endpoints = (stored.customLLMEndpoints || []).filter(
+            (e: any) => e.name !== request.name && e.url !== request.url
+          );
+          await browser.storage.local.set({ customLLMEndpoints: endpoints });
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'provider.test': {
+        try {
+          const headers: Record<string, string> = {};
+          if (request.apiKey) headers['Authorization'] = `Bearer ${request.apiKey}`;
+          const resp = await fetch(`${request.url}/models`, { headers, signal: AbortSignal.timeout(5000) });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          sendResponse({ success: true, models: (data.data || data.models || []).map((m: any) => m.id || m.name) });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      // =======================================================================
+      // Settings (browser.storage.local)
+      // =======================================================================
+      case 'settings.get': {
+        try {
+          const keys = request.keys || [
+            'selectedProvider', 'selectedModel', 'customLLMEndpoints', 'ollamaUrl',
+            'anthropicApiKey', 'openaiApiKey', 'hanzoApiKey',
+            'mcpPort', 'cdpPort', 'zapPorts',
+            'activeOrgId', 'browserBackend',
+          ];
+          const result = await browser.storage.local.get(keys);
+          sendResponse({ success: true, settings: result });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'settings.set': {
+        try {
+          await browser.storage.local.set(request.settings);
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'settings.export': {
+        try {
+          const all = await browser.storage.local.get(null);
+          const safe: Record<string, any> = {};
+          for (const [k, v] of Object.entries(all)) {
+            if (k.startsWith('hanzo_iam_')) continue;
+            safe[k] = v;
+          }
+          sendResponse({ success: true, settings: safe });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'settings.import': {
+        try {
+          const settings = request.settings || {};
+          delete settings.hanzo_iam_access_token;
+          delete settings.hanzo_iam_refresh_token;
+          delete settings.hanzo_iam_id_token;
+          await browser.storage.local.set(settings);
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'settings.sync':
+        sendResponse({ success: true });
+        break;
+
+      case 'config.save': {
+        // Save config to browser storage (Firefox doesn't have CDP bridge)
+        try {
+          if (request.key) {
+            await browser.storage.local.set({ [request.key]: request.value });
+          }
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      // =======================================================================
+      // API Key Management
+      // =======================================================================
+      case 'apikey.save': {
+        try {
+          await browser.storage.local.set({ [`apikey_${request.provider}`]: request.apiKey });
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'apikey.get': {
+        try {
+          const key = `apikey_${request.provider}`;
+          const stored = await browser.storage.local.get([key]);
+          sendResponse({ success: true, apiKey: stored[key] || null });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'apikey.list': {
+        try {
+          const all = await browser.storage.local.get(null);
+          const keys: { provider: string; hasKey: boolean }[] = [];
+          for (const [k] of Object.entries(all)) {
+            if (k.startsWith('apikey_')) {
+              keys.push({ provider: k.replace('apikey_', ''), hasKey: true });
+            }
+          }
+          sendResponse({ success: true, keys });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      // =======================================================================
+      // Organization Switcher
+      // =======================================================================
+      case 'org.list': {
+        try {
+          const token = await getValidAccessToken();
+          if (!token) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
+
+          const resp = await fetch(`${IAM_API}/api/get-account`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(5000),
+          });
+          if (!resp.ok) throw new Error(`IAM: ${resp.status}`);
+          const data = await resp.json();
+          const user = data.data || data;
+
+          const orgs: { id: string; name: string; displayName?: string }[] = [];
+          if (user.owner) {
+            orgs.push({ id: user.owner, name: user.owner, displayName: user.owner });
+          }
+          try {
+            const orgsResp = await fetch(`${IAM_API}/api/get-organizations`, {
+              headers: { Authorization: `Bearer ${token}` },
+              signal: AbortSignal.timeout(5000),
+            });
+            if (orgsResp.ok) {
+              const orgsData = await orgsResp.json();
+              for (const org of (orgsData.data || orgsData || [])) {
+                if (!orgs.find(o => o.id === org.name)) {
+                  orgs.push({ id: org.name, name: org.name, displayName: org.displayName || org.name });
+                }
+              }
+            }
+          } catch { /* user may not have permission */ }
+
+          const stored = await browser.storage.local.get(['activeOrgId']);
+          sendResponse({
+            success: true,
+            orgs,
+            activeOrgId: stored.activeOrgId || orgs[0]?.id || null,
+            user: { name: user.displayName || user.name, email: user.email, avatar: user.avatar },
+          });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'org.switch': {
+        try {
+          await browser.storage.local.set({ activeOrgId: request.orgId });
+          sendResponse({ success: true, activeOrgId: request.orgId });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      // =======================================================================
+      // Model Hub (portable — pure HTTP/fetch)
+      // =======================================================================
+      case 'hub.search': {
+        try {
+          const query = encodeURIComponent(request.query || '');
+          const limit = request.limit || 10;
+          const resp = await fetch(
+            `https://huggingface.co/api/models?search=${query}&limit=${limit}&sort=downloads&direction=-1`,
+            { signal: AbortSignal.timeout(10000) },
+          );
+          if (!resp.ok) throw new Error(`HuggingFace ${resp.status}`);
+          sendResponse({ success: true, models: await resp.json() });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'hub.model': {
+        try {
+          const resp = await fetch(`https://huggingface.co/api/models/${request.modelId}`, { signal: AbortSignal.timeout(10000) });
+          if (!resp.ok) throw new Error(`HuggingFace ${resp.status}`);
+          sendResponse({ success: true, model: await resp.json() });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'hub.recommended':
+        sendResponse({ success: true, models: [] });
+        break;
+
+      case 'hub.searchOllama': {
+        try {
+          // Ollama library search — use their API
+          const resp = await fetch(`https://ollama.com/api/tags?q=${encodeURIComponent(request.query || '')}`, { signal: AbortSignal.timeout(10000) });
+          if (resp.ok) {
+            sendResponse({ success: true, models: await resp.json() });
+          } else {
+            sendResponse({ success: true, models: [] });
+          }
+        } catch {
+          sendResponse({ success: true, models: [] });
+        }
+        break;
+      }
+
+      case 'hub.searchGGUF':
+      case 'hub.searchMLX':
+      case 'hub.modelCard':
+      case 'hub.modelStats':
+      case 'hub.allModels':
+        // Stub — these need the model-hub module which isn't bundled for Firefox yet
+        sendResponse({ success: true, models: [], card: null, stats: null, cloud: [], local: [], recommended: [] });
+        break;
+
+      case 'hub.downloadOllama': {
+        try {
+          const stored = await browser.storage.local.get(['ollamaUrl']);
+          const url = stored.ollamaUrl || 'http://localhost:11434';
+          fetch(`${url}/api/pull`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: request.modelName, stream: false }),
+          }).catch(() => {});
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      // =======================================================================
+      // Element Selected (forward to ZAP-connected MCPs)
+      // =======================================================================
+      case 'elementSelected': {
+        if (zapMgr.state.connected) {
+          for (const [mcpId] of zapMgr.connections) {
+            zapRequest(zapMgr, mcpId, 'notifications/elementSelected', request.data || {}).catch(() => {});
+          }
+        }
+        sendResponse({ success: true });
+        break;
+      }
+
+      // =======================================================================
+      // Page Overlay (forwarded to content script)
+      // =======================================================================
+      case 'page.overlay.toggle':
+      case 'page.overlay.show':
+      case 'page.overlay.hide':
+      case 'page.overlay.status': {
+        try {
+          const tabId = typeof request.tabId === 'number'
+            ? request.tabId
+            : (sender?.tab?.id ?? await hanzoExtension.getActiveTabId());
+          if (!tabId) {
+            sendResponse({ success: false, error: 'No target tab found' });
+            break;
+          }
+          const response = await browser.tabs.sendMessage(tabId, { action: request.action }).catch(() => ({}));
+          sendResponse({ success: true, tabId, ...(response || {}) });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      // =======================================================================
+      // Takeover (control session management)
+      // =======================================================================
+      case 'hanzo.takeover.start': {
+        const takeoverTabId = request.tabId || controlSession.tabId || await hanzoExtension.getActiveTabId();
+        if (!takeoverTabId) {
+          sendResponse({ success: false, error: 'No target tab found' });
+          break;
+        }
+        await hanzoExtension.startControlSession(takeoverTabId, request.task);
+        sendResponse({ success: true });
+        break;
+      }
+
+      case 'hanzo.takeover.end': {
+        await hanzoExtension.stopControlSession();
+        sendResponse({ success: true });
+        break;
+      }
+
+      case 'hanzo.takeover.cursor': {
+        const cursorTabId = controlSession.tabId || await hanzoExtension.getActiveTabId();
+        if (cursorTabId) {
+          browser.tabs.sendMessage(cursorTabId, {
+            action: 'ai.control.cursor',
+            x: request.x,
+            y: request.y,
+          }).catch(() => {});
+        }
+        sendResponse({ success: true });
+        break;
+      }
+
+      // =======================================================================
+      // Bridge & Usage
+      // =======================================================================
       case 'bridge.status': {
         const bridgeConnected = hanzoExtension.isBridgeConnected();
         sendResponse({
@@ -1723,85 +2098,17 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         break;
       }
 
-      case 'zap.status': {
-        sendResponse({
-          success: true,
-          zap: {
-            connected: zapState.connected,
-            mcps: zapState.mcps.map(m => ({
-              id: m.id,
-              name: m.name,
-              url: m.url,
-              toolCount: m.tools.length,
-            })),
-          },
-        });
-        break;
-      }
-
-      case 'zap.discover': {
-        discoverZapServers().then(() => {
-          sendResponse({
-            success: true,
-            mcps: zapState.mcps.map(m => ({
-              id: m.id,
-              name: m.name,
-              url: m.url,
-              tools: m.tools,
-            })),
-          });
-        }).catch((e: any) => {
-          sendResponse({ success: false, error: e.message });
-        });
-        break;
-      }
-
-      case 'zap.connect': {
-        if (!request.url) {
-          sendResponse({ success: false, error: 'Missing url' });
-          break;
-        }
-        connectZap(request.url).then((mcpId: string | null) => {
-          sendResponse({ success: !!mcpId, mcpId });
-        }).catch((e: any) => {
-          sendResponse({ success: false, error: e.message });
-        });
-        break;
-      }
-
-      case 'zap.listTools': {
-        const tools = zapState.mcps.flatMap(m =>
-          m.tools.map(t => ({ name: t, mcpId: m.id, mcpName: m.name }))
-        );
-        sendResponse({ success: true, tools });
-        break;
-      }
-
-      case 'zap.callTool': {
-        const { tool: toolName, args: toolArgs, mcpId } = request;
-        if (!toolName) {
-          sendResponse({ success: false, error: 'Missing tool name' });
-          break;
-        }
-        zapCallTool(toolName, toolArgs || {}, mcpId).then((result: any) => {
-          sendResponse({ success: true, result });
-        }).catch((e: any) => {
-          sendResponse({ success: false, error: e.message });
-        });
-        break;
-      }
-
-      case 'usage.metrics': {
+      case 'usage.metrics':
         sendResponse({ success: true, metrics: { chatRequests: 0, inputTokens: 0, outputTokens: 0, dedupeHits: 0, canceledRequests: 0 } });
         break;
-      }
 
-      case 'inspector.pickResult': {
-        // Forward to sidebar — broadcast to all extension pages
+      case 'inspector.pickResult':
         sendResponse({ success: true });
         break;
-      }
 
+      // =======================================================================
+      // AI Control Overlay (forwarded to content script)
+      // =======================================================================
       case 'ai.control.start':
       case 'ai.control.cursor':
       case 'ai.control.highlight':
@@ -1811,12 +2118,10 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
           sendResponse({ success: false, error: 'No target tab found' });
           break;
         }
-
         if (request.action !== 'ai.control.start' && controlSession.active && controlSession.tabId && targetTabId !== controlSession.tabId) {
           sendResponse({ success: false, error: `Control locked to tab ${controlSession.tabId}` });
           break;
         }
-
         if (request.action === 'ai.control.start') {
           await hanzoExtension.startControlSession(targetTabId, request.task);
         } else {
@@ -1832,9 +2137,56 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         break;
 
       case 'ai.control.cancel':
-        // User clicked Stop — end local control session
         await hanzoExtension.stopControlSession();
         sendResponse({ success: true });
+        break;
+
+      // =======================================================================
+      // CDP-specific stubs (not available in Firefox — chrome.debugger is Chrome-only)
+      // =======================================================================
+      case 'cdp.attach':
+      case 'cdp.detach':
+      case 'cdp.send':
+      case 'cdp.screenshot':
+      case 'cdp.click':
+      case 'cdp.fill':
+      case 'cdp.navigate':
+      case 'cdp.evaluate':
+        sendResponse({ success: false, error: 'CDP debugger is not available in Firefox. Use browser automation methods instead.' });
+        break;
+
+      // Monitor stubs (CDP-dependent in Chrome, limited in Firefox)
+      case 'monitor.start':
+      case 'monitor.stop':
+      case 'monitor.consoleLogs':
+      case 'monitor.consoleErrors':
+      case 'monitor.networkLogs':
+      case 'monitor.networkErrors':
+      case 'monitor.networkSuccess':
+      case 'monitor.allNetwork':
+      case 'monitor.wipeLogs':
+      case 'monitor.config':
+      case 'monitor.status':
+        sendResponse({ success: false, error: 'Page monitoring requires CDP (Chrome DevTools Protocol) which is not available in Firefox.' });
+        break;
+
+      // Audit stubs
+      case 'audit.accessibility':
+      case 'audit.performance':
+      case 'audit.seo':
+      case 'audit.bestPractices':
+      case 'audit.full':
+      case 'audit.nextjs':
+      case 'audit.debugger':
+      case 'debugger.mode':
+        sendResponse({ success: false, error: 'Page audits require CDP which is not available in Firefox.' });
+        break;
+
+      // Tab filesystem (requires CDP bridge)
+      case 'readTabFS':
+      case 'writeTabFS':
+      case 'listTabFS':
+        sendResponse({ success: false, error: 'Tab filesystem requires CDP bridge.' });
         break;
 
       default:
@@ -1845,7 +2197,10 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
   return true; // Keep channel open
 });
 
-// Initialize extension (no export - Firefox doesn't support ES modules in background)
+// =============================================================================
+// Initialization
+// =============================================================================
+
 const hanzoExtension = new HanzoFirefoxExtension();
 
 // End active session when the controlled tab closes.
