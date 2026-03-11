@@ -39,6 +39,11 @@ export const STORAGE_KEYS = {
 /** Cloud API base — override via storage key 'hanzo_config_api_base' */
 export const API_BASE_URL = 'https://api.hanzo.ai';
 
+// ── KMS (Secrets Management) ──────────────────────────────────────────
+
+/** KMS API base — override via storage key 'hanzo_config_kms_url' */
+export const KMS_API_URL = 'https://kms.hanzo.ai';
+
 // ── Local Provider Defaults ────────────────────────────────────────────
 
 export const LOCAL_PROVIDER_DEFAULTS = {
@@ -79,6 +84,7 @@ export interface RuntimeConfig {
   iamLoginUrl: string;
   iamApiUrl: string;
   apiBaseUrl: string;
+  kmsApiUrl: string;
   clientId: string;
   scopes: string;
   redirectUri: string;
@@ -89,6 +95,7 @@ const CONFIG_STORAGE_MAP: Record<keyof RuntimeConfig, { key: string; fallback: s
   iamLoginUrl: { key: 'hanzo_config_iam_login_url', fallback: IAM_LOGIN_URL },
   iamApiUrl: { key: 'hanzo_config_iam_api_url', fallback: IAM_API_URL },
   apiBaseUrl: { key: 'hanzo_config_api_base', fallback: API_BASE_URL },
+  kmsApiUrl: { key: 'hanzo_config_kms_url', fallback: KMS_API_URL },
   clientId: { key: 'hanzo_config_client_id', fallback: DEFAULT_CLIENT_ID },
   scopes: { key: 'hanzo_config_scopes', fallback: DEFAULT_SCOPES },
   redirectUri: { key: 'hanzo_config_redirect_uri', fallback: DEFAULT_REDIRECT_URI },
