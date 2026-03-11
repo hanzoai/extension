@@ -273,6 +273,74 @@ h3 {
   color: var(--text-dim);
 }
 
+/* Tools Grid */
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 4px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.tool-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.tool-btn:hover {
+  color: var(--text);
+  background: var(--glass-strong);
+  border-color: var(--border-strong);
+}
+
+.tool-btn:active {
+  transform: scale(0.96);
+}
+
+.tool-btn.active {
+  color: var(--text);
+  background: rgba(255,255,255,0.1);
+  border-color: var(--text);
+  box-shadow: 0 0 8px rgba(255,255,255,0.06);
+}
+
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tool-btn .tool-feedback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(76, 175, 80, 0.9);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 7px;
+  animation: fadeIn 0.15s ease;
+}
+
 /* Features — compact toggles */
 .features {
   display: flex;
