@@ -316,6 +316,7 @@
     "build:npm": "node scripts/build-mcp-npm.js",
     "build:cursor": "node scripts/build-cursor.js",
     "build:windsurf": "node scripts/build-windsurf.js",
+    "build:antigravity": "node scripts/build-antigravity.js",
     "build:all": "node scripts/build-all-platforms.js",
     "build:browser-extension": "node src/browser-extension/build.js",
     "package": "npm run build:all && vsce package --no-dependencies",
