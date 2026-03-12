@@ -58,20 +58,22 @@ jobs:
     - name: Package
       working-directory: packages/browser
       run: |
-        cd dist/browser-extension/chrome && zip -r ../../../hanzo-ai-chrome.zip .
-        cd ../../browser-extension/firefox && zip -r ../../../hanzo-ai-firefox.zip .
+        VERSION=$(node -p "require('./package.json').version")
+        cd dist/browser-extension/chrome && zip -r ../../../hanzo-ai-chrome-v${VERSION}.zip .
+        cd ../../browser-extension/firefox && zip -r ../../../hanzo-ai-firefox-v${VERSION}.zip .
+        cd ../../browser-extension/safari && zip -r ../../../hanzo-ai-safari-v${VERSION}.zip .
+        # Edge uses Chrome zip (Chromium-compatible)
+        cd ../../.. && cp hanzo-ai-chrome-v${VERSION}.zip hanzo-ai-edge-v${VERSION}.zip
 
-    - name: Upload Chrome zip
+    - name: Upload browser zips
       uses: actions/upload-artifact@v4
       with:
-        name: hanzo-ai-chrome
-        path: packages/browser/dist/hanzo-ai-chrome.zip
-
-    - name: Upload Firefox zip
-      uses: actions/upload-artifact@v4
-      with:
-        name: hanzo-ai-firefox
-        path: packages/browser/dist/hanzo-ai-firefox.zip
+        name: hanzo-ai-browser
+        path: |
+          packages/browser/dist/hanzo-ai-chrome-v*.zip
+          packages/browser/dist/hanzo-ai-edge-v*.zip
+          packages/browser/dist/hanzo-ai-firefox-v*.zip
+          packages/browser/dist/hanzo-ai-safari-v*.zip
 
     - name: Lint Firefox
       working-directory: packages/browser
@@ -147,7 +149,7 @@ jobs:
           -derivedDataPath dist/safari-build-ios
       continue-on-error: true
 
-  # ─── VS Code + Cursor + Windsurf + Open VSX ───
+  # ─── VS Code + Cursor + Windsurf + Antigravity + Open VSX ───
   vscode:
     name: VS Code Marketplace
     runs-on: ubuntu-latest
@@ -172,11 +174,29 @@ jobs:
       working-directory: packages/vscode
       run: vsce package --no-dependencies
 
-    - name: Upload VSIX
+    - name: Package DXT
+      working-directory: packages/vscode
+      run: npm run package:dxt
+
+    - name: Prepare release artifacts
+      working-directory: packages/vscode
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        mkdir -p release-assets
+        # VS Code / Cursor / Windsurf / Antigravity are identical VSIX, named per IDE
+        VSIX=$(ls *.vsix | head -1)
+        cp "$VSIX" "release-assets/hanzo-ai-vscode-v${VERSION}.vsix"
+        cp "$VSIX" "release-assets/hanzo-ai-cursor-v${VERSION}.vsix"
+        cp "$VSIX" "release-assets/hanzo-ai-windsurf-v${VERSION}.vsix"
+        cp "$VSIX" "release-assets/hanzo-ai-antigravity-v${VERSION}.vsix"
+        # DXT for Claude Code/Desktop
+        cp dist/hanzoai-${VERSION}.dxt "release-assets/hanzo-ai-claude-v${VERSION}.dxt" || true
+
+    - name: Upload IDE artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: hanzo-ai-vscode
-        path: packages/vscode/*.vsix
+        name: hanzo-ai-ide
+        path: packages/vscode/release-assets/*
 
     - name: Publish to VS Code Marketplace
       if: needs.secrets.outputs.has-vsce == 'true'
@@ -246,11 +266,40 @@ jobs:
       with:
         path: artifacts
 
+    - name: Determine version
+      id: version
+      run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        generate_release_notes: true
+        generate_release_notes: false
+        body: |
+          ## IDE Extensions
+
+          | IDE | Platform | Download |
+          |-----|----------|----------|
+          | **VS Code** | Windows / macOS / Linux | [`hanzo-ai-vscode-v${{ steps.version.outputs.version }}.vsix`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-vscode-v${{ steps.version.outputs.version }}.vsix) |
+          | **Cursor** | Windows / macOS / Linux | [`hanzo-ai-cursor-v${{ steps.version.outputs.version }}.vsix`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-cursor-v${{ steps.version.outputs.version }}.vsix) |
+          | **Windsurf** | Windows / macOS / Linux | [`hanzo-ai-windsurf-v${{ steps.version.outputs.version }}.vsix`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-windsurf-v${{ steps.version.outputs.version }}.vsix) |
+          | **Antigravity** | Windows / macOS / Linux | [`hanzo-ai-antigravity-v${{ steps.version.outputs.version }}.vsix`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-antigravity-v${{ steps.version.outputs.version }}.vsix) |
+          | **Claude Desktop/Code** | Windows / macOS / Linux | [`hanzo-ai-claude-v${{ steps.version.outputs.version }}.dxt`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-claude-v${{ steps.version.outputs.version }}.dxt) |
+          | **JetBrains** | Windows / macOS / Linux | [`hanzo-ai-jetbrains-v${{ steps.version.outputs.version }}.zip`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-jetbrains-v${{ steps.version.outputs.version }}.zip) |
+
+          ## Browser Extensions
+
+          | Browser | Platform | Download |
+          |---------|----------|----------|
+          | **Chrome** | Windows / macOS / Linux | [`hanzo-ai-chrome-v${{ steps.version.outputs.version }}.zip`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-chrome-v${{ steps.version.outputs.version }}.zip) |
+          | **Edge** | Windows / macOS / Linux | [`hanzo-ai-edge-v${{ steps.version.outputs.version }}.zip`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-edge-v${{ steps.version.outputs.version }}.zip) |
+          | **Firefox** | Windows / macOS / Linux | [`hanzo-ai-firefox-v${{ steps.version.outputs.version }}.zip`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-firefox-v${{ steps.version.outputs.version }}.zip) |
+          | **Safari** | macOS / iOS | [`hanzo-ai-safari-v${{ steps.version.outputs.version }}.zip`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-safari-v${{ steps.version.outputs.version }}.zip) |
+
+          > Chrome zip also works for Brave, Opera, Vivaldi, Arc.
+          > Cursor, Windsurf, and Antigravity use the VS Code VSIX format.
+
+          **Install**: `code --install-extension hanzo-ai-vscode-v${{ steps.version.outputs.version }}.vsix`
+          **Antigravity**: `antigravity --install-extension hanzo-ai-antigravity-v${{ steps.version.outputs.version }}.vsix`
         files: |
-          artifacts/hanzo-ai-chrome/hanzo-ai-chrome.zip
-          artifacts/hanzo-ai-firefox/hanzo-ai-firefox.zip
-          artifacts/hanzo-ai-vscode/*.vsix
+          artifacts/hanzo-ai-browser/*
+          artifacts/hanzo-ai-ide/*

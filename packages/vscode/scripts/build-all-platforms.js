@@ -34,6 +34,12 @@ const PLATFORMS = {
     buildCmd: 'npm run build:windsurf',
     outputDir: 'dist/windsurf',
     package: true
+  },
+  'antigravity': {
+    name: 'Google Antigravity Extension',
+    buildCmd: 'npm run build:antigravity',
+    outputDir: 'dist/antigravity',
+    package: true
   }
 };
 
@@ -54,7 +60,7 @@ async function buildAllPlatforms() {
     
     try {
       // Skip if build command doesn't exist yet
-      if (platform === 'cursor' || platform === 'windsurf') {
+      if (platform === 'cursor' || platform === 'windsurf' || platform === 'antigravity') {
         if (!fs.existsSync(`scripts/build-${platform}.js`)) {
           console.log(`   ⏭️  Skipped (build script not implemented yet)`);
           continue;
