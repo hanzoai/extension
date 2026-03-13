@@ -13,6 +13,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
 // Export types
@@ -21,11 +23,16 @@ export * from './types/index.js';
 // Export tools
 export * from './tools/index.js';
 
+// Export UI tools
+export * from './ui/index.js';
+
 // Export prompts
 export { getSystemPrompt } from './prompts/system.js';
 
-// Import Tool type for use in the function signature
+// Import Tool type and tool configuration for use in function signatures
 import { Tool } from './types/index.js';
+import { ToolConfig } from './tools/index.js';
+import { startZapServer } from './zap-server.js';
 
 // Main server factory
 export async function createMCPServer(config?: {
@@ -33,23 +40,26 @@ export async function createMCPServer(config?: {
   version?: string;
   projectPath?: string;
   customTools?: Tool[];
+  toolConfig?: ToolConfig;
 }) {
   const { 
     name = 'hanzo-mcp',
     version = '1.0.0',
     projectPath = process.cwd(),
-    customTools = []
+    customTools = [],
+    toolConfig = { enableCore: true, enableUI: false }
   } = config || {};
   
-  // Import tools and mode utils
-  const { getAllRegisteredTools, modeUtils } = await import('./tools/index.js');
+  // Import tools
+  const { getConfiguredTools } = await import('./tools/index.js');
   
-  // Get all registered tools
-  const allTools = getAllRegisteredTools();
+  // Get configured tools based on toolConfig
+  const configuredTools = getConfiguredTools({
+    ...toolConfig,
+    customTools: [...(toolConfig.customTools || []), ...customTools]
+  });
   
-  // Combine built-in and custom tools
-  const combinedTools = [...allTools, ...customTools];
-  const combinedToolMap = new Map(combinedTools.map(t => [t.name, t]));
+  const combinedToolMap = new Map(configuredTools.map(t => [t.name, t]));
   
   const server = new Server(
     { name, version },
@@ -61,85 +71,114 @@ export async function createMCPServer(config?: {
     }
   );
   
-  // Handle tool listing with mode filtering
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    // Get available tools based on current mode
-    const availableToolNames = modeUtils.getAvailableTools();
-    const filteredTools = combinedTools.filter(tool => 
-      availableToolNames.includes(tool.name) || 
-      // Always include mode/preset management tools
-      ['mode_switch', 'mode_list', 'preset_select', 'preset_list'].includes(tool.name)
-    );
-    
-    return {
-      tools: filteredTools.map(tool => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema
-      }))
-    };
+  // ── MCP method handlers (shared between MCP + ZAP for full parity) ────
+
+  const listToolsHandler = async () => ({
+    tools: configuredTools.map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+    })),
   });
-  
-  // Handle tool execution with mode checking
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const tool = combinedToolMap.get(request.params.name);
-    
+
+  const callToolHandler = async (params: { name: string; arguments?: Record<string, unknown> }) => {
+    const tool = combinedToolMap.get(params.name);
     if (!tool) {
       return {
-        content: [{
-          type: 'text',
-          text: `Unknown tool: ${request.params.name}`
-        }],
-        isError: true
+        content: [{ type: 'text', text: `Unknown tool: ${params.name}` }],
+        isError: true,
       };
     }
-    
-    // Check if tool is available in current mode
-    const modeManagementTools = ['mode_switch', 'mode_list', 'preset_select', 'preset_list', 'mode_create', 'shortcut'];
-    if (!modeManagementTools.includes(tool.name) && !modeUtils.isToolAvailable(tool.name)) {
-      const currentMode = modeUtils.getCurrentMode();
-      return {
-        content: [{
-          type: 'text',
-          text: `Tool '${tool.name}' is not available in ${currentMode.name} mode. Switch modes with 'mode_switch' or use 'mode_list' to see available modes.`
-        }],
-        isError: true
-      };
-    }
-    
     try {
-      const result = await tool.handler(request.params.arguments || {});
-      return result;
+      return await tool.handler(params.arguments || {});
     } catch (error: any) {
       return {
-        content: [{
-          type: 'text',
-          text: `Error executing ${tool.name}: ${error.message}`
-        }],
-        isError: true
+        content: [{ type: 'text', text: `Error executing ${tool.name}: ${error.message}` }],
+        isError: true,
       };
     }
+  };
+
+  const listResourcesHandler = async () => ({
+    resources: [{
+      uri: 'hanzo://system-prompt',
+      name: 'System Prompt',
+      mimeType: 'text/plain',
+      description: 'Hanzo MCP system prompt and context',
+    }],
   });
+
+  const readResourceHandler = async (params: { uri: string }) => {
+    if (params.uri === 'hanzo://system-prompt') {
+      const { getSystemPrompt: getSysPrompt } = await import('./prompts/system.js');
+      const systemPrompt = await getSysPrompt(projectPath);
+      return {
+        contents: [{ uri: params.uri, mimeType: 'text/plain', text: systemPrompt }],
+      };
+    }
+    return {
+      contents: [{ uri: params.uri, mimeType: 'text/plain', text: 'Resource not found' }],
+    };
+  };
+
+  // Method dispatch map — used by ZAP pass-through for full protocol parity
+  const methodHandlers: Record<string, (params: any) => Promise<any>> = {
+    'tools/list': listToolsHandler,
+    'tools/call': (params: any) => callToolHandler(params),
+    'resources/list': listResourcesHandler,
+    'resources/read': (params: any) => readResourceHandler(params),
+  };
+
+  // Register with MCP server
+  server.setRequestHandler(ListToolsRequestSchema, listToolsHandler);
+  server.setRequestHandler(CallToolRequestSchema, async (request) => callToolHandler(request.params));
+  server.setRequestHandler(ListResourcesRequestSchema, listResourcesHandler);
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => readResourceHandler(request.params));
   
   return {
     server,
-    tools: combinedTools,
+    tools: configuredTools,
     
     async start() {
+      // Start ZAP server for browser extension discovery
+      // ZAP is a binary transport for MCP — full protocol parity via handleMethod pass-through
+      const zapServer = await startZapServer({
+        tools: configuredTools,
+        name,
+        callTool: async (toolName, args) => {
+          const tool = combinedToolMap.get(toolName);
+          if (!tool) throw new Error(`Unknown tool: ${toolName}`);
+          return tool.handler(args);
+        },
+        // Pass-through for ALL MCP methods not handled by ZAP's built-in switch
+        // This ensures resources/*, prompts/*, and any future methods work over ZAP
+        handleMethod: async (method, params) => {
+          const handler = methodHandlers[method];
+          if (handler) return handler(params || {});
+          throw new Error(`Unsupported method: ${method}`);
+        },
+      }).catch((err) => {
+        console.error(`[ZAP] Failed to start: ${err.message}`);
+        return null;
+      });
+
       const transport = new StdioServerTransport();
       await server.connect(transport);
-      console.error(`${name} MCP server started with ${combinedTools.length} tools`);
+      console.error(`${name} MCP server started with ${configuredTools.length} tools`);
+      if (zapServer) {
+        console.error(`[ZAP] Browser extensions can discover this server on port ${zapServer.port}`);
+      }
     },
     
     addTool(tool: Tool) {
-      combinedTools.push(tool);
+      configuredTools.push(tool);
       combinedToolMap.set(tool.name, tool);
     },
     
     removeTool(name: string) {
-      const index = combinedTools.findIndex(t => t.name === name);
+      const index = configuredTools.findIndex(t => t.name === name);
       if (index >= 0) {
-        combinedTools.splice(index, 1);
+        configuredTools.splice(index, 1);
         combinedToolMap.delete(name);
       }
     }
