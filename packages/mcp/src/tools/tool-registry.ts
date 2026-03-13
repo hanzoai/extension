@@ -2,7 +2,7 @@
  * Central tool registry to avoid circular dependencies
  */
 
-import { Tool } from '../types';
+import { Tool } from '../types/index.js';
 
 // Registry that will be populated by each tool module
 export const toolRegistry = new Map<string, Tool>();
