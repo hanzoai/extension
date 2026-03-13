@@ -28,7 +28,7 @@
 
 body {
   width: 360px;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
+  font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
   font-size: 13px;
@@ -500,7 +500,7 @@ kbd {
   background: rgba(255,255,255,0.06);
   border: 1px solid var(--border);
   border-radius: 3px;
-  font-family: 'SF Mono', 'Menlo', monospace;
+  font-family: 'Geist Mono', 'Menlo', monospace;
   font-size: 10px;
 }
 
