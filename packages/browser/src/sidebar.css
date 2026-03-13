@@ -34,7 +34,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
+  font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 13px;
@@ -523,13 +523,13 @@ html {
   padding: 10px 12px;
   margin: 8px 0;
   overflow-x: auto;
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-family: 'Geist Mono', 'Monaco', 'Consolas', monospace;
   font-size: 12px;
   line-height: 1.4;
 }
 
 .msg-assistant code {
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-family: 'Geist Mono', 'Monaco', 'Consolas', monospace;
   font-size: 12px;
   background: rgba(255,255,255,0.06);
   padding: 2px 5px;
@@ -964,7 +964,7 @@ html {
 }
 
 .mono {
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-family: 'Geist Mono', 'Monaco', 'Consolas', monospace;
   font-size: 11px;
 }
 
@@ -1036,7 +1036,7 @@ html {
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 11px;
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-family: 'Geist Mono', 'Monaco', 'Consolas', monospace;
   color: var(--text-secondary);
   max-height: 200px;
   overflow-y: auto;
@@ -1100,7 +1100,7 @@ html {
   font-size: 11px;
   line-height: 1.4;
   color: var(--text-tertiary);
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-family: 'Geist Mono', 'Monaco', 'Consolas', monospace;
   white-space: pre-wrap;
   word-break: break-all;
   scrollbar-width: thin;
@@ -1248,7 +1248,7 @@ html {
 .tab-filesystem {
   max-height: 240px;
   overflow-y: auto;
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-family: 'Geist Mono', 'Monaco', 'Consolas', monospace;
   font-size: 12px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.08) transparent;
@@ -1661,7 +1661,7 @@ select option {
 }
 
 .usage-meter-header .mono {
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: 'Geist Mono', monospace;
   font-size: 11px;
   color: var(--text-primary);
 }
