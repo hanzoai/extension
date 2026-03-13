@@ -1,482 +1,248 @@
 /**
- * AST-based search tools for code intelligence
+ * AST tool — single tool, action-routed code intelligence
+ * search, find_symbol, dependencies, outline, metrics, exports, types, calls, hierarchy
  */
 
-import { Tool, ToolResult } from '../types';
+import { Tool } from '../types/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
-import Parser from 'web-tree-sitter';
 
-// Initialize parsers for different languages
-let parsersInitialized = false;
-const parsers: Map<string, Parser> = new Map();
-const languageMap: Map<string, Parser.Language> = new Map();
+const PATTERNS: Record<string, RegExp[]> = {
+  function_declaration: [/function\s+(\w+)\s*\(/, /def\s+(\w+)\s*\(/, /fn\s+(\w+)\s*\(/, /func\s+(\w+)\s*\(/],
+  class_definition: [/class\s+(\w+)/, /struct\s+(\w+)/, /interface\s+(\w+)/],
+  method_call: [/(\w+)\s*\.\s*(\w+)\s*\(/, /(\w+)::\s*(\w+)\s*\(/],
+  import_statement: [/import\s+.+\s+from\s+['"]/, /import\s+['"]/, /require\s*\(['"]/, /use\s+\w+/, /import\s+\w+/],
+  variable_declaration: [/(let|const|var)\s+(\w+)/, /(\w+)\s*:=\s*/, /let\s+(mut\s+)?(\w+)/],
+  type_definition: [/type\s+(\w+)\s*=/, /interface\s+(\w+)/, /enum\s+(\w+)/, /typedef\s+/],
+  decorator: [/@\w+/, /#\[\w+/],
+  export_statement: [/export\s+(default\s+)?(function|class|const|let|var|type|interface|enum)\s+(\w+)/]
+};
 
-async function initializeParsers() {
-  if (parsersInitialized) return;
-  
-  await Parser.init();
-  
-  // Load language grammars
-  const languages = [
-    { ext: ['js', 'mjs'], name: 'javascript', wasmPath: 'tree-sitter-javascript.wasm' },
-    { ext: ['ts', 'tsx'], name: 'typescript', wasmPath: 'tree-sitter-typescript.wasm' },
-    { ext: ['py'], name: 'python', wasmPath: 'tree-sitter-python.wasm' },
-    { ext: ['rs'], name: 'rust', wasmPath: 'tree-sitter-rust.wasm' },
-    { ext: ['go'], name: 'go', wasmPath: 'tree-sitter-go.wasm' },
-  ];
-  
-  // Note: In production, you'd load the actual WASM files
-  // For now, we'll use a simplified approach
-  parsersInitialized = true;
+async function getFiles(p: string, pattern?: string): Promise<string[]> {
+  const s = await fs.stat(p).catch(() => null);
+  if (s?.isFile()) return [p];
+  const pats = pattern ? [pattern] : ['**/*.js', '**/*.ts', '**/*.tsx', '**/*.py', '**/*.rs', '**/*.go', '**/*.java', '**/*.rb', '**/*.php', '**/*.c', '**/*.cpp', '**/*.h'];
+  const files: string[] = [];
+  for (const pat of pats)
+    files.push(...await glob(path.join(p, pat), { ignore: ['**/node_modules/**', '**/dist/**', '**/.git/**', '**/target/**', '**/build/**'], maxDepth: 10 }));
+  return files;
 }
 
-function getLanguageFromFile(filePath: string): string | null {
-  const ext = path.extname(filePath).slice(1);
-  const langMap: Record<string, string> = {
-    'js': 'javascript',
-    'mjs': 'javascript',
-    'ts': 'typescript',
-    'tsx': 'typescript',
-    'py': 'python',
-    'rs': 'rust',
-    'go': 'go',
-    'java': 'java',
-    'cpp': 'cpp',
-    'c': 'c',
-    'rb': 'ruby',
-    'php': 'php',
-  };
-  return langMap[ext] || null;
-}
-
-export const astSearchTool: Tool = {
-  name: 'ast_search',
-  description: 'Search code using Abstract Syntax Tree patterns',
+export const astTool: Tool = {
+  name: 'ast',
+  description: 'Code intelligence: search patterns, find symbols, analyze dependencies, outline file structure, metrics, list exports/types/calls, class hierarchy',
   inputSchema: {
     type: 'object',
     properties: {
-      pattern: {
-        type: 'string',
-        description: 'AST pattern to search for (e.g., "function_declaration", "class_definition")'
-      },
-      path: {
-        type: 'string',
-        description: 'Directory or file to search',
-        default: '.'
-      },
-      language: {
-        type: 'string',
-        description: 'Programming language (auto-detected if not specified)'
-      },
-      maxResults: {
-        type: 'number',
-        description: 'Maximum number of results',
-        default: 50
-      },
-      includeContext: {
-        type: 'boolean',
-        description: 'Include surrounding context',
-        default: true
-      }
+      action: { type: 'string', enum: [
+        'search', 'find_symbol', 'dependencies',
+        'outline', 'metrics', 'exports', 'types', 'calls', 'hierarchy'
+      ], description: 'AST action' },
+      pattern: { type: 'string', description: 'AST pattern (function_declaration, class_definition, etc.) or regex' },
+      symbol: { type: 'string', description: 'Symbol name to find' },
+      type: { type: 'string', enum: ['all', 'function', 'class', 'variable', 'method', 'type'], default: 'all' },
+      path: { type: 'string', default: '.' },
+      file: { type: 'string', description: 'Specific file (outline, metrics)' },
+      filePattern: { type: 'string', description: 'File glob filter (e.g., "**/*.ts")' },
+      exact: { type: 'boolean', default: false },
+      maxResults: { type: 'number', default: 50 },
+      showExternal: { type: 'boolean', default: true },
+      showInternal: { type: 'boolean', default: true },
+      depth: { type: 'number', description: 'Hierarchy depth', default: 3 }
     },
-    required: ['pattern']
+    required: ['action']
   },
   handler: async (args) => {
     try {
-      await initializeParsers();
-      
       const results: string[] = [];
-      const searchPath = args.path || '.';
-      
-      // Get files to search
-      let files: string[] = [];
-      const stat = await fs.stat(searchPath).catch(() => null);
-      
-      if (stat && stat.isFile()) {
-        files = [searchPath];
-      } else {
-        // Search for source files
-        const patterns = ['**/*.js', '**/*.ts', '**/*.tsx', '**/*.py', '**/*.rs', '**/*.go'];
-        for (const pattern of patterns) {
-          const matched = await glob(path.join(searchPath, pattern), {
-            ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
-            maxDepth: 10
-          });
-          files.push(...matched);
-        }
-      }
-      
-      // Search each file
-      for (const file of files.slice(0, args.maxResults || 50)) {
-        const content = await fs.readFile(file, 'utf-8');
-        const language = args.language || getLanguageFromFile(file);
-        
-        if (!language) continue;
-        
-        // Simple pattern matching for now
-        // In a full implementation, you'd use tree-sitter queries
-        const matches = searchASTPattern(content, args.pattern, language);
-        
-        if (matches.length > 0) {
-          results.push(`\n=== ${file} ===`);
-          for (const match of matches) {
-            results.push(match);
+
+      switch (args.action) {
+        case 'search': {
+          if (!args.pattern) return { content: [{ type: 'text', text: 'pattern required. Built-in: ' + Object.keys(PATTERNS).join(', ') }], isError: true };
+          const files = await getFiles(args.path || '.', args.filePattern);
+          const pats = PATTERNS[args.pattern] || [new RegExp(args.pattern, 'g')];
+          let total = 0;
+          for (const f of files) {
+            if (total >= (args.maxResults || 50)) break;
+            const lines = (await fs.readFile(f, 'utf-8')).split('\n');
+            const matches: string[] = [];
+            lines.forEach((line, i) => { for (const re of pats) if (re.test(line)) { matches.push(`  ${i + 1}: ${line.trim()}`); total++; break; } });
+            if (matches.length) results.push(`${f}:\n${matches.join('\n')}`);
           }
+          return { content: [{ type: 'text', text: results.length ? results.join('\n\n') : 'No matches' }] };
         }
+
+        case 'find_symbol': {
+          if (!args.symbol) return { content: [{ type: 'text', text: 'symbol required' }], isError: true };
+          const files = await getFiles(args.path || '.', args.filePattern);
+          const s = args.exact ? args.symbol : `\\w*${args.symbol}\\w*`;
+          const typePats: Record<string, RegExp[]> = {
+            function: [new RegExp(`function\\s+${s}\\s*\\(`, 'i'), new RegExp(`def\\s+${s}\\s*\\(`, 'i'), new RegExp(`fn\\s+${s}\\s*\\(`, 'i'), new RegExp(`func\\s+${s}\\s*\\(`, 'i')],
+            class: [new RegExp(`class\\s+${s}`, 'i'), new RegExp(`struct\\s+${s}`, 'i'), new RegExp(`interface\\s+${s}`, 'i')],
+            variable: [new RegExp(`(let|const|var)\\s+${s}\\s*[:=]`, 'i')],
+            method: [new RegExp(`\\.\\s*${s}\\s*\\(`, 'i')],
+            type: [new RegExp(`type\\s+${s}\\s*[={]`, 'i'), new RegExp(`interface\\s+${s}`, 'i'), new RegExp(`enum\\s+${s}`, 'i')]
+          };
+          const pats = args.type === 'all' ? Object.values(typePats).flat() : typePats[args.type || 'all'] || [];
+          for (const f of files) {
+            const lines = (await fs.readFile(f, 'utf-8')).split('\n');
+            const matches: string[] = [];
+            lines.forEach((line, i) => { for (const p of pats) if (p.test(line)) { matches.push(`  ${i + 1}: ${line.trim()}`); break; } });
+            if (matches.length) results.push(`${f}:\n${matches.join('\n')}`);
+          }
+          return { content: [{ type: 'text', text: results.length ? results.join('\n\n') : `Symbol '${args.symbol}' not found` }] };
+        }
+
+        case 'dependencies': {
+          const files = await getFiles(args.path || '.', args.filePattern);
+          const importPats = [/import\s+.*\s+from\s+['"](.*)['"]/,/import\s+['"](.*)['"]/,/require\s*\(['"](.*)['"]\)/,/from\s+(\S+)\s+import/,/import\s+"(.*)"/,/use\s+(\S+);/];
+          for (const f of files) {
+            const deps: string[] = [];
+            for (const line of (await fs.readFile(f, 'utf-8')).split('\n')) {
+              for (const p of importPats) { const m = line.match(p); if (m?.[1]) { deps.push(m[1]); break; } }
+            }
+            if (!deps.length) continue;
+            const ext = deps.filter(d => !d.startsWith('.')), int = deps.filter(d => d.startsWith('.'));
+            const out = [f + ':'];
+            if (args.showExternal !== false && ext.length) out.push('  External: ' + ext.join(', '));
+            if (args.showInternal !== false && int.length) out.push('  Internal: ' + int.join(', '));
+            results.push(out.join('\n'));
+          }
+          return { content: [{ type: 'text', text: results.length ? results.join('\n') : 'No dependencies found' }] };
+        }
+
+        case 'outline': {
+          const targetFile = args.file || args.path || '.';
+          const files = await getFiles(targetFile, args.filePattern);
+          for (const f of files.slice(0, 5)) {
+            const lines = (await fs.readFile(f, 'utf-8')).split('\n');
+            const items: string[] = [];
+            for (let i = 0; i < lines.length; i++) {
+              const l = lines[i];
+              const im = l.match(/^(import|from|use|require)/);
+              const ex = l.match(/export\s+(default\s+)?(async\s+)?(function|class|const|let|var|type|interface|enum)\s+(\w+)/);
+              const fn = l.match(/(?:async\s+)?(?:function|def|fn|func)\s+(\w+)\s*\(/);
+              const cl = l.match(/(class|struct|interface|trait|enum)\s+(\w+)/);
+              const tp = l.match(/(?:export\s+)?type\s+(\w+)\s*[={]/);
+              if (ex) items.push(`  ${i + 1}: export ${ex[3]} ${ex[4]}`);
+              else if (cl) items.push(`  ${i + 1}: ${cl[1]} ${cl[2]}`);
+              else if (fn && !im) items.push(`  ${i + 1}: fn ${fn[1]}`);
+              else if (tp) items.push(`  ${i + 1}: type ${tp[1]}`);
+            }
+            if (items.length) results.push(`${f} (${lines.length} lines):\n${items.join('\n')}`);
+          }
+          return { content: [{ type: 'text', text: results.length ? results.join('\n\n') : 'No symbols found' }] };
+        }
+
+        case 'metrics': {
+          const files = await getFiles(args.file || args.path || '.', args.filePattern);
+          let totalLines = 0, totalFiles = files.length, totalFuncs = 0, totalClasses = 0, totalImports = 0;
+          const byExt: Record<string, { files: number; lines: number }> = {};
+          for (const f of files) {
+            const content = await fs.readFile(f, 'utf-8');
+            const lines = content.split('\n');
+            const ext = path.extname(f) || 'other';
+            if (!byExt[ext]) byExt[ext] = { files: 0, lines: 0 };
+            byExt[ext].files++;
+            byExt[ext].lines += lines.length;
+            totalLines += lines.length;
+            for (const l of lines) {
+              if (/(?:function|def|fn|func)\s+\w+\s*\(/.test(l)) totalFuncs++;
+              if (/(?:class|struct|interface)\s+\w+/.test(l)) totalClasses++;
+              if (/(?:import|require|use|from)\s/.test(l)) totalImports++;
+            }
+          }
+          const extSummary = Object.entries(byExt).sort((a, b) => b[1].lines - a[1].lines).map(([ext, s]) => `  ${ext}: ${s.files} files, ${s.lines} lines`);
+          return { content: [{ type: 'text', text: `Metrics:\n  Files: ${totalFiles}\n  Lines: ${totalLines}\n  Functions: ${totalFuncs}\n  Classes: ${totalClasses}\n  Imports: ${totalImports}\n\nBy extension:\n${extSummary.join('\n')}` }] };
+        }
+
+        case 'exports': {
+          const files = await getFiles(args.path || '.', args.filePattern);
+          for (const f of files) {
+            const lines = (await fs.readFile(f, 'utf-8')).split('\n');
+            const exports: string[] = [];
+            for (let i = 0; i < lines.length; i++) {
+              const m = lines[i].match(/export\s+(default\s+)?(async\s+)?(function|class|const|let|var|type|interface|enum)\s+(\w+)/);
+              if (m) exports.push(`  ${i + 1}: ${m[1] || ''}${m[3]} ${m[4]}`);
+              const re = lines[i].match(/module\.exports\s*=\s*(\{[\s\S]*?\}|\w+)/);
+              if (re) exports.push(`  ${i + 1}: module.exports = ${re[1].substring(0, 60)}`);
+            }
+            if (exports.length) results.push(`${f}:\n${exports.join('\n')}`);
+          }
+          return { content: [{ type: 'text', text: results.length ? results.join('\n\n') : 'No exports found' }] };
+        }
+
+        case 'types': {
+          const files = await getFiles(args.path || '.', args.filePattern);
+          for (const f of files) {
+            const lines = (await fs.readFile(f, 'utf-8')).split('\n');
+            const types: string[] = [];
+            for (let i = 0; i < lines.length; i++) {
+              const l = lines[i];
+              const tm = l.match(/(?:export\s+)?(?:type|interface|enum)\s+(\w+)/);
+              const sm = l.match(/(?:pub\s+)?(?:struct|enum|trait)\s+(\w+)/);
+              if (tm) types.push(`  ${i + 1}: ${l.trim().substring(0, 80)}`);
+              else if (sm) types.push(`  ${i + 1}: ${l.trim().substring(0, 80)}`);
+            }
+            if (types.length) results.push(`${f}:\n${types.join('\n')}`);
+          }
+          return { content: [{ type: 'text', text: results.length ? results.join('\n\n') : 'No type definitions found' }] };
+        }
+
+        case 'calls': {
+          if (!args.symbol) return { content: [{ type: 'text', text: 'symbol required' }], isError: true };
+          const files = await getFiles(args.path || '.', args.filePattern);
+          const callPat = new RegExp(`\\b${args.symbol}\\s*\\(`, 'g');
+          for (const f of files) {
+            const lines = (await fs.readFile(f, 'utf-8')).split('\n');
+            const matches: string[] = [];
+            lines.forEach((line, i) => { if (callPat.test(line)) matches.push(`  ${i + 1}: ${line.trim()}`); });
+            if (matches.length) results.push(`${f}:\n${matches.join('\n')}`);
+          }
+          return { content: [{ type: 'text', text: results.length ? results.join('\n\n') : `No calls to '${args.symbol}' found` }] };
+        }
+
+        case 'hierarchy': {
+          if (!args.symbol) return { content: [{ type: 'text', text: 'symbol (class name) required' }], isError: true };
+          const files = await getFiles(args.path || '.', args.filePattern);
+          const classes: Array<{ name: string; parent?: string; file: string; line: number }> = [];
+          for (const f of files) {
+            const lines = (await fs.readFile(f, 'utf-8')).split('\n');
+            for (let i = 0; i < lines.length; i++) {
+              const m = lines[i].match(/class\s+(\w+)(?:\s+extends\s+(\w+))?/);
+              if (m) classes.push({ name: m[1], parent: m[2], file: f, line: i + 1 });
+              const sm = lines[i].match(/struct\s+(\w+)/);
+              if (sm) classes.push({ name: sm[1], file: f, line: i + 1 });
+            }
+          }
+          // Build tree from target
+          function buildTree(name: string, depth: number): string[] {
+            if (depth <= 0) return [];
+            const out: string[] = [];
+            const children = classes.filter(c => c.parent === name);
+            for (const c of children) {
+              out.push(`${'  '.repeat((args.depth || 3) - depth + 1)}├─ ${c.name} (${c.file}:${c.line})`);
+              out.push(...buildTree(c.name, depth - 1));
+            }
+            return out;
+          }
+          const root = classes.find(c => c.name === args.symbol);
+          const out = [root ? `${args.symbol} (${root.file}:${root.line})` : args.symbol];
+          if (root?.parent) out.push(`  extends: ${root.parent}`);
+          out.push(...buildTree(args.symbol, args.depth || 3));
+          const siblings = classes.filter(c => c.parent === root?.parent && c.name !== args.symbol);
+          if (siblings.length) { out.push('\nSiblings:'); for (const s of siblings) out.push(`  ${s.name} (${s.file}:${s.line})`); }
+          return { content: [{ type: 'text', text: out.join('\n') }] };
+        }
+
+        default:
+          return { content: [{ type: 'text', text: `Unknown action: ${args.action}` }], isError: true };
       }
-      
-      if (results.length === 0) {
-        return {
-          content: [{
-            type: 'text',
-            text: 'No AST patterns found'
-          }]
-        };
-      }
-      
-      return {
-        content: [{
-          type: 'text',
-          text: results.join('\n')
-        }]
-      };
     } catch (error: any) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error in AST search: ${error.message}`
-        }],
-        isError: true
-      };
+      return { content: [{ type: 'text', text: `Error: ${error.message}` }], isError: true };
     }
   }
 };
 
-// Simplified AST pattern matching
-function searchASTPattern(content: string, pattern: string, language: string): string[] {
-  const matches: string[] = [];
-  const lines = content.split('\n');
-  
-  // Simple heuristic matching for common patterns
-  const patterns: Record<string, RegExp[]> = {
-    'function_declaration': [
-      /function\s+(\w+)\s*\(/,  // JS function
-      /def\s+(\w+)\s*\(/,        // Python def
-      /fn\s+(\w+)\s*\(/,         // Rust fn
-      /func\s+(\w+)\s*\(/,       // Go func
-    ],
-    'class_definition': [
-      /class\s+(\w+)/,           // JS/Python/Java class
-      /struct\s+(\w+)/,          // Rust/Go struct
-      /interface\s+(\w+)/,       // TypeScript interface
-    ],
-    'method_call': [
-      /(\w+)\s*\.\s*(\w+)\s*\(/,  // Object method call
-      /(\w+)::\s*(\w+)\s*\(/,      // Rust/C++ static method
-    ],
-    'import_statement': [
-      /import\s+.+\s+from\s+['"]/,  // ES6 import
-      /import\s+['"]/,               // CommonJS import
-      /require\s*\(['"]/,            // CommonJS require
-      /use\s+\w+/,                   // Rust use
-      /import\s+\w+/,                // Python/Go import
-    ],
-    'variable_declaration': [
-      /(let|const|var)\s+(\w+)/,    // JS variable
-      /(\w+)\s*:=\s*/,               // Go short variable
-      /let\s+(mut\s+)?(\w+)/,        // Rust let
-    ]
-  };
-  
-  const searchPatterns = patterns[pattern] || [new RegExp(pattern, 'g')];
-  
-  lines.forEach((line, index) => {
-    for (const regex of searchPatterns) {
-      if (regex.test(line)) {
-        const context = [];
-        
-        // Add context lines
-        if (index > 0) context.push(`${index}: ${lines[index - 1]}`);
-        context.push(`${index + 1}: ${line} <-- MATCH`);
-        if (index < lines.length - 1) context.push(`${index + 2}: ${lines[index + 1]}`);
-        
-        matches.push(context.join('\n'));
-        break;
-      }
-    }
-  });
-  
-  return matches;
-}
-
-export const findSymbolTool: Tool = {
-  name: 'find_symbol',
-  description: 'Find symbol definitions (functions, classes, variables)',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      symbol: {
-        type: 'string',
-        description: 'Symbol name to find'
-      },
-      type: {
-        type: 'string',
-        description: 'Symbol type: function, class, variable, method, or all',
-        default: 'all'
-      },
-      path: {
-        type: 'string',
-        description: 'Directory to search',
-        default: '.'
-      },
-      exact: {
-        type: 'boolean',
-        description: 'Exact match only',
-        default: false
-      }
-    },
-    required: ['symbol']
-  },
-  handler: async (args) => {
-    try {
-      const results: string[] = [];
-      const searchPath = args.path || '.';
-      
-      // Get source files
-      const patterns = ['**/*.js', '**/*.ts', '**/*.tsx', '**/*.py', '**/*.rs', '**/*.go'];
-      let files: string[] = [];
-      
-      for (const pattern of patterns) {
-        const matched = await glob(path.join(searchPath, pattern), {
-          ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
-          maxDepth: 10
-        });
-        files.push(...matched);
-      }
-      
-      // Search for symbol
-      for (const file of files) {
-        const content = await fs.readFile(file, 'utf-8');
-        const matches = findSymbolInFile(content, args.symbol, args.type || 'all', args.exact || false);
-        
-        if (matches.length > 0) {
-          results.push(`\n=== ${file} ===`);
-          results.push(...matches);
-        }
-      }
-      
-      if (results.length === 0) {
-        return {
-          content: [{
-            type: 'text',
-            text: `Symbol '${args.symbol}' not found`
-          }]
-        };
-      }
-      
-      return {
-        content: [{
-          type: 'text',
-          text: results.join('\n')
-        }]
-      };
-    } catch (error: any) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error finding symbol: ${error.message}`
-        }],
-        isError: true
-      };
-    }
-  }
-};
-
-function findSymbolInFile(content: string, symbol: string, type: string, exact: boolean): string[] {
-  const matches: string[] = [];
-  const lines = content.split('\n');
-  
-  const patterns: Record<string, RegExp[]> = {
-    'function': [
-      new RegExp(`function\\s+${exact ? symbol : `\\w*${symbol}\\w*`}\\s*\\(`, 'i'),
-      new RegExp(`${exact ? symbol : `\\w*${symbol}\\w*`}\\s*[:=]\\s*function\\s*\\(`, 'i'),
-      new RegExp(`${exact ? symbol : `\\w*${symbol}\\w*`}\\s*[:=]\\s*\\([^)]*\\)\\s*=>`, 'i'),
-      new RegExp(`def\\s+${exact ? symbol : `\\w*${symbol}\\w*`}\\s*\\(`, 'i'),
-      new RegExp(`fn\\s+${exact ? symbol : `\\w*${symbol}\\w*`}\\s*\\(`, 'i'),
-      new RegExp(`func\\s+${exact ? symbol : `\\w*${symbol}\\w*`}\\s*\\(`, 'i'),
-    ],
-    'class': [
-      new RegExp(`class\\s+${exact ? symbol : `\\w*${symbol}\\w*`}`, 'i'),
-      new RegExp(`struct\\s+${exact ? symbol : `\\w*${symbol}\\w*`}`, 'i'),
-      new RegExp(`interface\\s+${exact ? symbol : `\\w*${symbol}\\w*`}`, 'i'),
-      new RegExp(`type\\s+${exact ? symbol : `\\w*${symbol}\\w*`}\\s*=`, 'i'),
-    ],
-    'variable': [
-      new RegExp(`(let|const|var)\\s+${exact ? symbol : `\\w*${symbol}\\w*`}\\s*[:=]`, 'i'),
-      new RegExp(`${exact ? symbol : `\\w*${symbol}\\w*`}\\s*:=`, 'i'),
-    ],
-    'method': [
-      new RegExp(`\\.\\s*${exact ? symbol : `\\w*${symbol}\\w*`}\\s*\\(`, 'i'),
-      new RegExp(`${exact ? symbol : `\\w*${symbol}\\w*`}\\s*:\\s*function\\s*\\(`, 'i'),
-    ]
-  };
-  
-  const searchPatterns = type === 'all' 
-    ? Object.values(patterns).flat()
-    : patterns[type] || [];
-  
-  lines.forEach((line, index) => {
-    for (const pattern of searchPatterns) {
-      if (pattern.test(line)) {
-        const context = [];
-        
-        // Add context
-        if (index > 0) context.push(`${index}: ${lines[index - 1]}`);
-        context.push(`${index + 1}: ${line} <-- MATCH`);
-        if (index < lines.length - 1) context.push(`${index + 2}: ${lines[index + 1]}`);
-        
-        matches.push(context.join('\n'));
-        break;
-      }
-    }
-  });
-  
-  return matches;
-}
-
-export const analyzeDependenciesTool: Tool = {
-  name: 'analyze_dependencies',
-  description: 'Analyze import dependencies in code',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      path: {
-        type: 'string',
-        description: 'File or directory to analyze',
-        default: '.'
-      },
-      showExternal: {
-        type: 'boolean',
-        description: 'Show external dependencies',
-        default: true
-      },
-      showInternal: {
-        type: 'boolean',
-        description: 'Show internal dependencies',
-        default: true
-      }
-    }
-  },
-  handler: async (args) => {
-    try {
-      const results: string[] = [];
-      const searchPath = args.path || '.';
-      
-      // Get files to analyze
-      let files: string[] = [];
-      const stat = await fs.stat(searchPath).catch(() => null);
-      
-      if (stat && stat.isFile()) {
-        files = [searchPath];
-      } else {
-        const patterns = ['**/*.js', '**/*.ts', '**/*.tsx', '**/*.py', '**/*.go'];
-        for (const pattern of patterns) {
-          const matched = await glob(path.join(searchPath, pattern), {
-            ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
-            maxDepth: 10
-          });
-          files.push(...matched);
-        }
-      }
-      
-      const dependencies = new Map<string, Set<string>>();
-      
-      // Analyze each file
-      for (const file of files) {
-        const content = await fs.readFile(file, 'utf-8');
-        const deps = extractDependencies(content, file);
-        
-        if (deps.length > 0) {
-          dependencies.set(file, new Set(deps));
-        }
-      }
-      
-      // Format results
-      results.push('=== Dependency Analysis ===\n');
-      
-      for (const [file, deps] of dependencies) {
-        results.push(`${file}:`);
-        
-        const external = Array.from(deps).filter(d => !d.startsWith('.'));
-        const internal = Array.from(deps).filter(d => d.startsWith('.'));
-        
-        if (args.showExternal !== false && external.length > 0) {
-          results.push('  External:');
-          external.forEach(dep => results.push(`    - ${dep}`));
-        }
-        
-        if (args.showInternal !== false && internal.length > 0) {
-          results.push('  Internal:');
-          internal.forEach(dep => results.push(`    - ${dep}`));
-        }
-        
-        results.push('');
-      }
-      
-      return {
-        content: [{
-          type: 'text',
-          text: results.join('\n')
-        }]
-      };
-    } catch (error: any) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error analyzing dependencies: ${error.message}`
-        }],
-        isError: true
-      };
-    }
-  }
-};
-
-function extractDependencies(content: string, filePath: string): string[] {
-  const deps: string[] = [];
-  const lines = content.split('\n');
-  
-  const importPatterns = [
-    // ES6 imports
-    /import\s+.*\s+from\s+['"](.*)['"]/,
-    /import\s+['"](.*)['"]/,
-    // CommonJS
-    /require\s*\(['"](.*)['"]\)/,
-    // Python
-    /from\s+(\S+)\s+import/,
-    /import\s+(\S+)/,
-    // Go
-    /import\s+"(.*)"/,
-    // Rust
-    /use\s+(\S+);/,
-  ];
-  
-  lines.forEach(line => {
-    for (const pattern of importPatterns) {
-      const match = line.match(pattern);
-      if (match && match[1]) {
-        deps.push(match[1]);
-      }
-    }
-  });
-  
-  return [...new Set(deps)];
-}
-
-// Export all AST tools
-export const astTools = [
-  astSearchTool,
-  findSymbolTool,
-  analyzeDependenciesTool
-];
+export const astTools = [astTool];
