@@ -1492,7 +1492,7 @@ const elementPicker = (() => {
     overlay.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483646;border:2px solid #fff;border-radius:3px;background:rgba(255,255,255,0.06);transition:all 0.1s ease;display:none;';
     label = document.createElement('div');
     label.id = 'hanzo-picker-label';
-    label.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;background:#000;color:#fff;font:11px/1.4 SF Mono,Menlo,monospace;padding:3px 8px;border-radius:4px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.4);';
+    label.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;background:#000;color:#fff;font:11px/1.4 Geist Mono,Menlo,monospace;padding:3px 8px;border-radius:4px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.4);';
     document.body.appendChild(overlay);
     document.body.appendChild(label);
   }
@@ -1636,7 +1636,7 @@ const inlineConsole = (() => {
     if (root) return;
     root = document.createElement('div');
     root.id = 'hanzo-console-root';
-    root.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;z-index:2147483646;font-family:SF Mono,Menlo,Consolas,monospace;font-size:12px;display:none;';
+    root.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;z-index:2147483646;font-family:Geist Mono,Menlo,Consolas,monospace;font-size:12px;display:none;';
     root.innerHTML = `
       <div style="background:rgba(0,0,0,0.92);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.15);border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
         <div id="hanzo-console-output" style="max-height:200px;overflow-y:auto;padding:8px 12px;color:#ccc;white-space:pre-wrap;word-break:break-all;"></div>
