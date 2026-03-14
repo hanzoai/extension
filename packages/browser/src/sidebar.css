@@ -573,14 +573,14 @@ html {
   flex-shrink: 0;
   position: relative;
   z-index: 10;
-  border-top: 1px solid var(--border);
-  background: var(--bg-secondary);
+  border-top: 1px solid rgba(255,255,255,0.10);
+  background: #0f0f0f;
 }
 
 .composer-box {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--input-border, var(--border));
-  border-radius: var(--radius);
+  background: #171717;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
   overflow: hidden;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -591,22 +591,24 @@ html {
 }
 
 .composer-box textarea {
+  display: block;
   width: 100%;
   padding: 10px 12px 4px;
   background: transparent;
   border: none;
-  color: var(--text-primary);
+  color: #fafafa;
   font-size: 13px;
-  font-family: inherit;
+  font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   line-height: 1.5;
   resize: none;
   outline: none;
   min-height: 36px;
   max-height: 120px;
+  box-sizing: border-box;
 }
 
 .composer-box textarea::placeholder {
-  color: var(--text-tertiary);
+  color: #666;
 }
 
 .composer-bar {
@@ -614,7 +616,7 @@ html {
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px 8px;
-  gap: 6px;
+  gap: 4px;
 }
 
 .composer-controls {
@@ -628,10 +630,10 @@ html {
 
 .composer-model {
   padding: 3px 18px 3px 6px;
-  background: var(--glass-strong);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 6px;
+  color: #a3a3a3;
   font-size: 10px;
   font-family: inherit;
   cursor: pointer;
@@ -648,14 +650,15 @@ html {
   transition: border-color 0.2s;
   height: 22px;
   flex-shrink: 0;
+  line-height: 16px;
 }
 
 .composer-model:hover {
-  border-color: var(--border-strong);
+  border-color: rgba(255,255,255,0.16);
 }
 
 .composer-model:focus {
-  border-color: var(--border-strong);
+  border-color: rgba(255,255,255,0.16);
   outline: none;
 }
 
@@ -664,7 +667,7 @@ html {
   align-items: center;
   gap: 2px;
   font-size: 10px;
-  color: var(--text-tertiary);
+  color: #666;
   user-select: none;
   cursor: pointer;
   white-space: nowrap;
@@ -675,19 +678,19 @@ html {
 }
 
 .composer-toggle:hover {
-  background: var(--glass);
+  background: rgba(255,255,255,0.04);
 }
 
 .composer-toggle input[type="checkbox"] {
   width: 11px;
   height: 11px;
-  accent-color: var(--accent);
+  accent-color: #fafafa;
   cursor: pointer;
   margin: 0;
 }
 
 .composer-toggle:has(input:checked) {
-  color: var(--text-secondary);
+  color: #a3a3a3;
 }
 
 .composer-status {
