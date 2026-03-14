@@ -313,22 +313,23 @@ export async function getUserInfo(storage: BrowserStorage): Promise<UserInfo | n
   return result[STORAGE_KEYS.user] || null;
 }
 
-/** Check if user is authenticated. */
+/** Check if user is authenticated (validates token, refreshes if needed). */
 export async function isAuthenticated(storage: BrowserStorage): Promise<boolean> {
-  const { accessToken } = await getStoredTokens(storage);
-  return !!accessToken;
+  const token = await getValidAccessToken(storage);
+  return !!token;
 }
 
-/** Get auth status for UI display. */
+/** Get auth status for UI display. Validates token and auto-clears stale sessions. */
 export async function getAuthStatus(storage: BrowserStorage): Promise<{
   authenticated: boolean;
   user: UserInfo | null;
 }> {
-  const [authenticated, user] = await Promise.all([
-    isAuthenticated(storage),
-    getUserInfo(storage),
-  ]);
-  return { authenticated, user };
+  const token = await getValidAccessToken(storage);
+  if (!token) {
+    return { authenticated: false, user: null };
+  }
+  const user = await getUserInfo(storage);
+  return { authenticated: true, user };
 }
 
 // ── Chrome/Firefox Adapter Factories ────────────────────────────────────
