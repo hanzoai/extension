@@ -1,30 +1,34 @@
-/* Hanzo AI Browser Extension Sidebar — Monochrome Vibrancy */
+/* Hanzo AI Browser Extension Sidebar — aligned with @hanzo/ui dark theme */
 
 :root {
-  --bg-primary: #000000;
-  --bg-secondary: #0A0A0A;
-  --bg-tertiary: #141414;
-  --bg-hover: #1F1F1F;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #0f0f0f;
+  --bg-tertiary: #171717;
+  --bg-hover: #262626;
 
-  --text-primary: #FFFFFF;
-  --text-secondary: #A0A0A0;
-  --text-tertiary: #6B6B6B;
+  --text-primary: #fafafa;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #666666;
 
-  --accent: #FFFFFF;
-  --accent-hover: #D4D4D4;
+  --accent: #fafafa;
+  --accent-hover: #d4d4d4;
   --accent-dim: rgba(255,255,255,0.06);
   --accent-glow: rgba(255,255,255,0.03);
 
-  --success: #4CAF50;
-  --warning: #FFC107;
-  --error: #F44336;
+  --success: #22c55e;
+  --warning: #eab308;
+  --error: #ef4444;
 
-  --border: rgba(255,255,255,0.08);
-  --border-strong: rgba(255,255,255,0.14);
+  --border: rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.16);
+  --input-border: rgba(255,255,255,0.15);
   --glass: rgba(255,255,255,0.04);
   --glass-strong: rgba(255,255,255,0.07);
   --shadow: 0 4px 12px rgba(0,0,0,0.6);
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --radius: 10px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
 }
 
 * {
@@ -255,67 +259,57 @@ html {
   line-height: 1.5;
 }
 
-/* White sign-in button */
+/* Sign-in button — matches @hanzo/ui primary button on dark */
 .auth-signin-btn {
   width: 100%;
-  padding: 14px 20px;
-  background: #FFFFFF;
-  color: #000000;
+  padding: 10px 16px;
+  height: 40px;
+  background: var(--accent);
+  color: #0a0a0a;
   border: none;
-  border-radius: 10px;
-  font-size: 15px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 12px;
-  position: relative;
-  overflow: hidden;
+  transition: background 0.15s, box-shadow 0.15s;
+  margin-bottom: 10px;
   letter-spacing: -0.01em;
 }
 
-.auth-signin-btn::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-  transition: left 0.5s ease;
-}
-
 .auth-signin-btn:hover {
-  background: #E0E0E0;
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.12);
+  background: var(--accent-hover);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
 }
 
-.auth-signin-btn:hover::after {
-  left: 100%;
+.auth-signin-btn:active {
+  transform: scale(0.98);
 }
 
 .auth-signin-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* Ghost create account button */
 .auth-create-btn {
   width: 100%;
-  padding: 12px 20px;
+  padding: 10px 16px;
+  height: 36px;
   background: transparent;
   color: var(--text-secondary);
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 20px;
+  transition: all 0.15s;
+  margin-bottom: 16px;
 }
 
 .auth-create-btn:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass);
+  border-color: var(--border-strong);
 }
 
 .auth-card.compact .auth-note {
@@ -339,7 +333,7 @@ html {
 .chat-modern-login-card {
   width: min(320px, 100%);
   border: 1px solid var(--border-strong);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--glass-strong);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -491,7 +485,7 @@ html {
 .msg {
   max-width: 90%;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   font-size: 13px;
   line-height: 1.5;
   word-wrap: break-word;
@@ -519,7 +513,7 @@ html {
 .msg-assistant pre {
   background: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 10px 12px;
   margin: 8px 0;
   overflow-x: auto;
@@ -547,7 +541,7 @@ html {
   color: white;
   font-size: 12px;
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .typing-indicator {
@@ -575,32 +569,30 @@ html {
 /* ==================== Composer (Modern Chat Input) ==================== */
 
 .composer {
-  padding: 8px 10px 10px;
+  padding: 10px;
   flex-shrink: 0;
   position: relative;
   z-index: 10;
   border-top: 1px solid var(--border);
-  background: rgba(0,0,0,0.3);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--bg-secondary);
 }
 
 .composer-box {
   background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid var(--input-border, var(--border));
+  border-radius: var(--radius);
   overflow: hidden;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .composer-box:focus-within {
-  border-color: rgba(255,255,255,0.2);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.4);
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.06);
 }
 
 .composer-box textarea {
   width: 100%;
-  padding: 12px 14px 6px;
+  padding: 10px 12px 4px;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -609,7 +601,7 @@ html {
   line-height: 1.5;
   resize: none;
   outline: none;
-  min-height: 38px;
+  min-height: 36px;
   max-height: 120px;
 }
 
@@ -621,24 +613,24 @@ html {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 6px 6px 10px;
+  padding: 4px 8px 8px;
   gap: 6px;
 }
 
 .composer-controls {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
   min-width: 0;
-  flex-wrap: wrap;
+  overflow: hidden;
 }
 
 .composer-model {
-  padding: 2px 20px 2px 6px;
+  padding: 3px 18px 3px 6px;
   background: var(--glass-strong);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 10px;
   font-family: inherit;
@@ -650,9 +642,12 @@ html {
   background-repeat: no-repeat;
   background-position: right 4px center;
   white-space: nowrap;
-  max-width: 130px;
+  max-width: 110px;
+  text-overflow: ellipsis;
+  overflow: hidden;
   transition: border-color 0.2s;
   height: 22px;
+  flex-shrink: 0;
 }
 
 .composer-model:hover {
@@ -676,6 +671,7 @@ html {
   padding: 2px 4px;
   border-radius: 4px;
   transition: background 0.15s;
+  flex-shrink: 0;
 }
 
 .composer-toggle:hover {
@@ -685,8 +681,9 @@ html {
 .composer-toggle input[type="checkbox"] {
   width: 11px;
   height: 11px;
-  accent-color: var(--text-secondary);
+  accent-color: var(--accent);
   cursor: pointer;
+  margin: 0;
 }
 
 .composer-toggle:has(input:checked) {
@@ -749,7 +746,7 @@ html {
   justify-content: center;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s;
@@ -782,7 +779,7 @@ html {
   background: var(--accent);
   color: #000000;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -823,7 +820,7 @@ html {
   background: var(--bg-tertiary);
   color: var(--text-primary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
@@ -844,7 +841,7 @@ html {
   padding: 10px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 500;
@@ -868,7 +865,7 @@ html {
 .panel {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 16px;
   transition: border-color 0.3s;
   position: relative;
@@ -910,7 +907,7 @@ html {
   background: var(--accent-dim);
   color: var(--accent);
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   font-size: 11px;
   font-weight: 600;
 }
@@ -1002,7 +999,7 @@ html {
   font-size: 11px;
   gap: 4px;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--glass-strong);
   border: 1px solid var(--border);
   color: var(--text-primary);
@@ -1034,7 +1031,7 @@ html {
   padding: 8px;
   background: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-family: 'Geist Mono', 'Monaco', 'Consolas', monospace;
   color: var(--text-secondary);
@@ -1144,7 +1141,7 @@ html {
   padding: 8px 10px;
   background: var(--glass);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   transition: border-color 0.2s;
 }
@@ -1218,7 +1215,7 @@ html {
   padding: 10px;
   background: var(--glass);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition: all 0.2s;
 }
 
@@ -1231,7 +1228,7 @@ html {
   width: 32px;
   height: 32px;
   background: var(--accent-dim);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1295,7 +1292,7 @@ html {
   padding: 6px 10px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 12px;
   font-family: inherit;
@@ -1335,7 +1332,7 @@ html {
   padding: 6px 10px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 12px;
   font-family: inherit;
@@ -1418,7 +1415,7 @@ select option {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 12px;
   text-align: center;
@@ -1507,7 +1504,7 @@ select option {
 .modal-content {
   background: var(--bg-secondary);
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: var(--radius);
   width: calc(100% - 32px);
   max-width: 320px;
   overflow: hidden;
@@ -1553,7 +1550,7 @@ select option {
   width: 100%;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   padding: 8px;
   font-family: inherit;
@@ -1591,7 +1588,7 @@ select option {
 .balance-card {
   background: var(--glass-strong);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 10px 12px;
   margin-bottom: 10px;
 }
@@ -1722,7 +1719,7 @@ select option {
   justify-content: space-between;
   align-items: center;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s;
   gap: 8px;
@@ -1774,7 +1771,7 @@ select option {
   flex: 1;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 5px 8px;
   font-size: 11px;
   color: var(--text-primary);

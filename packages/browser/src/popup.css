@@ -1,23 +1,26 @@
-/* Hanzo AI Browser Extension Popup — Refined Monochrome */
+/* Hanzo AI Browser Extension Popup — aligned with @hanzo/ui dark theme */
 
 :root {
-  --primary: #FFFFFF;
-  --primary-dark: #E0E0E0;
-  --bg: #000000;
-  --surface: #0A0A0A;
-  --surface-light: #1A1A1A;
-  --text: #FFFFFF;
-  --text-secondary: #A0A0A0;
+  --primary: #fafafa;
+  --primary-dark: #d4d4d4;
+  --bg: #0a0a0a;
+  --surface: #0f0f0f;
+  --surface-light: #171717;
+  --text: #fafafa;
+  --text-secondary: #a3a3a3;
   --text-dim: #666666;
-  --border: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.10);
   --border-strong: rgba(255,255,255,0.16);
   --glass: rgba(255,255,255,0.04);
   --glass-strong: rgba(255,255,255,0.07);
-  --success: #4CAF50;
-  --warning: #FFC107;
-  --error: #F44336;
-  --link: #A0A0A0;
-  --link-hover: #FFFFFF;
+  --success: #22c55e;
+  --warning: #eab308;
+  --error: #ef4444;
+  --link: #a3a3a3;
+  --link-hover: #fafafa;
+  --radius: 10px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
 }
 
 * {
@@ -134,6 +137,122 @@ h3 {
   color: var(--text-dim);
   margin-bottom: 16px;
   font-size: 13px;
+}
+
+/* Login Card */
+.login-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 380px;
+  padding: 32px 24px;
+}
+
+.login-card {
+  text-align: center;
+  max-width: 280px;
+  width: 100%;
+}
+
+.login-logo {
+  width: 48px;
+  height: 48px;
+  color: var(--text);
+  margin: 0 auto 20px;
+  display: block;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.12));
+}
+
+.login-headline {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+.login-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.login-signin-btn {
+  width: 100%;
+  padding: 12px 20px;
+  background: #FFFFFF;
+  color: #000000;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+  letter-spacing: -0.01em;
+}
+
+.login-signin-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  transition: left 0.5s ease;
+}
+
+.login-signin-btn:hover {
+  background: #E0E0E0;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.1);
+}
+
+.login-signin-btn:hover::after {
+  left: 100%;
+}
+
+.login-signin-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-create-btn {
+  width: 100%;
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 16px;
+}
+
+.login-create-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.login-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.login-note a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.login-note a:hover {
+  color: var(--text);
 }
 
 /* Buttons */
