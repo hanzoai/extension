@@ -20,14 +20,23 @@
     </header>
 
     <!-- Login Section -->
-    <div id="login-section" class="section">
-      <h2>Sign In</h2>
-      <p class="subtitle">Connect to your Hanzo AI account</p>
-      <button id="login-btn" class="btn btn-primary">Sign in with Hanzo</button>
-      <p class="help-text">
-        <a href="https://hanzo.id/register" target="_blank">Create account</a> &middot;
-        <a href="https://hanzo.id/forgot" target="_blank">Forgot password?</a>
-      </p>
+    <div id="login-section" class="section login-section">
+      <div class="login-card">
+        <svg class="login-logo" viewBox="0 0 67 67" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.21 67V44.6369H0V67H22.21Z" fill="currentColor"/>
+          <path d="M66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184Z" fill="currentColor"/>
+          <path d="M22.21 0H0V22.3184H22.21V0Z" fill="currentColor"/>
+          <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z" fill="currentColor"/>
+          <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z" fill="currentColor"/>
+        </svg>
+        <h2 class="login-headline">Sign in to Hanzo AI</h2>
+        <p class="login-sub">Chat with AI, use browser tools, and build with agents.</p>
+        <button id="login-btn" class="login-signin-btn">Sign In</button>
+        <button id="signup-btn-popup" class="login-create-btn">Create account</button>
+        <p class="login-note">
+          Browser tools work without sign-in. <a href="https://docs.hanzo.ai" target="_blank">Learn more</a>
+        </p>
+      </div>
     </div>
 
     <!-- Main Section (shown after login) -->

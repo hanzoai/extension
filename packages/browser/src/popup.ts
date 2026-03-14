@@ -67,15 +67,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   loginBtn?.addEventListener('click', () => {
-    loginBtn.disabled = true;
+    (loginBtn as HTMLButtonElement).disabled = true;
     loginBtn.textContent = 'Signing in...';
     chrome.runtime.sendMessage({ action: 'auth.login' }, (response) => {
-      loginBtn.disabled = false;
-      loginBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Sign in with Hanzo';
+      (loginBtn as HTMLButtonElement).disabled = false;
+      loginBtn.textContent = 'Sign In';
       if (response?.success) {
         checkAuth();
       }
     });
+  });
+
+  // Signup button in login card
+  const signupBtnPopup = document.getElementById('signup-btn-popup');
+  signupBtnPopup?.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'auth.signup' });
   });
 
   logoutBtn?.addEventListener('click', () => {
