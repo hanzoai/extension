@@ -210,7 +210,7 @@ class HanzoSidebar {
     // Always show tabs and initialize tools — auth only gates chat
     this.el.tabBar.classList.remove('hidden');
     this.el.authSection.classList.add('hidden');
-    this.switchTab('tools'); // Default to tools (always works)
+    this.switchTab('chat'); // Default to chat (shows login prompt if not authenticated)
 
     this.loadSettings();
     this.startMonitoring();
@@ -219,7 +219,6 @@ class HanzoSidebar {
       const response = await chrome.runtime.sendMessage({ action: 'auth.status' });
       if (response?.success && response.authenticated) {
         this.setUser(response.user);
-        this.switchTab('chat');
       } else {
         this.showChatLoginPrompt();
       }
@@ -254,7 +253,7 @@ class HanzoSidebar {
       const latestAuthBtn = document.getElementById('auth-btn') as HTMLButtonElement | null;
       if (latestAuthBtn) {
         latestAuthBtn.disabled = false;
-        latestAuthBtn.textContent = 'Sign in with Hanzo';
+        latestAuthBtn.textContent = 'Sign In';
       }
     }
   }

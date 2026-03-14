@@ -105,21 +105,26 @@ const CONFIG_STORAGE_MAP: Record<keyof RuntimeConfig, { key: string; fallback: s
 /**
  * Load runtime configuration from extension storage.
  * Any value can be overridden by setting the corresponding storage key.
+ *
+ * Accepts both the raw chrome.storage.local object (callback-based) and the
+ * BrowserStorage adapter (Promise-based). Uses await so both work correctly.
  */
-export async function loadRuntimeConfig(storage: typeof chrome.storage.local): Promise<RuntimeConfig> {
+export async function loadRuntimeConfig(
+  storage: { get(keys: string[]): Promise<Record<string, any>> } | typeof chrome.storage.local,
+): Promise<RuntimeConfig> {
   const keys = Object.values(CONFIG_STORAGE_MAP).map(v => v.key);
-  return new Promise((resolve) => {
-    storage.get(keys, (result: Record<string, any>) => {
-      const config = {} as RuntimeConfig;
-      for (const [field, { key, fallback }] of Object.entries(CONFIG_STORAGE_MAP)) {
-        const stored = result[key];
-        if (stored !== undefined && stored !== null && stored !== '') {
-          (config as any)[field] = typeof fallback === 'number' ? Number(stored) : String(stored);
-        } else {
-          (config as any)[field] = fallback;
-        }
-      }
-      resolve(config);
-    });
-  });
+
+  // Use Promise-based API (works with BrowserStorage adapter AND MV3 chrome.storage.local)
+  const result: Record<string, any> = await (storage as any).get(keys);
+
+  const config = {} as RuntimeConfig;
+  for (const [field, { key, fallback }] of Object.entries(CONFIG_STORAGE_MAP)) {
+    const stored = result[key];
+    if (stored !== undefined && stored !== null && stored !== '') {
+      (config as any)[field] = typeof fallback === 'number' ? Number(stored) : String(stored);
+    } else {
+      (config as any)[field] = fallback;
+    }
+  }
+  return config;
 }
