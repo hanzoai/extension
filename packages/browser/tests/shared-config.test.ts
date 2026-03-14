@@ -111,7 +111,7 @@ describe('BRAND_URLS', () => {
 describe('loadRuntimeConfig', () => {
   it('returns defaults when storage is empty', async () => {
     const mockStorage = {
-      get: vi.fn((keys: string[], callback: Function) => callback({})),
+      get: vi.fn(async (_keys: string[]) => ({})),
     };
 
     const config = await loadRuntimeConfig(mockStorage as any);
@@ -127,7 +127,7 @@ describe('loadRuntimeConfig', () => {
 
   it('reads overrides from storage', async () => {
     const mockStorage = {
-      get: vi.fn((keys: string[], callback: Function) => callback({
+      get: vi.fn(async (_keys: string[]) => ({
         hanzo_config_iam_login_url: 'https://custom.hanzo.id',
         hanzo_config_api_base: 'https://custom.api.hanzo.ai',
         hanzo_config_kms_url: 'https://custom.kms.hanzo.ai',
@@ -144,7 +144,7 @@ describe('loadRuntimeConfig', () => {
 
   it('ignores empty string overrides', async () => {
     const mockStorage = {
-      get: vi.fn((keys: string[], callback: Function) => callback({
+      get: vi.fn(async (_keys: string[]) => ({
         hanzo_config_iam_login_url: '',
       })),
     };
