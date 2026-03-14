@@ -51,12 +51,14 @@
           <p>Ask anything. Powered by Hanzo Cloud.</p>
         </div>
       </div>
-      <div id="chat-composer" class="composer">
-        <div class="composer-box">
-          <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-          <div class="composer-bar">
-            <div class="composer-controls">
-              <select id="model-select" class="composer-model">
+      <div id="chat-composer" style="padding:10px;flex-shrink:0;border-top:1px solid rgba(255,255,255,0.10);background:#0f0f0f;">
+        <div style="background:#171717;border:1px solid rgba(255,255,255,0.15);border-radius:10px;overflow:hidden;">
+          <textarea id="chat-input" placeholder="Ask anything..." rows="1"
+            style="display:block;width:100%;padding:10px 12px 4px;background:transparent;border:none;color:#fafafa;font-size:13px;font-family:inherit;line-height:1.5;resize:none;outline:none;min-height:36px;max-height:120px;box-sizing:border-box;"></textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px 8px;gap:4px;">
+            <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:0;overflow:hidden;">
+              <select id="model-select"
+                style="padding:3px 18px 3px 6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.10);border-radius:6px;color:#a3a3a3;font-size:10px;font-family:inherit;cursor:pointer;-moz-appearance:none;appearance:none;white-space:nowrap;max-width:110px;text-overflow:ellipsis;overflow:hidden;height:22px;line-height:16px;flex-shrink:0;">
                 <option value="auto">Auto</option>
                 <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
                 <option value="claude-opus-4-20250514">Claude Opus 4</option>
@@ -64,18 +66,19 @@
                 <option value="zen-coder-flash">Zen Coder Flash</option>
                 <option value="zen-max">Zen Max</option>
               </select>
-              <label class="composer-toggle" title="RAG context">
-                <input type="checkbox" id="rag-enabled" checked>
+              <label title="RAG context" style="display:inline-flex;align-items:center;gap:2px;font-size:10px;color:#666;cursor:pointer;white-space:nowrap;padding:2px 4px;flex-shrink:0;">
+                <input type="checkbox" id="rag-enabled" checked style="width:11px;height:11px;accent-color:#fafafa;cursor:pointer;margin:0;">
                 <span>RAG</span>
               </label>
-              <label class="composer-toggle" title="Include active tab">
-                <input type="checkbox" id="tab-context-enabled" checked>
+              <label title="Include active tab" style="display:inline-flex;align-items:center;gap:2px;font-size:10px;color:#666;cursor:pointer;white-space:nowrap;padding:2px 4px;flex-shrink:0;">
+                <input type="checkbox" id="tab-context-enabled" checked style="width:11px;height:11px;accent-color:#fafafa;cursor:pointer;margin:0;">
                 <span>Tab</span>
               </label>
-              <span id="rag-status" class="composer-status">Ready</span>
+              <span id="rag-status" style="font-size:9px;color:#666;white-space:nowrap;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,0.04);">Ready</span>
             </div>
-            <button id="send-btn" class="composer-send" title="Send (Enter)">
-              <svg viewBox="0 0 16 16" fill="none">
+            <button id="send-btn" title="Send (Enter)"
+              style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:#fafafa;border:none;border-radius:50%;color:#000;cursor:pointer;flex-shrink:0;">
+              <svg viewBox="0 0 16 16" fill="none" style="width:13px;height:13px;">
                 <path d="M3 13V3l10 5-10 5z" fill="currentColor"/>
               </svg>
             </button>
