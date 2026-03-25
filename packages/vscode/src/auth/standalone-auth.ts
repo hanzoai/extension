@@ -322,8 +322,8 @@ export class StandaloneAuthManager {
     public getHeaders(): Record<string, string> {
         if (this.isAnonymous) {
             return {
-                'X-Hanzo-Mode': 'anonymous',
-                'X-Hanzo-Device-Id': this.getDeviceId()
+                'X-IAM-Mode': 'anonymous',
+                'X-IAM-Device-Id': this.getDeviceId()
             };
         }
         
@@ -334,7 +334,7 @@ export class StandaloneAuthManager {
         if (token) {
             return {
                 'Authorization': `Bearer ${token}`,
-                'X-Hanzo-Device-Id': this.getDeviceId()
+                'X-IAM-Device-Id': this.getDeviceId()
             };
         }
         
