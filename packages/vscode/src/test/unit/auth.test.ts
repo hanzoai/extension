@@ -70,8 +70,8 @@ suite('StandaloneAuthManager Test Suite', () => {
         
         const headers = authManager.getHeaders();
         
-        assert.strictEqual(headers['X-IAM-Mode'], 'anonymous');
-        assert.strictEqual(headers['X-IAM-Device-Id'], 'test-device-id');
+        assert.strictEqual(headers['X-Mode'], 'anonymous');
+        assert.strictEqual(headers['X-Device-Id'], 'test-device-id');
         assert.strictEqual(headers['Authorization'], undefined);
     });
 
@@ -86,7 +86,7 @@ suite('StandaloneAuthManager Test Suite', () => {
         const headers = authManager.getHeaders();
         
         assert.strictEqual(headers['Authorization'], `Bearer ${mockToken}`);
-        assert.strictEqual(headers['X-IAM-Device-Id'], 'test-device-id');
+        assert.strictEqual(headers['X-Device-Id'], 'test-device-id');
     });
 
     test('Should handle logout', async () => {
