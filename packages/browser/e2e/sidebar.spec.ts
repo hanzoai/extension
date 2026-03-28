@@ -10,16 +10,16 @@ test.describe('Sidebar', () => {
     await expect(tabBar).toBeVisible();
   });
 
-  test('defaults to tools tab when not authenticated', async ({ context, extensionId }) => {
+  test('defaults to chat tab when not authenticated', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
 
     // Wait for JS to initialize
     await page.waitForTimeout(500);
 
-    // Tools tab should be active by default (no auth required)
-    const toolsTab = page.locator('#tab-tools');
-    await expect(toolsTab).toBeVisible();
+    // Chat tab should be active by default (shows login prompt for unauthenticated)
+    const chatTab = page.locator('#tab-chat');
+    await expect(chatTab).toBeVisible();
   });
 
   test('chat tab shows login prompt when not authenticated', async ({ context, extensionId }) => {
