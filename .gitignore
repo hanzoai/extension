@@ -55,3 +55,11 @@ packages/*/*.tgz
 .claude/
 claude_chats/
 *.zip
+
+# hygiene (untrack node_modules, block common build output)
+**/node_modules/
+.pnpm-store/
+build/
+.next/
+*.log
+tmp/
