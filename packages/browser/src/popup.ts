@@ -220,21 +220,28 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // MCP Bridge (:9224)
-    try {
-      fetch('http://localhost:9224', { signal: AbortSignal.timeout(2000) })
-        .then(r => r.json())
-        .then(data => {
-          if (data?.service === 'hanzo.browser') {
-            setStatus(mcpStatus, mcpPort, true, `:9224 OK`);
-          } else {
-            setStatus(mcpStatus, mcpPort, false, ':9224 N/A');
-          }
-        })
-        .catch(() => setStatus(mcpStatus, mcpPort, false, ':9224 offline'));
-    } catch {
-      setStatus(mcpStatus, mcpPort, false, ':9224 offline');
-    }
+    // MCP Bridge — probe the configured port (default 9224 for hanzo-mcp HTTP).
+    // Falls back to 9224 only if storage hasn't been written yet, but always
+    // SHOWS the actual port that was probed so the user isn't lied to.
+    chrome.storage.local.get(['mcpBridgePort'], (s) => {
+      const probePort = Number(s.mcpBridgePort) || 9224;
+      const url = `http://localhost:${probePort}`;
+      const offline = () => setStatus(mcpStatus, mcpPort, false, `:${probePort} offline`);
+      try {
+        fetch(url, { signal: AbortSignal.timeout(2000) })
+          .then(r => r.json())
+          .then(data => {
+            if (data?.service === 'hanzo.browser') {
+              setStatus(mcpStatus, mcpPort, true, `:${probePort} OK`);
+            } else {
+              setStatus(mcpStatus, mcpPort, false, `:${probePort} N/A`);
+            }
+          })
+          .catch(offline);
+      } catch {
+        offline();
+      }
+    });
 
     // WebGPU
     chrome.runtime.sendMessage({ action: 'runLocalAI', prompt: '' }, (response) => {
