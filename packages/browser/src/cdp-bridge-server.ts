@@ -250,45 +250,56 @@ class CDPBridgeServer {
     // Shorthand: b = targetBrowser for all sendRaw/sendToExtension calls below
     const b = targetBrowser;
 
+    // Universal tab targeting: a `tabId` or `tabIndex` on the incoming command
+    // applies to every downstream sendRaw call so the user can pin a specific
+    // tab without repeating it. Without this, every action falls back to
+    // `chrome.tabs.query({active:true,currentWindow:true})[0]` — which is
+    // fragile when the user has many windows / a chrome://newtab in focus.
+    const tabTarget = (extra?: Record<string, unknown>) => {
+      const out: Record<string, unknown> = { ...(extra || {}) };
+      if (rest.tabId !== undefined) out.tabId = rest.tabId;
+      if (rest.tabIndex !== undefined) out.tabIndex = rest.tabIndex;
+      if (rest.targetId !== undefined && out.tabId === undefined) out.tabId = rest.targetId;
+      return out;
+    };
+
     switch (action) {
       // Navigation
       case 'navigate':
-        return this.sendRaw('Page.navigate', { url: rest.url }, b);
+        return this.sendRaw('Page.navigate', tabTarget({ url: rest.url }), b);
 
       case 'navigate_back':
       case 'go_back':
-        return this.sendRaw('Page.goBack', undefined, b);
+        return this.sendRaw('Page.goBack', tabTarget(), b);
 
       case 'navigate_forward':
       case 'go_forward':
-        return this.sendRaw('Page.goForward', undefined, b);
+        return this.sendRaw('Page.goForward', tabTarget(), b);
 
       case 'reload':
-        return this.sendRaw('Page.reload', undefined, b);
+        return this.sendRaw('Page.reload', tabTarget(), b);
 
       case 'url':
-        return this.sendRaw('hanzo.url', undefined, b);
+        return this.sendRaw('hanzo.url', tabTarget(), b);
 
       case 'title':
-        return this.sendRaw('hanzo.title', undefined, b);
+        return this.sendRaw('hanzo.title', tabTarget(), b);
 
       case 'tab_info':
-        return this.sendRaw('hanzo.tabInfo', undefined, b);
+        return this.sendRaw('hanzo.tabInfo', tabTarget(), b);
 
       case 'content':
-        return this.sendRaw('Runtime.evaluate', {
+        return this.sendRaw('Runtime.evaluate', tabTarget({
           expression: 'document.documentElement.outerHTML',
           returnByValue: true
-        }, b);
+        }), b);
 
       // Screenshots
       case 'screenshot': {
-        const screenshot = await this.sendRaw('hanzo.screenshot', {
+        const screenshot = await this.sendRaw('hanzo.screenshot', tabTarget({
           format: rest.format || 'png',
           fullPage: rest.fullPage,
-          ...(rest.tabId ? { tabId: rest.tabId } : {}),
-          ...(rest.tabIndex !== undefined ? { tabIndex: rest.tabIndex } : {}),
-        }, b);
+        }), b);
         if (rest.filename && screenshot?.data) {
           const buffer = Buffer.from(screenshot.data, 'base64');
           fs.writeFileSync(rest.filename, buffer);
@@ -299,92 +310,92 @@ class CDPBridgeServer {
 
       case 'snapshot':
         // Accessibility snapshot
-        return this.sendRaw('Accessibility.getFullAXTree', undefined, b);
+        return this.sendRaw('Accessibility.getFullAXTree', tabTarget(), b);
 
       // Input - Click
       case 'click':
-        return this.sendRaw('hanzo.click', {
-          selector: rest.selector || rest.ref
-        }, b);
+        return this.sendRaw('hanzo.click', tabTarget({
+          selector: rest.selector || rest.ref,
+        }), b);
 
       case 'dblclick':
       case 'double_click':
-        return this.sendRaw('hanzo.dblclick', {
-          selector: rest.selector || rest.ref
-        }, b);
+        return this.sendRaw('hanzo.dblclick', tabTarget({
+          selector: rest.selector || rest.ref,
+        }), b);
 
       case 'hover':
-        return this.sendRaw('hanzo.hover', {
-          selector: rest.selector || rest.ref
-        }, b);
+        return this.sendRaw('hanzo.hover', tabTarget({
+          selector: rest.selector || rest.ref,
+        }), b);
 
       // Input - Type
       case 'type':
-        return this.sendRaw('hanzo.type', {
+        return this.sendRaw('hanzo.type', tabTarget({
           selector: rest.selector || rest.ref,
-          text: rest.text
-        }, b);
+          text: rest.text,
+        }), b);
 
       case 'fill':
-        return this.sendRaw('hanzo.fill', {
+        return this.sendRaw('hanzo.fill', tabTarget({
           selector: rest.selector || rest.ref,
-          value: rest.value || rest.text
-        }, b);
+          value: rest.value || rest.text,
+        }), b);
 
       case 'clear':
-        return this.sendRaw('hanzo.clear', {
-          selector: rest.selector || rest.ref
-        }, b);
+        return this.sendRaw('hanzo.clear', tabTarget({
+          selector: rest.selector || rest.ref,
+        }), b);
 
       case 'press_key':
       case 'press':
-        return this.sendRaw('Input.dispatchKeyEvent', {
+        return this.sendRaw('Input.dispatchKeyEvent', tabTarget({
           type: 'keyDown',
-          key: rest.key
-        }, b);
+          key: rest.key,
+        }), b);
 
       // Forms
       case 'select_option':
-        return this.sendRaw('hanzo.select', {
+        return this.sendRaw('hanzo.select', tabTarget({
           selector: rest.selector || rest.ref,
-          value: rest.value
-        }, b);
+          value: rest.value,
+        }), b);
 
       case 'check':
-        return this.sendRaw('hanzo.check', {
-          selector: rest.selector || rest.ref
-        }, b);
+        return this.sendRaw('hanzo.check', tabTarget({
+          selector: rest.selector || rest.ref,
+        }), b);
 
       case 'uncheck':
-        return this.sendRaw('hanzo.uncheck', {
-          selector: rest.selector || rest.ref
-        }, b);
+        return this.sendRaw('hanzo.uncheck', tabTarget({
+          selector: rest.selector || rest.ref,
+        }), b);
 
       // Navigation
       case 'go_back':
       case 'navigate_back':
-        return this.sendRaw('Page.goBack', undefined, b);
+        return this.sendRaw('Page.goBack', tabTarget(), b);
 
       case 'go_forward':
       case 'navigate_forward':
-        return this.sendRaw('Page.goForward', undefined, b);
+        return this.sendRaw('Page.goForward', tabTarget(), b);
 
       case 'get_url':
-        return this.sendRaw('hanzo.url', undefined, b);
+        return this.sendRaw('hanzo.url', tabTarget(), b);
 
       case 'get_title':
-        return this.sendRaw('hanzo.title', undefined, b);
+        return this.sendRaw('hanzo.title', tabTarget(), b);
 
       case 'get_tab_info':
       case 'tab_info':
-        return this.sendRaw('hanzo.tabInfo', undefined, b);
+        return this.sendRaw('hanzo.tabInfo', tabTarget(), b);
 
       case 'get_history':
       case 'history':
-        return this.sendRaw('hanzo.getHistory', { maxResults: rest.maxResults }, b);
+        return this.sendRaw('hanzo.getHistory', tabTarget({ maxResults: rest.maxResults }), b);
 
       case 'wait_for_navigation':
-        return this.sendRaw('hanzo.waitForNavigation', { timeout: rest.timeout }, b);
+        return this.sendRaw('hanzo.waitForNavigation', tabTarget({ timeout: rest.timeout }), b);
 
       case 'create_tab':
         return this.sendRaw('Target.createTarget', { url: rest.url || 'about:blank' }, b);
@@ -474,24 +485,27 @@ class CDPBridgeServer {
 
       case 'local_storage':
         if (rest.value !== undefined) {
-          return this.sendRaw('hanzo.setLocalStorage', { key: rest.key, value: rest.value }, b);
+          return this.sendRaw('hanzo.setLocalStorage', tabTarget({ key: rest.key, value: rest.value }), b);
         }
-        return this.sendRaw('hanzo.getLocalStorage', { key: rest.key }, b);
+        return this.sendRaw('hanzo.getLocalStorage', tabTarget({ key: rest.key }), b);
 
       case 'cookies':
-        return this.sendRaw('hanzo.getCookies', {}, b);
+        return this.sendRaw('hanzo.getCookies', tabTarget(), b);
 
       // Evaluate
       case 'evaluate': {
-        const evalResult = await this.sendRaw('Runtime.evaluate', {
+        const evalResult = await this.sendRaw('Runtime.evaluate', tabTarget({
           expression: rest.code || rest.function || rest.expression,
           returnByValue: true,
-          ...(rest.tabId ? { tabId: rest.tabId } : {}),
-          ...(rest.tabIndex !== undefined ? { tabIndex: rest.tabIndex } : {}),
-        }, b);
-        // Unwrap CDP result envelope: {result: {type, value}} → value
-        const value = evalResult?.result?.value ?? evalResult?.result ?? evalResult;
-        return { result: value };
+        }), b);
+        // Unwrap CDP result envelope. Handle every shape extensions can hand
+        // back: {result:{value}} (Chrome), {result:{value,type}} (CDP), bare
+        // value, undefined-as-empty-object ({}).
+        const inner = evalResult?.result;
+        if (inner && typeof inner === 'object' && 'value' in inner) {
+          return { result: (inner as any).value, raw: evalResult };
+        }
+        return { result: inner ?? evalResult };
       }
 
       // Wait
@@ -500,9 +514,9 @@ class CDPBridgeServer {
         return { waited: rest.timeout || 1 };
 
       case 'wait_for_load':
-        return this.sendRaw('Page.waitForLoadState', {
-          state: rest.state || 'load'
-        }, b);
+        return this.sendRaw('Page.waitForLoadState', tabTarget({
+          state: rest.state || 'load',
+        }), b);
 
       // Tabs
       case 'tabs':
