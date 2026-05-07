@@ -174,6 +174,19 @@ export class CDPBridge {
     return dataUrl.replace(/^data:image\/\w+;base64,/, '');
   }
   
+  /** Accept tabId in any of: number | "tab-NNN" | "NNN" | undefined. */
+  private parseTabId(raw: unknown): number | null {
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (typeof raw !== 'string') return null;
+    const m = raw.match(/(?:^|tab-)(\d+)$/);
+    if (m) {
+      const n = Number(m[1]);
+      return Number.isFinite(n) ? n : null;
+    }
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+
   async click(tabId: number, x: number, y: number): Promise<void> {
     await this.send(tabId, 'Input.dispatchMouseEvent', {
       type: 'mousePressed',
@@ -356,13 +369,17 @@ export class CDPBridge {
   
   private async handleBridgeMessage(message: any): Promise<CDPResponse> {
     const { id, method, params } = message;
-    
+
     try {
       let result: any;
-      
-      // Get active tab if not specified
-      const tabId = params?.tabId || await this.getActiveTabId();
-      
+
+      // Resolve target tab. Accept numeric tabId, "tab-NNN" targetId from
+      // getTargets, plain numeric string. Without explicit targeting fall
+      // back to the active tab in the focused window — which is fragile when
+      // the user has many windows open. Always prefer explicit ids.
+      const tabId = this.parseTabId(params?.tabId ?? params?.targetId)
+                    ?? await this.getActiveTabId();
+
       switch (method) {
         case 'Browser.getVersion':
           result = {
