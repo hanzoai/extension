@@ -177,13 +177,23 @@ class HanzoFirefoxExtension {
   }
 
   /**
-   * Resolve the tab ID to operate on — use explicit tabId/tabIndex param,
-   * fall back to the active tab.
+   * Resolve the tab ID to operate on. Order of precedence:
+   *
+   *   1. params.tabId — number, or "tab-NNN" string from getTargets, or "NNN".
+   *   2. params.targetId — same as tabId but kept for CDP-style callers.
+   *   3. params.tabIndex — index into the current window's tab list.
+   *   4. Fall back to the active tab in the current window.
+   *
+   * Without (1) or (2) the bridge always picks the OS-active tab, which is
+   * almost never what an automation client wants when many windows are open.
    */
   private async resolveTab(params: Record<string, unknown>): Promise<chrome.tabs.Tab> {
-    if (typeof params.tabId === 'number') {
-      const tab = await browser.tabs.get(params.tabId as number);
-      return tab;
+    const rawId = params.tabId ?? params.targetId;
+    if (rawId !== undefined && rawId !== null) {
+      const id = this.parseTabId(rawId);
+      if (id !== null) {
+        try { return await browser.tabs.get(id); } catch { /* fall through */ }
+      }
     }
     if (typeof params.tabIndex === 'number') {
       const tabs = await browser.tabs.query({ currentWindow: true });
@@ -193,6 +203,18 @@ class HanzoFirefoxExtension {
     const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (activeTab) return activeTab;
     throw new Error('No active tab');
+  }
+
+  private parseTabId(raw: unknown): number | null {
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (typeof raw !== 'string') return null;
+    const m = raw.match(/(?:^|tab-)(\d+)$/);
+    if (m) {
+      const n = Number(m[1]);
+      return Number.isFinite(n) ? n : null;
+    }
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
   }
 
   /**
