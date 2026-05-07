@@ -199,6 +199,18 @@ class HanzoFirefoxExtension {
    * Run JS in the page via executeScript and return the serialized result.
    * Wraps result to avoid undefined → {} JSON serialization issue.
    */
+  /**
+   * Detect a serialized Promise from executeScript: an empty object {} that
+   * came from awaiting a thenable. We can't do better in MV3 / Firefox because
+   * executeScript drops Promise values.
+   */
+  private looksLikePromiseResult(value: unknown): boolean {
+    return value !== null
+      && typeof value === 'object'
+      && Object.keys(value as Record<string, unknown>).length === 0
+      && !Array.isArray(value);
+  }
+
   private async runInPage(tabId: number, code: string, timeoutMs: number = 10000): Promise<any> {
     const wrappedCode = `
       (function() {
@@ -379,12 +391,33 @@ class HanzoFirefoxExtension {
       // =====================================================================
       // JavaScript evaluation
       // =====================================================================
-      case 'Runtime.evaluate': {
+      case 'Runtime.evaluate':
+      case 'evaluate': {
         if (!tabId) throw new Error('No active tab');
-        const expression = params.expression as string;
+        // Accept both `expression` (CDP) and `code` (MCP/SDK convention).
+        const expression = (params.expression as string) ?? (params.code as string) ?? '';
         const timeout = (params.timeout as number) || 10000;
-        const value = await this.runInPage(tabId, `return ${expression}`, timeout);
-        return { result: { value } };
+        // If the caller already wrote a `return` or wrote a function/IIFE,
+        // wrap differently so we don't double-wrap and break syntax.
+        const trimmed = expression.trim();
+        const code = /^\s*return\b/.test(trimmed)
+          ? trimmed
+          : trimmed.endsWith(';')
+            ? `${trimmed} return undefined;`
+            : `return (${trimmed});`;
+        let value = await this.runInPage(tabId, code, timeout);
+        // Auto-await Promises: the page may evaluate to a Promise, but
+        // executeScript serializes it as `{}`. Probe for a `.then` and
+        // resolve in-page so we return the resolved value instead.
+        if (this.looksLikePromiseResult(value)) {
+          value = await this.runInPage(tabId, `
+            return Promise.resolve((function(){ ${code} })()).then(function(__v){
+              try { return JSON.parse(JSON.stringify(__v)); } catch(e) { return String(__v); }
+            });
+          `, timeout);
+        }
+        // Match CDP shape (legacy callers) AND surface `value` directly.
+        return { result: { value }, value };
       }
 
       // =====================================================================
