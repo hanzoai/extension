@@ -223,23 +223,36 @@ class HanzoFirefoxExtension {
       // MV3 path — preferred on every modern build (Chrome 88+, FF 109+).
       const scripting = (browser as any).scripting;
       if (scripting?.executeScript) {
-        const results = await scripting.executeScript({
-          target: { tabId },
-          world: 'MAIN',
-          args: [code],
-          func: (codeStr: string) => {
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-              return Function(codeStr)();
-            } catch (e: any) {
-              return { __hanzo_error: e?.message || String(e) };
-            }
-          },
-        });
-        // scripting.executeScript returns an array of {result, frameId}.
-        // Surface the same shape the legacy MV2 API returned (one result
-        // per frame) so runInPage's caller doesn't have to change.
-        return Array.isArray(results) ? results.map((r: any) => r?.result) : [results];
+        const runIn = async (world: 'MAIN' | 'ISOLATED'): Promise<any[]> => {
+          const results = await scripting.executeScript({
+            target: { tabId },
+            world,
+            args: [code],
+            func: (codeStr: string) => {
+              try {
+                // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+                return Function(codeStr)();
+              } catch (e: any) {
+                return { __hanzo_error: e?.message || String(e) };
+              }
+            },
+          });
+          // scripting.executeScript returns an array of {result, frameId}.
+          return Array.isArray(results) ? results.map((r: any) => r?.result) : [results];
+        };
+
+        // Try MAIN (page CSP applies — see page-internal vars). If the page
+        // CSP blocks Function() the inner func returns __hanzo_error;
+        // ISOLATED world has its own CSP and almost always allows
+        // Function(), so we silently fall back. This rescues e.g. GitHub,
+        // Google Docs, banking sites with strict 'script-src self'.
+        const main = await runIn('MAIN');
+        const blocked = main.length > 0 && main.every((r) =>
+          r && typeof r === 'object' && r.__hanzo_error &&
+          /CSP|unsafe-eval|Content Security|Function|eval/i.test(String(r.__hanzo_error))
+        );
+        if (!blocked) return main;
+        return runIn('ISOLATED');
       }
       // MV2 fallback — only Firefox <109 reaches this branch.
       const legacy = (browser as any).tabs?.executeScript;
@@ -517,7 +530,9 @@ class HanzoFirefoxExtension {
         if (!tabId) throw new Error('No active tab');
         // Accept both `expression` (CDP) and `code` (MCP/SDK convention).
         const expression = (params.expression as string) ?? (params.code as string) ?? '';
-        const timeout = (params.timeout as number) || 10000;
+        // Default 30s — Porkbun-class pages with 1500+ DOM nodes routinely
+        // need more than 10s for first-paint queries. Caller can override.
+        const timeout = (params.timeout as number) || 30000;
         // Caller can opt into Promise-await semantics. CDP names this flag
         // `awaitPromise`; the MCP/SDK callers pass `await_promise`.
         const awaitPromise = Boolean(params.awaitPromise ?? params.await_promise);
