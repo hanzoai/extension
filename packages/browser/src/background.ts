@@ -1830,17 +1830,24 @@ getPortConfig().then(({ zapPorts }) => {
   discoverZapServers(zapMgr, BROWSER_NAME, VERSION, zapPorts, debugLog);
 });
 
-// Keep-alive alarm — Chrome MV3 service workers idle out after ~30s.
-// `chrome.alarms.onAlarm` wakes the worker even when suspended; the
-// handler kicks rediscovery whenever the live ZAP connection is gone,
-// closing the race where setTimeout-based reconnect timers never fire.
+// Keep-alive — Layer 1: Port. Content scripts in every loaded http(s) tab
+// hold a `zap-keepalive` port. As long as ANY tab has one, Chrome keeps
+// the service worker alive without alarms.
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'zap-keepalive') return;
+  port.onMessage.addListener(() => { /* receipt is the keep-alive */ });
+});
+
+// Keep-alive — Layer 2: Alarms. Belt-and-suspenders for the case where
+// no http(s) tab is open AND the worker idles out. Alarm fires every 30s,
+// wakes the worker, re-discovers if the ZAP socket is gone.
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
 try {
   chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.5 });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
     if (!zapMgr.state.connected) {
-      debugLog('[Hanzo/ZAP] keep-alive: no connection, rediscovering');
+      debugLog('[Hanzo/ZAP] keep-alive alarm: no connection, rediscovering');
       getPortConfig().then(({ zapPorts }) => {
         discoverZapServers(zapMgr, BROWSER_NAME, VERSION, zapPorts, debugLog);
       });
