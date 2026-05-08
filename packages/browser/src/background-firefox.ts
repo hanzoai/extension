@@ -205,15 +205,14 @@ class HanzoFirefoxExtension {
     throw new Error('No active tab');
   }
 
+  /** Fully anchored: rejects URLs / hashes / arbitrary strings even when
+   *  they happen to end with a numeric segment. See shared/tab-id.ts. */
   private parseTabId(raw: unknown): number | null {
     if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-    if (typeof raw !== 'string') return null;
-    const m = raw.match(/(?:^|tab-)(\d+)$/);
-    if (m) {
-      const n = Number(m[1]);
-      return Number.isFinite(n) ? n : null;
-    }
-    const n = Number(raw);
+    if (typeof raw !== 'string' || raw === '') return null;
+    const m = raw.match(/^(?:tab-)?(\d+)$/);
+    if (!m) return null;
+    const n = Number(m[1]);
     return Number.isFinite(n) ? n : null;
   }
 
@@ -1202,10 +1201,15 @@ class HanzoFirefoxExtension {
 import {
   IAM_LOGIN_URL as IAM_LOGIN,
   IAM_API_URL as IAM_API,
+  IAM_API_PATH,
   API_BASE_URL as API_BASE,
   STORAGE_KEYS,
   LOCAL_PROVIDER_DEFAULTS,
 } from './shared/config.js';
+
+// Hanzo convention: api.hanzo.ai/v1/<service>/<endpoint>. Never `/api/`.
+// Use IAM_V1 everywhere instead of `${IAM_API}/api/...`.
+const IAM_V1 = `${IAM_API}${IAM_API_PATH}`;
 
 // Auth: all PKCE, token storage, and IAM logic lives in shared/auth.ts
 const ffAdapter: BrowserAdapter = firefoxAdapter();
@@ -1947,7 +1951,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
           const token = await getValidAccessToken();
           if (!token) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
 
-          const resp = await fetch(`${IAM_API}/api/get-account`, {
+          const resp = await fetch(`${IAM_V1}/get-account`, {
             headers: { Authorization: `Bearer ${token}` },
             signal: AbortSignal.timeout(5000),
           });
@@ -1960,7 +1964,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
             orgs.push({ id: user.owner, name: user.owner, displayName: user.owner });
           }
           try {
-            const orgsResp = await fetch(`${IAM_API}/api/get-organizations`, {
+            const orgsResp = await fetch(`${IAM_V1}/get-organizations`, {
               headers: { Authorization: `Bearer ${token}` },
               signal: AbortSignal.timeout(5000),
             });

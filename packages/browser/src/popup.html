@@ -227,7 +227,11 @@
       <!-- Quick Guide -->
       <div class="guide" style="margin-top: 12px;">
         <h3 style="text-transform: none; letter-spacing: 0; color: var(--text);">Shortcuts</h3>
-        <p><kbd>Alt</kbd> + <kbd>Click</kbd> any element to jump to source</p>
+        <p>
+          <kbd id="inspect-shortcut-display">Ctrl</kbd> + <kbd>Click</kbd>
+          any element to jump to source
+          <button id="record-inspect-shortcut" class="btn-link" style="margin-left:6px;font-size:11px;">edit</button>
+        </p>
         <p><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>H</kbd> open Hanzo panel</p>
       </div>
     </div>
@@ -285,6 +289,23 @@
           <label>
             Max Workers
             <input type="number" id="max-workers" value="3" min="1" max="10">
+          </label>
+        </div>
+
+        <div class="setting-group">
+          <h3>Keyboard</h3>
+          <label>
+            Inspect modifier
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+              <kbd id="inspect-shortcut-current" style="flex:1;font-family:monospace;padding:4px 8px;background:var(--surface-2,#222);border-radius:4px;font-size:12px;">Ctrl</kbd>
+              <button id="inspect-shortcut-record" type="button" class="btn btn-ghost" style="padding:4px 10px;">Record</button>
+              <button id="inspect-shortcut-reset" type="button" class="btn btn-ghost" style="padding:4px 10px;">Reset</button>
+            </div>
+            <small style="color:var(--text-muted,#888);font-size:11px;">
+              Hold + click any element on a page to jump to its source. Default
+              is Ctrl (or ⌘ on Mac). Click "Record" then press the chord you
+              want — modifiers alone or modifier+letter both work.
+            </small>
           </label>
         </div>
 
