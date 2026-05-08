@@ -266,7 +266,7 @@ hanzo-browser-server start
 hanzo-browser-server install-extension
 \`\`\`
 
-3. Alt+Click any element in your browser to navigate to its source code!
+3. Ctrl+Click any element in your browser to navigate to its source code!
 
 ## Features
 

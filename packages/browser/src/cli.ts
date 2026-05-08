@@ -42,7 +42,7 @@ program
     console.log(chalk.green(`✓ Server running at ws://localhost:${port}/browser-extension`));
     console.log(chalk.yellow('\n📝 Instructions:'));
     console.log('1. Install the browser extension (run with --install-extension flag)');
-    console.log('2. Alt+Click any element in your browser to navigate to its source code');
+    console.log('2. Ctrl+Click any element in your browser to navigate to its source code');
     console.log('3. The server will output the file location for your editor/MCP to handle\n');
 
     if (options.installExtension) {
@@ -146,7 +146,7 @@ async function installExtension() {
         console.log('2. Enable "Developer mode" (toggle in top right)');
         console.log('3. Click "Load unpacked"');
         console.log(`4. Select the folder: ${path.join(__dirname, '..', '..', 'dist', 'browser-extension')}`);
-        console.log('5. The extension is now installed! Alt+Click elements to navigate to source.\n');
+        console.log('5. The extension is now installed! Ctrl+Click elements to navigate to source.\n');
         resolve();
       } else {
         reject(new Error(`Build failed with code ${code}`));

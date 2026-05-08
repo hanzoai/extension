@@ -16,7 +16,7 @@ import {
   queryRagFromEndpoint,
 } from './shared/rag.js';
 import {
-  IAM_API_URL, IAM_LOGIN_URL, API_BASE_URL,
+  IAM_API_URL, IAM_LOGIN_URL, IAM_API_PATH, API_BASE_URL,
   DEFAULT_MCP_PORT as CFG_MCP_PORT,
   DEFAULT_CDP_PORT as CFG_CDP_PORT,
   DEFAULT_RAG_TOP_K as CFG_RAG_TOP_K,
@@ -24,6 +24,9 @@ import {
   LOCAL_PROVIDER_DEFAULTS,
   loadRuntimeConfig,
 } from './shared/config.js';
+
+// Hanzo convention: /v1/<service>/<endpoint>. Never `/api/`.
+const IAM_V1 = `${IAM_API_URL}${IAM_API_PATH}`;
 import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './cdp-bridge';
@@ -796,7 +799,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       try {
         const token = await auth.getValidAccessToken();
         if (token) {
-          fetch(`${IAM_LOGIN_URL}/api/update-user`, {
+          fetch(`${IAM_V1}/update-user`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1457,7 +1460,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         const token = await auth.getValidAccessToken();
         if (!token) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
 
-        const resp = await fetch(`${IAM_API_URL}/api/get-account`, {
+        const resp = await fetch(`${IAM_V1}/get-account`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: AbortSignal.timeout(5000),
         });
@@ -1475,7 +1478,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 
         // Fetch orgs the user belongs to
         try {
-          const orgsResp = await fetch(`${IAM_API_URL}/api/get-organizations`, {
+          const orgsResp = await fetch(`${IAM_V1}/get-organizations`, {
             headers: { Authorization: `Bearer ${token}` },
             signal: AbortSignal.timeout(5000),
           });
