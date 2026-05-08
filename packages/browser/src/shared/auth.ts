@@ -11,6 +11,7 @@
 import {
   IAM_LOGIN_URL,
   IAM_API_URL,
+  IAM_API_PATH,
   DEFAULT_CLIENT_ID,
   DEFAULT_SCOPES,
   DEFAULT_REDIRECT_URI,
@@ -281,13 +282,15 @@ async function refreshAccessToken(storage: BrowserStorage, refreshToken: string)
   return tokens.access_token;
 }
 
-/** Fetch user info from IAM (/api/get-account or /api/userinfo fallback). */
+/** Fetch user info from IAM. Hanzo gateway exposes Casdoor's get-account
+ *  and userinfo at `${iamApiUrl}/v1/iam/...` — never `/api/`. */
 async function fetchUserInfo(storage: BrowserStorage, accessToken: string): Promise<UserInfo> {
   const config = await getRuntimeConfig(storage);
+  const base = `${config.iamApiUrl}${IAM_API_PATH}`;
   const headers = { Authorization: `Bearer ${accessToken}` };
 
   try {
-    const acctResp = await fetch(`${config.iamApiUrl}/api/get-account`, { headers });
+    const acctResp = await fetch(`${base}/get-account`, { headers });
     if (acctResp.ok) {
       const acctJson = await acctResp.json();
       const acct = acctJson.data || acctJson;
@@ -302,7 +305,7 @@ async function fetchUserInfo(storage: BrowserStorage, accessToken: string): Prom
     }
   } catch { /* fall through */ }
 
-  const response = await fetch(`${config.iamApiUrl}/api/userinfo`, { headers });
+  const response = await fetch(`${base}/userinfo`, { headers });
   if (!response.ok) throw new Error('Failed to fetch user info');
   return response.json();
 }
