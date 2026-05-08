@@ -418,11 +418,16 @@ export class CDPBridge {
           break;
 
         case 'Runtime.evaluate':
-          // Must enable Runtime domain and set returnByValue for actual values
+          // Must enable Runtime domain and set returnByValue for actual
+          // values. `awaitPromise: true` makes CDP wait for async IIFEs
+          // to resolve so callers passing `(async () => {...})()` get
+          // the resolved value instead of an empty {} (the previous bug
+          // — caller saw a serialized Promise placeholder).
           await this.send(tabId, 'Runtime.enable');
           result = await this.send(tabId, method, {
             ...params,
             returnByValue: true,
+            awaitPromise: true,
           });
           break;
 
