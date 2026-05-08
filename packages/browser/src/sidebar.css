@@ -263,7 +263,7 @@ html {
   line-height: 1.5;
 }
 
-/* Sign-in button — matches @hanzo/ui primary button on dark */
+/* Sign-in button — matches @hanzo/gui primary button on dark (monochrome) */
 .auth-signin-btn {
   width: 100%;
   padding: 10px 16px;
