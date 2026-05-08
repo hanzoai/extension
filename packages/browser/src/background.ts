@@ -15,7 +15,6 @@ import {
   handleZapMessage,
   setZapRequestHandler,
   MSG_REQUEST,
-  DEFAULT_ZAP_PORTS as SHARED_ZAP_PORTS,
   type ZapManager,
 } from './shared/zap.js';
 import {
@@ -124,8 +123,11 @@ const controlSession: ControlSession = {
   startedAt: null,
 };
 
-// Default ports (overridable via chrome.storage.local settings)
-const DEFAULT_ZAP_PORTS = SHARED_ZAP_PORTS;
+// Default ports (overridable via chrome.storage.local settings).
+// NOTE: ZAP discovery is mDNS-only (HIP-0069); the legacy zapPorts setting
+// is no longer consulted for discovery — kept here only because other
+// surfaces (status display, settings UI) still expose it during the
+// removal window.
 const DEFAULT_MCP_PORT = CFG_MCP_PORT;
 const DEFAULT_CDP_PORT = CFG_CDP_PORT;
 const DEFAULT_RAG_TOP_K = CFG_RAG_TOP_K;
@@ -142,11 +144,10 @@ const controlMessageLimiter = new ActionRateLimiter();
 const controlMessageSignatures = new Map<string, string>();
 
 /** Load port configuration from storage */
-async function getPortConfig(): Promise<{ zapPorts: number[]; mcpPort: number; cdpPort: number }> {
+async function getPortConfig(): Promise<{ mcpPort: number; cdpPort: number }> {
   return new Promise((resolve) => {
-    chrome.storage.local.get(['zapPorts', 'mcpPort', 'cdpPort'], (result) => {
+    chrome.storage.local.get(['mcpPort', 'cdpPort'], (result) => {
       resolve({
-        zapPorts: result.zapPorts || DEFAULT_ZAP_PORTS,
         mcpPort: result.mcpPort || DEFAULT_MCP_PORT,
         cdpPort: result.cdpPort || DEFAULT_CDP_PORT,
       });
@@ -1826,9 +1827,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 setZapRequestHandler(zapMgr, async (method, params) => {
   return cdpBridge.dispatchMethod(method, params);
 });
-getPortConfig().then(({ zapPorts }) => {
-  discoverZapServers(zapMgr, BROWSER_NAME, VERSION, zapPorts, debugLog);
-});
+// mDNS-only discovery per HIP-0069 — port hint not consulted.
+discoverZapServers(zapMgr, BROWSER_NAME, VERSION, undefined, debugLog);
 
 // Keep-alive — Layer 1: Port. Content scripts in every loaded http(s) tab
 // hold a `zap-keepalive` port. As long as ANY tab has one, Chrome keeps
@@ -1847,10 +1847,8 @@ try {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
     if (!zapMgr.state.connected) {
-      debugLog('[Hanzo/ZAP] keep-alive alarm: no connection, rediscovering');
-      getPortConfig().then(({ zapPorts }) => {
-        discoverZapServers(zapMgr, BROWSER_NAME, VERSION, zapPorts, debugLog);
-      });
+      debugLog('[Hanzo/ZAP] keep-alive alarm: no connection, rediscovering via mDNS');
+      discoverZapServers(zapMgr, BROWSER_NAME, VERSION, undefined, debugLog);
     }
   });
 } catch (e) {
