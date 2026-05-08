@@ -167,6 +167,32 @@ export async function connectZap(
             tools: (info.tools || []).map((t: any) => t.name),
           });
           log(`[Hanzo/ZAP] Connected to ${info.name || url} (${(info.tools || []).length} tools)`);
+
+          // Heartbeat — guards against half-open WS where neither side gets
+          // an onclose. Send a PING every 20s; if no PONG within 8s, force
+          // close so the reconnect chain fires. Cleared on ws close.
+          const heartbeat: any = setInterval(() => {
+            try {
+              const sentAt = Date.now();
+              ws.send(encodeZapMessage(MSG_PING, { t: sentAt }));
+              const pongDeadline = setTimeout(() => {
+                log('[Hanzo/ZAP] heartbeat timeout — closing socket to retrigger retry');
+                try { ws.close(); } catch { /* already closed */ }
+              }, 8000);
+              const onPongRaw = ws.onmessage;
+              ws.onmessage = (ev: MessageEvent) => {
+                try {
+                  if (ev.data instanceof ArrayBuffer) {
+                    const m = decodeZapMessage(ev.data);
+                    if (m && m.type === MSG_PONG) clearTimeout(pongDeadline);
+                  }
+                } catch { /* fall-through to existing handler */ }
+                if (onPongRaw) (onPongRaw as any).call(ws, ev);
+              };
+            } catch { /* socket closed mid-tick */ }
+          }, 20000);
+          (ws as any).__hanzo_heartbeat = heartbeat;
+
           resolve(mcpId);
           break;
         }
@@ -218,6 +244,9 @@ export async function connectZap(
     };
 
     ws.onclose = () => {
+      // Stop the heartbeat — without this we'd keep PING-ing a dead socket.
+      const hb = (ws as any).__hanzo_heartbeat;
+      if (hb) clearInterval(hb);
       for (const [id, conn] of mgr.connections) {
         if (conn === ws) {
           mgr.connections.delete(id);
