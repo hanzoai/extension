@@ -1,10 +1,19 @@
 // Background Service Worker for Browser Extension
+//
+// First import: webextension-polyfill. On Chrome/Edge this is a side-effect
+// import that defines `globalThis.browser` as the unified Promise-returning
+// WebExtension API. On Firefox/Safari `browser.*` is already native and the
+// polyfill is a no-op. The shared modules (auth.ts, tab-id.ts, etc.) read
+// this global so importing it once at the entrypoint is enough.
+import 'webextension-polyfill';
+
 import type { ZapState, ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
 import {
   createZapManager,
   encodeZapMessage,
   discoverZapServers,
   handleZapMessage,
+  setZapRequestHandler,
   MSG_REQUEST,
   DEFAULT_ZAP_PORTS as SHARED_ZAP_PORTS,
   type ZapManager,
@@ -1794,10 +1803,12 @@ function handleMCPMessage(data: any) {
 // Startup
 // =============================================================================
 
-// 0. Register side panel
-if (chrome.sidePanel) {
-  chrome.sidePanel.setOptions({ path: 'sidebar.html', enabled: true });
-}
+// 0. Side panel intentionally NOT registered. The user requirement is a
+// right-anchored, in-page chat overlay across every browser; the native
+// chrome.sidePanel surface gives an OS-managed panel which doesn't match
+// that design and behaves differently from the Firefox path. Routing
+// through the content-script overlay (page.overlay.* messages) is the
+// single source of truth — see popup.ts.
 
 // End active session when the controlled tab closes.
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -1807,6 +1818,14 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 // 1. Primary: Discover ZAP servers (high-performance binary protocol)
+//    Install a request handler so Python hanzo-mcps can dispatch browser
+//    actions BACK to this extension over the same socket. This is what
+//    makes the 2-process architecture work — the extension is no longer
+//    a one-way client; it accepts inbound RPC and routes via the existing
+//    cdp-bridge dispatcher.
+setZapRequestHandler(zapMgr, async (method, params) => {
+  return cdpBridge.dispatchMethod(method, params);
+});
 getPortConfig().then(({ zapPorts }) => {
   discoverZapServers(zapMgr, BROWSER_NAME, VERSION, zapPorts, debugLog);
 });

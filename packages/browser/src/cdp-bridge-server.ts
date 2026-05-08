@@ -1,6 +1,18 @@
 #!/usr/bin/env node
 /**
- * CDP Bridge Server - Unified browser control interface
+ * CDP Bridge Server — DEPRECATED in @hanzo/browser-extension 2.0.0.
+ *
+ * The canonical 2-process architecture removes this node bridge from the
+ * critical path. Each Python `hanzo-mcp` now hosts a ZAP server directly
+ * (one of ports 9999..9995); browser extensions discover and connect to
+ * those MCPs without any intermediary. See
+ * `python-sdk/pkg/hanzo-tools-browser/hanzo_tools/browser/zap_server.py`.
+ *
+ * This file remains only as a fallback for non-ZAP MCP clients (legacy
+ * stdio-only consumers that still want to talk to the extension via the
+ * old WS+HTTP API on 9223/9224). It is no longer auto-launched. Do not
+ * extend it for new functionality — extend the Python ZAP server and the
+ * extension's `shared/zap.ts` instead.
  *
  * Provides hanzo.browser(action, params) interface matching hanzo-mcp pattern.
  * Browser extension connects to this server for remote control.
