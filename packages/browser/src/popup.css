@@ -13,9 +13,10 @@
   --border-strong: rgba(255,255,255,0.16);
   --glass: rgba(255,255,255,0.04);
   --glass-strong: rgba(255,255,255,0.07);
-  --success: #22c55e;
-  --warning: #eab308;
-  --error: #ef4444;
+  /* Status: monochrome by hue per @hanzo/brand (white luminance scale). */
+  --success: #fafafa;
+  --warning: #d4d4d4;
+  --error: rgba(255,255,255,0.55);
   --link: #a3a3a3;
   --link-hover: #fafafa;
   --radius: 10px;

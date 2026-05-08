@@ -37,6 +37,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const openPageOverlay = document.getElementById('open-page-overlay'); // legacy id, may not exist
   const pinLeftBtn = document.getElementById('pin-left');
   const pinRightBtn = document.getElementById('pin-right');
+  const overlayEnabledCheckbox = document.getElementById('overlay-enabled') as HTMLInputElement | null;
+  const widthBtns = Array.from(document.querySelectorAll('.width-btn')) as HTMLButtonElement[];
+  const overlaySideRow = document.getElementById('overlay-side-row');
+  const overlayWidthRow = document.getElementById('overlay-width-row');
+
+  type OverlayWidth = 'compact' | 'default' | 'wide';
+
+  function syncSettingsUi(enabled: boolean, side: 'left' | 'right', width: OverlayWidth) {
+    if (overlayEnabledCheckbox) overlayEnabledCheckbox.checked = enabled;
+    pinLeftBtn?.setAttribute('data-active', side === 'left' ? 'true' : 'false');
+    pinRightBtn?.setAttribute('data-active', side === 'right' ? 'true' : 'false');
+    widthBtns.forEach((b) => b.setAttribute('data-active', b.getAttribute('data-width') === width ? 'true' : 'false'));
+    // Grey out side/width when on-page overlay is disabled.
+    [overlaySideRow, overlayWidthRow].forEach((row) => {
+      if (!row) return;
+      (row as HTMLElement).style.opacity = enabled ? '1' : '0.5';
+      (row as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
+    });
+  }
 
   // Status dots
   const zapStatus = document.getElementById('zap-status');
@@ -109,47 +128,84 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Open chat ---
   // Default surface: in-page edge-pinned overlay (content-script). Honours
-  // the user's `overlaySide` (left|right) preference. Firefox users who
-  // prefer the OS-native sidebar can also reach the same chat surface via
-  // View → Sidebar → Hanzo AI (registered via sidebar_action in
-  // manifest-firefox.json).
+  // the user's `overlayEnabled`, `overlaySide`, and `overlayWidth` prefs.
+  // When `overlayEnabled` is false (or the active tab is privileged), opens
+  // the chat surface in a standalone tab. Firefox users can also reach it
+  // via View → Sidebar → Hanzo AI (registered via sidebar_action).
+  function openSidebarTab() {
+    chrome.tabs.create({ url: chrome.runtime.getURL('sidebar.html') });
+    window.close();
+  }
+
   openPanel?.addEventListener('click', () => {
-    chrome.storage?.sync?.get?.(['overlaySide'], (vals) => {
+    chrome.storage?.sync?.get?.(['overlayEnabled', 'overlaySide', 'overlayWidth'], (vals) => {
+      const enabled = vals?.overlayEnabled !== false;
       const side = vals?.overlaySide === 'left' ? 'left' : 'right';
+      const width: OverlayWidth = vals?.overlayWidth === 'compact'
+        ? 'compact' : vals?.overlayWidth === 'wide' ? 'wide' : 'default';
+      if (!enabled) { openSidebarTab(); return; }
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const activeTab = tabs[0];
         const target = isInjectableTab(activeTab) ? activeTab : null;
-        if (!target?.id) {
-          // Fallback: open the chat surface in a regular tab so the popup
-          // button still does something on privileged (chrome:// / about:)
-          // pages where content scripts can't run.
-          chrome.tabs.create({ url: chrome.runtime.getURL('sidebar.html') });
-          window.close();
-          return;
-        }
-        chrome.runtime.sendMessage({ action: 'page.overlay.show', tabId: target.id, side }, () => {
-          window.close();
-        });
+        if (!target?.id) { openSidebarTab(); return; }
+        chrome.runtime.sendMessage({
+          action: 'page.overlay.show',
+          tabId: target.id,
+          side,
+          width,
+        }, () => window.close());
       });
     });
   });
 
   function setActiveSide(side: 'left' | 'right') {
+    chrome.storage?.sync?.set?.({ overlaySide: side });
     pinLeftBtn?.setAttribute('data-active', side === 'left' ? 'true' : 'false');
     pinRightBtn?.setAttribute('data-active', side === 'right' ? 'true' : 'false');
-    chrome.storage?.sync?.set?.({ overlaySide: side });
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const id = tabs[0]?.id;
       if (id) chrome.runtime.sendMessage({ action: 'page.overlay.setSide', tabId: id, side });
     });
   }
+  function setActiveWidth(width: OverlayWidth) {
+    chrome.storage?.sync?.set?.({ overlayWidth: width });
+    widthBtns.forEach((b) => b.setAttribute('data-active', b.getAttribute('data-width') === width ? 'true' : 'false'));
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const id = tabs[0]?.id;
+      if (id) chrome.runtime.sendMessage({ action: 'page.overlay.setWidth', tabId: id, width });
+    });
+  }
+  function setOverlayEnabled(enabled: boolean) {
+    chrome.storage?.sync?.set?.({ overlayEnabled: enabled });
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const id = tabs[0]?.id;
+      if (id) chrome.runtime.sendMessage({ action: 'page.overlay.setEnabled', tabId: id, enabled });
+    });
+    chrome.storage?.sync?.get?.(['overlaySide', 'overlayWidth'], (vals) => {
+      const side = vals?.overlaySide === 'left' ? 'left' : 'right';
+      const width: OverlayWidth = vals?.overlayWidth === 'compact'
+        ? 'compact' : vals?.overlayWidth === 'wide' ? 'wide' : 'default';
+      syncSettingsUi(enabled, side, width);
+    });
+  }
+
   pinLeftBtn?.addEventListener('click', () => setActiveSide('left'));
   pinRightBtn?.addEventListener('click', () => setActiveSide('right'));
-  // Restore active-pin highlighting from storage.
-  chrome.storage?.sync?.get?.(['overlaySide'], (vals) => {
+  widthBtns.forEach((b) => b.addEventListener('click', () => {
+    const w = b.getAttribute('data-width') as OverlayWidth | null;
+    if (w === 'compact' || w === 'default' || w === 'wide') setActiveWidth(w);
+  }));
+  overlayEnabledCheckbox?.addEventListener('change', (e) => {
+    setOverlayEnabled((e.target as HTMLInputElement).checked);
+  });
+
+  // Initial UI sync from storage.
+  chrome.storage?.sync?.get?.(['overlayEnabled', 'overlaySide', 'overlayWidth'], (vals) => {
+    const enabled = vals?.overlayEnabled !== false;
     const side = vals?.overlaySide === 'left' ? 'left' : 'right';
-    pinLeftBtn?.setAttribute('data-active', side === 'left' ? 'true' : 'false');
-    pinRightBtn?.setAttribute('data-active', side === 'right' ? 'true' : 'false');
+    const width: OverlayWidth = vals?.overlayWidth === 'compact'
+      ? 'compact' : vals?.overlayWidth === 'wide' ? 'wide' : 'default';
+    syncSettingsUi(enabled, side, width);
   });
 
   function isInjectableTab(tab: chrome.tabs.Tab | undefined): boolean {
