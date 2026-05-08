@@ -100,25 +100,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // --- Open side panel ---
+  // --- Open chat panel ---
+  // Always uses the in-page right-anchored overlay (content-script). The
+  // browser-native sidebar (chrome.sidePanel / browser.sidebarAction) is
+  // not used because:
+  //   - Firefox always renders its sidebar on the user's preferred side
+  //     (default left) and surrounds it with the native sidebar-icon strip,
+  //     which the user explicitly does NOT want.
+  //   - Chrome's sidePanel is right-anchored, but the position is OS-managed
+  //     and doesn't match the in-page overlay's behaviour.
+  // Routing every "Open Chat Panel" click through page.overlay gives a
+  // consistent right-anchored chat across every browser.
   openPanel?.addEventListener('click', () => {
-    if (chrome.sidePanel) {
-      // Chrome / Edge: use sidePanel API
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.sidePanel.open({ tabId: tabs[0].id });
-          window.close();
-        }
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = tabs[0];
+      const target = isInjectableTab(activeTab) ? activeTab : null;
+      if (!target?.id) {
+        // Fallback: open a standalone window with the chat surface so the
+        // popup-button still does something on chrome:// / about: pages.
+        chrome.tabs.create({ url: chrome.runtime.getURL('sidebar.html') });
+        window.close();
+        return;
+      }
+      chrome.runtime.sendMessage({ action: 'page.overlay.show', tabId: target.id }, () => {
+        window.close();
       });
-    } else if (typeof browser !== 'undefined' && browser.sidebarAction) {
-      // Firefox: use sidebarAction API
-      browser.sidebarAction.open();
-      window.close();
-    } else {
-      // Fallback: try opening sidebar.html as a new tab
-      chrome.tabs.create({ url: chrome.runtime.getURL('sidebar.html') });
-      window.close();
-    }
+    });
   });
 
   function isInjectableTab(tab: chrome.tabs.Tab | undefined): boolean {
