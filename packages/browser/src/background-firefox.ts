@@ -161,18 +161,57 @@ class HanzoFirefoxExtension {
   }
 
   /**
-   * Wrap executeScript with a timeout to prevent blocking on GPU-heavy pages
+   * Run JS in a page tab and return its result, with a hard timeout.
+   *
+   * Firefox MV3 removed `browser.tabs.executeScript` (the string-based
+   * MV2 API). The replacement is `browser.scripting.executeScript({...})`
+   * which only accepts a function (or files), not a code string. To keep
+   * the existing call sites that pass dynamic strings working, we inject
+   * a one-line trampoline `(c) => Function(c)()` and forward the user's
+   * code as an argument, executing in the page's MAIN world (so the
+   * page's own CSP applies and `Function` is allowed on most sites).
+   *
+   * Falls back to MV2 `tabs.executeScript` on browsers / runtimes that
+   * still have it (older Firefox, Chrome MV2 which we don't ship but
+   * don't want to break).
    */
   private executeScriptWithTimeout(
     tabId: number,
     code: string,
     timeoutMs: number = 10000
   ): Promise<any[]> {
+    const exec: Promise<any[]> = (async () => {
+      // MV3 path — preferred on every modern build (Chrome 88+, FF 109+).
+      const scripting = (browser as any).scripting;
+      if (scripting?.executeScript) {
+        const results = await scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          args: [code],
+          func: (codeStr: string) => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+              return Function(codeStr)();
+            } catch (e: any) {
+              return { __hanzo_error: e?.message || String(e) };
+            }
+          },
+        });
+        // scripting.executeScript returns an array of {result, frameId}.
+        // Surface the same shape the legacy MV2 API returned (one result
+        // per frame) so runInPage's caller doesn't have to change.
+        return Array.isArray(results) ? results.map((r: any) => r?.result) : [results];
+      }
+      // MV2 fallback — only Firefox <109 reaches this branch.
+      const legacy = (browser as any).tabs?.executeScript;
+      if (legacy) return legacy.call(browser.tabs, tabId, { code });
+      throw new Error('No executeScript API available (need MV3 scripting permission)');
+    })();
     return Promise.race([
-      browser.tabs.executeScript(tabId, { code }),
+      exec,
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('executeScript timeout')), timeoutMs)
-      )
+      ),
     ]);
   }
 
@@ -233,15 +272,18 @@ class HanzoFirefoxExtension {
   }
 
   private async runInPage(tabId: number, code: string, timeoutMs: number = 10000): Promise<any> {
+    // Wrap the user's code in a function body that ALWAYS has a top-level
+    // `return`. Without this `Function(body)()` discards the IIFE result and
+    // hands back undefined → JSON serializes to {} → caller can't tell
+    // success from failure. The trampoline we use is `Function(c)()`, so
+    // `c` itself must `return` whatever the page produced.
     const wrappedCode = `
-      (function() {
-        try {
-          var __r = (function() { ${code} })();
-          return __r === undefined ? null : __r;
-        } catch(__e) {
-          return { __hanzo_error: __e.message || String(__e) };
-        }
-      })()
+      try {
+        var __r = (function() { ${code} })();
+        return __r === undefined ? null : __r;
+      } catch(__e) {
+        return { __hanzo_error: __e.message || String(__e) };
+      }
     `;
     const results = await this.executeScriptWithTimeout(tabId, wrappedCode, timeoutMs);
     const result = results[0];
@@ -443,6 +485,13 @@ class HanzoFirefoxExtension {
 
       // =====================================================================
       // Screenshots
+      //
+      // Firefox is strict about the captureVisibleTab signature: it wants
+      // `(windowId, options)`. The Chrome MV3 polyfill accepted just
+      // `(options)` so a lot of cross-browser code passes opts as the first
+      // arg, which Firefox interprets as a windowId integer and silently
+      // returns the empty string. Resolve the *target* tab's windowId
+      // explicitly so the screenshot is always of the right window.
       // =====================================================================
       case 'Page.captureScreenshot':
       case 'hanzo.screenshot': {
@@ -450,9 +499,31 @@ class HanzoFirefoxExtension {
         const quality = (params.quality as number) || (format === 'jpeg' ? 80 : undefined);
         const opts: any = { format: format as 'png' | 'jpeg' };
         if (quality !== undefined) opts.quality = quality;
-        const dataUrl = await browser.tabs.captureVisibleTab(opts) as unknown as string;
+        // tab is the resolved target (already set via resolveTab at top of
+        // executeMethod). If the caller targeted a non-foreground tab we
+        // briefly activate it so captureVisibleTab can render it. We
+        // restore focus right after.
+        let activatedFor: number | null = null;
+        let prevActiveId: number | undefined;
+        if (tab && !tab.active) {
+          const [prev] = await browser.tabs.query({ active: true, windowId: tab.windowId });
+          prevActiveId = prev?.id;
+          await browser.tabs.update(tab.id!, { active: true });
+          activatedFor = tab.id ?? null;
+          // Give the tab one tick to actually compose.
+          await new Promise(r => setTimeout(r, 50));
+        }
+        let dataUrl: string;
+        try {
+          dataUrl = await browser.tabs.captureVisibleTab(tab?.windowId ?? null as any, opts) as unknown as string;
+        } finally {
+          if (activatedFor !== null && prevActiveId) {
+            await browser.tabs.update(prevActiveId, { active: true }).catch(() => {});
+          }
+        }
+        if (!dataUrl) throw new Error('captureVisibleTab returned empty result');
         const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-        return { data: base64 };
+        return { data: base64, format, size: base64.length };
       }
 
       // =====================================================================
