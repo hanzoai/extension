@@ -339,47 +339,66 @@ export async function getAuthStatus(storage: BrowserStorage): Promise<{
   return { authenticated: true, user };
 }
 
-// ── Chrome/Firefox Adapter Factories ────────────────────────────────────
-
-/** Create a BrowserAdapter from Chrome extension APIs */
-export function chromeAdapter(): BrowserAdapter {
-  return {
-    storage: {
-      get: (keys) => new Promise((resolve) => chrome.storage.local.get(keys, resolve)),
-      set: (items) => chrome.storage.local.set(items),
-      remove: (keys) => chrome.storage.local.remove(keys),
-    },
-    tabs: {
-      create: (opts) => new Promise((resolve, reject) => {
-        chrome.tabs.create(opts, (tab) => {
-          if (chrome.runtime.lastError || !tab?.id) {
-            reject(new Error(chrome.runtime.lastError?.message || 'Failed to open tab'));
-          } else {
-            resolve(tab);
-          }
-        });
-      }),
-      remove: (tabId) => chrome.tabs.remove(tabId),
-      onUpdated: chrome.tabs.onUpdated,
-      onRemoved: chrome.tabs.onRemoved,
-    },
-  };
+// ── WebExtension Adapter Factory ────────────────────────────────────────
+//
+// Unified across Chrome (MV3), Firefox (MV3), Safari (WebExtension), and
+// Edge (Chromium MV3). Uses webextension-polyfill at the entrypoint level
+// so `globalThis.browser` is the canonical Promise-returning API on every
+// runtime. On Firefox/Safari `browser.*` is native; on Chrome the polyfill
+// wraps `chrome.*` callbacks. The result is ONE codepath that works
+// identically everywhere — no more separate `chromeAdapter` /
+// `firefoxAdapter` factories with subtly different behavior.
+//
+// The adapter intentionally still targets a small surface (storage +
+// tabs) because that's all auth.ts needs. If we ever migrate the wider
+// codebase to `browser.*` we'd extend this — but for now keeping the
+// surface minimal avoids unnecessary churn in callback-style listeners
+// elsewhere (e.g. the runtime.onMessage handlers, which are still chrome
+// callback style by design).
+function getBrowser(): typeof browser {
+  // Prefer the polyfilled `browser` if present (Chrome with the polyfill
+  // imported at entrypoint, or any native browser.*-supporting runtime).
+  // Fall back to wrapping `chrome.*` directly if neither is present
+  // (which only happens in tests / non-extension contexts).
+  return (globalThis as any).browser ?? (globalThis as any).chrome;
 }
 
-/** Create a BrowserAdapter from Firefox WebExtension APIs */
-export function firefoxAdapter(): BrowserAdapter {
-  const b = (globalThis as any).browser;
+/**
+ * Create a BrowserAdapter that works on Chrome/Firefox/Edge/Safari.
+ * Requires `globalThis.browser` to be defined (which the polyfill
+ * import at the entrypoint guarantees on Chrome).
+ */
+export function webExtensionAdapter(): BrowserAdapter {
+  const b: any = getBrowser();
   return {
     storage: {
-      get: (keys) => b.storage.local.get(keys),
-      set: (items) => b.storage.local.set(items),
-      remove: (keys) => b.storage.local.remove(keys),
+      // Promise-returning on every runtime once the polyfill is loaded.
+      get: (keys) => Promise.resolve(b.storage.local.get(keys)),
+      set: (items) => Promise.resolve(b.storage.local.set(items)),
+      remove: (keys) => Promise.resolve(b.storage.local.remove(keys)),
     },
     tabs: {
-      create: (opts) => b.tabs.create(opts),
-      remove: (tabId) => b.tabs.remove(tabId),
+      create: (opts) => Promise.resolve(b.tabs.create(opts)),
+      remove: (tabId) => Promise.resolve(b.tabs.remove(tabId)),
       onUpdated: b.tabs.onUpdated,
       onRemoved: b.tabs.onRemoved,
     },
   };
+}
+
+/**
+ * Legacy Chrome adapter — kept for backwards compatibility with callers
+ * that imported it before 1.9.0. Now just an alias for
+ * `webExtensionAdapter`. Prefer `webExtensionAdapter` in new code.
+ */
+export function chromeAdapter(): BrowserAdapter {
+  return webExtensionAdapter();
+}
+
+/**
+ * Legacy Firefox adapter — same deal as `chromeAdapter`. Both are
+ * aliases now that the polyfill gives us one identical surface.
+ */
+export function firefoxAdapter(): BrowserAdapter {
+  return webExtensionAdapter();
 }

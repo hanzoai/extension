@@ -8,29 +8,13 @@ const { execSync } = require('child_process');
 async function build() {
   console.log('Building browser extension...');
 
-  const hanzoUiRoot = path.resolve(__dirname, '../../../../ui');
-  const hanzoUiPrimitives = path.join(hanzoUiRoot, 'pkg/ui/dist/primitives/index-common.js');
-  const localReact = path.join(hanzoUiRoot, 'node_modules/react');
-  const localReactDom = path.join(hanzoUiRoot, 'node_modules/react-dom');
-  const forceLocalUiShim = process.env.HANZO_FORCE_LOCAL_UI_SHIM === '1';
-  const canUseSharedUi =
-    !forceLocalUiShim &&
-    fs.existsSync(hanzoUiPrimitives) &&
-    fs.existsSync(localReact) &&
-    fs.existsSync(localReactDom);
-
-  if (canUseSharedUi) {
-    console.log('Using shared @hanzo/ui primitives from sibling repo:', hanzoUiPrimitives);
-  } else {
-    console.warn(
-      [
-        'Shared @hanzo/ui dependencies were not found. Falling back to local primitives shim.',
-        `Expected: ${hanzoUiPrimitives}`,
-        `Expected: ${localReact}`,
-        `Expected: ${localReactDom}`,
-      ].join('\n')
-    );
-  }
+  // The extension does NOT depend on `@hanzo/ui`. Primitives are served by
+  // a small local shim aliased as `@hanzo/gui` so call-sites read like the
+  // canonical hanzo design system. The full tamagui-based @hanzo/gui will
+  // land in a feature branch — when that ships, just point the alias below
+  // at the published `@hanzo/gui` package and remove gui-primitives.tsx.
+  const hanzoGuiShim = path.join(__dirname, 'gui-primitives.tsx');
+  console.log('Using @hanzo/gui local primitives shim:', hanzoGuiShim);
 
   // Ensure dist directories exist
   fs.mkdirSync('dist/browser-extension', { recursive: true });
@@ -80,16 +64,11 @@ async function build() {
     format: 'esm'
   });
 
-  // Build sidebar + popup UI scripts (TypeScript-first, with JS fallback)
-  const sidebarAliases = canUseSharedUi
-    ? {
-        '@hanzo/ui/primitives-common': hanzoUiPrimitives,
-        react: localReact,
-        'react-dom': localReactDom,
-      }
-    : {
-        '@hanzo/ui/primitives-common': path.join(__dirname, 'primitives-common-fallback.tsx'),
-      };
+  // Build sidebar + popup UI scripts (TypeScript-first, with JS fallback).
+  // Primitives are aliased to the local @hanzo/gui shim (see gui-primitives.tsx).
+  const sidebarAliases = {
+    '@hanzo/gui': hanzoGuiShim,
+  };
 
   await esbuild.build({
     entryPoints: [fs.existsSync('src/sidebar.ts') ? 'src/sidebar.ts' : 'src/sidebar.js'],
