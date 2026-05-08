@@ -1,5 +1,11 @@
 // Hanzo Browser Extension - Content Script
 // Connects clicked elements to source code via source-maps
+//
+// Polyfill MUST be the first import so any subsequent code that touches
+// `browser.*` (the cross-browser API surface) sees the wrapped Promise
+// API on Chrome too. On native runtimes (Firefox / Safari) the import is
+// a no-op.
+import 'webextension-polyfill';
 
 import {
   DEFAULT_INSPECT_SHORTCUT,
@@ -109,12 +115,18 @@ class HanzoContentScript {
           sendResponse({ success: true });
           return true;
         case 'page.overlay.toggle':
+          if (request.side === 'left' || request.side === 'right') {
+            pageOverlay.setSide(request.side);
+          }
           sendResponse({
             success: true,
             open: pageOverlay.toggle(),
           });
           return true;
         case 'page.overlay.show':
+          if (request.side === 'left' || request.side === 'right') {
+            pageOverlay.setSide(request.side);
+          }
           pageOverlay.show();
           sendResponse({ success: true, open: true });
           return true;
@@ -123,7 +135,15 @@ class HanzoContentScript {
           sendResponse({ success: true, open: false });
           return true;
         case 'page.overlay.status':
-          sendResponse({ success: true, open: pageOverlay.isOpen() });
+          sendResponse({ success: true, open: pageOverlay.isOpen(), side: pageOverlay.getSide() });
+          return true;
+        case 'page.overlay.setSide':
+          if (request.side === 'left' || request.side === 'right') {
+            pageOverlay.setSide(request.side);
+            sendResponse({ success: true, side: request.side });
+          } else {
+            sendResponse({ success: false, error: 'side must be "left" or "right"' });
+          }
           return true;
 
         // --- Popup Tool Actions ---
@@ -752,6 +772,7 @@ class HanzoPageOverlay {
   private mounted = false;
   private enabled = false;
   private open = false;
+  private side: 'left' | 'right' = 'right';
   private sending = false;
   private watchMode = false;
   private editMode = false;
@@ -778,6 +799,21 @@ class HanzoPageOverlay {
     this.injectStyles();
     this.mount();
     this.bindGlobalEvents();
+    this.restoreSide();
+  }
+
+  private restoreSide(): void {
+    try {
+      const ss = browser?.storage?.sync;
+      if (!ss?.get) return;
+      ss.get(['overlaySide']).then((v: any) => {
+        const stored = v?.overlaySide;
+        if (stored === 'left' || stored === 'right') {
+          this.side = stored;
+          this.root?.setAttribute('data-side', stored);
+        }
+      }).catch(() => {});
+    } catch { /* storage may be unavailable */ }
   }
 
   toggle(): boolean {
@@ -787,6 +823,23 @@ class HanzoPageOverlay {
     }
     this.hide();
     return false;
+  }
+
+  isOpen(): boolean {
+    return this.open;
+  }
+
+  getSide(): 'left' | 'right' {
+    return this.side;
+  }
+
+  setSide(side: 'left' | 'right'): void {
+    this.side = side;
+    this.root?.setAttribute('data-side', side);
+    try {
+      // Persist asynchronously; callers don't need to await.
+      browser?.storage?.sync?.set({ overlaySide: side });
+    } catch { /* storage may be unavailable in some contexts */ }
   }
 
   show(): void {
@@ -808,10 +861,6 @@ class HanzoPageOverlay {
     this.setEditMode(false);
   }
 
-  isOpen(): boolean {
-    return this.open;
-  }
-
   private ensureMounted(): void {
     if (this.mounted) return;
     this.mount();
@@ -823,74 +872,55 @@ class HanzoPageOverlay {
     const style = document.createElement('style');
     style.id = 'hanzo-page-overlay-styles';
     style.textContent = `
+      /* Edge-pinned sidebar panel — no FAB, opened from extension popup. */
       #hanzo-page-overlay-root {
         position: fixed;
-        right: 20px;
-        bottom: 20px;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: min(420px, 100vw);
         z-index: 2147483645;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         pointer-events: none;
+      }
+
+      /* User-configurable side. Set data-side="left" on the root to flip. */
+      #hanzo-page-overlay-root[data-side="left"] {
+        right: auto;
+        left: 0;
       }
 
       #hanzo-page-overlay-root * {
         box-sizing: border-box;
       }
 
-      #hanzo-page-overlay-root[data-enabled="false"] .hanzo-page-launcher {
-        opacity: 0;
-        transform: translateY(16px);
-        pointer-events: none;
-      }
-
-      .hanzo-page-launcher {
-        width: 54px;
-        height: 54px;
-        border-radius: 9999px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: linear-gradient(135deg, rgba(22, 24, 31, 0.96), rgba(7, 8, 12, 0.96));
-        color: #ffffff;
-        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        pointer-events: auto;
-        transition: transform 0.2s ease, opacity 0.2s ease;
-      }
-
-      .hanzo-page-launcher:hover {
-        transform: translateY(-2px);
-      }
-
       .hanzo-page-panel {
-        width: min(420px, calc(100vw - 24px));
-        max-height: min(620px, calc(100vh - 28px));
-        border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.16);
+        width: 100%;
+        height: 100%;
+        border-left: 1px solid rgba(255, 255, 255, 0.16);
         background: linear-gradient(180deg, rgba(11, 13, 18, 0.97), rgba(7, 8, 12, 0.97));
         color: #eef2ff;
         overflow: hidden;
-        box-shadow: 0 22px 48px rgba(0, 0, 0, 0.45);
-        transform-origin: bottom right;
-        transform: translateY(8px) scale(0.98);
+        box-shadow: -22px 0 48px rgba(0, 0, 0, 0.45);
+        transform: translateX(100%);
         opacity: 0;
         pointer-events: none;
         display: flex;
         flex-direction: column;
-        margin-bottom: 10px;
         transition: transform 0.18s ease, opacity 0.18s ease;
       }
 
-      #hanzo-page-overlay-root[data-open="true"] .hanzo-page-panel {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-        pointer-events: auto;
+      #hanzo-page-overlay-root[data-side="left"] .hanzo-page-panel {
+        border-left: none;
+        border-right: 1px solid rgba(255, 255, 255, 0.16);
+        box-shadow: 22px 0 48px rgba(0, 0, 0, 0.45);
+        transform: translateX(-100%);
       }
 
-      #hanzo-page-overlay-root[data-open="true"] .hanzo-page-launcher {
-        opacity: 0;
-        transform: scale(0.9);
-        pointer-events: none;
+      #hanzo-page-overlay-root[data-open="true"] .hanzo-page-panel {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
       }
 
       .hanzo-page-header {
@@ -1071,6 +1101,7 @@ class HanzoPageOverlay {
     this.root.id = 'hanzo-page-overlay-root';
     this.root.setAttribute('data-open', 'false');
     this.root.setAttribute('data-enabled', 'false');
+    this.root.setAttribute('data-side', this.side);
     this.root.innerHTML = `
       <div class="hanzo-page-panel" role="dialog" aria-label="Hanzo Page Assistant">
         <div class="hanzo-page-header">
@@ -1102,11 +1133,10 @@ class HanzoPageOverlay {
           <button data-role="send" type="button">Ask</button>
         </div>
       </div>
-      <button class="hanzo-page-launcher" data-role="launcher" type="button" title="Open Hanzo Overlay">AI</button>
     `;
 
     this.panel = this.root.querySelector('.hanzo-page-panel');
-    this.launcher = this.root.querySelector('[data-role="launcher"]');
+    this.launcher = null;
     this.messagesEl = this.root.querySelector('[data-role="messages"]');
     this.inputEl = this.root.querySelector('[data-role="input"]');
     this.sendBtn = this.root.querySelector('[data-role="send"]');
@@ -1116,7 +1146,6 @@ class HanzoPageOverlay {
     this.editBtn = this.root.querySelector('[data-role="edit"]');
     this.statusEl = this.root.querySelector('.hanzo-page-status');
 
-    this.launcher?.addEventListener('click', () => this.show());
     this.root.querySelector('[data-role="close"]')?.addEventListener('click', () => this.hide());
     this.watchBtn?.addEventListener('click', () => this.setWatchMode(!this.watchMode));
     this.editBtn?.addEventListener('click', () => this.setEditMode(!this.editMode));
