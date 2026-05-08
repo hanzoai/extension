@@ -50,11 +50,24 @@ export function decodeZapMessage(buf: ArrayBuffer): { type: number; payload: any
 
 // ── Connection Management ───────────────────────────────────────────────
 
+/**
+ * Handler invoked when a ZAP server pushes a request TO the extension.
+ * Returns a result (or throws) and the framework converts that into a
+ * MSG_RESPONSE frame back to the server.
+ *
+ * Keeping this at the manager level means the extension's existing
+ * request-dispatchers (handleExtensionRequest, executeMethod) can be
+ * mounted once and serve every connected MCP without duplication.
+ */
+export type ZapRequestHandler = (method: string, params: any) => Promise<any> | any;
+
 export interface ZapManager {
   state: ZapState;
   connections: Map<string, WebSocket>;
   pendingRequests: Map<string, { resolve: Function; reject: Function }>;
   requestIdCounter: number;
+  /** Optional inbound request handler (set via setZapRequestHandler). */
+  requestHandler?: ZapRequestHandler;
 }
 
 export function createZapManager(): ZapManager {
@@ -68,6 +81,11 @@ export function createZapManager(): ZapManager {
     pendingRequests: new Map(),
     requestIdCounter: 0,
   };
+}
+
+/** Install (or replace) the inbound request handler. */
+export function setZapRequestHandler(mgr: ZapManager, handler: ZapRequestHandler | undefined): void {
+  mgr.requestHandler = handler;
 }
 
 /** Probe a ZAP server on given port */
@@ -160,6 +178,29 @@ export async function connectZap(
             if (error) pending.reject(new Error(error.message || error));
             else pending.resolve(result);
           }
+          break;
+        }
+        case MSG_REQUEST: {
+          // Server-initiated RPC: a Python hanzo-mcp is asking the
+          // extension to perform a browser action. Dispatch via the
+          // installed handler and reply with MSG_RESPONSE.
+          const { id: reqId, method: reqMethod, params: reqParams } = msg.payload || {};
+          const respond = (payload: object) => {
+            try {
+              ws.send(encodeZapMessage(MSG_RESPONSE, payload));
+            } catch (e) {
+              // ws.send throws if the socket is closing; nothing we can do.
+            }
+          };
+          const handler = mgr.requestHandler;
+          if (!handler) {
+            respond({ id: reqId, error: { code: -32601, message: `No request handler installed (method: ${reqMethod})` } });
+            break;
+          }
+          Promise.resolve()
+            .then(() => handler(reqMethod, reqParams || {}))
+            .then((result) => respond({ id: reqId, result: result === undefined ? null : result }))
+            .catch((e: any) => respond({ id: reqId, error: { code: -1, message: e?.message || String(e) } }));
           break;
         }
         case MSG_PING:
