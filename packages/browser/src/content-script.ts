@@ -115,8 +115,10 @@ class HanzoContentScript {
           sendResponse({ success: true });
           return true;
         case 'page.overlay.toggle':
-          if (request.side === 'left' || request.side === 'right') {
-            pageOverlay.setSide(request.side);
+          if (request.side === 'left' || request.side === 'right') pageOverlay.setSide(request.side);
+          if (request.mode === 'push' || request.mode === 'overlay') pageOverlay.setMode(request.mode);
+          if (request.width === 'compact' || request.width === 'default' || request.width === 'wide') {
+            pageOverlay.setWidth(request.width);
           }
           sendResponse({
             success: true,
@@ -124,8 +126,10 @@ class HanzoContentScript {
           });
           return true;
         case 'page.overlay.show':
-          if (request.side === 'left' || request.side === 'right') {
-            pageOverlay.setSide(request.side);
+          if (request.side === 'left' || request.side === 'right') pageOverlay.setSide(request.side);
+          if (request.mode === 'push' || request.mode === 'overlay') pageOverlay.setMode(request.mode);
+          if (request.width === 'compact' || request.width === 'default' || request.width === 'wide') {
+            pageOverlay.setWidth(request.width);
           }
           pageOverlay.show();
           sendResponse({ success: true, open: true });
@@ -135,7 +139,12 @@ class HanzoContentScript {
           sendResponse({ success: true, open: false });
           return true;
         case 'page.overlay.status':
-          sendResponse({ success: true, open: pageOverlay.isOpen(), side: pageOverlay.getSide() });
+          sendResponse({
+            success: true,
+            open: pageOverlay.isOpen(),
+            side: pageOverlay.getSide(),
+            mode: pageOverlay.getMode(),
+          });
           return true;
         case 'page.overlay.setSide':
           if (request.side === 'left' || request.side === 'right') {
@@ -143,6 +152,30 @@ class HanzoContentScript {
             sendResponse({ success: true, side: request.side });
           } else {
             sendResponse({ success: false, error: 'side must be "left" or "right"' });
+          }
+          return true;
+        case 'page.overlay.setMode':
+          if (request.mode === 'push' || request.mode === 'overlay') {
+            pageOverlay.setMode(request.mode);
+            sendResponse({ success: true, mode: request.mode });
+          } else {
+            sendResponse({ success: false, error: 'mode must be "push" or "overlay"' });
+          }
+          return true;
+        case 'page.overlay.setWidth':
+          if (request.width === 'compact' || request.width === 'default' || request.width === 'wide') {
+            pageOverlay.setWidth(request.width);
+            sendResponse({ success: true, width: request.width });
+          } else {
+            sendResponse({ success: false, error: 'width must be compact|default|wide' });
+          }
+          return true;
+        case 'page.overlay.setEnabled':
+          if (typeof request.enabled === 'boolean') {
+            pageOverlay.setEnabled(request.enabled);
+            sendResponse({ success: true, enabled: request.enabled });
+          } else {
+            sendResponse({ success: false, error: 'enabled must be boolean' });
           }
           return true;
 
@@ -768,11 +801,22 @@ interface OverlayElementContext {
   html: string;
 }
 
+type OverlayMode = 'overlay' | 'push';
+type OverlayWidth = 'compact' | 'default' | 'wide';
+
+const OVERLAY_WIDTH_PX: Record<OverlayWidth, number> = {
+  compact: 320,
+  default: 420,
+  wide: 560,
+};
+
 class HanzoPageOverlay {
   private mounted = false;
   private enabled = false;
   private open = false;
   private side: 'left' | 'right' = 'right';
+  private mode: OverlayMode = 'overlay';
+  private width: OverlayWidth = 'default';
   private sending = false;
   private watchMode = false;
   private editMode = false;
@@ -799,21 +843,53 @@ class HanzoPageOverlay {
     this.injectStyles();
     this.mount();
     this.bindGlobalEvents();
-    this.restoreSide();
+    this.restorePrefs();
   }
 
-  private restoreSide(): void {
+  private restorePrefs(): void {
     try {
-      const ss = browser?.storage?.sync;
+      const ss = (typeof browser !== 'undefined' ? browser : (chrome as any))?.storage?.sync;
       if (!ss?.get) return;
-      ss.get(['overlaySide']).then((v: any) => {
-        const stored = v?.overlaySide;
-        if (stored === 'left' || stored === 'right') {
-          this.side = stored;
-          this.root?.setAttribute('data-side', stored);
+      const promised = ss.get(['overlaySide', 'overlayMode', 'overlayWidth']);
+      const apply = (v: any) => {
+        if (v?.overlaySide === 'left' || v?.overlaySide === 'right') {
+          this.side = v.overlaySide;
+          this.root?.setAttribute('data-side', this.side);
         }
-      }).catch(() => {});
+        if (v?.overlayMode === 'push' || v?.overlayMode === 'overlay') {
+          this.mode = v.overlayMode;
+          this.root?.setAttribute('data-mode', this.mode);
+        }
+        if (v?.overlayWidth === 'compact' || v?.overlayWidth === 'default' || v?.overlayWidth === 'wide') {
+          this.width = v.overlayWidth;
+          this.applyWidth();
+        }
+        this.applyPushIfOpen();
+      };
+      if (promised && typeof promised.then === 'function') {
+        promised.then(apply).catch(() => {});
+      } else {
+        ss.get(['overlaySide', 'overlayMode', 'overlayWidth'], apply);
+      }
     } catch { /* storage may be unavailable */ }
+  }
+
+  private applyWidth(): void {
+    const px = OVERLAY_WIDTH_PX[this.width] ?? OVERLAY_WIDTH_PX.default;
+    if (this.root) {
+      this.root.style.setProperty('--hanzo-overlay-width', `${px}px`);
+      this.root.style.width = `min(${px}px, 100vw)`;
+    }
+    document.documentElement.style.setProperty('--hanzo-overlay-width', `${px}px`);
+  }
+
+  private applyPushIfOpen(): void {
+    const html = document.documentElement;
+    // Always strip first so we never stack margins.
+    html.classList.remove('hanzo-overlay-push', 'hanzo-overlay-push-left', 'hanzo-overlay-push-right');
+    if (this.open && this.enabled && this.mode === 'push') {
+      html.classList.add('hanzo-overlay-push', `hanzo-overlay-push-${this.side}`);
+    }
   }
 
   toggle(): boolean {
@@ -833,13 +909,42 @@ class HanzoPageOverlay {
     return this.side;
   }
 
+  getMode(): OverlayMode {
+    return this.mode;
+  }
+
   setSide(side: 'left' | 'right'): void {
     this.side = side;
     this.root?.setAttribute('data-side', side);
+    this.applyPushIfOpen();
+    this.persist({ overlaySide: side });
+  }
+
+  setMode(mode: OverlayMode): void {
+    this.mode = mode;
+    this.root?.setAttribute('data-mode', mode);
+    this.applyPushIfOpen();
+    this.persist({ overlayMode: mode });
+  }
+
+  setWidth(width: OverlayWidth): void {
+    this.width = width;
+    this.applyWidth();
+    this.persist({ overlayWidth: width });
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    this.root?.setAttribute('data-enabled', enabled ? 'true' : 'false');
+    if (!enabled) this.hide();
+    this.persist({ overlayEnabled: enabled });
+  }
+
+  private persist(values: Record<string, unknown>): void {
     try {
-      // Persist asynchronously; callers don't need to await.
-      browser?.storage?.sync?.set({ overlaySide: side });
-    } catch { /* storage may be unavailable in some contexts */ }
+      const ss = (typeof browser !== 'undefined' ? browser : (chrome as any))?.storage?.sync;
+      ss?.set?.(values);
+    } catch { /* storage may be unavailable */ }
   }
 
   show(): void {
@@ -848,6 +953,7 @@ class HanzoPageOverlay {
     this.open = true;
     this.root?.setAttribute('data-enabled', 'true');
     this.root?.setAttribute('data-open', 'true');
+    this.applyPushIfOpen();
     this.loadModels();
     this.focusInput();
   }
@@ -855,6 +961,7 @@ class HanzoPageOverlay {
   hide(): void {
     this.open = false;
     this.root?.setAttribute('data-open', 'false');
+    this.applyPushIfOpen();
     this.updateStatus('');
     this.clearHighlight();
     this.setWatchMode(false);
@@ -872,19 +979,19 @@ class HanzoPageOverlay {
     const style = document.createElement('style');
     style.id = 'hanzo-page-overlay-styles';
     style.textContent = `
-      /* Edge-pinned sidebar panel — no FAB, opened from extension popup. */
+      /* Edge-pinned sidebar panel — no FAB, opened from extension popup.
+         Hanzo brand: monochrome (white primary, neutral surfaces). No blue. */
       #hanzo-page-overlay-root {
         position: fixed;
         top: 0;
         bottom: 0;
         right: 0;
-        width: min(420px, 100vw);
+        width: min(var(--hanzo-overlay-width, 420px), 100vw);
         z-index: 2147483645;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         pointer-events: none;
       }
 
-      /* User-configurable side. Set data-side="left" on the root to flip. */
       #hanzo-page-overlay-root[data-side="left"] {
         right: auto;
         left: 0;
@@ -894,12 +1001,24 @@ class HanzoPageOverlay {
         box-sizing: border-box;
       }
 
+      /* Push mode: when the user pins the panel as a dock, html shifts so
+         page content reflows beside it instead of being covered. Applied to
+         <html> from setMode('push') + open. */
+      html.hanzo-overlay-push.hanzo-overlay-push-right {
+        margin-right: var(--hanzo-overlay-width, 420px) !important;
+        transition: margin-right 0.18s ease;
+      }
+      html.hanzo-overlay-push.hanzo-overlay-push-left {
+        margin-left: var(--hanzo-overlay-width, 420px) !important;
+        transition: margin-left 0.18s ease;
+      }
+
       .hanzo-page-panel {
         width: 100%;
         height: 100%;
         border-left: 1px solid rgba(255, 255, 255, 0.16);
-        background: linear-gradient(180deg, rgba(11, 13, 18, 0.97), rgba(7, 8, 12, 0.97));
-        color: #eef2ff;
+        background: linear-gradient(180deg, rgba(10, 10, 11, 0.97), rgba(7, 7, 8, 0.97));
+        color: #f5f5f5;
         overflow: hidden;
         box-shadow: -22px 0 48px rgba(0, 0, 0, 0.45);
         transform: translateX(100%);
@@ -907,6 +1026,7 @@ class HanzoPageOverlay {
         pointer-events: none;
         display: flex;
         flex-direction: column;
+        min-height: 0;
         transition: transform 0.18s ease, opacity 0.18s ease;
       }
 
@@ -928,14 +1048,16 @@ class HanzoPageOverlay {
         align-items: center;
         justify-content: space-between;
         padding: 12px 14px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.10);
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+        flex-shrink: 0;
       }
 
       .hanzo-page-brand {
         font-weight: 700;
         letter-spacing: 0.2px;
         font-size: 13px;
+        color: #f5f5f5;
       }
 
       .hanzo-page-header-actions {
@@ -948,16 +1070,22 @@ class HanzoPageOverlay {
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 9999px;
         padding: 4px 10px;
-        background: rgba(255, 255, 255, 0.02);
-        color: #d6deff;
+        background: transparent;
+        color: rgba(245, 245, 245, 0.85);
         cursor: pointer;
         font-size: 11px;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+      }
+
+      .hanzo-chip-btn:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
       }
 
       .hanzo-chip-btn[data-active="true"] {
-        border-color: rgba(56, 189, 248, 0.62);
-        background: rgba(14, 116, 144, 0.3);
-        color: #e0f2fe;
+        border-color: rgba(255, 255, 255, 0.7);
+        background: rgba(255, 255, 255, 0.10);
+        color: #fff;
       }
 
       .hanzo-icon-btn {
@@ -966,9 +1094,28 @@ class HanzoPageOverlay {
         border-radius: 8px;
         border: 1px solid rgba(255, 255, 255, 0.18);
         background: transparent;
-        color: #e5e7eb;
+        color: #f5f5f5;
         cursor: pointer;
-        font-size: 16px;
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        transition: background 0.15s, border-color 0.15s;
+      }
+
+      .hanzo-icon-btn:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .hanzo-icon-btn[data-active="true"] {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.5);
+      }
+
+      .hanzo-icon-btn svg {
+        width: 14px;
+        height: 14px;
       }
 
       .hanzo-page-meta {
@@ -977,11 +1124,12 @@ class HanzoPageOverlay {
         grid-template-columns: 1fr auto;
         gap: 8px;
         align-items: center;
+        flex-shrink: 0;
       }
 
       .hanzo-page-context {
         font-size: 11px;
-        color: #a5b4fc;
+        color: rgba(245, 245, 245, 0.65);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -989,11 +1137,12 @@ class HanzoPageOverlay {
 
       .hanzo-page-status {
         font-size: 11px;
-        color: #93c5fd;
+        color: rgba(245, 245, 245, 0.55);
       }
 
       .hanzo-model-row {
         padding: 0 14px 8px 14px;
+        flex-shrink: 0;
       }
 
       .hanzo-model-row select {
@@ -1001,15 +1150,16 @@ class HanzoPageOverlay {
         border-radius: 8px;
         border: 1px solid rgba(255, 255, 255, 0.16);
         background: rgba(255, 255, 255, 0.03);
-        color: #f1f5f9;
+        color: #f5f5f5;
         padding: 7px 9px;
         font-size: 12px;
       }
 
+      /* The chat scroller: takes ALL remaining vertical space so the
+         composer below stays sticky against the bottom of the panel. */
       .hanzo-page-messages {
-        flex: 1;
-        min-height: 200px;
-        max-height: 370px;
+        flex: 1 1 auto;
+        min-height: 0;
         overflow-y: auto;
         padding: 8px 14px 12px 14px;
         display: flex;
@@ -1028,23 +1178,27 @@ class HanzoPageOverlay {
       .hanzo-page-msg.user {
         align-self: flex-end;
         max-width: 88%;
-        background: rgba(59, 130, 246, 0.2);
-        border: 1px solid rgba(59, 130, 246, 0.4);
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.18);
       }
 
       .hanzo-page-msg.assistant {
         align-self: flex-start;
         max-width: 92%;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.10);
       }
 
+      /* Composer pinned to bottom of the panel. flex-shrink: 0 prevents
+         it from collapsing when the messages scroller grows. */
       .hanzo-page-composer {
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: 1px solid rgba(255, 255, 255, 0.10);
         padding: 10px 12px;
         display: flex;
         gap: 8px;
         align-items: flex-end;
+        background: rgba(0, 0, 0, 0.35);
+        flex-shrink: 0;
       }
 
       .hanzo-page-composer textarea {
@@ -1055,21 +1209,31 @@ class HanzoPageOverlay {
         border-radius: 10px;
         border: 1px solid rgba(255, 255, 255, 0.17);
         background: rgba(255, 255, 255, 0.03);
-        color: #f8fafc;
+        color: #f5f5f5;
         padding: 9px 11px;
         font-size: 12px;
       }
 
+      /* Primary action: WHITE per @hanzo/brand monochrome guidelines. */
       .hanzo-page-composer button {
         min-width: 68px;
         height: 38px;
         border-radius: 10px;
-        border: 1px solid rgba(37, 99, 235, 0.65);
-        background: linear-gradient(180deg, rgba(37, 99, 235, 0.95), rgba(30, 64, 175, 0.95));
-        color: #eff6ff;
+        border: 1px solid #ffffff;
+        background: #ffffff;
+        color: #0a0a0b;
         font-weight: 600;
         font-size: 12px;
         cursor: pointer;
+        transition: background 0.12s, transform 0.08s;
+      }
+
+      .hanzo-page-composer button:hover:not(:disabled) {
+        background: #f5f5f5;
+      }
+
+      .hanzo-page-composer button:active:not(:disabled) {
+        transform: translateY(1px);
       }
 
       .hanzo-page-composer button:disabled {
@@ -1081,13 +1245,13 @@ class HanzoPageOverlay {
         position: fixed;
         z-index: 2147483644;
         pointer-events: none;
-        border: 2px solid rgba(56, 189, 248, 0.95);
+        border: 2px solid rgba(255, 255, 255, 0.95);
         border-radius: 6px;
-        box-shadow: 0 0 0 2px rgba(14, 116, 144, 0.2);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
       }
 
       [data-hanzo-inline-editing="true"] {
-        outline: 2px solid rgba(251, 191, 36, 0.92) !important;
+        outline: 2px solid rgba(255, 255, 255, 0.92) !important;
         outline-offset: 2px !important;
       }
     `;
@@ -1102,14 +1266,21 @@ class HanzoPageOverlay {
     this.root.setAttribute('data-open', 'false');
     this.root.setAttribute('data-enabled', 'false');
     this.root.setAttribute('data-side', this.side);
+    this.root.setAttribute('data-mode', this.mode);
+    this.applyWidth();
     this.root.innerHTML = `
       <div class="hanzo-page-panel" role="dialog" aria-label="Hanzo Page Assistant">
         <div class="hanzo-page-header">
-          <div class="hanzo-page-brand">Hanzo Overlay</div>
+          <div class="hanzo-page-brand">Hanzo</div>
           <div class="hanzo-page-header-actions">
             <button class="hanzo-chip-btn" data-role="watch" data-active="false" title="Watch elements on hover">Watch</button>
             <button class="hanzo-chip-btn" data-role="edit" data-active="false" title="Click any element to edit text">Edit</button>
-            <button class="hanzo-icon-btn" data-role="close" title="Minimize">×</button>
+            <button class="hanzo-icon-btn" data-role="pin-mode" title="Toggle: pin (push content) vs overlay (float over page)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M9 4v16M3 4h12a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H3z"/>
+              </svg>
+            </button>
+            <button class="hanzo-icon-btn" data-role="close" title="Hide overlay">×</button>
           </div>
         </div>
         <div class="hanzo-page-meta">
@@ -1147,6 +1318,13 @@ class HanzoPageOverlay {
     this.statusEl = this.root.querySelector('.hanzo-page-status');
 
     this.root.querySelector('[data-role="close"]')?.addEventListener('click', () => this.hide());
+    const pinModeBtn = this.root.querySelector('[data-role="pin-mode"]');
+    pinModeBtn?.setAttribute('data-active', this.mode === 'push' ? 'true' : 'false');
+    pinModeBtn?.addEventListener('click', () => {
+      const next: OverlayMode = this.mode === 'push' ? 'overlay' : 'push';
+      this.setMode(next);
+      pinModeBtn.setAttribute('data-active', next === 'push' ? 'true' : 'false');
+    });
     this.watchBtn?.addEventListener('click', () => this.setWatchMode(!this.watchMode));
     this.editBtn?.addEventListener('click', () => this.setEditMode(!this.editMode));
     this.sendBtn?.addEventListener('click', () => this.askPageQuestion());
