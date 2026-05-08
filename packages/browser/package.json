@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/browser-extension",
-  "version": "1.8.8",
+  "version": "2.0.0",
   "description": "Hanzo AI Browser Extension",
   "main": "dist/background.js",
   "scripts": {
@@ -16,14 +16,15 @@
     "axios": "^1.10.0",
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
+    "webextension-polyfill": "0.12.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@types/chrome": "^0.0.270",
     "@types/firefox-webext-browser": "^120.0.0",
     "@types/jsdom": "^21.1.7",
     "@types/ws": "^8.18.1",
-    "@playwright/test": "^1.52.0",
     "esbuild": "^0.25.6",
     "jsdom": "^26.1.0",
     "react": "^18.3.1",

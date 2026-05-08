@@ -51,12 +51,16 @@ function zapDecode(data: Uint8Array): { type: number; payload: any } | null {
 
 // ── Protocol Constants ────────────────────────────────────────────────
 
-const MSG_HANDSHAKE    = 0x01; // Init
-const MSG_HANDSHAKE_OK = 0x02; // InitAck
-const MSG_REQUEST      = 0x10; // Push
-const MSG_RESPONSE     = 0x12; // Resolve
-const MSG_PING         = 0xf0;
-const MSG_PONG         = 0xf1;
+// Wire constants must match @hanzo/browser-extension/src/shared/zap.ts.
+// Earlier drafts used 0x12/0xf0/0xf1 — those were wrong and silently broke
+// extension <-> mcp sessions. Canonical values live in shared/zap.ts and
+// are pinned by tests.
+const MSG_HANDSHAKE    = 0x01;
+const MSG_HANDSHAKE_OK = 0x02;
+const MSG_REQUEST      = 0x10;
+const MSG_RESPONSE     = 0x11;
+const MSG_PING         = 0xFE;
+const MSG_PONG         = 0xFF;
 
 const ZAP_PORTS = [9999, 9998, 9997, 9996, 9995];
 const SERVER_ID = `mcp-${Date.now().toString(36)}`;
