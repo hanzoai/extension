@@ -28,6 +28,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const mainSection = document.getElementById('main-section');
   const settingsSection = document.getElementById('settings-section');
 
+  // Footer version — pulled from manifest at runtime so it always tracks build.
+  const versionEl = document.getElementById('footer-version');
+  if (versionEl) {
+    try {
+      versionEl.textContent = `v${chrome.runtime.getManifest().version}`;
+    } catch { /* manifest unavailable in some contexts */ }
+  }
+
   // Auth
   const loginBtn = document.getElementById('login-btn');
   const logoutBtn = document.getElementById('logout-btn');
