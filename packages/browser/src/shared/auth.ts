@@ -210,16 +210,20 @@ export async function login(adapter: BrowserAdapter): Promise<UserInfo> {
       token_type: 'Bearer',
     });
   } else if (code) {
-    const tokenResponse = await fetch(`${config.iamApiUrl}/oauth/token`, {
+    // Hanzo gateway exposes Casdoor's `/api/login/oauth/access_token` at
+    // `/v1/iam/login/oauth/access_token`. The bare `/oauth/token` from
+    // the OIDC well-known doc 404s in prod. Token exchange wants
+    // application/x-www-form-urlencoded per RFC 6749, not JSON.
+    const tokenResponse = await fetch(`${config.iamApiUrl}${IAM_API_PATH}/login/oauth/access_token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: config.clientId,
         code,
         redirect_uri: redirectUri,
         code_verifier: codeVerifier,
-      }),
+      }).toString(),
     });
     if (!tokenResponse.ok) throw new Error(`Token exchange failed: ${await tokenResponse.text()}`);
     await storeTokens(adapter.storage, await tokenResponse.json());
@@ -267,14 +271,14 @@ export async function getValidAccessToken(storage: BrowserStorage): Promise<stri
 
 async function refreshAccessToken(storage: BrowserStorage, refreshToken: string): Promise<string> {
   const config = await getRuntimeConfig(storage);
-  const response = await fetch(`${config.iamApiUrl}/oauth/token`, {
+  const response = await fetch(`${config.iamApiUrl}${IAM_API_PATH}/login/oauth/access_token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
       grant_type: 'refresh_token',
       client_id: config.clientId,
       refresh_token: refreshToken,
-    }),
+    }).toString(),
   });
   if (!response.ok) throw new Error('Token refresh failed');
   const tokens: TokenData = await response.json();
