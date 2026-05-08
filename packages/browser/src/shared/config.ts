@@ -13,8 +13,16 @@
 /** Login UI domain (Hanzo ID) */
 export const IAM_LOGIN_URL = 'https://hanzo.id';
 
-/** IAM API domain (Casdoor backend) */
+/** IAM API domain (Casdoor backend, fronted by Hanzo's API gateway) */
 export const IAM_API_URL = 'https://iam.hanzo.ai';
+
+/**
+ * IAM API path prefix. Hanzo convention is `/v1/<service>/<endpoint>` — never
+ * `/api/`. The Casdoor upstream uses `/api/*` natively but the prod gateway
+ * rewrites `/v1/iam/*` → upstream. Always reference endpoints through this
+ * constant so prefix changes are a single edit.
+ */
+export const IAM_API_PATH = '/v1/iam';
 
 /** OAuth2 client ID — override via storage key 'hanzo_config_client_id' */
 export const DEFAULT_CLIENT_ID = 'app-hanzo';

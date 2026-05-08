@@ -4,15 +4,24 @@
  * Lightweight fetch-based client for Hanzo KMS (kms.hanzo.ai).
  * Uses IAM bearer tokens for auth — no separate KMS credentials needed.
  *
- * API surface mirrors @hanzo/kms-sdk SecretsApi:
- *   GET    /api/v3/secrets/raw              → list
- *   GET    /api/v3/secrets/raw/:name        → get
- *   POST   /api/v3/secrets/raw/:name        → create
- *   PATCH  /api/v3/secrets/raw/:name        → update
- *   DELETE /api/v3/secrets/raw/:name        → delete
+ * API path. Hanzo convention is `/v1/<service>/<endpoint>` — but the KMS
+ * upstream is an Infisical fork that publishes its v3 API under the root
+ * `${KMS_PATH_PREFIX}/secrets/raw`. The kms.hanzo.ai gateway currently passes that
+ * through unchanged (verified: `kms.hanzo.ai/api/v3/secrets/raw` → 401 JSON,
+ * `/v1/kms/...` → SPA HTML). We centralise the path in `KMS_PATH_PREFIX`
+ * so the day the gateway adds the rewrite we update one constant.
+ *
+ *   GET    {KMS_PATH_PREFIX}/secrets/raw         → list
+ *   GET    {KMS_PATH_PREFIX}/secrets/raw/:name   → get
+ *   POST   {KMS_PATH_PREFIX}/secrets/raw/:name   → create
+ *   PATCH  {KMS_PATH_PREFIX}/secrets/raw/:name   → update
+ *   DELETE {KMS_PATH_PREFIX}/secrets/raw/:name   → delete
  */
 
 import { KMS_API_URL } from './config.js';
+
+/** Prefix for every KMS request. See file header. */
+const KMS_PATH_PREFIX = '/api/v3';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -67,7 +76,7 @@ export async function kmsListSecrets(
     environment: params.environment,
     secretPath: params.secretPath,
   });
-  const resp = await fetch(kmsUrl(`/api/v3/secrets/raw${query}`, baseUrl), {
+  const resp = await fetch(kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw${query}`, baseUrl), {
     headers: kmsHeaders(token),
   });
   if (!resp.ok) throw new Error(`KMS list failed: ${resp.status} ${await resp.text()}`);
@@ -87,7 +96,7 @@ export async function kmsGetSecret(
     secretPath: params.secretPath,
   });
   const resp = await fetch(
-    kmsUrl(`/api/v3/secrets/raw/${encodeURIComponent(params.secretName)}${query}`, baseUrl),
+    kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw/${encodeURIComponent(params.secretName)}${query}`, baseUrl),
     { headers: kmsHeaders(token) },
   );
   if (!resp.ok) throw new Error(`KMS get failed: ${resp.status} ${await resp.text()}`);
@@ -103,7 +112,7 @@ export async function kmsCreateSecret(
   baseUrl?: string,
 ): Promise<KmsSecret> {
   const resp = await fetch(
-    kmsUrl(`/api/v3/secrets/raw/${encodeURIComponent(params.secretName)}`, baseUrl),
+    kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw/${encodeURIComponent(params.secretName)}`, baseUrl),
     {
       method: 'POST',
       headers: kmsHeaders(token),
@@ -129,7 +138,7 @@ export async function kmsUpdateSecret(
   baseUrl?: string,
 ): Promise<KmsSecret> {
   const resp = await fetch(
-    kmsUrl(`/api/v3/secrets/raw/${encodeURIComponent(params.secretName)}`, baseUrl),
+    kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw/${encodeURIComponent(params.secretName)}`, baseUrl),
     {
       method: 'PATCH',
       headers: kmsHeaders(token),
@@ -153,7 +162,7 @@ export async function kmsDeleteSecret(
   baseUrl?: string,
 ): Promise<void> {
   const resp = await fetch(
-    kmsUrl(`/api/v3/secrets/raw/${encodeURIComponent(params.secretName)}`, baseUrl),
+    kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw/${encodeURIComponent(params.secretName)}`, baseUrl),
     {
       method: 'DELETE',
       headers: kmsHeaders(token),

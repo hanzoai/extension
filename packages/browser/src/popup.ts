@@ -1,6 +1,15 @@
 // Hanzo AI — Popup Script
 // Uses background message passing for auth (not direct storage access).
 
+import {
+  DEFAULT_INSPECT_SHORTCUT,
+  formatShortcut,
+  loadInspectShortcut,
+  saveInspectShortcut,
+  shortcutFromEvent,
+  type Shortcut,
+} from './shared/shortcut.js';
+
 declare const browser: typeof chrome & {
   sidebarAction?: {
     open(): Promise<void>;
@@ -264,15 +273,81 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function loadSettings() {
     chrome.storage.local.get(['mcpPort', 'cdpPort', 'zapPorts'], (result) => {
-      const mcpPortInput = document.getElementById('mcp-port-setting');
-      const cdpPortInput = document.getElementById('cdp-port-setting');
-      const zapPortsInput = document.getElementById('zap-ports-setting');
+      const mcpPortInput = document.getElementById('mcp-port-setting') as HTMLInputElement | null;
+      const cdpPortInput = document.getElementById('cdp-port-setting') as HTMLInputElement | null;
+      const zapPortsInput = document.getElementById('zap-ports-setting') as HTMLInputElement | null;
 
-      if (mcpPortInput) mcpPortInput.value = result.mcpPort || 3001;
-      if (cdpPortInput) cdpPortInput.value = result.cdpPort || 9223;
+      if (mcpPortInput) mcpPortInput.value = String(result.mcpPort || 3001);
+      if (cdpPortInput) cdpPortInput.value = String(result.cdpPort || 9223);
       if (zapPortsInput) zapPortsInput.value = (result.zapPorts || [9999, 9998, 9997, 9996, 9995]).join(',');
     });
+
+    // Inspect-modifier display + recorder.
+    refreshShortcutDisplay();
   }
+
+  // ── Inspect Shortcut Recorder ─────────────────────────────────────────
+  // Shows the current chord; clicking "Record" captures a single keydown
+  // and saves the resulting Shortcut to chrome.storage.local. Content
+  // scripts watch storage for changes and update without page reload.
+  let recordingShortcut = false;
+  let recordingHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  async function refreshShortcutDisplay() {
+    const display = document.getElementById('inspect-shortcut-display');
+    const settingsDisplay = document.getElementById('inspect-shortcut-current');
+    const s = await loadInspectShortcut(chrome.storage.local as any);
+    const text = formatShortcut(s);
+    if (display) display.textContent = text;
+    if (settingsDisplay) settingsDisplay.textContent = text;
+  }
+  // Initial render before settings panel is opened (header chip).
+  refreshShortcutDisplay();
+
+  function startRecording(label: HTMLElement) {
+    if (recordingShortcut) return;
+    recordingShortcut = true;
+    label.textContent = 'Press a key…';
+    recordingHandler = async (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const next = shortcutFromEvent(e);
+      if (!next) {
+        // Tab/Esc pressed — bail out without saving.
+        stopRecording();
+        return;
+      }
+      await saveInspectShortcut(chrome.storage.local as any, next);
+      stopRecording();
+      refreshShortcutDisplay();
+    };
+    document.addEventListener('keydown', recordingHandler, { capture: true });
+    // Safety: cancel recording after 10s in case the user wanders off.
+    setTimeout(() => { if (recordingShortcut) stopRecording(); }, 10000);
+  }
+
+  function stopRecording() {
+    if (recordingHandler) document.removeEventListener('keydown', recordingHandler, { capture: true });
+    recordingHandler = null;
+    recordingShortcut = false;
+    refreshShortcutDisplay();
+  }
+
+  document.getElementById('record-inspect-shortcut')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const display = document.getElementById('inspect-shortcut-display');
+    if (display) startRecording(display);
+  });
+  document.getElementById('inspect-shortcut-record')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const display = document.getElementById('inspect-shortcut-current');
+    if (display) startRecording(display);
+  });
+  document.getElementById('inspect-shortcut-reset')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await saveInspectShortcut(chrome.storage.local as any, { ...DEFAULT_INSPECT_SHORTCUT });
+    refreshShortcutDisplay();
+  });
 
   saveSettings?.addEventListener('click', () => {
     const mcpPortVal = parseInt(document.getElementById('mcp-port-setting')?.value) || 3001;
