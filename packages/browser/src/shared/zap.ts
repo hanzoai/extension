@@ -15,7 +15,12 @@ export const MSG_RESPONSE     = 0x11;
 export const MSG_PING         = 0xFE;
 export const MSG_PONG         = 0xFF;
 
-export const DEFAULT_ZAP_PORTS = [9999, 9998, 9997, 9996, 9995];
+/**
+ * Canonical Hanzo service-type per HIP-0069. Discovery is mDNS-only —
+ * the legacy [9999..9995] port-probe was removed in 1.9.13 to surface
+ * non-compliant deployments instead of papering over them.
+ */
+export const HANZO_SERVICE_TYPE = '_hanzo._tcp.local.';
 export const ZAP_RECONNECT_DELAY = 3000;
 export const ZAP_DISCOVERY_TIMEOUT = 2000;
 
@@ -317,66 +322,68 @@ export function zapGetPrompt(mgr: ZapManager, mcpId: string, name: string, args?
 
 /**
  * Ask the native messaging helper (ai.hanzo.zap_mdns) for a live mDNS browse
- * of `_hanzo-zap._tcp.local.` services. Returns ws:// URLs the extension
- * can connect to. Returns [] when the helper isn't installed or browse
- * comes back empty — caller falls back to fixed-port probing.
+ * of `_hanzo._tcp.local.` services per HIP-0069. Returns ws:// URLs the
+ * extension can connect to. Returns [] when the helper isn't installed or
+ * the browse times out empty.
  */
 async function discoverViaMdns(timeoutMs: number = 1500): Promise<string[]> {
-  try {
-    const api: any = (typeof browser !== 'undefined' ? browser : (chrome as any));
-    const send = api?.runtime?.sendNativeMessage;
-    if (typeof send !== 'function') return [];
-    const resp: any = await new Promise((resolve) => {
-      try {
-        const p = send.call(api.runtime, 'ai.hanzo.zap_mdns', { op: 'browse', timeout_ms: timeoutMs });
-        if (p && typeof p.then === 'function') {
-          p.then(resolve).catch(() => resolve(null));
-        } else {
-          send.call(api.runtime, 'ai.hanzo.zap_mdns', { op: 'browse', timeout_ms: timeoutMs }, (r: any) => resolve(r));
-        }
-      } catch {
-        resolve(null);
-      }
-    });
-    if (!resp || !resp.ok || !Array.isArray(resp.services)) return [];
-    return resp.services.map((s: any) => s.url).filter((u: any): u is string => typeof u === 'string');
-  } catch {
-    return [];
+  const api: any = (typeof browser !== 'undefined' ? browser : (chrome as any));
+  const send = api?.runtime?.sendNativeMessage;
+  if (typeof send !== 'function') {
+    throw new Error(
+      '[Hanzo/ZAP] runtime.sendNativeMessage unavailable — ai.hanzo.zap_mdns helper required for discovery',
+    );
   }
+  const resp: any = await new Promise((resolve, reject) => {
+    try {
+      const p = send.call(api.runtime, 'ai.hanzo.zap_mdns', { op: 'browse', timeout_ms: timeoutMs });
+      if (p && typeof p.then === 'function') {
+        p.then(resolve).catch(reject);
+      } else {
+        send.call(api.runtime, 'ai.hanzo.zap_mdns', { op: 'browse', timeout_ms: timeoutMs }, (r: any) => resolve(r));
+      }
+    } catch (e) {
+      reject(e);
+    }
+  });
+  if (!resp || !resp.ok || !Array.isArray(resp.services)) return [];
+  return resp.services
+    .map((s: any) => s.url)
+    .filter((u: any): u is string => typeof u === 'string');
 }
 
-/** Discover and connect to ZAP servers — mDNS first, fixed-port fallback */
+/**
+ * Discover and connect to ZAP servers via mDNS only (HIP-0069). No
+ * port-probe fallback — non-compliant deployments fail loudly so we can
+ * detect and fix them. The native-messaging helper `ai.hanzo.zap_mdns`
+ * MUST be installed; install instructions live at
+ * `~/work/zap/mdns/ext/native-messaging-host.json`.
+ */
 export async function discoverZapServers(
   mgr: ZapManager,
   browserName: string,
   version: string,
-  ports: number[] = DEFAULT_ZAP_PORTS,
+  _ports: number[] | undefined = undefined,  // unused — retained for ABI continuity
   log: (msg: string) => void = console.log,
 ): Promise<void> {
-  log('[Hanzo/ZAP] Discovering MCP servers...');
-
-  // Stage 1: mDNS via native messaging helper (preferred — LAN-wide,
-  // collision-free). When the helper isn't installed this returns [] and
-  // we fall through to the fixed-port probe.
-  const mdnsUrls = await discoverViaMdns(1500);
-  if (mdnsUrls.length > 0) {
-    log(`[Hanzo/ZAP] mDNS found ${mdnsUrls.length} server(s): ${mdnsUrls.join(', ')}`);
-    await Promise.all(mdnsUrls.map(url => connectZap(url, mgr, browserName, version, log)));
+  log('[Hanzo/ZAP] Discovering MCP via mDNS (_hanzo._tcp.local.)...');
+  let mdnsUrls: string[] = [];
+  try {
+    mdnsUrls = await discoverViaMdns(1500);
+  } catch (e: any) {
+    log(`[Hanzo/ZAP] mDNS browse failed: ${e?.message || e}. Retrying in 10s.`);
+    setTimeout(() => discoverZapServers(mgr, browserName, version, undefined, log), 10000);
     return;
   }
 
-  // Stage 2: fixed-port probe (legacy fallback).
-  const results = await Promise.all(ports.map(p => probeZapServer(p, mgr, browserName, version)));
-  const available = results.filter(Boolean) as string[];
-
-  if (available.length === 0) {
-    log('[Hanzo/ZAP] No servers found, retrying in 10s...');
-    setTimeout(() => discoverZapServers(mgr, browserName, version, ports, log), 10000);
+  if (mdnsUrls.length === 0) {
+    log('[Hanzo/ZAP] No services advertising _hanzo._tcp.local. Retrying in 10s.');
+    setTimeout(() => discoverZapServers(mgr, browserName, version, undefined, log), 10000);
     return;
   }
 
-  log(`[Hanzo/ZAP] Found ${available.length} server(s): ${available.join(', ')}`);
-  await Promise.all(available.map(url => connectZap(url, mgr, browserName, version, log)));
+  log(`[Hanzo/ZAP] mDNS found ${mdnsUrls.length} server(s): ${mdnsUrls.join(', ')}`);
+  await Promise.all(mdnsUrls.map(url => connectZap(url, mgr, browserName, version, log)));
 }
 
 // ── Message Handler Helpers ─────────────────────────────────────────────
