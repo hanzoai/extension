@@ -10,6 +10,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as readline from 'readline';
 import * as fs from 'fs';
 import * as path from 'path';
+import { unwrapEvaluateResult } from './shared/tab-id.js';
 
 interface CDPClient {
   ws: WebSocket;
@@ -61,6 +62,21 @@ class CDPBridgeServer {
 
   constructor(port: number = 9223) {
     this.httpPort = port;
+    // Restore persisted defaultBrowser so user's "always Firefox" preference
+    // survives bridge restarts. The config file is written by the
+    // `config` message handler.
+    try {
+      const cfgPath = path.join(
+        process.env.HOME || process.env.USERPROFILE || '.',
+        '.hanzo', 'extension', 'config.json',
+      );
+      if (fs.existsSync(cfgPath)) {
+        const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+        if (cfg && typeof cfg.defaultBrowser === 'string') {
+          this.defaultBrowser = cfg.defaultBrowser;
+        }
+      }
+    } catch { /* ignore — startup config is best-effort */ }
     this.wss = new WebSocketServer({ port, path: '/cdp' });
 
     this.wss.on('connection', (ws) => {
@@ -100,21 +116,53 @@ class CDPBridgeServer {
     }
   }
 
-  /** Find a client by browser name/ID, or return first connected client */
+  /**
+   * Default browser preference order when caller doesn't specify a target.
+   * Firefox first because (a) it's the user's primary browser, (b) it's
+   * where authenticated sessions typically live (Cloudflare, Porkbun,
+   * hanzo.id), (c) Chrome is often a secondary/clean profile that the
+   * agent should never silently land on.
+   *
+   * Override at runtime by writing the `defaultBrowser` config via the
+   * `config` action, e.g. `{ action: 'config', key: 'defaultBrowser',
+   * value: 'chrome' }`. The override is also persisted to
+   * `~/.hanzo/extension/config.json` so it survives bridge restarts.
+   */
+  private static DEFAULT_BROWSER_PREFERENCE = ['firefox', 'safari', 'edge', 'chrome'] as const;
+  private defaultBrowser: string | null = null;
+
+  /** Find a client by browser name/ID. Without a target, picks the
+   *  configured default browser (defaults to Firefox) or the first
+   *  preferred-order match among connected clients. */
   private resolveClient(target?: string): CDPClient | undefined {
-    if (!target) {
-      // Default: first connected client
-      return this.clients.values().next().value;
+    if (target) {
+      // Exact match on ID first (e.g. "chrome-2")
+      for (const client of this.clients.values()) {
+        if (client.id === target) return client;
+      }
+      // Then match by browser type (returns first of that type)
+      for (const client of this.clients.values()) {
+        if (client.browser === target) return client;
+      }
+      return undefined;
     }
-    // Exact match on ID first (e.g. "chrome-2")
-    for (const client of this.clients.values()) {
-      if (client.id === target) return client;
+    // No target — prefer the user-configured default browser if connected.
+    if (this.defaultBrowser) {
+      for (const client of this.clients.values()) {
+        if (client.id === this.defaultBrowser || client.browser === this.defaultBrowser) {
+          return client;
+        }
+      }
     }
-    // Match by browser type (returns first of that type, e.g. "firefox")
-    for (const client of this.clients.values()) {
-      if (client.browser === target) return client;
+    // Fall back to the standard preference order. Firefox first because
+    // the user's authenticated sessions live there.
+    for (const browser of CDPBridgeServer.DEFAULT_BROWSER_PREFERENCE) {
+      for (const client of this.clients.values()) {
+        if (client.browser === browser) return client;
+      }
     }
-    return undefined;
+    // Last resort: any connected client.
+    return this.clients.values().next().value;
   }
 
   private handleMessage(ws: WebSocket, message: any) {
@@ -134,6 +182,12 @@ class CDPBridgeServer {
     }
 
     if (message.type === 'config') {
+      // Special-case: defaultBrowser is read by resolveClient() so apply it
+      // immediately in addition to persisting it. Without this every config
+      // change would require a bridge restart.
+      if (message.key === 'defaultBrowser') {
+        this.defaultBrowser = (message.value as string) || null;
+      }
       this.saveConfig(message.key, message.value);
       return;
     }
@@ -244,6 +298,25 @@ class CDPBridgeServer {
       return {
         browsers: this.getConnectedBrowserDetails(),
         count: this.clients.size,
+        defaultBrowser: this.defaultBrowser,
+        preferenceOrder: CDPBridgeServer.DEFAULT_BROWSER_PREFERENCE,
+      };
+    }
+
+    // Special action: set the default browser the bridge auto-routes to
+    // when no per-call `browser` target is specified. Persisted to
+    // ~/.hanzo/extension/config.json so it survives restarts.
+    if (action === 'set_default_browser' || action === 'use_browser') {
+      const target = (params.browser || params.value || params.target) as string | undefined;
+      if (!target) {
+        return { ok: false, error: 'browser/value/target required (e.g. "firefox")' };
+      }
+      this.defaultBrowser = target;
+      this.saveConfig('defaultBrowser', target);
+      return {
+        ok: true,
+        defaultBrowser: this.defaultBrowser,
+        connected: this.getConnectedBrowserDetails(),
       };
     }
 
@@ -371,15 +444,12 @@ class CDPBridgeServer {
           selector: rest.selector || rest.ref,
         }), b);
 
-      // Navigation
-      case 'go_back':
-      case 'navigate_back':
-        return this.sendRaw('Page.goBack', tabTarget(), b);
-
-      case 'go_forward':
-      case 'navigate_forward':
-        return this.sendRaw('Page.goForward', tabTarget(), b);
-
+      // Aliases for the navigation cases above. We attach `get_url`,
+      // `get_title`, `get_tab_info`, `get_history`, `wait_for_navigation`,
+      // `create_tab` here. Note that `go_back`, `go_forward`, `tab_info`,
+      // and `history` are already aliased in the upper block — TS picks
+      // the first matching case-label so duplicates here would be dead
+      // code. Consolidating once and for all to avoid that confusion.
       case 'get_url':
         return this.sendRaw('hanzo.url', tabTarget(), b);
 
@@ -387,11 +457,9 @@ class CDPBridgeServer {
         return this.sendRaw('hanzo.title', tabTarget(), b);
 
       case 'get_tab_info':
-      case 'tab_info':
         return this.sendRaw('hanzo.tabInfo', tabTarget(), b);
 
       case 'get_history':
-      case 'history':
         return this.sendRaw('hanzo.getHistory', tabTarget({ maxResults: rest.maxResults }), b);
 
       case 'wait_for_navigation':
@@ -399,9 +467,6 @@ class CDPBridgeServer {
 
       case 'create_tab':
         return this.sendRaw('Target.createTarget', { url: rest.url || 'about:blank' }, b);
-
-      case 'close_tab':
-        return this.sendRaw('Target.closeTarget', { targetId: rest.tabId }, b);
 
       // Fetch through browser context (uses page cookies/auth)
       case 'fetch': {
@@ -492,20 +557,23 @@ class CDPBridgeServer {
       case 'cookies':
         return this.sendRaw('hanzo.getCookies', tabTarget(), b);
 
-      // Evaluate
+      // Evaluate.
+      //
+      // awaitPromise: true tells CDP to wait for any async IIFE to resolve
+      // before returning. Without it, expressions like
+      //   (async () => fetch('/x').then(r => r.json()))()
+      // serialise as `{}` (a Promise placeholder) and the caller can't
+      // distinguish "the page evaluated to {}" from "the bridge swallowed
+      // the result". We then route through `unwrapEvaluateResult` (the
+      // shared helper from shared/tab-id.ts) which handles every shape
+      // Chrome / Firefox / Safari extensions can hand back.
       case 'evaluate': {
         const evalResult = await this.sendRaw('Runtime.evaluate', tabTarget({
           expression: rest.code || rest.function || rest.expression,
           returnByValue: true,
+          awaitPromise: true,
         }), b);
-        // Unwrap CDP result envelope. Handle every shape extensions can hand
-        // back: {result:{value}} (Chrome), {result:{value,type}} (CDP), bare
-        // value, undefined-as-empty-object ({}).
-        const inner = evalResult?.result;
-        if (inner && typeof inner === 'object' && 'value' in inner) {
-          return { result: (inner as any).value, raw: evalResult };
-        }
-        return { result: inner ?? evalResult };
+        return { result: unwrapEvaluateResult(evalResult), raw: evalResult };
       }
 
       // Wait
