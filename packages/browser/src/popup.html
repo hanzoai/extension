@@ -57,19 +57,21 @@
         <div class="divider"></div>
       </div>
 
-      <!-- Actions -->
+      <!-- Actions: single unified Open Chat button + side picker.
+           Both old buttons (Open Chat Panel, Toggle On-Page Overlay)
+           did the same thing in different words; unified here. -->
       <button id="open-panel" class="btn btn-secondary" style="margin-bottom: 8px;">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        Open Chat Panel
+        Open Chat
       </button>
-      <button id="open-page-overlay" class="btn btn-ghost" style="margin-bottom: 12px;">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M4 4h16v12H8l-4 4V4z"/>
-        </svg>
-        Toggle On-Page Overlay
-      </button>
+      <div class="side-picker" style="display:flex;gap:6px;margin-bottom:12px;font-size:11px;align-items:center;">
+        <span style="color:var(--text-muted,#888);">Pin:</span>
+        <button id="pin-left" class="btn btn-ghost" style="flex:1;padding:4px 8px;font-size:11px;">Left</button>
+        <button id="pin-right" class="btn btn-ghost" style="flex:1;padding:4px 8px;font-size:11px;" data-active="true">Right</button>
+        <span style="color:var(--text-muted,#888);font-size:10px;">FF: View → Sidebar → Hanzo AI for native</span>
+      </div>
 
       <div class="divider"></div>
 
