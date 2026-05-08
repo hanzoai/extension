@@ -57,20 +57,41 @@
         <div class="divider"></div>
       </div>
 
-      <!-- Actions: single unified Open Chat button + side picker.
-           Both old buttons (Open Chat Panel, Toggle On-Page Overlay)
-           did the same thing in different words; unified here. -->
+      <!-- Actions: single Open Chat button + on-page surface settings. -->
       <button id="open-panel" class="btn btn-secondary" style="margin-bottom: 8px;">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
         Open Chat
       </button>
-      <div class="side-picker" style="display:flex;gap:6px;margin-bottom:12px;font-size:11px;align-items:center;">
-        <span style="color:var(--text-muted,#888);">Pin:</span>
-        <button id="pin-left" class="btn btn-ghost" style="flex:1;padding:4px 8px;font-size:11px;">Left</button>
-        <button id="pin-right" class="btn btn-ghost" style="flex:1;padding:4px 8px;font-size:11px;" data-active="true">Right</button>
-        <span style="color:var(--text-muted,#888);font-size:10px;">FF: View → Sidebar → Hanzo AI for native</span>
+
+      <!-- On-page chat config -->
+      <div class="onpage-config" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:11px;">
+        <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="overlay-enabled" checked>
+            <span>On-page chat panel</span>
+          </label>
+          <span style="color:var(--text-muted,#888);font-size:10px;">overlay vs new tab</span>
+        </div>
+
+        <div id="overlay-side-row" class="side-picker" style="display:flex;gap:6px;align-items:center;">
+          <span style="color:var(--text-muted,#888);">Pin:</span>
+          <button id="pin-left" class="btn btn-ghost" style="flex:1;padding:4px 8px;font-size:11px;">Left</button>
+          <button id="pin-right" class="btn btn-ghost" style="flex:1;padding:4px 8px;font-size:11px;" data-active="true">Right</button>
+        </div>
+
+        <div id="overlay-width-row" style="display:flex;gap:6px;align-items:center;">
+          <span style="color:var(--text-muted,#888);">Width:</span>
+          <button class="btn btn-ghost width-btn" data-width="compact" style="flex:1;padding:4px 8px;font-size:11px;">Compact</button>
+          <button class="btn btn-ghost width-btn" data-width="default" style="flex:1;padding:4px 8px;font-size:11px;" data-active="true">Default</button>
+          <button class="btn btn-ghost width-btn" data-width="wide" style="flex:1;padding:4px 8px;font-size:11px;">Wide</button>
+        </div>
+
+        <span style="color:var(--text-muted,#888);font-size:10px;line-height:1.4;">
+          FF native sidebar: View → Sidebar → Hanzo AI.<br>
+          Disable to fall back to a standalone tab — useful on sites with strict CSP.
+        </span>
       </div>
 
       <div class="divider"></div>
