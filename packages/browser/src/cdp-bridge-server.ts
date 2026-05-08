@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CDP Bridge Server — DEPRECATED in @hanzo/browser-extension 2.0.0.
+ * CDP Bridge Server — DEPRECATED in @hanzo/browser-extension 1.9.1.
  *
  * The canonical 2-process architecture removes this node bridge from the
  * critical path. Each Python `hanzo-mcp` now hosts a ZAP server directly
