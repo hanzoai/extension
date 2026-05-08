@@ -1940,3 +1940,27 @@ const inlineConsole = (() => {
 
 // Initialize
 new HanzoContentScript();
+
+// =============================================================================
+// Background keep-alive port.
+//
+// Firefox MV3 treats `background.scripts` as event pages; Chrome MV3 service
+// workers idle out after ~30s. An open `chrome.runtime` port from any
+// content script keeps the background page alive for the lifetime of the
+// port — no polling, no alarms required. Every loaded http(s) tab holds
+// one of these, so the background ZAP socket survives indefinitely as
+// long as the user has any non-privileged tab open.
+//
+// Heartbeats every 10s prevent Firefox's 4-minute idle-port disconnect.
+// =============================================================================
+try {
+  const port = (browser as any)?.runtime?.connect?.({ name: 'zap-keepalive' })
+    || (chrome as any)?.runtime?.connect?.({ name: 'zap-keepalive' });
+  if (port) {
+    const tick = setInterval(() => {
+      try { port.postMessage({ type: 'ping', t: Date.now() }); }
+      catch { clearInterval(tick); }
+    }, 10_000);
+    port.onDisconnect?.addListener?.(() => clearInterval(tick));
+  }
+} catch { /* not all pages let content scripts open ports — best effort */ }
