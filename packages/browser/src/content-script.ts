@@ -1,6 +1,14 @@
 // Hanzo Browser Extension - Content Script
 // Connects clicked elements to source code via source-maps
 
+import {
+  DEFAULT_INSPECT_SHORTCUT,
+  loadInspectShortcut,
+  matchesShortcut,
+  STORAGE_KEY_INSPECT,
+  type Shortcut,
+} from './shared/shortcut.js';
+
 interface SourceLocation {
   file: string;
   line: number;
@@ -16,15 +24,46 @@ interface ElementSelectedEvent {
 }
 
 class HanzoContentScript {
+  // Cache the configured shortcut so every click/mousemove doesn't hit
+  // chrome.storage. Reloaded eagerly on storage change so the popup's
+  // recorder updates take effect immediately (no page reload required).
+  private inspectShortcut: Shortcut = { ...DEFAULT_INSPECT_SHORTCUT };
+
   constructor() {
+    this.loadShortcut();
+    this.watchShortcut();
     this.setupClickHandler();
     this.injectHelpers();
     this.setupMessageHandlers();
   }
 
+  private async loadShortcut() {
+    try {
+      // chrome.storage.local in MV3 returns a Promise.
+      this.inspectShortcut = await loadInspectShortcut(chrome.storage.local as any);
+    } catch {
+      this.inspectShortcut = { ...DEFAULT_INSPECT_SHORTCUT };
+    }
+  }
+
+  private watchShortcut() {
+    try {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        const c = changes[STORAGE_KEY_INSPECT];
+        if (!c) return;
+        if (c.newValue && typeof c.newValue === 'object') {
+          this.inspectShortcut = c.newValue as Shortcut;
+        } else {
+          this.inspectShortcut = { ...DEFAULT_INSPECT_SHORTCUT };
+        }
+      });
+    } catch { /* not all storage APIs implement onChanged */ }
+  }
+
   private setupClickHandler() {
     document.addEventListener('click', (e) => {
-      if (!e.altKey) return;
+      if (!matchesShortcut(e, this.inspectShortcut)) return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -247,7 +286,9 @@ class HanzoContentScript {
         el.removeAttribute('data-hanzo-hover');
       });
 
-      if (e.altKey && e.target instanceof HTMLElement) {
+      // mousemove gives the same modifier flags as click, so the
+      // configured inspect shortcut governs the hover outline too.
+      if (matchesShortcut(e, this.inspectShortcut) && e.target instanceof HTMLElement) {
         e.target.setAttribute('data-hanzo-hover', 'true');
       }
     });

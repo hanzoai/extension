@@ -174,16 +174,14 @@ export class CDPBridge {
     return dataUrl.replace(/^data:image\/\w+;base64,/, '');
   }
   
-  /** Accept tabId in any of: number | "tab-NNN" | "NNN" | undefined. */
+  /** Accept tabId in any of: number | "tab-NNN" | "NNN" | undefined.
+   *  Fully anchored so "https://x.com/?tab-123" can't be coerced. */
   private parseTabId(raw: unknown): number | null {
     if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-    if (typeof raw !== 'string') return null;
-    const m = raw.match(/(?:^|tab-)(\d+)$/);
-    if (m) {
-      const n = Number(m[1]);
-      return Number.isFinite(n) ? n : null;
-    }
-    const n = Number(raw);
+    if (typeof raw !== 'string' || raw === '') return null;
+    const m = raw.match(/^(?:tab-)?(\d+)$/);
+    if (!m) return null;
+    const n = Number(m[1]);
     return Number.isFinite(n) ? n : null;
   }
 
