@@ -1830,6 +1830,26 @@ getPortConfig().then(({ zapPorts }) => {
   discoverZapServers(zapMgr, BROWSER_NAME, VERSION, zapPorts, debugLog);
 });
 
+// Keep-alive alarm — Chrome MV3 service workers idle out after ~30s.
+// `chrome.alarms.onAlarm` wakes the worker even when suspended; the
+// handler kicks rediscovery whenever the live ZAP connection is gone,
+// closing the race where setTimeout-based reconnect timers never fire.
+const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
+try {
+  chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.5 });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name !== KEEP_ALIVE_ALARM) return;
+    if (!zapMgr.state.connected) {
+      debugLog('[Hanzo/ZAP] keep-alive: no connection, rediscovering');
+      getPortConfig().then(({ zapPorts }) => {
+        discoverZapServers(zapMgr, BROWSER_NAME, VERSION, zapPorts, debugLog);
+      });
+    }
+  });
+} catch (e) {
+  console.warn('[Hanzo] alarms unavailable:', e);
+}
+
 // 2. Fallback: Connect to legacy MCP WebSocket
 connectToMCP();
 
