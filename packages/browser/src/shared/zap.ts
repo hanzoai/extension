@@ -297,7 +297,37 @@ export function zapGetPrompt(mgr: ZapManager, mcpId: string, name: string, args?
   return zapRequest(mgr, mcpId, 'prompts/get', { name, arguments: args });
 }
 
-/** Discover and connect to ZAP servers */
+/**
+ * Ask the native messaging helper (ai.hanzo.zap_mdns) for a live mDNS browse
+ * of `_hanzo-zap._tcp.local.` services. Returns ws:// URLs the extension
+ * can connect to. Returns [] when the helper isn't installed or browse
+ * comes back empty — caller falls back to fixed-port probing.
+ */
+async function discoverViaMdns(timeoutMs: number = 1500): Promise<string[]> {
+  try {
+    const api: any = (typeof browser !== 'undefined' ? browser : (chrome as any));
+    const send = api?.runtime?.sendNativeMessage;
+    if (typeof send !== 'function') return [];
+    const resp: any = await new Promise((resolve) => {
+      try {
+        const p = send.call(api.runtime, 'ai.hanzo.zap_mdns', { op: 'browse', timeout_ms: timeoutMs });
+        if (p && typeof p.then === 'function') {
+          p.then(resolve).catch(() => resolve(null));
+        } else {
+          send.call(api.runtime, 'ai.hanzo.zap_mdns', { op: 'browse', timeout_ms: timeoutMs }, (r: any) => resolve(r));
+        }
+      } catch {
+        resolve(null);
+      }
+    });
+    if (!resp || !resp.ok || !Array.isArray(resp.services)) return [];
+    return resp.services.map((s: any) => s.url).filter((u: any): u is string => typeof u === 'string');
+  } catch {
+    return [];
+  }
+}
+
+/** Discover and connect to ZAP servers — mDNS first, fixed-port fallback */
 export async function discoverZapServers(
   mgr: ZapManager,
   browserName: string,
@@ -306,6 +336,18 @@ export async function discoverZapServers(
   log: (msg: string) => void = console.log,
 ): Promise<void> {
   log('[Hanzo/ZAP] Discovering MCP servers...');
+
+  // Stage 1: mDNS via native messaging helper (preferred — LAN-wide,
+  // collision-free). When the helper isn't installed this returns [] and
+  // we fall through to the fixed-port probe.
+  const mdnsUrls = await discoverViaMdns(1500);
+  if (mdnsUrls.length > 0) {
+    log(`[Hanzo/ZAP] mDNS found ${mdnsUrls.length} server(s): ${mdnsUrls.join(', ')}`);
+    await Promise.all(mdnsUrls.map(url => connectZap(url, mgr, browserName, version, log)));
+    return;
+  }
+
+  // Stage 2: fixed-port probe (legacy fallback).
   const results = await Promise.all(ports.map(p => probeZapServer(p, mgr, browserName, version)));
   const available = results.filter(Boolean) as string[];
 
