@@ -2456,25 +2456,33 @@ setZapRequestHandler(zapMgr, async (method, params) => {
 discoverZapServers(zapMgr, BROWSER_NAME, VERSION);
 
 // =============================================================================
-// Keep-alive alarm — Firefox MV3 treats `"scripts"` backgrounds as event
-// pages, suspending them after ~30s of inactivity. setTimeout / setInterval
-// inside the suspended page never fire, so our reconnect chain dies after
-// the first onclose. browser.alarms.onAlarm wakes the background up
-// regardless of suspension, giving us a guaranteed re-evaluation point.
+// Keep-alive — two-layer:
 //
-// The handler does the only work that matters: if no live ZAP connection
-// exists, kick off discovery again. WebSocket onclose still triggers the
-// fast (3s) retry within a single wake-cycle; alarms cover the case where
-// the background was unloaded between the close and the retry.
+//   1. Port: every content-script connects a `zap-keepalive` port. As long
+//      as ANY tab holds a port, Firefox keeps the background event-page
+//      loaded indefinitely. This is the canonical MV3 pattern and the
+//      cheapest fix for the suspend bug — no polling required.
+//
+//   2. Alarms: belt-and-suspenders for the case where no http(s) tab is
+//      open (about: pages, fresh window) AND the background gets
+//      suspended. Alarm fires every 30s, wakes the page, re-discovers
+//      if the ZAP socket is gone.
 // =============================================================================
+browser.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'zap-keepalive') return;
+  // Just receiving messages keeps the background page alive — we don't
+  // even need to respond. Drop the listener silently when the content
+  // script unloads.
+  port.onMessage.addListener(() => { /* noop — receipt is the keep-alive */ });
+});
+
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
-const KEEP_ALIVE_PERIOD_MIN = 0.5; // 30 seconds — Firefox's minimum is 30s for unprivileged extensions
 try {
-  browser.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: KEEP_ALIVE_PERIOD_MIN });
+  browser.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.5 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
     if (!zapMgr.state.connected) {
-      console.log('[Hanzo/ZAP] keep-alive: no connection, rediscovering');
+      console.log('[Hanzo/ZAP] keep-alive alarm: no connection, rediscovering');
       discoverZapServers(zapMgr, BROWSER_NAME, VERSION);
     }
   });
