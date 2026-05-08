@@ -209,6 +209,14 @@ export async function connectZap(
       }
     };
 
+    let scheduledRetry = false;
+    const scheduleRetry = (reason: string) => {
+      if (scheduledRetry) return;
+      scheduledRetry = true;
+      log(`[Hanzo/ZAP] ${reason} — reconnecting to ${url} in ${ZAP_RECONNECT_DELAY}ms...`);
+      setTimeout(() => connectZap(url, mgr, browserName, version, log), ZAP_RECONNECT_DELAY);
+    };
+
     ws.onclose = () => {
       for (const [id, conn] of mgr.connections) {
         if (conn === ws) {
@@ -218,12 +226,17 @@ export async function connectZap(
         }
       }
       mgr.state.connected = mgr.connections.size > 0;
-      log(`[Hanzo/ZAP] Disconnected from ${url}, reconnecting in ${ZAP_RECONNECT_DELAY}ms...`);
-      setTimeout(() => connectZap(url, mgr, browserName, version, log), ZAP_RECONNECT_DELAY);
+      scheduleRetry('Disconnected');
     };
 
     ws.onerror = () => {
       clearTimeout(connTimer);
+      // onerror fires when the bind window misses, the server is restarting,
+      // or the connection is reset mid-handshake. Without scheduling a retry
+      // here the entire reconnect chain dies after a single failed attempt
+      // (1.9.6 and earlier) — fixed in 1.9.7 by chaining a retry the same
+      // way onclose does.
+      scheduleRetry('Connect error');
       resolve(null);
     };
   });
