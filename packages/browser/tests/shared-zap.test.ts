@@ -5,6 +5,7 @@ import {
   createZapManager,
   hasZapTool,
   handleZapMessage,
+  setZapRequestHandler,
   zapCallTool,
   zapListResources,
   zapReadResource,
@@ -284,5 +285,37 @@ describe('handleZapMessage', () => {
       const handled = handleZapMessage(action, { name: 'test', uri: 'test', url: 'ws://localhost:9999' }, noop, mgr, 'Chrome', '1.0');
       expect(handled).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setZapRequestHandler — closes the loop for ZAP-server-initiated RPC
+// (the 2-process architecture where Python hanzo-mcps push browser
+// actions TO the extension over the same socket).
+// ---------------------------------------------------------------------------
+
+describe('setZapRequestHandler', () => {
+  it('attaches the handler onto the manager', () => {
+    const mgr = createZapManager();
+    expect(mgr.requestHandler).toBeUndefined();
+    const handler = async () => ({ ok: true });
+    setZapRequestHandler(mgr, handler);
+    expect(mgr.requestHandler).toBe(handler);
+  });
+
+  it('replaces an existing handler', () => {
+    const mgr = createZapManager();
+    const a = async () => 'a';
+    const b = async () => 'b';
+    setZapRequestHandler(mgr, a);
+    setZapRequestHandler(mgr, b);
+    expect(mgr.requestHandler).toBe(b);
+  });
+
+  it('clears the handler when undefined', () => {
+    const mgr = createZapManager();
+    setZapRequestHandler(mgr, async () => null);
+    setZapRequestHandler(mgr, undefined);
+    expect(mgr.requestHandler).toBeUndefined();
   });
 });

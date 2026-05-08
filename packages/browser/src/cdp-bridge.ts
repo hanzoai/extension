@@ -1,6 +1,7 @@
 // CDP Bridge for hanzo-mcp Browser Tool Integration
 // Enables Playwright to control browser via Chrome DevTools Protocol
 import { ActionRateLimiter, debugLog, loadDebugFlagFromStorage } from './runtime-guard';
+import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
 
 interface CDPSession {
   tabId: number;
@@ -164,27 +165,40 @@ export class CDPBridge {
       debugLog(`[CDP] Page.captureScreenshot failed, using captureVisibleTab fallback: ${e}`);
     }
 
-    // Fallback: use chrome.tabs.captureVisibleTab (no debugger needed)
+    // Fallback: chrome.tabs.captureVisibleTab. This API only works on a
+    // *foreground* tab in the target window — Firefox enforces this strictly,
+    // Chrome will sometimes succeed with a backgrounded tab but is
+    // inconsistent on Mac. Brief-activate the target tab if needed and
+    // restore focus afterwards. Always pass an explicit windowId resolved
+    // from the tab so multi-window automation captures the right window.
     const tab = await chrome.tabs.get(tabId);
-    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
-      format: options?.format === 'jpeg' ? 'jpeg' : 'png',
-      quality: options?.quality,
-    });
+    let activatedFor: number | null = null;
+    let prevActiveId: number | undefined;
+    if (!tab.active) {
+      const prev = await new Promise<chrome.tabs.Tab | undefined>((resolve) => {
+        chrome.tabs.query({ active: true, windowId: tab.windowId }, (tabs) => resolve(tabs[0]));
+      });
+      prevActiveId = prev?.id;
+      await chrome.tabs.update(tabId, { active: true });
+      activatedFor = tabId;
+      // One animation tick so the tab actually composes.
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    let dataUrl: string;
+    try {
+      dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+        format: options?.format === 'jpeg' ? 'jpeg' : 'png',
+        quality: options?.quality,
+      });
+    } finally {
+      if (activatedFor !== null && prevActiveId) {
+        chrome.tabs.update(prevActiveId, { active: true }).catch(() => {});
+      }
+    }
     // Strip data:image/png;base64, prefix
     return dataUrl.replace(/^data:image\/\w+;base64,/, '');
   }
   
-  /** Accept tabId in any of: number | "tab-NNN" | "NNN" | undefined.
-   *  Fully anchored so "https://x.com/?tab-123" can't be coerced. */
-  private parseTabId(raw: unknown): number | null {
-    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-    if (typeof raw !== 'string' || raw === '') return null;
-    const m = raw.match(/^(?:tab-)?(\d+)$/);
-    if (!m) return null;
-    const n = Number(m[1]);
-    return Number.isFinite(n) ? n : null;
-  }
-
   async click(tabId: number, x: number, y: number): Promise<void> {
     await this.send(tabId, 'Input.dispatchMouseEvent', {
       type: 'mousePressed',
@@ -218,11 +232,18 @@ export class CDPBridge {
   
   async evaluate(tabId: number, expression: string): Promise<any> {
     await this.send(tabId, 'Runtime.enable');
+    // awaitPromise: true makes CDP wait for any async IIFE the caller passed
+    // to resolve before returning. Without this, expressions like
+    //   (async () => fetch('/x').then(r => r.json()))()
+    // serialize to {} (a Promise placeholder) and the caller can't tell
+    // success from failure. unwrapEvaluateResult further normalises every
+    // shape (Chrome / CDP / hanzo-tools) to the bare value.
     const result = await this.send(tabId, 'Runtime.evaluate', {
       expression,
-      returnByValue: true
+      returnByValue: true,
+      awaitPromise: true,
     });
-    return result.result?.value;
+    return unwrapEvaluateResult(result);
   }
   
   async getDocument(tabId: number): Promise<any> {
@@ -365,6 +386,24 @@ export class CDPBridge {
     }
   }
   
+  /**
+   * Public entry point for ZAP-server-initiated requests.
+   *
+   * Wraps {@link handleBridgeMessage} so background scripts can hand off
+   * ``method`` + ``params`` from a ZAP MSG_REQUEST without synthesising a
+   * fake numeric ``id``. Throws on bridge error so the caller can convert
+   * to a MSG_RESPONSE error frame.
+   */
+  async dispatchMethod(method: string, params: any): Promise<any> {
+    const response = await this.handleBridgeMessage({ id: 0, method, params: params || {} });
+    if (response.error) {
+      const err: any = new Error(response.error.message);
+      err.code = response.error.code;
+      throw err;
+    }
+    return response.result;
+  }
+
   private async handleBridgeMessage(message: any): Promise<CDPResponse> {
     const { id, method, params } = message;
 
@@ -375,7 +414,7 @@ export class CDPBridge {
       // getTargets, plain numeric string. Without explicit targeting fall
       // back to the active tab in the focused window — which is fragile when
       // the user has many windows open. Always prefer explicit ids.
-      const tabId = this.parseTabId(params?.tabId ?? params?.targetId)
+      const tabId = parseTabId(params?.tabId ?? params?.targetId)
                     ?? await this.getActiveTabId();
 
       switch (method) {
