@@ -1,4 +1,6 @@
-/* Hanzo AI Browser Extension Sidebar — aligned with @hanzo/ui dark theme */
+/* Hanzo AI Browser Extension Sidebar — Hanzo brand: strictly monochrome.
+   See ~/work/hanzo/brand/brand.json — primaryColor #FFFFFF, no chromatic
+   accents. Status states are conveyed by intensity, not hue. */
 
 :root {
   --bg-primary: #0a0a0a;
@@ -15,9 +17,11 @@
   --accent-dim: rgba(255,255,255,0.06);
   --accent-glow: rgba(255,255,255,0.03);
 
-  --success: #22c55e;
-  --warning: #eab308;
-  --error: #ef4444;
+  /* Status: monochrome by hue, distinguished by opacity / weight.
+     Brand is strict monochrome, so success/warn/error use luminance. */
+  --success: #fafafa;
+  --warning: #d4d4d4;
+  --error: rgba(255,255,255,0.55);
 
   --border: rgba(255,255,255,0.10);
   --border-strong: rgba(255,255,255,0.16);
@@ -1046,16 +1050,18 @@ html {
   word-break: break-all;
 }
 
+/* Element-syntax tinting — kept monochrome via opacity, not hue. */
 .inspector-result .element-tag {
-  color: #7cc4f8;
+  color: #fafafa;
+  font-weight: 600;
 }
 
 .inspector-result .element-id {
-  color: #c792ea;
+  color: rgba(255,255,255,0.78);
 }
 
 .inspector-result .element-class {
-  color: #c3e88d;
+  color: rgba(255,255,255,0.62);
 }
 
 .inspector-result .element-size {
@@ -1681,11 +1687,13 @@ select option {
   min-width: 0;
 }
 
-.bar-blue { background: #3B82F6; }
-.bar-violet { background: #8B5CF6; }
-.bar-emerald { background: #10B981; }
-.bar-amber { background: #F59E0B; }
-.bar-red { background: #EF4444; }
+/* Usage bars: monochrome scale (brightest → dimmest) per @hanzo/brand.
+   Class names kept for compatibility with existing markup. */
+.bar-blue    { background: rgba(255,255,255,0.95); }
+.bar-violet  { background: rgba(255,255,255,0.75); }
+.bar-emerald { background: rgba(255,255,255,0.55); }
+.bar-amber   { background: rgba(255,255,255,0.40); }
+.bar-red     { background: rgba(255,255,255,0.25); }
 
 .usage-bar-group {
   margin-top: 8px;
@@ -1761,9 +1769,9 @@ select option {
   letter-spacing: 0.05em;
   white-space: nowrap;
 }
-.badge-cloud { background: rgba(59,130,246,0.15); color: #60A5FA; }
-.badge-local { background: rgba(16,185,129,0.15); color: #34D399; }
-.badge-hub { background: rgba(139,92,246,0.15); color: #A78BFA; }
+.badge-cloud { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.92); }
+.badge-local { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.78); }
+.badge-hub   { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.65); }
 
 .model-hub-actions {
   display: flex;
