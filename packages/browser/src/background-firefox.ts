@@ -8,8 +8,14 @@
  * - Uses `browser.*` APIs (with Promises) instead of `chrome.*` (callbacks)
  * - Cannot use ES module exports at top level
  * - Cannot run WebSocket servers, only clients
- * - Uses `browser.tabs.executeScript` instead of `chrome.debugger`
+ * - MV3 109+ uses `browser.scripting.executeScript({world,func,args})`,
+ *   NOT the removed MV2 `tabs.executeScript`. See `executeScriptWithTimeout`.
+ *
+ * The webextension-polyfill import is a no-op on Firefox (browser.* is
+ * native) but keeping it as the first import here mirrors the Chrome
+ * background's structure and avoids divergence.
  */
+import 'webextension-polyfill';
 
 import type { ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
 import {
@@ -20,6 +26,7 @@ import {
   zapCallTool,
   hasZapTool,
   handleZapMessage,
+  setZapRequestHandler,
   type ZapManager,
 } from './shared/zap.js';
 import {
@@ -37,6 +44,7 @@ import {
   firefoxAdapter,
   type BrowserAdapter,
 } from './shared/auth.js';
+import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
 
 // Declare browser API for TypeScript
 declare const browser: typeof chrome;
@@ -66,8 +74,9 @@ const controlSession: ControlSession = {
   startedAt: null,
 };
 
-// Start ZAP discovery on load (using shared module)
-discoverZapServers(zapMgr, BROWSER_NAME, VERSION);
+// ZAP discovery is started AFTER the extension class is instantiated
+// because the inbound request handler delegates to its dispatchMethod().
+// See bottom of file for the discoverZapServers() call.
 
 // =============================================================================
 
@@ -124,9 +133,16 @@ class HanzoFirefoxExtension {
   }
 
   private register(): void {
+    // Tell the bridge server explicitly that we're Firefox so the
+    // `browser` parameter on multi-browser actions can route to us by
+    // name (e.g. `{ action: 'navigate', browser: 'firefox', url: '...' }`).
+    // Without this the bridge falls back to the User-Agent sniff in
+    // `assignClientId` which we can't observe from the SW (no navigator
+    // headers on a WebSocket message).
     this.send({
       type: 'register',
       role: 'cdp-provider',
+      browser: BROWSER_NAME, // 'firefox'
       capabilities: [
         'navigate', 'screenshot', 'click', 'dblclick', 'hover', 'type',
         'evaluate', 'tabs', 'fill', 'clear', 'reload', 'goBack', 'goForward',
@@ -229,7 +245,7 @@ class HanzoFirefoxExtension {
   private async resolveTab(params: Record<string, unknown>): Promise<chrome.tabs.Tab> {
     const rawId = params.tabId ?? params.targetId;
     if (rawId !== undefined && rawId !== null) {
-      const id = this.parseTabId(rawId);
+      const id = parseTabId(rawId);
       if (id !== null) {
         try { return await browser.tabs.get(id); } catch { /* fall through */ }
       }
@@ -242,17 +258,6 @@ class HanzoFirefoxExtension {
     const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (activeTab) return activeTab;
     throw new Error('No active tab');
-  }
-
-  /** Fully anchored: rejects URLs / hashes / arbitrary strings even when
-   *  they happen to end with a numeric segment. See shared/tab-id.ts. */
-  private parseTabId(raw: unknown): number | null {
-    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-    if (typeof raw !== 'string' || raw === '') return null;
-    const m = raw.match(/^(?:tab-)?(\d+)$/);
-    if (!m) return null;
-    const n = Number(m[1]);
-    return Number.isFinite(n) ? n : null;
   }
 
   /**
@@ -293,6 +298,21 @@ class HanzoFirefoxExtension {
     return result;
   }
 
+  /**
+   * Public dispatcher for ZAP-server-initiated requests. Mirrors
+   * `CDPBridge.dispatchMethod` on the Chrome side so background-ZAP wiring
+   * is symmetric across browsers. Calls into the same canonical
+   * ``executeMethod`` switch already used by the legacy WS path.
+   */
+  async dispatchMethod(method: string, params: Record<string, unknown>): Promise<any> {
+    const result = await this.executeMethod(method, params || {});
+    if (result && typeof result === 'object' && 'error' in result && result.error) {
+      const err: any = new Error(String(result.error));
+      throw err;
+    }
+    return result;
+  }
+
   private async executeMethod(
     method: string,
     params: Record<string, unknown>
@@ -329,18 +349,16 @@ class HanzoFirefoxExtension {
       }
 
       case 'Target.closeTarget': {
-        const closeId = params.targetId
-          ? parseInt((params.targetId as string).replace('tab-', ''), 10)
-          : params.tabId as number;
-        if (closeId) await browser.tabs.remove(closeId);
+        // Use shared parseTabId for safety: rejects URLs / strings that
+        // happen to end with digits (e.g. an ad URL with ?tab=123 in it).
+        const closeId = parseTabId(params.targetId ?? params.tabId);
+        if (closeId !== null) await browser.tabs.remove(closeId);
         return { success: true };
       }
 
       case 'Target.activateTarget': {
-        const activateId = params.targetId
-          ? parseInt((params.targetId as string).replace('tab-', ''), 10)
-          : params.tabId as number;
-        if (activateId) await browser.tabs.update(activateId, { active: true });
+        const activateId = parseTabId(params.targetId ?? params.tabId);
+        if (activateId !== null) await browser.tabs.update(activateId, { active: true });
         return { success: true };
       }
 
@@ -2332,6 +2350,17 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
 // =============================================================================
 
 const hanzoExtension = new HanzoFirefoxExtension();
+
+// Install the ZAP inbound-request handler so Python hanzo-mcps can dispatch
+// browser actions BACK to Firefox over the same socket. This is what
+// closes the loop: the extension is no longer ZAP-client-only — it accepts
+// inbound RPC and routes via the canonical executeMethod dispatcher.
+setZapRequestHandler(zapMgr, async (method, params) => {
+  return hanzoExtension.dispatchMethod(method, (params || {}) as Record<string, unknown>);
+});
+
+// Start ZAP discovery now that the handler is installed.
+discoverZapServers(zapMgr, BROWSER_NAME, VERSION);
 
 // End active session when the controlled tab closes.
 browser.tabs.onRemoved.addListener((tabId) => {
