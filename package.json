@@ -1,8 +1,8 @@
 {
-  "name": "hanzo-ai-monorepo",
-  "version": "1.9.11",
+  "name": "@hanzo/extension",
+  "version": "1.9.12",
   "private": true,
-  "description": "Hanzo AI Development Platform Monorepo",
+  "description": "Hanzo AI Extension",
   "license": "MIT",
   "repository": {
     "type": "git",
