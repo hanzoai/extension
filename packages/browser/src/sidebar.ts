@@ -1,3 +1,7 @@
+// Polyfill the WebExtension API on Chrome so storage calls return Promises
+// like Firefox / Safari natively do. No-op on those runtimes.
+import 'webextension-polyfill';
+
 import {
   CHAT_BUDGETS,
   debugLog,

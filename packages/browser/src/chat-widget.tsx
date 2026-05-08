@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
   Textarea,
-} from '@hanzo/ui/primitives-common';
+} from '@hanzo/gui';
 
 function LoginPrompt() {
   return (
