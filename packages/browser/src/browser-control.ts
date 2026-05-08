@@ -1377,30 +1377,94 @@ export class BrowserControl {
   // Script Execution Helper
   // ===========================================================================
 
-  private executeScript<T = any>(tabId: number, code: string): Promise<T> {
-    return new Promise((resolve, reject) => {
-      if (chrome.scripting) {
-        // MV3: use chrome.scripting.executeScript
-        chrome.scripting.executeScript({
+  /**
+   * Run JS in a tab and return its result.
+   *
+   * Why MV3 + MAIN world + the Function trampoline?
+   *
+   *   - `chrome.scripting.executeScript` only accepts a function (or files);
+   *     it does NOT take a code string the way MV2's `tabs.executeScript`
+   *     did. To support our existing call sites that pass dynamic code as
+   *     a string, we serialise the user's code through `args` and run it
+   *     via `Function(codeStr)()` inside the page.
+   *   - MAIN world is required so the page's own globals (window.fetch,
+   *     CustomElements, framework instances) are visible. ISOLATED world
+   *     can't see them.
+   *   - Async unwrap: if the caller's code yields a Promise, executeScript
+   *     serialises it as `{}` (the value-loss bug). We detect that shape
+   *     and re-run wrapping in `Promise.resolve(...)` so the resolved
+   *     value comes back instead of the placeholder.
+   *
+   * Falls back to the MV2 string API on browsers / runtimes that still
+   * have it (older Firefox; no Chrome MV2 ships now).
+   */
+  private async executeScript<T = any>(tabId: number, code: string): Promise<T> {
+    const exec = async (wrapped: string): Promise<T> => {
+      // MV3 path — preferred on every modern build.
+      if (chrome.scripting?.executeScript) {
+        const results = await chrome.scripting.executeScript({
           target: { tabId },
-          func: new Function(`return (${code})`) as () => T,
-        }, (results) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else {
-            resolve(results?.[0]?.result as T);
-          }
+          world: 'MAIN',
+          args: [wrapped],
+          func: (codeStr: string) => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+              return Function(codeStr)();
+            } catch (e: any) {
+              return { __hanzo_error: e?.message || String(e) };
+            }
+          },
         });
-      } else {
-        // MV2 fallback: use chrome.tabs.executeScript
-        (chrome.tabs as any).executeScript(tabId, { code }, (results: any[]) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else {
-            resolve(results?.[0] as T);
-          }
+        return (results?.[0] as any)?.result as T;
+      }
+      // MV2 fallback — only Chrome-MV2 / older Firefox would reach this.
+      const legacy = (chrome.tabs as any).executeScript;
+      if (legacy) {
+        return new Promise<T>((resolve, reject) => {
+          legacy(tabId, { code: wrapped }, (results: any[]) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(results?.[0] as T);
+            }
+          });
         });
       }
-    });
+      throw new Error('No executeScript API available (need MV3 scripting permission)');
+    };
+
+    // Wrap the user's code so it ALWAYS has a top-level `return`. The
+    // Function trampoline discards the value of an IIFE — without an
+    // explicit `return` the result is undefined → JSON-encodes to `{}`.
+    const trimmed = code.trim();
+    const wrappedCode = /^\s*return\b/.test(trimmed)
+      ? trimmed
+      : `try { return (${trimmed}); } catch(__e) { return { __hanzo_error: __e.message || String(__e) }; }`;
+
+    let result: any = await exec(wrappedCode);
+
+    // Unwrap our error sentinel so callers see a real Error.
+    if (result && typeof result === 'object' && '__hanzo_error' in result) {
+      throw new Error(result.__hanzo_error);
+    }
+
+    // Detect the empty-Promise serialization. If the caller's code yielded
+    // a Promise (e.g. (async () => 'x')()) executeScript drops it as `{}`.
+    // Re-run wrapped in Promise.resolve so the resolved value comes back.
+    const looksEmpty = result !== null
+      && typeof result === 'object'
+      && Object.keys(result).length === 0
+      && !Array.isArray(result);
+    if (looksEmpty) {
+      const promiseWrapped = `return Promise.resolve((function(){ ${wrappedCode} })()).then(function(__v){
+        try { return JSON.parse(JSON.stringify(__v === undefined ? null : __v)); } catch(e) { return String(__v); }
+      });`;
+      result = await exec(promiseWrapped);
+      if (result && typeof result === 'object' && '__hanzo_error' in result) {
+        throw new Error(result.__hanzo_error);
+      }
+    }
+
+    return result as T;
   }
 }
