@@ -1,5 +1,10 @@
 // Hanzo AI — Popup Script
 // Uses background message passing for auth (not direct storage access).
+//
+// Polyfill the WebExtension API surface so this script can read/write
+// chrome.storage with Promise-returning calls on every browser. Chrome
+// gets the polyfill wrapper, Firefox/Safari get a no-op.
+import 'webextension-polyfill';
 
 import {
   DEFAULT_INSPECT_SHORTCUT,
@@ -29,7 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Open panel
   const openPanel = document.getElementById('open-panel');
-  const openPageOverlay = document.getElementById('open-page-overlay');
+  const openPageOverlay = document.getElementById('open-page-overlay'); // legacy id, may not exist
+  const pinLeftBtn = document.getElementById('pin-left');
+  const pinRightBtn = document.getElementById('pin-right');
 
   // Status dots
   const zapStatus = document.getElementById('zap-status');
@@ -100,32 +107,49 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // --- Open chat panel ---
-  // Always uses the in-page right-anchored overlay (content-script). The
-  // browser-native sidebar (chrome.sidePanel / browser.sidebarAction) is
-  // not used because:
-  //   - Firefox always renders its sidebar on the user's preferred side
-  //     (default left) and surrounds it with the native sidebar-icon strip,
-  //     which the user explicitly does NOT want.
-  //   - Chrome's sidePanel is right-anchored, but the position is OS-managed
-  //     and doesn't match the in-page overlay's behaviour.
-  // Routing every "Open Chat Panel" click through page.overlay gives a
-  // consistent right-anchored chat across every browser.
+  // --- Open chat ---
+  // Default surface: in-page edge-pinned overlay (content-script). Honours
+  // the user's `overlaySide` (left|right) preference. Firefox users who
+  // prefer the OS-native sidebar can also reach the same chat surface via
+  // View → Sidebar → Hanzo AI (registered via sidebar_action in
+  // manifest-firefox.json).
   openPanel?.addEventListener('click', () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const activeTab = tabs[0];
-      const target = isInjectableTab(activeTab) ? activeTab : null;
-      if (!target?.id) {
-        // Fallback: open a standalone window with the chat surface so the
-        // popup-button still does something on chrome:// / about: pages.
-        chrome.tabs.create({ url: chrome.runtime.getURL('sidebar.html') });
-        window.close();
-        return;
-      }
-      chrome.runtime.sendMessage({ action: 'page.overlay.show', tabId: target.id }, () => {
-        window.close();
+    chrome.storage?.sync?.get?.(['overlaySide'], (vals) => {
+      const side = vals?.overlaySide === 'left' ? 'left' : 'right';
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const activeTab = tabs[0];
+        const target = isInjectableTab(activeTab) ? activeTab : null;
+        if (!target?.id) {
+          // Fallback: open the chat surface in a regular tab so the popup
+          // button still does something on privileged (chrome:// / about:)
+          // pages where content scripts can't run.
+          chrome.tabs.create({ url: chrome.runtime.getURL('sidebar.html') });
+          window.close();
+          return;
+        }
+        chrome.runtime.sendMessage({ action: 'page.overlay.show', tabId: target.id, side }, () => {
+          window.close();
+        });
       });
     });
+  });
+
+  function setActiveSide(side: 'left' | 'right') {
+    pinLeftBtn?.setAttribute('data-active', side === 'left' ? 'true' : 'false');
+    pinRightBtn?.setAttribute('data-active', side === 'right' ? 'true' : 'false');
+    chrome.storage?.sync?.set?.({ overlaySide: side });
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const id = tabs[0]?.id;
+      if (id) chrome.runtime.sendMessage({ action: 'page.overlay.setSide', tabId: id, side });
+    });
+  }
+  pinLeftBtn?.addEventListener('click', () => setActiveSide('left'));
+  pinRightBtn?.addEventListener('click', () => setActiveSide('right'));
+  // Restore active-pin highlighting from storage.
+  chrome.storage?.sync?.get?.(['overlaySide'], (vals) => {
+    const side = vals?.overlaySide === 'left' ? 'left' : 'right';
+    pinLeftBtn?.setAttribute('data-active', side === 'left' ? 'true' : 'false');
+    pinRightBtn?.setAttribute('data-active', side === 'right' ? 'true' : 'false');
   });
 
   function isInjectableTab(tab: chrome.tabs.Tab | undefined): boolean {
