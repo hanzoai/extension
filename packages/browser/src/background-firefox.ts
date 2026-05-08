@@ -64,6 +64,29 @@ interface CDPResponse {
 const BROWSER_NAME = 'firefox';
 const VERSION = typeof browser !== 'undefined' ? browser.runtime.getManifest().version : '0';
 
+// URLs the extension can never run scripts in. browser.scripting.executeScript
+// silently returns no frames for these, which used to surface as a mystery
+// `{}` to the caller. We detect upfront and raise an actionable error.
+const PRIVILEGED_URL_PATTERNS: RegExp[] = [
+  /^about:/i,                     // about:debugging, about:addons, about:config…
+  /^moz-extension:/i,             // any extension's own pages
+  /^chrome:/i,                    // chrome://… (Firefox accepts these too)
+  /^view-source:/i,
+  /^resource:/i,
+  /^file:/i,                      // local files unless explicit perm granted
+  /^https?:\/\/addons\.mozilla\.org\b/i, // AMO blocks WebExtensions by policy
+];
+
+function isPrivilegedTab(tab: chrome.tabs.Tab | undefined): boolean {
+  if (!tab) return false;
+  const url = tab.url || (tab as any).pendingUrl || '';
+  if (!url) {
+    // Some Firefox builds redact url for privileged tabs; treat as privileged.
+    return true;
+  }
+  return PRIVILEGED_URL_PATTERNS.some((rx) => rx.test(url));
+}
+
 // Shared ZAP manager (replaces inline ZAP protocol code)
 const zapMgr: ZapManager = createZapManager();
 
@@ -262,21 +285,22 @@ class HanzoFirefoxExtension {
 
   /**
    * Run JS in the page via executeScript and return the serialized result.
-   * Wraps result to avoid undefined → {} JSON serialization issue.
+   * Bumped to throw on empty/missing results so undefined → {} can no
+   * longer hide a privileged-tab or CSP failure (1.9.2).
    */
-  /**
-   * Detect a serialized Promise from executeScript: an empty object {} that
-   * came from awaiting a thenable. We can't do better in MV3 / Firefox because
-   * executeScript drops Promise values.
-   */
-  private looksLikePromiseResult(value: unknown): boolean {
-    return value !== null
-      && typeof value === 'object'
-      && Object.keys(value as Record<string, unknown>).length === 0
-      && !Array.isArray(value);
-  }
-
   private async runInPage(tabId: number, code: string, timeoutMs: number = 10000): Promise<any> {
+    // Privileged URLs (about:, moz-extension:, view-source:, …) silently
+    // refuse executeScript. Detect upfront with an actionable error rather
+    // than letting the caller see a mystery `{}` response.
+    let tab: chrome.tabs.Tab | undefined;
+    try { tab = await browser.tabs.get(tabId); } catch { /* best-effort */ }
+    if (tab && isPrivilegedTab(tab)) {
+      throw new Error(
+        `Cannot run JS in privileged tab ${tabId} (${tab.url}). ` +
+        `Activate a regular http(s) tab via tabId/tab_id parameter.`,
+      );
+    }
+
     // Wrap the user's code in a function body that ALWAYS has a top-level
     // `return`. Without this `Function(body)()` discards the IIFE result and
     // hands back undefined → JSON serializes to {} → caller can't tell
@@ -291,7 +315,23 @@ class HanzoFirefoxExtension {
       }
     `;
     const results = await this.executeScriptWithTimeout(tabId, wrappedCode, timeoutMs);
+    if (!Array.isArray(results) || results.length === 0) {
+      throw new Error(
+        `executeScript returned no frames for tab ${tabId} — page may be ` +
+        `privileged, in a process the extension can't access, or unloaded.`,
+      );
+    }
+    // results is the per-frame mapped array of `r?.result`. With world: MAIN
+    // an `undefined` slot means a frame errored *outside* our try/catch
+    // (typical CSP `script-src 'self'` blocking `Function()`). Surface that
+    // explicitly instead of returning a silent `undefined`.
     const result = results[0];
+    if (result === undefined) {
+      throw new Error(
+        `executeScript ran but returned no value (frame errored outside the ` +
+        `wrapped try/catch — most often page CSP blocking Function()). Tab ${tabId}.`,
+      );
+    }
     if (result && typeof result === 'object' && result.__hanzo_error) {
       throw new Error(result.__hanzo_error);
     }
@@ -478,6 +518,10 @@ class HanzoFirefoxExtension {
         // Accept both `expression` (CDP) and `code` (MCP/SDK convention).
         const expression = (params.expression as string) ?? (params.code as string) ?? '';
         const timeout = (params.timeout as number) || 10000;
+        // Caller can opt into Promise-await semantics. CDP names this flag
+        // `awaitPromise`; the MCP/SDK callers pass `await_promise`.
+        const awaitPromise = Boolean(params.awaitPromise ?? params.await_promise);
+
         // If the caller already wrote a `return` or wrote a function/IIFE,
         // wrap differently so we don't double-wrap and break syntax.
         const trimmed = expression.trim();
@@ -486,19 +530,53 @@ class HanzoFirefoxExtension {
           : trimmed.endsWith(';')
             ? `${trimmed} return undefined;`
             : `return (${trimmed});`;
-        let value = await this.runInPage(tabId, code, timeout);
-        // Auto-await Promises: the page may evaluate to a Promise, but
-        // executeScript serializes it as `{}`. Probe for a `.then` and
-        // resolve in-page so we return the resolved value instead.
-        if (this.looksLikePromiseResult(value)) {
-          value = await this.runInPage(tabId, `
+
+        // When awaitPromise is requested, resolve in-page so executeScript's
+        // structured-clone serialization sees the resolved value rather than
+        // a Promise (which it can't transfer).
+        const evalCode = awaitPromise
+          ? `
             return Promise.resolve((function(){ ${code} })()).then(function(__v){
               try { return JSON.parse(JSON.stringify(__v)); } catch(e) { return String(__v); }
             });
-          `, timeout);
+          `
+          : code;
+
+        let value: unknown;
+        let evalError: string | null = null;
+        try {
+          value = await this.runInPage(tabId, evalCode, timeout);
+        } catch (e: any) {
+          evalError = e?.message || String(e);
+          value = null;
         }
-        // Match CDP shape (legacy callers) AND surface `value` directly.
-        return { result: { value }, value };
+
+        // CDP-shape: { result: { type, value } } plus a top-level `value`
+        // alias for ergonomic callers. Coerce `undefined` → `null` so the
+        // JSON-encoded ZAP frame keeps the keys. If evaluation errored,
+        // surface CDP-style `exceptionDetails` AND a top-level `error` so
+        // both flavors of caller can see what happened.
+        const safeValue = value === undefined ? null : value;
+        const cdpType = safeValue === null
+          ? 'object'
+          : Array.isArray(safeValue)
+            ? 'object'
+            : typeof safeValue;
+        const out: Record<string, unknown> = {
+          result: { type: cdpType, value: safeValue },
+          value: safeValue,
+        };
+        if (evalError !== null) {
+          out.error = evalError;
+          out.result = {
+            type: 'object',
+            value: null,
+            subtype: 'error',
+            description: evalError,
+          };
+          out.exceptionDetails = { text: evalError };
+        }
+        return out;
       }
 
       // =====================================================================
