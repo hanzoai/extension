@@ -18,7 +18,7 @@ import {
   MSG_RESPONSE,
   MSG_PING,
   MSG_PONG,
-  DEFAULT_ZAP_PORTS,
+  HANZO_SERVICE_TYPE,
   ZAP_RECONNECT_DELAY,
   ZAP_DISCOVERY_TIMEOUT,
 } from '../src/shared/zap';
@@ -41,8 +41,11 @@ describe('Protocol constants', () => {
     expect(MSG_PONG).toBe(0xFF);
   });
 
-  it('DEFAULT_ZAP_PORTS is correct', () => {
-    expect(DEFAULT_ZAP_PORTS).toEqual([9999, 9998, 9997, 9996, 9995]);
+  it('HANZO_SERVICE_TYPE is _hanzo._tcp.local. (HIP-0069 mDNS-only)', () => {
+    // Replaces the legacy DEFAULT_ZAP_PORTS port-probe list. Discovery is
+    // now exclusively mDNS — the OS-assigned ZAP port is advertised by
+    // hanzo-zap-mdns and consumed via the extension's mDNS resolver.
+    expect(HANZO_SERVICE_TYPE).toBe('_hanzo._tcp.local.');
   });
 
   it('timing constants are defined', () => {
