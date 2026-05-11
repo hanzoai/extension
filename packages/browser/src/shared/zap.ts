@@ -335,13 +335,23 @@ async function discoverViaMdns(timeoutMs: number = 1500): Promise<string[]> {
     );
   }
   const resp: any = await new Promise((resolve, reject) => {
+    // Two dialects:
+    //   - Firefox / promise-returning Chrome (MV3): sendNativeMessage(name, msg) → Promise
+    //   - Chrome MV2 callback API: sendNativeMessage(name, msg, callback)
+    // Detect by whether the first call returns a thenable; only fall back to
+    // the callback shape when it doesn't, so we never send the same browse
+    // request twice.
     try {
-      const p = send.call(api.runtime, 'ai.hanzo.zap_mdns', { op: 'browse', timeout_ms: timeoutMs });
-      if (p && typeof p.then === 'function') {
-        p.then(resolve).catch(reject);
-      } else {
-        send.call(api.runtime, 'ai.hanzo.zap_mdns', { op: 'browse', timeout_ms: timeoutMs }, (r: any) => resolve(r));
+      const result = send.call(api.runtime, 'ai.hanzo.zap_mdns', { op: 'browse', timeout_ms: timeoutMs }, (r: any) => {
+        // Callback dialect: result of the call() above is undefined and the
+        // helper response arrives here. Promise dialect ignores callbacks.
+        if (r !== undefined) resolve(r);
+      });
+      if (result && typeof result.then === 'function') {
+        result.then(resolve).catch(reject);
       }
+      // If result was undefined and the callback never fires, the discovery
+      // loop's interval handles the retry — no need for a per-call timer.
     } catch (e) {
       reject(e);
     }
@@ -353,11 +363,11 @@ async function discoverViaMdns(timeoutMs: number = 1500): Promise<string[]> {
 }
 
 /**
- * Discover and connect to ZAP servers via mDNS only (HIP-0069). No
- * port-probe fallback — non-compliant deployments fail loudly so we can
- * detect and fix them. The native-messaging helper `ai.hanzo.zap_mdns`
- * MUST be installed; install instructions live at
- * `~/work/zap/mdns/ext/native-messaging-host.json`.
+ * Discover and connect to ZAP servers via mDNS only (HIP-0069). One probe.
+ * Use ``startZapDiscoveryLoop`` for the always-on watchdog that keeps trying
+ * until a connection sticks and re-runs whenever the connection list empties.
+ * The native-messaging helper `ai.hanzo.zap_mdns` MUST be installed; install
+ * instructions live at `~/work/zap/mdns/ext/native-messaging-host.json`.
  */
 export async function discoverZapServers(
   mgr: ZapManager,
@@ -371,19 +381,57 @@ export async function discoverZapServers(
   try {
     mdnsUrls = await discoverViaMdns(1500);
   } catch (e: any) {
-    log(`[Hanzo/ZAP] mDNS browse failed: ${e?.message || e}. Retrying in 10s.`);
-    setTimeout(() => discoverZapServers(mgr, browserName, version, undefined, log), 10000);
+    log(`[Hanzo/ZAP] mDNS browse failed: ${e?.message || e}.`);
     return;
   }
 
   if (mdnsUrls.length === 0) {
-    log('[Hanzo/ZAP] No services advertising _hanzo._tcp.local. Retrying in 10s.');
-    setTimeout(() => discoverZapServers(mgr, browserName, version, undefined, log), 10000);
+    log('[Hanzo/ZAP] No services advertising _hanzo._tcp.local.');
     return;
   }
 
-  log(`[Hanzo/ZAP] mDNS found ${mdnsUrls.length} server(s): ${mdnsUrls.join(', ')}`);
-  await Promise.all(mdnsUrls.map(url => connectZap(url, mgr, browserName, version, log)));
+  // Skip URLs we're already connected to so a watchdog re-tick is a no-op
+  // when everything is already wired.
+  const known = new Set<string>();
+  for (const m of mgr.state.mcps) known.add(m.url);
+  const fresh = mdnsUrls.filter(u => !known.has(u));
+  if (fresh.length === 0) return;
+
+  log(`[Hanzo/ZAP] mDNS found ${fresh.length} new server(s): ${fresh.join(', ')}`);
+  await Promise.all(fresh.map(url => connectZap(url, mgr, browserName, version, log)));
+}
+
+/**
+ * Always-on discovery watchdog. Ticks every ``intervalMs`` and re-runs
+ * discovery whenever the manager has zero live connections (or a fresh server
+ * has appeared on mDNS that we're not yet connected to). This is the canonical
+ * entry point — replaces the fragile setTimeout-on-failure chain that died
+ * the moment any code-path missed a re-arm. Returns the interval handle so
+ * tests can stop it; in production the page lives for the extension lifetime.
+ */
+export function startZapDiscoveryLoop(
+  mgr: ZapManager,
+  browserName: string,
+  version: string,
+  intervalMs: number = 5000,
+  log: (msg: string) => void = console.log,
+): { stop: () => void } {
+  let inFlight = false;
+  const tick = async () => {
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      await discoverZapServers(mgr, browserName, version, undefined, log);
+    } catch (e: any) {
+      log(`[Hanzo/ZAP] discovery tick failed: ${e?.message || e}`);
+    } finally {
+      inFlight = false;
+    }
+  };
+  // Run an immediate first probe; then settle into the watchdog cadence.
+  void tick();
+  const handle = setInterval(tick, intervalMs);
+  return { stop: () => clearInterval(handle) };
 }
 
 // ── Message Handler Helpers ─────────────────────────────────────────────

@@ -12,6 +12,7 @@ import {
   createZapManager,
   encodeZapMessage,
   discoverZapServers,
+  startZapDiscoveryLoop,
   handleZapMessage,
   setZapRequestHandler,
   MSG_REQUEST,
@@ -1827,8 +1828,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 setZapRequestHandler(zapMgr, async (method, params) => {
   return cdpBridge.dispatchMethod(method, params);
 });
-// mDNS-only discovery per HIP-0069 — port hint not consulted.
-discoverZapServers(zapMgr, BROWSER_NAME, VERSION, undefined, debugLog);
+// mDNS-only discovery per HIP-0069 — always-on watchdog, no port hint.
+startZapDiscoveryLoop(zapMgr, BROWSER_NAME, VERSION, 5000, debugLog);
 
 // Keep-alive — Layer 1: Port. Content scripts in every loaded http(s) tab
 // hold a `zap-keepalive` port. As long as ANY tab has one, Chrome keeps
@@ -1843,12 +1844,13 @@ chrome.runtime.onConnect.addListener((port) => {
 // wakes the worker, re-discovers if the ZAP socket is gone.
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
 try {
-  chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.5 });
+  // Wakes the worker every 15s; one-shot discovery probe if disconnected.
+  chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.25 });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
     if (!zapMgr.state.connected) {
       debugLog('[Hanzo/ZAP] keep-alive alarm: no connection, rediscovering via mDNS');
-      discoverZapServers(zapMgr, BROWSER_NAME, VERSION, undefined, debugLog);
+      void discoverZapServers(zapMgr, BROWSER_NAME, VERSION, undefined, debugLog);
     }
   });
 } catch (e) {
