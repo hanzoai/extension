@@ -21,6 +21,7 @@ import type { ControlSession, RagSnippet, RagQueryParams } from './shared/types.
 import {
   createZapManager,
   discoverZapServers,
+  startZapDiscoveryLoop,
   connectZap,
   zapRequest,
   zapCallTool,
@@ -2452,8 +2453,10 @@ setZapRequestHandler(zapMgr, async (method, params) => {
   return hanzoExtension.dispatchMethod(method, (params || {}) as Record<string, unknown>);
 });
 
-// Start ZAP discovery now that the handler is installed.
-discoverZapServers(zapMgr, BROWSER_NAME, VERSION);
+// Start the always-on ZAP discovery loop. Ticks every 5s; each tick is a
+// no-op when we're already connected to every advertised server. Replaces
+// the earlier setTimeout chain that died if any path missed a re-arm.
+startZapDiscoveryLoop(zapMgr, BROWSER_NAME, VERSION, 5000);
 
 // =============================================================================
 // Keep-alive — two-layer:
@@ -2478,12 +2481,15 @@ browser.runtime.onConnect.addListener((port) => {
 
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
 try {
-  browser.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.5 });
+  // Belt-and-suspenders: even if the discovery interval is suspended (e.g.
+  // background page idled out), the alarm wakes it every 15s and triggers
+  // a one-shot discovery probe.
+  browser.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.25 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
     if (!zapMgr.state.connected) {
       console.log('[Hanzo/ZAP] keep-alive alarm: no connection, rediscovering');
-      discoverZapServers(zapMgr, BROWSER_NAME, VERSION);
+      void discoverZapServers(zapMgr, BROWSER_NAME, VERSION);
     }
   });
 } catch (e) {
