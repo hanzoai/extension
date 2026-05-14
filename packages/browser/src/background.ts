@@ -1765,9 +1765,14 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 // Legacy MCP WebSocket (fallback when no ZAP gateway running)
 // =============================================================================
 
+// Off by default — ZAP mDNS is the canonical transport. Flip on for local
+// dev against a hanzo-mcp WS server or a CDP bridge running on the host.
+const ENABLE_LEGACY_TRANSPORTS = false;
+
 let ws: WebSocket | null = null;
 
 async function connectToMCP() {
+  if (!ENABLE_LEGACY_TRANSPORTS) return;
   const { mcpPort } = await getPortConfig();
   ws = new WebSocket(`ws://localhost:${mcpPort}/browser-extension`);
 
@@ -1857,18 +1862,22 @@ try {
   console.warn('[Hanzo] alarms unavailable:', e);
 }
 
-// 2. Fallback: Connect to legacy MCP WebSocket
-connectToMCP();
+// 2. Fallback: Connect to legacy MCP WebSocket (gated; ZAP is primary)
+if (ENABLE_LEGACY_TRANSPORTS) {
+  connectToMCP();
+}
 
-// 3. CDP bridge for browser control (configurable port)
-getPortConfig().then(({ cdpPort }) => {
-  try {
-    cdpBridge.startWebSocketServer(cdpPort);
-    debugLog(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
-  } catch (e) {
-    console.error('[Hanzo] Failed to start CDP bridge:', e);
-  }
-});
+// 3. CDP bridge for browser control (configurable port) — legacy; ZAP is primary
+if (ENABLE_LEGACY_TRANSPORTS) {
+  getPortConfig().then(({ cdpPort }) => {
+    try {
+      cdpBridge.startWebSocketServer(cdpPort);
+      debugLog(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
+    } catch (e) {
+      console.error('[Hanzo] Failed to start CDP bridge:', e);
+    }
+  });
+}
 
 // Export for testing
 export { browserControl, webgpuAI, zapMgr, zapState };
