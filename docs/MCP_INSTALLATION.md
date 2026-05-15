@@ -184,7 +184,7 @@ The extension will generate `.windsurfrules` file.
 - `HANZO_ANONYMOUS` - Set to 'true' for anonymous mode
 - `MCP_TRANSPORT` - Transport method (stdio or tcp)
 - `MCP_PORT` - Port for TCP transport (default: 3000)
-- `HANZO_IAM_ENDPOINT` - Custom IAM endpoint (default: https://iam.hanzo.ai)
+- `IAM_ENDPOINT` - Custom IAM endpoint (default: https://iam.hanzo.ai)
 
 ### Tool Configuration
 
