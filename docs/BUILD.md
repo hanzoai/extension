@@ -144,7 +144,7 @@ VS Code extensions are signed automatically when published to the marketplace.
 - `VSCODE_ENV`: Set to 'development' or 'production'
 - `HANZO_WORKSPACE`: Default workspace for MCP operations
 - `HANZO_ANONYMOUS`: Set to 'true' for anonymous mode
-- `HANZO_IAM_ENDPOINT`: Custom IAM endpoint (default: https://iam.hanzo.ai)
+- `IAM_ENDPOINT`: Custom IAM endpoint (default: https://iam.hanzo.ai)
 
 ## Testing Builds
 
