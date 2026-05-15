@@ -39,12 +39,12 @@ export class StandaloneAuthManager {
         this.tokenFile = path.join(this.configDir, 'auth.json');
         this.deviceIdFile = path.join(this.configDir, 'device.json');
         
-        // Casdoor configuration: login UI on hanzo.id, API on iam.hanzo.ai
+        // IAM configuration: login UI on hanzo.id, API on iam.hanzo.ai
         this.casdoorConfig = {
-            endpoint: process.env.HANZO_IAM_ENDPOINT || 'https://iam.hanzo.ai',
-            loginUrl: process.env.HANZO_IAM_LOGIN_URL || 'https://hanzo.id',
-            clientId: process.env.HANZO_IAM_CLIENT_ID || 'hanzo-mcp',
-            clientSecret: process.env.HANZO_IAM_CLIENT_SECRET,
+            endpoint: process.env.IAM_ENDPOINT || 'https://iam.hanzo.ai',
+            loginUrl: process.env.IAM_LOGIN_URL || 'https://hanzo.id',
+            clientId: process.env.IAM_CLIENT_ID || 'hanzo-mcp',
+            clientSecret: process.env.IAM_CLIENT_SECRET,
             applicationName: 'hanzo-mcp',
             organizationName: 'hanzo'
         };
