@@ -24,6 +24,15 @@ export const HANZO_SERVICE_TYPE = '_hanzo._tcp.local.';
 export const ZAP_RECONNECT_DELAY = 3000;
 export const ZAP_DISCOVERY_TIMEOUT = 2000;
 
+/**
+ * Localhost ports the extension probes when the mDNS native-messaging
+ * helper (``ai.hanzo.zap_mdns``) is unavailable. Same range hanzo-mcp's
+ * ``ZapServer`` binds to. Kept identical to ``zap.protocol.ZAP_PORTS``
+ * on the Python side so a local hanzo-mcp is always discoverable in dev
+ * without requiring the mDNS host to be installed.
+ */
+export const ZAP_PORTS: readonly number[] = [9999, 9998, 9997, 9996, 9995];
+
 // ── Encode / Decode ─────────────────────────────────────────────────────
 
 export function encodeZapMessage(type: number, payload: object): ArrayBuffer {
@@ -363,11 +372,12 @@ async function discoverViaMdns(timeoutMs: number = 1500): Promise<string[]> {
 }
 
 /**
- * Discover and connect to ZAP servers via mDNS only (HIP-0069). One probe.
- * Use ``startZapDiscoveryLoop`` for the always-on watchdog that keeps trying
- * until a connection sticks and re-runs whenever the connection list empties.
- * The native-messaging helper `ai.hanzo.zap_mdns` MUST be installed; install
- * instructions live at `~/work/zap/mdns/ext/native-messaging-host.json`.
+ * Discover and connect to ZAP servers. Tries mDNS (HIP-0069,
+ * `_hanzo._tcp.local.`) first via the ``ai.hanzo.zap_mdns`` native-messaging
+ * helper; when the helper is absent or finds nothing, falls back to
+ * probing the localhost ``ZAP_PORTS`` range so a developer running
+ * hanzo-mcp on the same machine is always reachable without extra
+ * installation. Use ``startZapDiscoveryLoop`` for the always-on watchdog.
  */
 export async function discoverZapServers(
   mgr: ZapManager,
@@ -378,27 +388,48 @@ export async function discoverZapServers(
 ): Promise<void> {
   log('[Hanzo/ZAP] Discovering MCP via mDNS (_hanzo._tcp.local.)...');
   let mdnsUrls: string[] = [];
+  let mdnsError = false;
   try {
     mdnsUrls = await discoverViaMdns(1500);
   } catch (e: any) {
-    log(`[Hanzo/ZAP] mDNS browse failed: ${e?.message || e}.`);
-    return;
-  }
-
-  if (mdnsUrls.length === 0) {
-    log('[Hanzo/ZAP] No services advertising _hanzo._tcp.local.');
-    return;
+    mdnsError = true;
+    log(`[Hanzo/ZAP] mDNS browse failed: ${e?.message || e} — falling back to localhost probe.`);
   }
 
   // Skip URLs we're already connected to so a watchdog re-tick is a no-op
   // when everything is already wired.
   const known = new Set<string>();
   for (const m of mgr.state.mcps) known.add(m.url);
-  const fresh = mdnsUrls.filter(u => !known.has(u));
-  if (fresh.length === 0) return;
 
-  log(`[Hanzo/ZAP] mDNS found ${fresh.length} new server(s): ${fresh.join(', ')}`);
-  await Promise.all(fresh.map(url => connectZap(url, mgr, browserName, version, log)));
+  let candidates = mdnsUrls.filter(u => !known.has(u));
+
+  // Fallback: when mDNS yielded nothing (helper missing OR no advertisers
+  // on the LAN), probe the localhost ZAP_PORTS range *sequentially* —
+  // stop on the first hit. Parallel probing surfaces ERR_CONNECTION_REFUSED
+  // in Chrome's console for every empty port, even though those probes
+  // are expected to fail. Sequential keeps the console clean: at most one
+  // refused log per discovery tick, and zero on the happy path.
+  if (candidates.length === 0) {
+    if (!mdnsError && mdnsUrls.length === 0) {
+      log('[Hanzo/ZAP] No services advertising _hanzo._tcp.local. — probing localhost ports.');
+    }
+    for (const port of ZAP_PORTS) {
+      const url = await probeZapServer(port, mgr, browserName, version);
+      if (url && !known.has(url)) {
+        candidates = [url];
+        break;
+      }
+    }
+    if (candidates.length === 0) {
+      log('[Hanzo/ZAP] No hanzo-mcp ZAP server found on mDNS or localhost.');
+      return;
+    }
+    log(`[Hanzo/ZAP] Localhost probe found ${candidates.length} server(s): ${candidates.join(', ')}`);
+  } else {
+    log(`[Hanzo/ZAP] mDNS found ${candidates.length} new server(s): ${candidates.join(', ')}`);
+  }
+
+  await Promise.all(candidates.map(url => connectZap(url, mgr, browserName, version, log)));
 }
 
 /**
