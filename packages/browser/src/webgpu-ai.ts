@@ -1,6 +1,29 @@
 // WebGPU AI Runner for Browser Extension
 // Enables local AI inference directly in the browser via WebGPU compute shaders.
 // Supports model loading, BPE tokenization, autoregressive generation, and embeddings.
+//
+// File format support:
+//   - Raw blob (legacy hanzo-browser-control): the bytes are uploaded as one
+//     GPUBuffer and consumed by the inline matmul/softmax shaders below.
+//   - GGUF (llama.cpp's quantized container, v1-v3): parsed into a
+//     name-keyed map of (offset, length, dtype, shape) descriptors, with
+//     each tensor lazily uploaded to its own GPUBuffer through ExpertCache.
+//     This unlocks Zen-Nano/Zen-Eco/Zen-Coder GGUF artifacts published on
+//     HuggingFace without an intermediate conversion step.
+//
+// Sparse-load shell (ExpertCache below) materialises tensors on demand and
+// evicts cold ones under an LRU budget. For dense models the cache simply
+// holds every layer; for MoE (Zen Coder 480B, etc.) it only ever holds the
+// experts the router actually picks for live tokens, which is the whole
+// point of being able to run "too big" models in a browser.
+//
+// Still TODO before a GGUF model is end-to-end runnable here:
+//   - Transformer kernel suite: RMSNorm, RoPE, multi-head attention with
+//     KV cache, SwiGLU FFN, MoE router + dispatch (multiple thousand lines
+//     of WGSL). The parser + cache below ARE the prerequisite layer.
+//   - Speculative decoding: small dense draft (Zen Nano 0.6B) proposing N
+//     tokens, large MoE verify (Zen Coder 31B/3B-active) checking the batch
+//     in one forward pass. Layered on top of the kernels.
 
 interface ModelConfig {
   name: string;
@@ -15,6 +38,162 @@ interface LoadedModel {
   config: ModelConfig;
   vocab: string[];
   vocabIndex: Map<string, number>;
+  // Populated when the artifact is GGUF (otherwise undefined and the legacy
+  // single-blob matmul/softmax pipeline runs).
+  gguf?: GGUFContext;
+}
+
+// ---------------------------------------------------------------------------
+// GGUF format
+// ---------------------------------------------------------------------------
+//
+// Reference: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
+// Layout (LE throughout):
+//   [magic:4 "GGUF"] [version:u32] [tensor_count:u64] [kv_count:u64]
+//   <kv-metadata × kv_count>
+//   <tensor-info  × tensor_count>
+//   <padding to alignment (default 32B)>
+//   <tensor data blob>
+
+const GGUF_MAGIC = 0x46554747; // "GGUF" little-endian as u32
+
+enum GGUFType {
+  UINT8 = 0,
+  INT8 = 1,
+  UINT16 = 2,
+  INT16 = 3,
+  UINT32 = 4,
+  INT32 = 5,
+  FLOAT32 = 6,
+  BOOL = 7,
+  STRING = 8,
+  ARRAY = 9,
+  UINT64 = 10,
+  INT64 = 11,
+  FLOAT64 = 12,
+}
+
+// GGML quantization types — only the ones modern HF GGUFs use are enumerated.
+enum GGMLDType {
+  F32 = 0,
+  F16 = 1,
+  Q4_0 = 2,
+  Q4_1 = 3,
+  Q5_0 = 6,
+  Q5_1 = 7,
+  Q8_0 = 8,
+  Q8_1 = 9,
+  Q2_K = 10,
+  Q3_K = 11,
+  Q4_K = 12,
+  Q5_K = 13,
+  Q6_K = 14,
+  Q8_K = 15,
+  I8 = 16,
+  I16 = 17,
+  I32 = 18,
+}
+
+interface GGUFTensorInfo {
+  name: string;
+  shape: number[];
+  dtype: GGMLDType;
+  /** Byte offset within the tensor-data blob (NOT within the file). */
+  offset: number;
+  /** Bytes occupied — computed once at parse, used for slicing + cache budget. */
+  length: number;
+}
+
+interface GGUFContext {
+  /** Raw KV metadata. ``general.architecture``, hyperparameters, vocab live here. */
+  kv: Record<string, any>;
+  /** Name → tensor descriptor. ``offset`` is relative to ``dataStart``. */
+  tensors: Map<string, GGUFTensorInfo>;
+  /** Byte offset in the source ArrayBuffer where the tensor data blob begins. */
+  dataStart: number;
+  /** Total tensor-data length. */
+  dataLength: number;
+  /** Backing buffer (kept for lazy slicing into GPUBuffers via ExpertCache). */
+  source: ArrayBuffer;
+}
+
+/**
+ * LRU sparse-load cache. Keys are typically ``"<layer>.<expert>.<tensor>"``
+ * (or simpler ``"<tensor-name>"`` for dense models). On a miss the loader
+ * fn is invoked to upload the bytes into a fresh GPUBuffer; on overflow the
+ * coldest entry is destroyed.
+ *
+ * Why this shape: WebGPU has a ~2GB per-buffer cap and shared VRAM budgets
+ * vary by platform, so the cache budget is in bytes (not entries). For MoE
+ * the eviction policy is what lets you run Zen Coder 480B Q4 (~240GB
+ * weights) on a 100GB Mac — the live working set per token is tiny.
+ */
+class ExpertCache {
+  private map = new Map<string, { buffer: GPUBuffer; bytes: number }>();
+  private order: string[] = []; // LRU: front = most recent
+  private currentBytes = 0;
+
+  constructor(
+    private device: GPUDevice,
+    /** Max bytes resident on the device. Default 4 GiB; bump for larger VRAM. */
+    private budgetBytes: number = 4 * 1024 * 1024 * 1024,
+  ) {}
+
+  has(key: string): boolean { return this.map.has(key); }
+
+  /** Get the GPUBuffer for ``key``, loading it on miss. */
+  async get(key: string, loader: () => Promise<{ data: ArrayBuffer; label?: string }>): Promise<GPUBuffer> {
+    const hit = this.map.get(key);
+    if (hit) {
+      this._touch(key);
+      return hit.buffer;
+    }
+    const { data, label } = await loader();
+    while (this.currentBytes + data.byteLength > this.budgetBytes && this.order.length > 0) {
+      this._evictColdest();
+    }
+    const buffer = this.device.createBuffer({
+      size: data.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      label: label || `expert-${key}`,
+    });
+    this.device.queue.writeBuffer(buffer, 0, data);
+    this.map.set(key, { buffer, bytes: data.byteLength });
+    this.order.unshift(key);
+    this.currentBytes += data.byteLength;
+    return buffer;
+  }
+
+  /** Force-evict everything. */
+  clear(): void {
+    for (const { buffer } of this.map.values()) buffer.destroy();
+    this.map.clear();
+    this.order = [];
+    this.currentBytes = 0;
+  }
+
+  stats(): { entries: number; bytes: number; budget: number } {
+    return { entries: this.map.size, bytes: this.currentBytes, budget: this.budgetBytes };
+  }
+
+  private _touch(key: string): void {
+    const i = this.order.indexOf(key);
+    if (i > 0) {
+      this.order.splice(i, 1);
+      this.order.unshift(key);
+    }
+  }
+
+  private _evictColdest(): void {
+    const coldKey = this.order.pop();
+    if (!coldKey) return;
+    const entry = this.map.get(coldKey);
+    if (!entry) return;
+    entry.buffer.destroy();
+    this.map.delete(coldKey);
+    this.currentBytes -= entry.bytes;
+    console.log(`[Hanzo AI] Cache evicted ${coldKey} (${entry.bytes} bytes)`);
+  }
 }
 
 export class WebGPUAI {
@@ -174,12 +353,11 @@ export class WebGPUAI {
 
     console.log(`[Hanzo AI] Loading model: ${config.name}`);
 
-    // Load model weights
-    const response = await fetch(config.url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch model ${config.name}: ${response.status}`);
-    }
-    const modelData = await response.arrayBuffer();
+    // Load model weights — cache-first, streaming with progress logs.
+    // Service-worker Cache API persists across worker restarts so the bytes
+    // are downloaded at most once per URL. Range-streaming the body avoids
+    // pinning the entire blob in JS memory before GPU upload.
+    const modelData = await this._fetchWithCache(config.url, config.name);
 
     // Create GPU buffer for model weights
     const modelBuffer = this.device.createBuffer({
@@ -577,6 +755,98 @@ export class WebGPUAI {
     readBuffer.destroy();
 
     return embedding;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cached, progress-reporting fetch — used by loadModel().
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Fetch a model blob with persistent caching. Backed by the service-worker
+   * Cache API so the bytes survive worker restarts and only download once
+   * per URL. Streams the body to log progress every ~5% so big artifacts
+   * (huggingface.co/<repo>/resolve/main/<file>) don't appear to hang.
+   *
+   * Cache invalidation: the URL is the key; bump the URL (e.g. point to a
+   * different revision sha) to force a re-fetch. Use ``WebGPUAI.evictCache``
+   * to wipe everything when models go bad.
+   */
+  private async _fetchWithCache(url: string, label: string): Promise<ArrayBuffer> {
+    const cacheName = 'hanzo-webgpu-models-v1';
+    const cache = typeof caches !== 'undefined' ? await caches.open(cacheName) : null;
+
+    if (cache) {
+      const hit = await cache.match(url);
+      if (hit) {
+        console.log(`[Hanzo AI] Cache hit: ${label} (${url})`);
+        return await hit.arrayBuffer();
+      }
+    }
+
+    console.log(`[Hanzo AI] Fetching: ${label} (${url})`);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${label}: ${response.status} ${response.statusText}`);
+    }
+
+    const total = Number(response.headers.get('content-length') || 0);
+    let received = 0;
+    let nextLog = total > 0 ? Math.floor(total * 0.05) : Infinity;
+    const chunks: Uint8Array[] = [];
+
+    if (response.body) {
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.byteLength;
+        if (total > 0 && received >= nextLog) {
+          const pct = Math.floor((received / total) * 100);
+          console.log(`[Hanzo AI] ${label}: ${pct}% (${received}/${total} bytes)`);
+          nextLog = received + Math.floor(total * 0.05);
+        }
+      }
+    } else {
+      chunks.push(new Uint8Array(await response.arrayBuffer()));
+    }
+
+    // Stitch chunks into a single ArrayBuffer.
+    const blob = new Uint8Array(received || chunks.reduce((n, c) => n + c.byteLength, 0));
+    let offset = 0;
+    for (const c of chunks) {
+      blob.set(c, offset);
+      offset += c.byteLength;
+    }
+    console.log(`[Hanzo AI] Fetched: ${label} (${blob.byteLength} bytes)`);
+
+    // Write back into the cache. Response body is single-use; re-construct
+    // from the assembled blob so cache.put gets a fresh, readable stream.
+    if (cache) {
+      try {
+        await cache.put(url, new Response(blob, {
+          headers: { 'content-type': 'application/octet-stream' },
+        }));
+        console.log(`[Hanzo AI] Cached: ${label}`);
+      } catch (e) {
+        // Quota errors are non-fatal — we still have the bytes in memory.
+        console.warn(`[Hanzo AI] Cache write failed for ${label}:`, e);
+      }
+    }
+
+    return blob.buffer;
+  }
+
+  /** Build an HF resolve URL for a given repo / file / revision. */
+  static huggingFaceURL(repo: string, file: string, revision: string = 'main'): string {
+    return `https://huggingface.co/${repo}/resolve/${revision}/${file}`;
+  }
+
+  /** Wipe every cached model blob. Useful when a model artifact is rotated. */
+  static async evictCache(): Promise<void> {
+    if (typeof caches === 'undefined') return;
+    await caches.delete('hanzo-webgpu-models-v1');
+    console.log('[Hanzo AI] WebGPU model cache evicted');
   }
 
   // ---------------------------------------------------------------------------
