@@ -292,15 +292,46 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (gpuAvailable) {
     debugLog('[Hanzo] WebGPU available');
     try {
-      await webgpuAI.loadModel({
-        name: 'hanzo-browser-control',
-        url: chrome.runtime.getURL('models/browser-control-4bit.bin'),
-        quantization: '4bit',
-        maxTokens: 512
-      });
+      // Model source resolution order (first hit wins):
+      //   1. chrome.storage.local.hanzo_model_url  — explicit override
+      //   2. chrome.storage.local.hanzo_model_hf   — { repo, file, revision? }
+      //   3. The hanzo-browser-control HF default — cached after first load
+      //   4. The bundled-with-extension fallback at models/browser-control-4bit.bin
+      const stored = await chrome.storage.local.get([
+        'hanzo_model_url', 'hanzo_model_hf', 'hanzo_model_quant', 'hanzo_model_max_tokens', 'hanzo_model_vocab_url',
+      ]);
+      let modelUrl: string;
+      if (stored.hanzo_model_url) {
+        modelUrl = stored.hanzo_model_url;
+      } else if (stored.hanzo_model_hf && stored.hanzo_model_hf.repo && stored.hanzo_model_hf.file) {
+        const { repo, file, revision } = stored.hanzo_model_hf;
+        modelUrl = WebGPUAI.huggingFaceURL(repo, file, revision || 'main');
+      } else {
+        // Default to the HF-published browser-control artifact. If it 404s, the
+        // catch below falls through to the bundled file, then to remote providers.
+        modelUrl = WebGPUAI.huggingFaceURL('zenlm/hanzo-browser-control', 'browser-control-4bit.bin');
+      }
+      try {
+        await webgpuAI.loadModel({
+          name: 'hanzo-browser-control',
+          url: modelUrl,
+          quantization: stored.hanzo_model_quant || '4bit',
+          maxTokens: stored.hanzo_model_max_tokens || 512,
+          vocabUrl: stored.hanzo_model_vocab_url,
+        });
+        debugLog(`[Hanzo] WebGPU model loaded from ${modelUrl}`);
+      } catch (hfErr) {
+        debugLog(`[Hanzo] WebGPU model fetch failed for ${modelUrl}: ${hfErr}; trying bundled fallback…`);
+        await webgpuAI.loadModel({
+          name: 'hanzo-browser-control',
+          url: chrome.runtime.getURL('models/browser-control-4bit.bin'),
+          quantization: '4bit',
+          maxTokens: 512,
+        });
+      }
     } catch (error) {
-      // Model file not bundled yet — will use Ollama/LM Studio/cloud instead
-      debugLog('[Hanzo] Local model not bundled, using remote providers');
+      // Neither HF nor bundled artifact available — fall back to remote providers.
+      debugLog(`[Hanzo] No local WebGPU model available (${error}); using Ollama/LM Studio/cloud`);
     }
   }
 
