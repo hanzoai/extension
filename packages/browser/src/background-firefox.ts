@@ -173,13 +173,24 @@ class HanzoFirefoxExtension {
         'select', 'check', 'uncheck', 'press_key', 'content', 'snapshot',
         'getText', 'getHTML', 'getAttribute', 'getElementInfo', 'getPageInfo',
         'querySelectorAll', 'waitForSelector', 'waitForNavigation',
+        // CSP-safe text/label primitives + composite waits (1.9.16+)
+        'clickByText', 'fillByLabel', 'findByText', 'listForm',
+        'press', 'scroll', 'waitForText', 'waitForMutation',
+        'submitForm', 'uploadFile', 'dialogAccept',
+        'observe', 'observeRead', 'observeStop',
+        // Coordinate-level Input.* (1.9.16+)
+        'Input.dispatchMouseEvent', 'Input.scrollWheel',
+        // DOM.* + Page.* aliases (1.9.16+)
+        'DOM.querySelector', 'DOM.scrollIntoView', 'DOM.focus',
+        'Page.printToPDF',
+        // Existing legacy
         'fetch', 'cookies', 'localStorage', 'injectScript', 'injectCSS',
         'createTab', 'closeTab', 'activateTab', 'history',
         'observeMutations', 'computedStyles', 'boundingRects',
         'setHTML', 'setText', 'setAttribute', 'removeAttribute',
         'setStyle', 'addClass', 'removeClass', 'insertElement', 'removeElement',
-        'monitor', 'audit'
-      ]
+        'monitor', 'audit',
+      ],
     });
   }
 
@@ -350,6 +361,69 @@ class HanzoFirefoxExtension {
       throw new Error(result.__hanzo_error);
     }
     return result;
+  }
+
+  /**
+   * CSP-safe alternative to runInPage. Passes a real function reference
+   * (and serializable args) to scripting.executeScript. Because no
+   * Function() or eval() is constructed at runtime, page CSP that
+   * blocks 'unsafe-eval' does NOT block this path. Works on .gov, on
+   * sites that ship strict default-src 'self', and on github.com.
+   *
+   * Use this for any DOM read/write the bridge needs to do. The
+   * `fn` argument is a normal JS function — it is serialized by
+   * Firefox/Chrome's scripting API and executed in the MAIN world.
+   *
+   * Added in 1.9.16 alongside the CDP-shaped decomplected surface.
+   */
+  private async runFunc<R = any>(
+    tabId: number,
+    fn: (...args: any[]) => R,
+    args: any[] = [],
+    timeoutMs: number = 10000,
+  ): Promise<R> {
+    let tab: chrome.tabs.Tab | undefined;
+    try { tab = await browser.tabs.get(tabId); } catch { /* best-effort */ }
+    if (tab && isPrivilegedTab(tab)) {
+      throw new Error(
+        `Cannot run JS in privileged tab ${tabId} (${tab.url}).`,
+      );
+    }
+    const scripting = (browser as any).scripting;
+    if (!scripting?.executeScript) {
+      throw new Error('scripting.executeScript not available (need MV3 scripting permission)');
+    }
+    const exec = (async () => {
+      const runIn = async (world: 'MAIN' | 'ISOLATED'): Promise<any[]> => {
+        const results = await scripting.executeScript({
+          target: { tabId },
+          world,
+          args,
+          func: fn,
+        });
+        return Array.isArray(results) ? results.map((r: any) => r?.result) : [results];
+      };
+      let out: any[];
+      try {
+        out = await runIn('MAIN');
+      } catch (e) {
+        out = await runIn('ISOLATED');
+      }
+      if (!Array.isArray(out) || out.length === 0) {
+        throw new Error(
+          `runFunc returned no frames for tab ${tabId} — page may be privileged or unloaded.`,
+        );
+      }
+      const result = out[0];
+      if (result && typeof result === 'object' && (result as any).__hanzo_error) {
+        throw new Error((result as any).__hanzo_error);
+      }
+      return result === undefined ? (null as any) : result;
+    })();
+    return Promise.race([
+      exec,
+      new Promise<R>((_, reject) => setTimeout(() => reject(new Error('runFunc timeout')), timeoutMs)),
+    ]);
   }
 
   /**
@@ -668,14 +742,15 @@ class HanzoFirefoxExtension {
       // =====================================================================
       case 'hanzo.click': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const sel = this.escapeSelector(params.selector as string);
         this.notifyOverlay(tabId, 'ai.control.highlight', { selector: params.selector as string });
         this.notifyOverlay(tabId, 'ai.control.status', { text: `Clicking ${params.selector}` });
-        const clicked = await this.runInPage(tabId, `
-          var el = document.querySelector('${sel}');
-          if (el) { el.click(); return true; }
-          return false;
-        `);
+        const clicked = await this.runFunc<boolean>(tabId, (selector: string) => {
+          const el = document.querySelector(selector) as HTMLElement | null;
+          if (!el) return false;
+          try { el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
+          el.click();
+          return true;
+        }, [params.selector as string]);
         return { success: !!clicked };
       }
 
@@ -712,20 +787,34 @@ class HanzoFirefoxExtension {
       // =====================================================================
       case 'hanzo.fill': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const sel = this.escapeSelector(params.selector as string);
-        const val = this.escapeValue((params.value as string) || '');
         this.notifyOverlay(tabId, 'ai.control.highlight', { selector: params.selector as string });
         this.notifyOverlay(tabId, 'ai.control.status', { text: `Filling ${params.selector}` });
-        await this.runInPage(tabId, `
-          var el = document.querySelector('${sel}');
-          if (el) {
-            el.focus();
-            el.value = '${val}';
-            el.dispatchEvent(new Event('input', {bubbles: true}));
-            el.dispatchEvent(new Event('change', {bubbles: true}));
+        const ok = await this.runFunc<boolean>(tabId, (selector: string, value: string) => {
+          const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | HTMLElement | null;
+          if (!el) return false;
+          try { (el as HTMLElement).scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
+          (el as HTMLElement).focus();
+          const tag = (el as HTMLElement).tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+              || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+            if (setter && (tag === 'INPUT' || tag === 'TEXTAREA')) {
+              setter.call(el, value);
+            } else {
+              (el as HTMLInputElement).value = value;
+            }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
           }
-        `);
-        return { success: true };
+          if ((el as HTMLElement).isContentEditable) {
+            (el as HTMLElement).textContent = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            return true;
+          }
+          return false;
+        }, [params.selector as string, (params.value as string) || '']);
+        return { success: !!ok };
       }
 
       case 'hanzo.type': {
@@ -749,16 +838,17 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.clear': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const sel = this.escapeSelector(params.selector as string);
-        await this.runInPage(tabId, `
-          var el = document.querySelector('${sel}');
-          if (el) {
-            el.value = '';
-            el.dispatchEvent(new Event('input', {bubbles: true}));
-            el.dispatchEvent(new Event('change', {bubbles: true}));
-          }
-        `);
-        return { success: true };
+        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+          const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | null;
+          if (!el) return false;
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+            || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+          if (setter) setter.call(el, ''); else (el as HTMLInputElement).value = '';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }, [params.selector as string]);
+        return { success: !!ok };
       }
 
       case 'hanzo.select': {
@@ -777,22 +867,26 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.check': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const sel = this.escapeSelector(params.selector as string);
-        await this.runInPage(tabId, `
-          var el = document.querySelector('${sel}');
-          if (el && !el.checked) { el.click(); }
-        `);
-        return { success: true };
+        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+          const el = document.querySelector(selector) as HTMLInputElement | null;
+          if (!el) return false;
+          try { el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
+          if (!el.checked) el.click();
+          return true;
+        }, [params.selector as string]);
+        return { success: !!ok };
       }
 
       case 'hanzo.uncheck': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const sel = this.escapeSelector(params.selector as string);
-        await this.runInPage(tabId, `
-          var el = document.querySelector('${sel}');
-          if (el && el.checked) { el.click(); }
-        `);
-        return { success: true };
+        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+          const el = document.querySelector(selector) as HTMLInputElement | null;
+          if (!el) return false;
+          try { el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
+          if (el.checked) el.click();
+          return true;
+        }, [params.selector as string]);
+        return { success: !!ok };
       }
 
       case 'Input.dispatchKeyEvent': {
@@ -815,22 +909,21 @@ class HanzoFirefoxExtension {
       // =====================================================================
       case 'hanzo.getText': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const sel = this.escapeSelector(params.selector as string);
-        const text = await this.runInPage(tabId, `
-          var el = document.querySelector('${sel}');
-          return el ? el.textContent : null;
-        `);
+        const text = await this.runFunc<string | null>(tabId, (selector: string) => {
+          const el = document.querySelector(selector);
+          return el ? (el.textContent || '') : null;
+        }, [params.selector as string]);
         return { result: { value: text } };
       }
 
       case 'hanzo.getHTML': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const sel = this.escapeSelector(params.selector as string);
         const outer = params.outer !== false;
-        const html = await this.runInPage(tabId, `
-          var el = document.querySelector('${sel}');
-          return el ? ${outer ? 'el.outerHTML' : 'el.innerHTML'} : null;
-        `);
+        const html = await this.runFunc<string | null>(tabId, (selector: string, useOuter: boolean) => {
+          const el = document.querySelector(selector);
+          if (!el) return null;
+          return useOuter ? el.outerHTML : el.innerHTML;
+        }, [params.selector as string, outer]);
         return { result: { value: html } };
       }
 
@@ -883,23 +976,462 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.querySelectorAll': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const sel = this.escapeSelector(params.selector as string);
-        const elements = await this.runInPage(tabId, `
-          var els = document.querySelectorAll('${sel}');
-          var result = [];
-          for (var i = 0; i < Math.min(els.length, 100); i++) {
-            var el = els[i];
-            var rect = el.getBoundingClientRect();
-            result.push({
-              index: i, tagName: el.tagName, id: el.id, className: el.className,
-              textContent: (el.textContent || '').trim().slice(0, 100),
-              value: el.value, href: el.href,
-              visible: !!(rect.width && rect.height)
+        const elements = await this.runFunc<any[]>(tabId, (selector: string, limit: number) => {
+          const els = document.querySelectorAll(selector);
+          const out: any[] = [];
+          const n = Math.min(els.length, limit);
+          for (let i = 0; i < n; i++) {
+            const el = els[i] as HTMLElement;
+            const rect = el.getBoundingClientRect();
+            out.push({
+              index: i,
+              tagName: el.tagName,
+              id: el.id || '',
+              className: typeof el.className === 'string' ? el.className : '',
+              name: el.getAttribute('name') || '',
+              type: el.getAttribute('type') || '',
+              role: el.getAttribute('role') || '',
+              ariaLabel: el.getAttribute('aria-label') || '',
+              value: (el as HTMLInputElement).value || '',
+              href: (el as HTMLAnchorElement).href || '',
+              textContent: (el.textContent || '').trim().slice(0, 200),
+              visible: !!(rect.width && rect.height),
             });
           }
-          return result;
-        `);
+          return out;
+        }, [params.selector as string, (params.limit as number) || 100]);
         return { elements: elements || [] };
+      }
+
+      // ─────────────────────────────────────────────────────────────────
+      // CDP-shaped decomplected surface (1.9.16+). See dist/API.md for the
+      // canonical reference. Three orthogonal layers:
+      //   1) Wire transport (JSON over WS/HTTP)
+      //   2) CDP-shaped canonical primitives (Page.* DOM.* Input.* ...)
+      //   3) hanzo.* ergonomic aliases that compose canonical primitives
+      // Every DOM-touching method goes through runFunc → executeScript with
+      // a direct function reference. NEVER Function() / eval(). That is what
+      // makes them CSP-safe on .gov, github.com, and any strict-CSP SPA.
+      // ─────────────────────────────────────────────────────────────────
+
+      case 'Input.dispatchMouseEvent': {
+        if (!tabId) throw new Error('No active tab');
+        const result = await this.runFunc<any>(tabId, (p: any) => {
+          const { type, x, y, button = 0, clickCount = 1, modifiers = 0 } = p;
+          const target = document.elementFromPoint(x, y) as HTMLElement | null;
+          if (!target) return { delivered: false, reason: 'no element at point' };
+          const mods = {
+            altKey: !!(modifiers & 1), ctrlKey: !!(modifiers & 2),
+            metaKey: !!(modifiers & 4), shiftKey: !!(modifiers & 8),
+          };
+          const init: MouseEventInit = {
+            bubbles: true, cancelable: true, view: window,
+            button, buttons: type === 'mousePressed' ? 1 : 0,
+            clientX: x, clientY: y, screenX: x, screenY: y, detail: clickCount,
+            ...mods,
+          };
+          const map: Record<string, string> = { mouseMoved: 'mousemove', mousePressed: 'mousedown', mouseReleased: 'mouseup' };
+          target.dispatchEvent(new MouseEvent(map[type] || type.toLowerCase(), init));
+          if (type === 'mousePressed' && clickCount >= 1) {
+            target.dispatchEvent(new MouseEvent('click', init));
+          }
+          return { delivered: true, target: target.tagName, x, y };
+        }, [params]);
+        return result;
+      }
+
+      case 'Input.scrollWheel': {
+        if (!tabId) throw new Error('No active tab');
+        const result = await this.runFunc<any>(tabId, (p: any) => {
+          const { x = 0, y = 0, deltaX = 0, deltaY = 0 } = p;
+          const target = (x || y)
+            ? (document.elementFromPoint(x, y) as HTMLElement | null)
+            : ((document.scrollingElement || document.body) as HTMLElement | null);
+          if (!target) return { delivered: false };
+          target.dispatchEvent(new WheelEvent('wheel', {
+            bubbles: true, cancelable: true, deltaX, deltaY, clientX: x, clientY: y,
+          }));
+          if (target === document.scrollingElement || target === document.body) {
+            window.scrollBy({ left: deltaX, top: deltaY, behavior: 'instant' as ScrollBehavior });
+          }
+          return { delivered: true };
+        }, [params]);
+        return result;
+      }
+
+      case 'Page.printToPDF': {
+        if (!tabId) throw new Error('No active tab');
+        await this.runFunc<boolean>(tabId, () => { window.print(); return true; }, []);
+        return {
+          opened: true,
+          note: 'Firefox extension cannot programmatically save PDF. ' +
+                'For headless PDF export use Page.captureScreenshot with fullPage=true ' +
+                'and convert PNG→PDF on the client side.',
+        };
+      }
+
+      case 'DOM.querySelector': {
+        if (!tabId || !params.selector) throw new Error('No active tab or selector');
+        const element = await this.runFunc<any>(tabId, (selector: string) => {
+          const el = document.querySelector(selector) as HTMLElement | null;
+          if (!el) return null;
+          const rect = el.getBoundingClientRect();
+          return {
+            tagName: el.tagName, id: el.id || '',
+            className: typeof el.className === 'string' ? el.className : '',
+            textContent: (el.textContent || '').trim().slice(0, 200),
+            value: (el as HTMLInputElement).value || '',
+            visible: !!(rect.width && rect.height),
+            rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
+          };
+        }, [params.selector as string]);
+        return { element };
+      }
+
+      case 'DOM.scrollIntoView': {
+        if (!tabId || !params.selector) throw new Error('No active tab or selector');
+        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+          const el = document.querySelector(selector) as HTMLElement | null;
+          if (!el) return false;
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          return true;
+        }, [params.selector as string]);
+        return { success: !!ok };
+      }
+
+      case 'DOM.focus': {
+        if (!tabId || !params.selector) throw new Error('No active tab or selector');
+        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+          const el = document.querySelector(selector) as HTMLElement | null;
+          if (!el) return false;
+          el.focus();
+          return true;
+        }, [params.selector as string]);
+        return { success: !!ok };
+      }
+
+      case 'hanzo.clickByText': {
+        if (!tabId || !params.text) throw new Error('No active tab or text');
+        const result = await this.runFunc<any>(tabId, (text: string, scope: string) => {
+          const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          const want = norm(text);
+          const tags = scope === 'all'
+            ? 'button, a, input[type=button], input[type=submit], input[type=radio], input[type=checkbox], label, [role=button], [role=radio], [role=checkbox], [role=tab], [role=menuitem]'
+            : 'button, a, label, [role=button], [role=radio], [role=checkbox], [role=tab], [role=menuitem]';
+          const els = Array.from(document.querySelectorAll(tags)) as HTMLElement[];
+          const matches = els.filter((el) => {
+            const t = norm(el.innerText || (el as HTMLInputElement).value || el.getAttribute('aria-label') || '');
+            return t === want || t.includes(want);
+          });
+          const exact = matches.find((el) => norm(el.innerText || (el as HTMLInputElement).value || el.getAttribute('aria-label') || '') === want) || matches[0];
+          if (!exact) return { clicked: false, candidates: matches.length };
+          try { exact.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
+          exact.click();
+          return { clicked: true, tag: exact.tagName, text: (exact.innerText || (exact as HTMLInputElement).value || '').slice(0, 100) };
+        }, [params.text as string, (params.scope as string) || 'default']);
+        return result || { clicked: false };
+      }
+
+      case 'hanzo.fillByLabel': {
+        if (!tabId || !params.label) throw new Error('No active tab or label');
+        const result = await this.runFunc<any>(tabId, (labelText: string, value: string) => {
+          const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          const want = norm(labelText);
+          const labels = Array.from(document.querySelectorAll('label')) as HTMLLabelElement[];
+          const lbl = labels.find((l) => norm(l.innerText) === want) || labels.find((l) => norm(l.innerText).includes(want));
+          let input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null = null;
+          if (lbl) {
+            const forId = lbl.getAttribute('for');
+            if (forId) input = document.getElementById(forId) as any;
+            if (!input) input = lbl.querySelector('input, textarea, select');
+          }
+          if (!input) {
+            const all = Array.from(document.querySelectorAll('input, textarea, select')) as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)[];
+            input = all.find((el) =>
+              norm(el.getAttribute('aria-label') || '') === want
+              || norm(el.getAttribute('placeholder') || '') === want
+              || norm(el.getAttribute('name') || '') === want
+              || norm(el.getAttribute('id') || '') === want
+            ) || null;
+          }
+          if (!input) return { filled: false };
+          try { input.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
+          input.focus();
+          const tag = input.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA') {
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+              || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+            if (setter) setter.call(input, value); else (input as HTMLInputElement).value = value;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            return { filled: true, name: input.name || input.id };
+          }
+          if (tag === 'SELECT') {
+            (input as HTMLSelectElement).value = value;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            return { filled: true, name: input.name || input.id };
+          }
+          return { filled: false };
+        }, [params.label as string, (params.value as string) || '']);
+        return result || { filled: false };
+      }
+
+      case 'hanzo.findByText': {
+        if (!tabId || !params.text) throw new Error('Missing text');
+        const result = await this.runFunc<any[]>(tabId, (text: string, scope: string, limit: number) => {
+          const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          const want = norm(text);
+          const tagSel = scope === 'all' ? '*' : 'button, a, label, input, select, textarea, [role=button], [role=radio], [role=checkbox], [role=tab], [role=menuitem], h1, h2, h3, h4, h5, h6, p, span, li, td';
+          const els = Array.from(document.querySelectorAll(tagSel)) as HTMLElement[];
+          const matches: any[] = [];
+          for (let i = 0; i < els.length && matches.length < limit; i++) {
+            const el = els[i];
+            const t = norm(el.innerText || (el as HTMLInputElement).value || el.getAttribute('aria-label') || '');
+            if (!t) continue;
+            if (t === want || t.includes(want)) {
+              const rect = el.getBoundingClientRect();
+              matches.push({
+                index: i, tag: el.tagName,
+                id: el.id || '',
+                className: typeof el.className === 'string' ? el.className : '',
+                text: t.slice(0, 200), exact: t === want,
+                rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
+                visible: !!(rect.width && rect.height),
+              });
+            }
+          }
+          matches.sort((a, b) => (b.exact ? 1 : 0) - (a.exact ? 1 : 0));
+          return matches;
+        }, [params.text as string, (params.scope as string) || 'default', (params.limit as number) || 50]);
+        return { matches: result || [] };
+      }
+
+      case 'hanzo.listForm': {
+        if (!tabId) throw new Error('No active tab');
+        const inputs = await this.runFunc<any[]>(tabId, () => {
+          const all = Array.from(document.querySelectorAll('input, textarea, select, button, label, [role=radio], [role=checkbox], [role=button]')) as HTMLElement[];
+          return all.slice(0, 200).map((el, i) => {
+            const rect = el.getBoundingClientRect();
+            const lblFor = el.id ? document.querySelector(`label[for="${el.id}"]`) as HTMLElement | null : null;
+            return {
+              i,
+              tag: el.tagName,
+              type: el.getAttribute('type') || '',
+              name: el.getAttribute('name') || '',
+              id: el.id || '',
+              role: el.getAttribute('role') || '',
+              ariaLabel: el.getAttribute('aria-label') || '',
+              placeholder: el.getAttribute('placeholder') || '',
+              value: (el as HTMLInputElement).value || '',
+              checked: !!(el as HTMLInputElement).checked,
+              labelText: (lblFor?.innerText || '').trim().slice(0, 200),
+              innerText: (el.innerText || '').trim().slice(0, 200),
+              visible: !!(rect.width && rect.height),
+            };
+          });
+        }, []);
+        return { inputs: inputs || [] };
+      }
+
+      case 'hanzo.press': {
+        if (!tabId || !params.key) throw new Error('Missing key');
+        const result = await this.runFunc<any>(tabId, (key: string, modifiers: any) => {
+          const el = (document.activeElement || document.body) as HTMLElement;
+          const mods = {
+            altKey: !!modifiers?.alt, ctrlKey: !!modifiers?.ctrl,
+            metaKey: !!modifiers?.meta, shiftKey: !!modifiers?.shift,
+          };
+          const keyCodeMap: Record<string, number> = {
+            Enter: 13, Tab: 9, Escape: 27, Backspace: 8, Delete: 46,
+            ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39,
+            Home: 36, End: 35, PageUp: 33, PageDown: 34, ' ': 32,
+          };
+          const keyCode = keyCodeMap[key] ?? (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
+          const init: any = { key, code: key, keyCode, which: keyCode, bubbles: true, cancelable: true, ...mods };
+          el.dispatchEvent(new KeyboardEvent('keydown', init));
+          if (key.length === 1) el.dispatchEvent(new KeyboardEvent('keypress', init));
+          el.dispatchEvent(new KeyboardEvent('keyup', init));
+          if (key === 'Enter' && el.tagName === 'INPUT') {
+            const form = (el as HTMLInputElement).form;
+            if (form) { try { (form as any).requestSubmit?.() || form.submit?.(); } catch (e) {} }
+          }
+          return { delivered: true, target: el.tagName, keyCode };
+        }, [params.key as string, params.modifiers || {}]);
+        return result;
+      }
+
+      case 'hanzo.scroll': {
+        if (!tabId) throw new Error('No active tab');
+        const result = await this.runFunc<any>(tabId, (target: any, amount: any) => {
+          if (target === 'top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return { scrolled: 'top' }; }
+          if (target === 'bottom') { window.scrollTo({ top: document.body?.scrollHeight || 0, behavior: 'smooth' }); return { scrolled: 'bottom' }; }
+          if (typeof target === 'string' && target) {
+            const el = document.querySelector(target) as HTMLElement | null;
+            if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return { scrolled: 'into-view', selector: target }; }
+            return { scrolled: null, error: 'selector not found', selector: target };
+          }
+          if (amount && (amount.x || amount.y)) {
+            window.scrollBy({ left: amount.x || 0, top: amount.y || 0, behavior: 'smooth' });
+            return { scrolled: 'by', ...amount };
+          }
+          return { scrolled: null, error: 'no target or amount' };
+        }, [params.target || params.selector || null, params.amount || null]);
+        return result;
+      }
+
+      case 'hanzo.waitForText': {
+        if (!tabId || !params.text) throw new Error('Missing text');
+        const timeoutMs = (params.timeout as number) || 15000;
+        const interval = (params.interval as number) || 250;
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+          const found = await this.runFunc<boolean>(tabId, (text: string) => {
+            const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            return norm(document.body?.innerText || '').includes(norm(text));
+          }, [params.text as string]);
+          if (found) return { found: true, elapsed: Date.now() - start };
+          await new Promise((r) => setTimeout(r, interval));
+        }
+        return { found: false, timedOut: true, elapsed: Date.now() - start };
+      }
+
+      case 'hanzo.waitForMutation': {
+        if (!tabId || !params.selector) throw new Error('Missing selector');
+        const timeoutMs = (params.timeout as number) || 15000;
+        const result = await this.runFunc<any>(tabId, (selector: string, timeout: number) => {
+          return new Promise((resolve) => {
+            const existing = document.querySelector(selector);
+            if (existing) { resolve({ found: true, immediate: true }); return; }
+            const observer = new MutationObserver(() => {
+              const el = document.querySelector(selector);
+              if (el) { observer.disconnect(); resolve({ found: true, immediate: false }); }
+            });
+            observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+            setTimeout(() => { observer.disconnect(); resolve({ found: false, timedOut: true }); }, timeout);
+          });
+        }, [params.selector as string, timeoutMs]);
+        return result;
+      }
+
+      case 'hanzo.submitForm': {
+        if (!tabId) throw new Error('No active tab');
+        const result = await this.runFunc<any>(tabId, (hint: string | null) => {
+          const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          const intents = hint ? [hint] : ['submit', 'continue', 'next', 'save', 'send', 'agree', 'accept', 'ok'];
+          const wantList = intents.map(norm);
+          const candidates = Array.from(document.querySelectorAll(
+            'button, input[type=submit], input[type=button], a[role=button], [role=button], a.btn'
+          )) as HTMLElement[];
+          for (const want of wantList) {
+            for (const c of candidates) {
+              const t = norm(c.innerText || (c as HTMLInputElement).value || c.getAttribute('aria-label') || '');
+              if (t === want) {
+                try { c.scrollIntoView({ block: 'center' }); } catch (e) {}
+                c.click();
+                return { submitted: true, intent: want, tag: c.tagName, text: t.slice(0, 100), exact: true };
+              }
+            }
+            for (const c of candidates) {
+              const t = norm(c.innerText || (c as HTMLInputElement).value || c.getAttribute('aria-label') || '');
+              if (t.includes(want)) {
+                try { c.scrollIntoView({ block: 'center' }); } catch (e) {}
+                c.click();
+                return { submitted: true, intent: want, tag: c.tagName, text: t.slice(0, 100), exact: false };
+              }
+            }
+          }
+          return { submitted: false, candidates: candidates.length, intents };
+        }, [(params.intent as string) || null]);
+        return result;
+      }
+
+      case 'hanzo.uploadFile': {
+        if (!tabId || !params.selector || !params.content || !params.name) {
+          throw new Error('Need selector, name, content (base64)');
+        }
+        const result = await this.runFunc<any>(tabId, (selector: string, name: string, mimeType: string, contentB64: string) => {
+          const el = document.querySelector(selector) as HTMLInputElement | null;
+          if (!el) return { uploaded: false, error: 'selector not found' };
+          if (el.tagName !== 'INPUT' || el.type !== 'file') return { uploaded: false, error: 'not a file input' };
+          const binStr = atob(contentB64);
+          const bytes = new Uint8Array(binStr.length);
+          for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+          const file = new File([bytes], name, { type: mimeType });
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          el.files = dt.files;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return { uploaded: true, name, size: bytes.byteLength };
+        }, [params.selector as string, params.name as string, (params.mimeType as string) || 'application/octet-stream', params.content as string]);
+        return result;
+      }
+
+      case 'hanzo.dialogAccept': {
+        if (!tabId) throw new Error('No active tab');
+        await this.runFunc<boolean>(tabId, (acceptText: string) => {
+          const W = window as any;
+          W.__hanzo_dialogText = acceptText || '';
+          W.alert = () => true;
+          W.confirm = () => true;
+          W.prompt = () => W.__hanzo_dialogText || '';
+          return true;
+        }, [(params.text as string) || '']);
+        return { armed: true };
+      }
+
+      case 'hanzo.observe': {
+        if (!tabId || !params.name) throw new Error('Missing name');
+        await this.runFunc<boolean>(tabId, (name: string, selector: string | null, opts: any) => {
+          const W = window as any;
+          W.__hanzo_obs = W.__hanzo_obs || {};
+          if (W.__hanzo_obs[name]?.observer) W.__hanzo_obs[name].observer.disconnect();
+          W.__hanzo_obs[name] = { events: [], observer: null };
+          const target = selector ? document.querySelector(selector) : document.documentElement;
+          if (!target) return false;
+          const obs = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+              W.__hanzo_obs[name].events.push({
+                type: m.type,
+                target: (m.target as Element)?.tagName || '',
+                added: m.addedNodes?.length || 0,
+                removed: m.removedNodes?.length || 0,
+                attr: m.attributeName || null,
+                ts: Date.now(),
+              });
+              if (W.__hanzo_obs[name].events.length > 500) W.__hanzo_obs[name].events.shift();
+            }
+          });
+          obs.observe(target, opts || { childList: true, subtree: true, attributes: true });
+          W.__hanzo_obs[name].observer = obs;
+          return true;
+        }, [params.name as string, (params.selector as string) || null, params.options || null]);
+        return { started: true, name: params.name };
+      }
+
+      case 'hanzo.observeRead': {
+        if (!tabId || !params.name) throw new Error('Missing name');
+        const events = await this.runFunc<any[]>(tabId, (name: string, clear: boolean) => {
+          const W = window as any;
+          const entry = W.__hanzo_obs?.[name];
+          if (!entry) return [];
+          const out = entry.events.slice();
+          if (clear !== false) entry.events.length = 0;
+          return out;
+        }, [params.name as string, params.clear !== false]);
+        return { events: events || [] };
+      }
+
+      case 'hanzo.observeStop': {
+        if (!tabId || !params.name) throw new Error('Missing name');
+        await this.runFunc<boolean>(tabId, (name: string) => {
+          const W = window as any;
+          const entry = W.__hanzo_obs?.[name];
+          if (entry?.observer) entry.observer.disconnect();
+          if (W.__hanzo_obs) delete W.__hanzo_obs[name];
+          return true;
+        }, [params.name as string]);
+        return { stopped: true, name: params.name };
       }
 
       case 'hanzo.getComputedStyles': {
