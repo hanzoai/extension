@@ -401,7 +401,10 @@ class HanzoFirefoxExtension {
           args,
           func: fn,
         });
-        return Array.isArray(results) ? results.map((r: any) => r?.result) : [results];
+        // Keep the full InjectionResult shape ({result, error, frameId}) so
+        // we can propagate page-side throws (1.9.18). Previously we mapped
+        // to r?.result which silently dropped errors → callers saw null.
+        return Array.isArray(results) ? results : [results];
       };
       let out: any[];
       try {
@@ -414,7 +417,11 @@ class HanzoFirefoxExtension {
           `runFunc returned no frames for tab ${tabId} — page may be privileged or unloaded.`,
         );
       }
-      const result = out[0];
+      const first = out[0] || {};
+      if (first.error) {
+        throw new Error(`runFunc page-side error: ${first.error}`);
+      }
+      const result = first.result;
       if (result && typeof result === 'object' && (result as any).__hanzo_error) {
         throw new Error((result as any).__hanzo_error);
       }
@@ -793,16 +800,26 @@ class HanzoFirefoxExtension {
           const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | HTMLElement | null;
           if (!el) return false;
           try { (el as HTMLElement).scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
-          (el as HTMLElement).focus();
+          try { (el as HTMLElement).focus(); } catch (e) {}
           const tag = (el as HTMLElement).tagName;
           if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
-              || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-            if (setter && (tag === 'INPUT' || tag === 'TEXTAREA')) {
-              setter.call(el, value);
-            } else {
-              (el as HTMLInputElement).value = value;
-            }
+            // React-compatible: per-tag native setter. Calling
+            // HTMLInputElement's setter on a TEXTAREA throws "Illegal
+            // invocation" — was the silent failure on SEC TCR (1.9.18 fix).
+            let setter: any = null;
+            try {
+              if (tag === 'TEXTAREA') {
+                setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+              } else if (tag === 'INPUT') {
+                setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+              } else if (tag === 'SELECT') {
+                setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')?.set;
+              }
+            } catch (e) { setter = null; }
+            try {
+              if (setter) setter.call(el, value);
+              else (el as HTMLInputElement).value = value;
+            } catch (e) { (el as HTMLInputElement).value = value; }
             el.dispatchEvent(new Event('input', { bubbles: true }));
             el.dispatchEvent(new Event('change', { bubbles: true }));
             return true;
