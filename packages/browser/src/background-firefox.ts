@@ -1852,7 +1852,19 @@ class HanzoFirefoxExtension {
       return { error: `${action} not yet implemented in Firefox extension` };
     }
 
-    return { error: `Unknown extension action: ${action}` };
+    // ─────────────────────────────────────────────────────────────────
+    // 1.9.17: fall back to the canonical executeMethod dispatcher.
+    // Without this, HTTP-API callers using {action: "hanzo.scroll", ...}
+    // silently failed because handleExtensionRequest only handled
+    // monitor.*/audit.* — every Page.* / DOM.* / Input.* / hanzo.* method
+    // fell off the end. The canonical dispatcher (executeMethod) holds
+    // the full CDP-shaped surface added in 1.9.16+.
+    // ─────────────────────────────────────────────────────────────────
+    try {
+      return await this.executeMethod(action, params || {});
+    } catch (e: any) {
+      return { error: (e && e.message) || String(e) };
+    }
   }
 
   private notifyOverlay(tabId: number, action: string, data: Record<string, unknown>): void {
