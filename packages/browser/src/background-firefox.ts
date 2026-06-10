@@ -747,18 +747,36 @@ class HanzoFirefoxExtension {
       // =====================================================================
       // Click / Interaction
       // =====================================================================
-      case 'hanzo.click': {
+            case 'hanzo.click': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         this.notifyOverlay(tabId, 'ai.control.highlight', { selector: params.selector as string });
         this.notifyOverlay(tabId, 'ai.control.status', { text: `Clicking ${params.selector}` });
-        const clicked = await this.runFunc<boolean>(tabId, (selector: string) => {
+        const result = await this.runFunc<any>(tabId, (selector: string) => {
           const el = document.querySelector(selector) as HTMLElement | null;
-          if (!el) return false;
+          if (!el) return { clicked: false, reason: 'not-found' };
           try { el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
-          el.click();
-          return true;
+          const r = el.getBoundingClientRect();
+          const x = r.left + r.width / 2;
+          const y = r.top + r.height / 2;
+          const init: MouseEventInit = {
+            bubbles: true, cancelable: true, composed: true, view: window,
+            button: 0, buttons: 1, clientX: x, clientY: y, screenX: x, screenY: y, detail: 1,
+          };
+          try {
+            el.dispatchEvent(new MouseEvent('mouseover', init));
+            el.dispatchEvent(new MouseEvent('mouseenter', init));
+            el.dispatchEvent(new MouseEvent('mousemove', init));
+            el.dispatchEvent(new MouseEvent('mousedown', init));
+            try { el.focus({ preventScroll: true }); } catch (e) {}
+            el.dispatchEvent(new MouseEvent('mouseup', { ...init, buttons: 0 }));
+            el.dispatchEvent(new MouseEvent('click', { ...init, buttons: 0 }));
+            return { clicked: true, tag: el.tagName, x, y, isTrusted: false };
+          } catch (e) {
+            try { (el as HTMLElement).click(); return { clicked: true, fallback: 'el.click()', isTrusted: false }; }
+            catch (e2) { return { clicked: false, error: String(e2) }; }
+          }
         }, [params.selector as string]);
-        return { success: !!clicked };
+        return { success: !!(result && (result as any).clicked), detail: result };
       }
 
       case 'hanzo.dblclick': {
