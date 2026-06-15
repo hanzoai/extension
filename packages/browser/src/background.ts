@@ -1798,7 +1798,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 
 // Off by default — ZAP mDNS is the canonical transport. Flip on for local
 // dev against a hanzo-mcp WS server or a CDP bridge running on the host.
-const ENABLE_LEGACY_TRANSPORTS = false;
+const ENABLE_LEGACY_TRANSPORTS = true;
 
 let ws: WebSocket | null = null;
 
