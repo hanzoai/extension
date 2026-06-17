@@ -1,54 +1,48 @@
-# LLM.md - Hanzo Extension
+# Hanzo Extension
 
-## Overview
-Hanzo AI Development Platform Monorepo. The browser extension lives in
-`packages/browser` and ships to Chrome / Firefox / Safari.
+Browser extension (`packages/browser`) that joins the shared local **zapd** fabric.
+One native primitive — no WebSocket, no localhost port, no mDNS, no CDP bridge.
+Ships Chrome / Firefox / Safari. Build: esbuild (`src/build.js`, `pnpm build`);
+tests: vitest.
 
-## Tech Stack
-- **Language**: TypeScript/JavaScript
-- **Build**: esbuild via `packages/browser/src/build.js`
-- **Tests**: vitest
+## Architecture (native ZAP)
 
-## Build & Run
-```bash
-pnpm install && pnpm build
-pnpm test
-```
+    extension ─connectNative("ai.hanzo.zap")─► native host ─UDS─► zapd ◄─ hanzo-mcp
 
-## Architecture (browser-extension 1.9.x — native ZAP)
-
-The extension connects to the **one shared local `zapd` router** (see
-`~/work/zap`) through exactly one browser-native primitive — there is **no**
-WebSocket, no localhost port, no mDNS probing, no CDP bridge:
-
-```
-extension ─connectNative("ai.hanzo.zap")─► native host ─UDS─► zapd ◄─ hanzo-mcp
-```
-
-- **shared/native-zap.ts** — the ONE transport: `connectNativeZap()` opens the
-  native-messaging port, registers as a provider (`browser:<chrome|firefox>/default`,
-  the host stamps the device hostname), and dispatches inbound ROUTE commands.
+- `shared/native-zap.ts` — the ONE transport: `connectNativeZap()` opens the native
+  port (**singleton** — one port; the router does evict-and-replace), registers as
+  provider `browser:<engine>/<host>/default`, dispatches inbound ROUTE commands.
   Cross-browser (`browser ∥ chrome`).
-- **background.ts** (Chrome) — `connectNativeZap(..., cdpBridge.dispatchMethod)`.
-  Dispatch still uses `chrome.debugger` (CDP-to-tab) → Chrome's "debugging this
-  browser" banner. **TODO:** native `browser.*` dispatch for banner-light parity.
-- **background-firefox.ts** — `connectNativeZap(..., hanzoExtension.dispatchMethod)`.
-  Already native `browser.*` (no banner). Same transport as Chrome.
-- **browser-dispatch.ts** (was `cdp-bridge.ts`) — `chrome.debugger` actuation
-  (`dispatchMethod`). The legacy `cdp-bridge-server.ts` WS bridge is **deleted**.
-- **shared/zap.ts** — legacy WebSocket ZAP wire; retained only for unrelated
-  helpers (RAG/event broadcast no-op when disconnected). NOT the transport.
+- `background.ts` (Chrome) — dispatch via `chrome.debugger` (CDP→tab; shows the
+  "debugging this browser" banner; WebKit-incompatible). **To be removed** — see WXT plan.
+- `background-firefox.ts` — native `browser.*` dispatch (no banner). The correct model.
+- `browser-dispatch.ts` — `chrome.debugger` actuation (Chrome-only).
 
-Native-host manifests: Chrome `…/Google/Chrome/NativeMessagingHosts/ai.hanzo.zap.json`
-(`allowed_origins`), Firefox `…/Mozilla/NativeMessagingHosts/ai.hanzo.zap.json`
-(`allowed_extensions: ["hanzo-ai@hanzo.ai"]`). Both `path` → `~/work/zap/host/zap_host.sh`.
+Wire to zapd: the binary ZAP router envelope (`zap-proto/zapd/src/frame.rs`); the
+browser↔host hop is native-messaging JSON, base64'd, quarantined in the host. Host +
+per-browser manifests come from `zapd install-host` (`zap-proto/zapd`).
 
-The wire to zapd is the **binary ZAP router envelope** (`len|type|flags|from|to|payload`,
-defined in `zap-proto/zapd/src/frame.rs`); the opaque command payload is a compact
-binary codec. The browser↔host hop is native-messaging JSON (Chrome-forced), base64'd,
-quarantined in the host.
+## Versioning
+Patch only (X.Y.Z+1), never major. `package.json` is the source of truth; `build.js`
+stamps it into every manifest (chrome/firefox/safari).
 
-## Versioning rule
-Always bump **patch** (X.Y.Z → X.Y.Z+1). Never bump major — the ZAP
-transport pivot ships as ordinary patches, not a 2.0. `package.json` and
-both `manifest*.json` must agree.
+## Cross-platform — WXT migration (canonical plan, not yet executed)
+
+One WebExtension codebase, every engine. **WXT** = build/SDK layer (build matrix,
+manifest gen, targets, MV3, Vite/TS); `webextension-polyfill` / `@wxt-dev/browser` =
+`browser.*` normalization. **Custom (keep):** `shared/native-zap.ts`, and the Safari
+`SafariWebExtensionHandler.swift` → `~/.zap/run/zapd.sock` bridge. WXT builds Safari
+but does NOT give WebKit `chrome.debugger` — so dispatch must become portable
+`browser.*` (the Firefox model is already correct).
+
+1. Adopt WXT build matrix (chrome/firefox/safari) — replaces `build.js`.
+2. Collapse forks → one `background.ts`; delete `background-firefox.ts`; runtime
+   `browser` adapter.
+3. Collapse dispatch → delete `chrome.debugger` / `browser-dispatch.ts`; actuate over
+   `tabs`/`scripting`/`webNavigation`/`browser.*` (portable, no banner, Safari-capable).
+4. Transport stays per-platform: Chrome/Firefox `connectNative` → host → `zapd.sock`;
+   Safari `SafariWebExtensionHandler.swift` → `zapd.sock`.
+5. CI guards (last; go red until 1–4 land): fail if `chrome.debugger`, the `debugger`
+   permission, or `background-firefox.ts` appears.
+
+Large, multi-phase — do it as a focused pass, never half-merged.
