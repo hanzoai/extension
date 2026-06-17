@@ -85,7 +85,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════
   extension-e2e:
     name: Extension E2E (${{ matrix.browser }})
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -129,7 +129,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════
   summary:
     name: Parity Summary
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     needs: [e2e-matrix, extension-e2e]
     if: always()
     steps:
