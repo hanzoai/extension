@@ -121,23 +121,18 @@ async function build() {
   // There is a tsconfig in src.
   // execSync('cd src && npx tsc --noEmit', { stdio: 'inherit' });
 
-  // Copy manifests for different browsers
-  fs.copyFileSync(
-    'src/manifest.json',
-    'dist/browser-extension/manifest.json'
-  );
-
-  // Chrome version
-  fs.copyFileSync(
-    'src/manifest.json',
-    'dist/browser-extension/chrome/manifest.json'
-  );
-
-  // Firefox version
-  fs.copyFileSync(
-    'src/manifest-firefox.json',
-    'dist/browser-extension/firefox/manifest.json'
-  );
+  // Copy manifests for different browsers. package.json is the SINGLE source of
+  // truth for the version — stamp it into every manifest so the three can never
+  // drift apart (the "must agree" rule, enforced by the build instead of by hand).
+  const pkgVersion = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
+  const writeManifest = (srcPath, destPath) => {
+    const m = JSON.parse(fs.readFileSync(srcPath, 'utf8'));
+    m.version = pkgVersion;
+    fs.writeFileSync(destPath, JSON.stringify(m, null, 2));
+  };
+  writeManifest('src/manifest.json', 'dist/browser-extension/manifest.json');
+  writeManifest('src/manifest.json', 'dist/browser-extension/chrome/manifest.json');
+  writeManifest('src/manifest-firefox.json', 'dist/browser-extension/firefox/manifest.json');
 
   // Safari needs special handling — write Info.plist for Xcode project
   fs.writeFileSync('dist/browser-extension/safari/Info.plist', `<?xml version="1.0" encoding="UTF-8"?>
@@ -149,9 +144,9 @@ async function build() {
     <key>CFBundleIdentifier</key>
     <string>ai.hanzo.browser-extension</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>${pkgVersion}</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>${pkgVersion}</string>
     <key>NSExtension</key>
     <dict>
         <key>NSExtensionPointIdentifier</key>
