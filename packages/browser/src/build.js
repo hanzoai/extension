@@ -109,16 +109,6 @@ async function build() {
     packages: 'external'
   });
 
-  // Build CDP Bridge Server (WebSocket + HTTP API for hanzo-mcp integration)
-  await esbuild.build({
-    entryPoints: ['src/cdp-bridge-server.ts'],
-    bundle: true,
-    outfile: 'dist/browser-extension/cdp-bridge-server.js',
-    platform: 'node',
-    target: 'node16',
-    packages: 'external'
-  });
-
   // Make CLI executable
   if (process.platform !== 'win32') {
     execSync('chmod +x dist/browser-extension/cli.js');

@@ -11,13 +11,11 @@ import type { ZapState, ControlSession, RagSnippet, RagQueryParams } from './sha
 import {
   createZapManager,
   encodeZapMessage,
-  discoverZapServers,
-  startZapDiscoveryLoop,
   handleZapMessage,
-  setZapRequestHandler,
   MSG_REQUEST,
   type ZapManager,
 } from './shared/zap.js';
+import { connectNativeZap, type NativeZapState } from './shared/native-zap.js';
 import {
   getRagConfig as getSharedRagConfig,
   normalizeRagSnippets,
@@ -38,7 +36,7 @@ import {
 const IAM_V1 = `${IAM_API_URL}${IAM_API_PATH}`;
 import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
-import { getCDPBridge, CDPBridge } from './cdp-bridge';
+import { getCDPBridge, CDPBridge } from './browser-dispatch';
 import * as auth from './auth';
 import { listModels, chatCompletion, ChatMessage } from './chat-client';
 import { PageMonitor } from './page-monitor';
@@ -1793,51 +1791,6 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 }
 
 // =============================================================================
-// Legacy MCP WebSocket (fallback when no ZAP gateway running)
-// =============================================================================
-
-// Off by default — ZAP mDNS is the canonical transport. Flip on for local
-// dev against a hanzo-mcp WS server or a CDP bridge running on the host.
-const ENABLE_LEGACY_TRANSPORTS = true;
-
-let ws: WebSocket | null = null;
-
-async function connectToMCP() {
-  if (!ENABLE_LEGACY_TRANSPORTS) return;
-  const { mcpPort } = await getPortConfig();
-  ws = new WebSocket(`ws://localhost:${mcpPort}/browser-extension`);
-
-  ws.onopen = () => {
-    debugLog('[Hanzo] Connected to legacy MCP server');
-  };
-
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    handleMCPMessage(data);
-  };
-
-  ws.onerror = () => {
-    // Silent — ZAP is primary, this is fallback
-  };
-
-  ws.onclose = () => {
-    setTimeout(connectToMCP, 5000);
-  };
-}
-
-function handleMCPMessage(data: any) {
-  switch (data.type) {
-    case 'browserControl':
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          browserControl.launchAIWorker(tabs[0].id, data.model);
-        }
-      });
-      break;
-  }
-}
-
-// =============================================================================
 // Startup
 // =============================================================================
 
@@ -1855,17 +1808,19 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
-// 1. Primary: Discover ZAP servers (high-performance binary protocol)
-//    Install a request handler so Python hanzo-mcps can dispatch browser
-//    actions BACK to this extension over the same socket. This is what
-//    makes the 2-process architecture work — the extension is no longer
-//    a one-way client; it accepts inbound RPC and routes via the existing
-//    cdp-bridge dispatcher.
-setZapRequestHandler(zapMgr, async (method, params) => {
-  return cdpBridge.dispatchMethod(method, params);
-});
-// mDNS-only discovery per HIP-0069 — always-on watchdog, no port hint.
-startZapDiscoveryLoop(zapMgr, BROWSER_NAME, VERSION, 5000, debugLog);
+// 1. Primary: connect to the local zapd router via the ai.hanzo.zap native
+//    host and register as a browser provider. Inbound ROUTE commands are
+//    dispatched to the browser. Exactly one transport — no WebSocket, no
+//    localhost ports, no mDNS probing; the browser can never get a refused
+//    connection (connectNative attaches the host or fails once, cleanly).
+const BROWSER_CAPS = ['browser.tabs', 'browser.navigate', 'browser.dom', 'browser.screenshot', 'browser.input'];
+const nativeZap: NativeZapState = {
+  connected: false,
+  port: null,
+  providerId: `browser:${BROWSER_NAME}/default`,
+};
+const browserDispatch = (method: string, params: any) => cdpBridge.dispatchMethod(method, params);
+connectNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, debugLog);
 
 // Keep-alive — Layer 1: Port. Content scripts in every loaded http(s) tab
 // hold a `zap-keepalive` port. As long as ANY tab has one, Chrome keeps
@@ -1875,40 +1830,22 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener(() => { /* receipt is the keep-alive */ });
 });
 
-// Keep-alive — Layer 2: Alarms. Belt-and-suspenders for the case where
-// no http(s) tab is open AND the worker idles out. Alarm fires every 30s,
-// wakes the worker, re-discovers if the ZAP socket is gone.
+// Keep-alive — Layer 2: Alarms. Wake the worker periodically; if the native
+// host link dropped (or the worker was idled out), reconnect.
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
 try {
-  // Wakes the worker every 15s; one-shot discovery probe if disconnected.
   chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.25 });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
-    if (!zapMgr.state.connected) {
-      debugLog('[Hanzo/ZAP] keep-alive alarm: no connection, rediscovering via mDNS');
-      void discoverZapServers(zapMgr, BROWSER_NAME, VERSION, undefined, debugLog);
+    if (!nativeZap.connected) {
+      debugLog('[Hanzo/ZAP] keep-alive: reconnecting native host');
+      connectNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, debugLog);
     }
   });
 } catch (e) {
   console.warn('[Hanzo] alarms unavailable:', e);
 }
 
-// 2. Fallback: Connect to legacy MCP WebSocket (gated; ZAP is primary)
-if (ENABLE_LEGACY_TRANSPORTS) {
-  connectToMCP();
-}
-
-// 3. CDP bridge for browser control (configurable port) — legacy; ZAP is primary
-if (ENABLE_LEGACY_TRANSPORTS) {
-  getPortConfig().then(({ cdpPort }) => {
-    try {
-      cdpBridge.startWebSocketServer(cdpPort);
-      debugLog(`[Hanzo] CDP bridge connecting to ws://localhost:${cdpPort}/cdp`);
-    } catch (e) {
-      console.error('[Hanzo] Failed to start CDP bridge:', e);
-    }
-  });
-}
 
 // Export for testing
 export { browserControl, webgpuAI, zapMgr, zapState };
