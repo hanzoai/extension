@@ -20,16 +20,13 @@ import 'webextension-polyfill';
 import type { ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
 import {
   createZapManager,
-  discoverZapServers,
-  startZapDiscoveryLoop,
-  connectZap,
   zapRequest,
   zapCallTool,
   hasZapTool,
   handleZapMessage,
-  setZapRequestHandler,
   type ZapManager,
 } from './shared/zap.js';
+import { connectNativeZap, type NativeZapState } from './shared/native-zap.js';
 import {
   getRagConfig,
   normalizeRagSnippets,
@@ -3024,18 +3021,18 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
 
 const hanzoExtension = new HanzoFirefoxExtension();
 
-// Install the ZAP inbound-request handler so Python hanzo-mcps can dispatch
-// browser actions BACK to Firefox over the same socket. This is what
-// closes the loop: the extension is no longer ZAP-client-only — it accepts
-// inbound RPC and routes via the canonical executeMethod dispatcher.
-setZapRequestHandler(zapMgr, async (method, params) => {
-  return hanzoExtension.dispatchMethod(method, (params || {}) as Record<string, unknown>);
-});
-
-// Start the always-on ZAP discovery loop. Ticks every 5s; each tick is a
-// no-op when we're already connected to every advertised server. Replaces
-// the earlier setTimeout chain that died if any path missed a re-arm.
-startZapDiscoveryLoop(zapMgr, BROWSER_NAME, VERSION, 5000);
+// Connect to the local zapd router via the ai.hanzo.zap native host and
+// register Firefox as a browser provider — the SAME transport Chrome uses.
+// Inbound ROUTE commands dispatch to Firefox's native browser.* dispatcher.
+const BROWSER_CAPS = ['browser.tabs', 'browser.navigate', 'browser.dom', 'browser.screenshot', 'browser.input'];
+const nativeZap: NativeZapState = {
+  connected: false,
+  port: null,
+  providerId: `browser:${BROWSER_NAME}/default`,
+};
+const browserDispatch = (method: string, params: any) =>
+  hanzoExtension.dispatchMethod(method, (params || {}) as Record<string, unknown>);
+connectNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
 
 // =============================================================================
 // Keep-alive — two-layer:
@@ -3066,9 +3063,9 @@ try {
   browser.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.25 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
-    if (!zapMgr.state.connected) {
-      console.log('[Hanzo/ZAP] keep-alive alarm: no connection, rediscovering');
-      void discoverZapServers(zapMgr, BROWSER_NAME, VERSION);
+    if (!nativeZap.connected) {
+      console.log('[Hanzo/ZAP] keep-alive: reconnecting native host');
+      connectNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
     }
   });
 } catch (e) {
