@@ -314,78 +314,10 @@ export class CDPBridge {
     return true;
   }
   
-  // WebSocket server for external connections (hanzo-mcp)
-  startWebSocketServer(port: number = 9223): void {
-    // Note: Chrome extensions can't create native WebSocket servers
-    // Instead, we connect to an external bridge server
-    this.connectToBridge(`ws://localhost:${port}/cdp`);
-  }
-  
-  private connectToBridge(url: string): void {
-    try {
-      this.wsServer = new WebSocket(url);
-      
-      this.wsServer.onopen = () => {
-        debugLog('[CDP] Connected to bridge server');
-        // Register as CDP provider with browser identification
-        const browser = typeof navigator !== 'undefined'
-          ? (navigator.userAgent.includes('Firefox') ? 'firefox'
-            : navigator.userAgent.includes('Edg/') ? 'edge'
-            : navigator.userAgent.includes('Chrome') ? 'chrome'
-            : navigator.userAgent.includes('Safari') ? 'safari'
-            : 'unknown')
-          : 'unknown';
-        this.wsServer?.send(JSON.stringify({
-          type: 'register',
-          role: 'cdp-provider',
-          browser,
-          capabilities: ['navigate', 'screenshot', 'click', 'type', 'evaluate', 'takeover']
-        }));
-      };
-      
-      this.wsServer.onmessage = async (event) => {
-        try {
-          const message = JSON.parse(event.data);
+  // Legacy bridge client removed — the extension reaches the local zapd router
+  // via the ai.hanzo.zap native host. dispatchMethod() below remains the
+  // inbound browser-command dispatcher.
 
-          // Handle extension-request from bridge server (monitor/audit calls)
-          if (message.type === 'extension-request' && message.action) {
-            chrome.runtime.sendMessage(
-              { action: message.action, ...(message.params || {}) },
-              (result) => {
-                this.wsServer?.send(JSON.stringify({
-                  type: 'extension-response',
-                  id: message.id,
-                  result: result || { error: chrome.runtime.lastError?.message },
-                }));
-              }
-            );
-            return;
-          }
-
-          const response = await this.handleBridgeMessage(message);
-          this.wsServer?.send(JSON.stringify(response));
-        } catch (error: any) {
-          this.wsServer?.send(JSON.stringify({
-            id: 0,
-            error: { code: -32603, message: error.message }
-          }));
-        }
-      };
-      
-      this.wsServer.onerror = (error) => {
-        console.error('[CDP] Bridge connection error:', error);
-      };
-      
-      this.wsServer.onclose = () => {
-        debugLog('[CDP] Bridge disconnected, reconnecting in 5s...');
-        setTimeout(() => this.connectToBridge(url), 5000);
-      };
-    } catch (error) {
-      console.error('[CDP] Failed to connect to bridge:', error);
-      setTimeout(() => this.connectToBridge(url), 5000);
-    }
-  }
-  
   /**
    * Public entry point for ZAP-server-initiated requests.
    *

@@ -24,14 +24,6 @@ export const HANZO_SERVICE_TYPE = '_hanzo._tcp.local.';
 export const ZAP_RECONNECT_DELAY = 3000;
 export const ZAP_DISCOVERY_TIMEOUT = 2000;
 
-/**
- * Localhost ports the extension probes when the mDNS native-messaging
- * helper (``ai.hanzo.zap_mdns``) is unavailable. Same range hanzo-mcp's
- * ``ZapServer`` binds to. Kept identical to ``zap.protocol.ZAP_PORTS``
- * on the Python side so a local hanzo-mcp is always discoverable in dev
- * without requiring the mDNS host to be installed.
- */
-export const ZAP_PORTS: readonly number[] = [9999, 9998, 9997, 9996, 9995];
 
 // ── Encode / Decode ─────────────────────────────────────────────────────
 
@@ -100,40 +92,6 @@ export function createZapManager(): ZapManager {
 /** Install (or replace) the inbound request handler. */
 export function setZapRequestHandler(mgr: ZapManager, handler: ZapRequestHandler | undefined): void {
   mgr.requestHandler = handler;
-}
-
-/** Probe a ZAP server on given port */
-export function probeZapServer(
-  port: number,
-  mgr: ZapManager,
-  browserName: string,
-  version: string,
-): Promise<string | null> {
-  return new Promise((resolve) => {
-    const url = `ws://localhost:${port}`;
-    const ws = new WebSocket(url);
-    const timer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
-
-    ws.binaryType = 'arraybuffer';
-    ws.onopen = () => {
-      clearTimeout(timer);
-      ws.send(encodeZapMessage(MSG_HANDSHAKE, {
-        clientId: mgr.state.extensionId,
-        clientType: 'browser_extension',
-        browser: browserName,
-        version,
-        capabilities: ['tabs', 'navigate', 'screenshot', 'evaluate', 'cookies', 'storage'],
-      }));
-
-      const hsTimer = setTimeout(() => { ws.close(); resolve(null); }, ZAP_DISCOVERY_TIMEOUT);
-      ws.onmessage = () => {
-        clearTimeout(hsTimer);
-        ws.close();
-        resolve(url);
-      };
-    };
-    ws.onerror = () => { clearTimeout(timer); resolve(null); };
-  });
 }
 
 /** Connect to a ZAP server and set up message handling */
@@ -401,33 +359,19 @@ export async function discoverZapServers(
   const known = new Set<string>();
   for (const m of mgr.state.mcps) known.add(m.url);
 
-  let candidates = mdnsUrls.filter(u => !known.has(u));
+  const candidates = mdnsUrls.filter(u => !known.has(u));
 
-  // Fallback: when mDNS yielded nothing (helper missing OR no advertisers
-  // on the LAN), probe the localhost ZAP_PORTS range *sequentially* —
-  // stop on the first hit. Parallel probing surfaces ERR_CONNECTION_REFUSED
-  // in Chrome's console for every empty port, even though those probes
-  // are expected to fail. Sequential keeps the console clean: at most one
-  // refused log per discovery tick, and zero on the happy path.
+  // mDNS-only per HIP-0069. A browser extension must NEVER open arbitrary
+  // ws://localhost:* sockets — that is the ERR_CONNECTION_REFUSED spam.
+  // Either the native helper advertises a server, or we are cleanly
+  // unavailable. No localhost port probing, no fallback ladder.
   if (candidates.length === 0) {
-    if (!mdnsError && mdnsUrls.length === 0) {
-      log('[Hanzo/ZAP] No services advertising _hanzo._tcp.local. — probing localhost ports.');
+    if (mdnsError) {
+      log('[Hanzo/ZAP] unavailable: native mDNS helper ai.hanzo.zap_mdns missing/unreachable');
     }
-    for (const port of ZAP_PORTS) {
-      const url = await probeZapServer(port, mgr, browserName, version);
-      if (url && !known.has(url)) {
-        candidates = [url];
-        break;
-      }
-    }
-    if (candidates.length === 0) {
-      log('[Hanzo/ZAP] No hanzo-mcp ZAP server found on mDNS or localhost.');
-      return;
-    }
-    log(`[Hanzo/ZAP] Localhost probe found ${candidates.length} server(s): ${candidates.join(', ')}`);
-  } else {
-    log(`[Hanzo/ZAP] mDNS found ${candidates.length} new server(s): ${candidates.join(', ')}`);
+    return;
   }
+  log(`[Hanzo/ZAP] mDNS found ${candidates.length} new server(s): ${candidates.join(', ')}`);
 
   await Promise.all(candidates.map(url => connectZap(url, mgr, browserName, version, log)));
 }
@@ -493,31 +437,11 @@ export function handleZapMessage(
       return true;
 
     case 'zap.discover':
-      discoverZapServers(mgr, browserName, version).then(() => {
-        sendResponse({
-          success: true,
-          mcps: mgr.state.mcps.map(m => ({
-            id: m.id,
-            name: m.name,
-            url: m.url,
-            tools: m.tools,
-          })),
-        });
-      }).catch((e: any) => {
-        sendResponse({ success: false, error: e.message });
-      });
-      return true;
-
     case 'zap.connect':
-      if (!request.url) {
-        sendResponse({ success: false, error: 'Missing url' });
-        return true;
-      }
-      connectZap(request.url, mgr, browserName, version).then((mcpId) => {
-        sendResponse({ success: !!mcpId, mcpId });
-      }).catch((e: any) => {
-        sendResponse({ success: false, error: e.message });
-      });
+      // Discovery/dialing is gone. The extension connects to the local zapd
+      // router via the ai.hanzo.zap native host (see native-zap.ts) — there is
+      // no URL/port to discover or dial.
+      sendResponse({ success: false, error: 'native-zap: connection is via the ai.hanzo.zap native host (no discovery)' });
       return true;
 
     case 'zap.callTool': {
