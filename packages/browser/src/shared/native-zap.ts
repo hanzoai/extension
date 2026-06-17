@@ -77,6 +77,13 @@ export function connectNativeZap(
   // Cross-browser: Firefox exposes `browser.runtime`, Chrome `chrome.runtime`;
   // both implement connectNative. One transport, both browsers.
   const rt: any = (typeof browser !== 'undefined' ? (browser as any) : chrome).runtime;
+  // Singleton: never run two native ports. Tear down any prior port first — its
+  // onDisconnect below is guarded so a replaced port never schedules a reconnect.
+  // Without this, repeated connectNativeZap() calls (startup + events + the 3s
+  // reconnect) accumulate ports, each spawning a native host → a host-spawn storm.
+  const prior = state.port;
+  state.port = null;
+  if (prior) { try { prior.disconnect(); } catch {} }
   let port: chrome.runtime.Port;
   try {
     port = rt.connectNative('ai.hanzo.zap');
@@ -125,7 +132,9 @@ export function connectNativeZap(
   });
 
   port.onDisconnect.addListener(() => {
+    if (state.port !== port) return; // replaced by a newer port — do not reconnect
     state.connected = false;
+    state.port = null;
     const err = rt.lastError?.message;
     log('[Hanzo/ZAP] native host disconnected' + (err ? ': ' + err : ''));
     setTimeout(() => connectNativeZap(state, brand, caps, dispatch, log), RECONNECT_MS);
