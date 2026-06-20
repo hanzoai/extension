@@ -11,7 +11,7 @@ jobs:
   # ─── Unit Tests ───
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     steps:
     - uses: actions/checkout@v4
     - uses: pnpm/action-setup@v4
@@ -41,7 +41,7 @@ jobs:
   # ─── Playwright E2E ───
   e2e:
     name: E2E
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     needs: test
     steps:
     - uses: actions/checkout@v4
@@ -82,7 +82,7 @@ jobs:
   # ─── Build all extensions ───
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     needs: [test, e2e]
     steps:
     - uses: actions/checkout@v4
@@ -211,7 +211,7 @@ jobs:
   # ─── JetBrains ───
   build-jetbrains:
     name: JetBrains
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     needs: [test, e2e]
     steps:
     - uses: actions/checkout@v4
@@ -243,7 +243,7 @@ jobs:
   # ─── GitHub Release (on tag push) ───
   release:
     name: Release
-    runs-on: ubuntu-latest
+    runs-on: hanzo-build-linux-amd64
     needs: [build, build-safari, build-jetbrains]
     if: >-
       always() &&
