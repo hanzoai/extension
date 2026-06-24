@@ -5,7 +5,7 @@
  * Uses IAM bearer tokens for auth — no separate KMS credentials needed.
  *
  * API path. Hanzo convention is `/v1/<service>/<endpoint>` — but the KMS
- * upstream is an Infisical fork that publishes its v3 API under the root
+ * upstream publishes its v3 API under the root
  * `${KMS_PATH_PREFIX}/secrets/raw`. The kms.hanzo.ai gateway currently passes that
  * through unchanged (verified: `kms.hanzo.ai/api/v3/secrets/raw` → 401 JSON,
  * `/v1/kms/...` → SPA HTML). We centralise the path in `KMS_PATH_PREFIX`
