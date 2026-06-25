@@ -904,7 +904,7 @@ export const storageTool: Tool = {
 
 export const authTool: Tool = {
   name: 'auth',
-  description: 'Authentication: whoami, token info, account, sessions, login, logout, refresh, permissions, MFA status',
+  description: 'Authentication (canonical OIDC, HIP-0111): whoami/token/account read claims from /v1/iam/oauth/userinfo; refresh exchanges a refresh_token at /v1/iam/oauth/token; logout. Token issuance is via OAuth2 authorization-code + PKCE only.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -913,9 +913,6 @@ export const authTool: Tool = {
         'login', 'logout', 'refresh',
         'sessions', 'permissions', 'mfa'
       ] },
-      email: { type: 'string' }, password: { type: 'string' },
-      application: { type: 'string', default: 'app-hanzo' },
-      organization: { type: 'string', default: 'hanzo' },
       refreshToken: { type: 'string' }
     },
     required: ['action']
@@ -924,20 +921,27 @@ export const authTool: Tool = {
     try {
       switch (args.action) {
         case 'whoami':
-        case 'token': return ok(j(await api(IAM_URL, '/api/userinfo')));
-        case 'account': return ok(j(await api(IAM_URL, '/api/get-account')));
-        case 'login': {
-          if (!args.email || !args.password) return fail('email and password required');
-          return ok(j(await api(IAM_URL, '/api/login', { method: 'POST', body: JSON.stringify({ type: 'token', username: args.email, password: args.password, application: args.application || 'app-hanzo', organization: args.organization || 'hanzo' }) })));
-        }
-        case 'logout': return ok(j(await api(IAM_URL, '/api/logout', { method: 'POST' })));
+        case 'token':
+        case 'account': return ok(j(await api(IAM_URL, '/v1/iam/oauth/userinfo')));
+        case 'login':
+          // HIP-0111: hand-rolled password login is forbidden. Tokens are
+          // issued only via the OAuth2 authorization-code + PKCE flow
+          // (`/v1/iam/oauth/authorize` → `/v1/iam/oauth/token`). Use a
+          // browser-based login client; this MCP tool cannot mint tokens.
+          return fail('login: use OAuth2 authorization-code + PKCE via /v1/iam/oauth/authorize — password login is not supported (HIP-0111)');
+        case 'logout': return ok(j(await api(IAM_URL, '/v1/iam/oauth/logout', { method: 'POST' })));
         case 'refresh': {
           if (!args.refreshToken) return fail('refreshToken required');
-          return ok(j(await api(IAM_URL, '/api/login', { method: 'POST', body: JSON.stringify({ type: 'refresh_token', refreshToken: args.refreshToken }) })));
+          return ok(j(await api(IAM_URL, '/v1/iam/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: args.refreshToken }).toString() })));
         }
-        case 'sessions': return ok(j(await api(IAM_URL, '/api/get-sessions')));
-        case 'permissions': return ok(j(await api(IAM_URL, '/api/get-permissions')));
-        case 'mfa': return ok(j(await api(IAM_URL, '/api/mfa-status')));
+        case 'sessions':
+        case 'permissions':
+        case 'mfa':
+          // No OIDC equivalent; the legacy Casdoor `/api/get-sessions`,
+          // `/api/get-permissions`, `/api/mfa-status` endpoints are not part
+          // of the canonical HIP-0111 surface. Read claims from the token /
+          // userinfo instead.
+          return fail(`${args.action}: not available via canonical OIDC (HIP-0111); inspect token claims or use the IAM admin API`);
         default: return fail(`Unknown action: ${args.action}`);
       }
     } catch (e: any) { return fail(e.message); }

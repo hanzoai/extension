@@ -173,7 +173,7 @@ export class HanzoAuth extends EventEmitter {
             
             this.server.listen(port, () => {
                 // Authorization Code + PKCE (OAuth 2.1 standard)
-                const authUrl = new URL('/oauth/authorize', this.config.iamLoginUrl);
+                const authUrl = new URL('/v1/iam/oauth/authorize', this.config.iamLoginUrl);
                 authUrl.searchParams.set('client_id', this.config.clientId);
                 authUrl.searchParams.set('response_type', 'code');
                 authUrl.searchParams.set('redirect_uri', `http://localhost:${port}/callback`);
@@ -200,18 +200,18 @@ export class HanzoAuth extends EventEmitter {
     }
 
     private async exchangeCodeForTokens(code: string, codeVerifier: string): Promise<void> {
-        const response = await fetch(`${this.config.iamUrl}/oauth/token`, {
+        const response = await fetch(`${this.config.iamUrl}/v1/iam/oauth/token`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: JSON.stringify({
+            body: new URLSearchParams({
                 grant_type: 'authorization_code',
                 code,
                 client_id: this.config.clientId,
                 code_verifier: codeVerifier,
                 redirect_uri: 'http://localhost:51234/callback'
-            })
+            }).toString()
         });
         
         if (!response.ok) {
@@ -241,24 +241,12 @@ export class HanzoAuth extends EventEmitter {
         if (!this.credentials?.accessToken) return;
         const headers = { 'Authorization': `Bearer ${this.credentials.accessToken}` };
 
-        // /api/get-account returns full profile; /api/userinfo only returns sub
-        try {
-            const acctResp = await fetch(`${this.config.iamUrl}/api/get-account`, { headers });
-            if (acctResp.ok) {
-                const acctJson = await acctResp.json() as any;
-                const acct = acctJson.data || acctJson;
-                if (acct.name || acct.email) {
-                    this.credentials.userId = acct.id || acct.sub;
-                    this.credentials.email = acct.email;
-                    return;
-                }
-            }
-        } catch { /* fall through */ }
-
-        const response = await fetch(`${this.config.iamUrl}/api/userinfo`, { headers });
+        // HIP-0111 canonical OIDC userinfo. Returns standard claims (sub,
+        // email, name); no Casdoor `/api/get-account` profile shape.
+        const response = await fetch(`${this.config.iamUrl}/v1/iam/oauth/userinfo`, { headers });
         if (response.ok) {
             const user = await response.json() as any;
-            this.credentials.userId = user.id || user.sub;
+            this.credentials.userId = user.sub || user.id;
             this.credentials.email = user.email;
         }
     }
@@ -318,16 +306,16 @@ export class HanzoAuth extends EventEmitter {
         }
         
         try {
-            const response = await fetch(`${this.config.iamUrl}/oauth/token`, {
+            const response = await fetch(`${this.config.iamUrl}/v1/iam/oauth/token`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/x-www-form-urlencoded'
                 },
-                body: JSON.stringify({
+                body: new URLSearchParams({
                     grant_type: 'refresh_token',
                     refresh_token: this.credentials.refreshToken,
                     client_id: this.config.clientId
-                })
+                }).toString()
             });
             
             if (!response.ok) {
@@ -356,7 +344,7 @@ export class HanzoAuth extends EventEmitter {
     async logout(): Promise<void> {
         if (this.credentials?.accessToken) {
             try {
-                await fetch(`${this.config.iamUrl}/oauth/revoke`, {
+                await fetch(`${this.config.iamUrl}/v1/iam/oauth/logout`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
