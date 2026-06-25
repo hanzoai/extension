@@ -187,7 +187,7 @@ export async function login(adapter: BrowserAdapter): Promise<UserInfo> {
   const state = generateRandomString(32);
   const redirectUri = config.redirectUri;
 
-  const authorizeUrl = new URL(`${config.iamLoginUrl}/oauth/authorize`);
+  const authorizeUrl = new URL(`${config.iamLoginUrl}${IAM_API_PATH}/oauth/authorize`);
   authorizeUrl.searchParams.set('client_id', config.clientId);
   authorizeUrl.searchParams.set('response_type', 'code');
   authorizeUrl.searchParams.set('redirect_uri', redirectUri);
@@ -210,11 +210,9 @@ export async function login(adapter: BrowserAdapter): Promise<UserInfo> {
       token_type: 'Bearer',
     });
   } else if (code) {
-    // Hanzo gateway exposes Casdoor's `/api/login/oauth/access_token` at
-    // `/v1/iam/login/oauth/access_token`. The bare `/oauth/token` from
-    // the OIDC well-known doc 404s in prod. Token exchange wants
-    // application/x-www-form-urlencoded per RFC 6749, not JSON.
-    const tokenResponse = await fetch(`${config.iamApiUrl}${IAM_API_PATH}/login/oauth/access_token`, {
+    // HIP-0111 canonical token endpoint `/v1/iam/oauth/token`. Token
+    // exchange wants application/x-www-form-urlencoded per RFC 6749.
+    const tokenResponse = await fetch(`${config.iamApiUrl}${IAM_API_PATH}/oauth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -271,7 +269,7 @@ export async function getValidAccessToken(storage: BrowserStorage): Promise<stri
 
 async function refreshAccessToken(storage: BrowserStorage, refreshToken: string): Promise<string> {
   const config = await getRuntimeConfig(storage);
-  const response = await fetch(`${config.iamApiUrl}${IAM_API_PATH}/login/oauth/access_token`, {
+  const response = await fetch(`${config.iamApiUrl}${IAM_API_PATH}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -286,30 +284,14 @@ async function refreshAccessToken(storage: BrowserStorage, refreshToken: string)
   return tokens.access_token;
 }
 
-/** Fetch user info from IAM. Hanzo gateway exposes Casdoor's get-account
- *  and userinfo at `${iamApiUrl}/v1/iam/...` — never `/api/`. */
+/** Fetch user info from IAM via the canonical HIP-0111 OIDC userinfo
+ *  endpoint `${iamApiUrl}/v1/iam/oauth/userinfo`. Returns standard OIDC
+ *  claims (sub, email, name, picture); never the Casdoor `/api/` shape. */
 async function fetchUserInfo(storage: BrowserStorage, accessToken: string): Promise<UserInfo> {
   const config = await getRuntimeConfig(storage);
-  const base = `${config.iamApiUrl}${IAM_API_PATH}`;
   const headers = { Authorization: `Bearer ${accessToken}` };
 
-  try {
-    const acctResp = await fetch(`${base}/get-account`, { headers });
-    if (acctResp.ok) {
-      const acctJson = await acctResp.json();
-      const acct = acctJson.data || acctJson;
-      if (acct.name || acct.email) {
-        return {
-          sub: acct.id || acct.sub,
-          name: acct.displayName || acct.name,
-          email: acct.email,
-          picture: acct.avatar || undefined,
-        };
-      }
-    }
-  } catch { /* fall through */ }
-
-  const response = await fetch(`${base}/userinfo`, { headers });
+  const response = await fetch(`${config.iamApiUrl}${IAM_API_PATH}/oauth/userinfo`, { headers });
   if (!response.ok) throw new Error('Failed to fetch user info');
   return response.json();
 }
