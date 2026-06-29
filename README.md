@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="extension" width="880"></p>
+
 # Dev - Ship Up to 100X Faster with Parallel AI Agents 🚀
 
 [![VS Code Extension CI/CD](https://github.com/hanzoai/dev/workflows/VS%20Code%20Extension%20CI%2FCD/badge.svg)](https://github.com/hanzoai/dev/actions/workflows/vscode-extension.yml)
