@@ -1508,7 +1508,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         const data = await resp.json();
         const user = data.data || data;
 
-        // Casdoor stores org memberships in user.groups or via org API
+        // Hanzo IAM stores org memberships in user.groups or via org API
         const orgs: { id: string; name: string; displayName?: string }[] = [];
 
         // Primary org from user's owner field
