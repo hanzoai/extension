@@ -11,8 +11,8 @@ interface AuthToken {
     expiresAt: number;
 }
 
-interface CasdoorConfig {
-    endpoint: string;     // Casdoor API (iam.hanzo.ai)
+interface IAMConfig {
+    endpoint: string;     // Hanzo IAM API (iam.hanzo.ai)
     loginUrl: string;     // Login UI (hanzo.id)
     clientId: string;
     clientSecret?: string;
@@ -24,7 +24,7 @@ export class StandaloneAuthManager {
     private configDir: string;
     private tokenFile: string;
     private deviceIdFile: string;
-    private casdoorConfig: CasdoorConfig;
+    private iamConfig: IAMConfig;
     private isAnonymous: boolean;
 
     constructor(isAnonymous: boolean = false) {
@@ -40,7 +40,7 @@ export class StandaloneAuthManager {
         this.deviceIdFile = path.join(this.configDir, 'device.json');
         
         // IAM configuration: login UI on hanzo.id, API on iam.hanzo.ai
-        this.casdoorConfig = {
+        this.iamConfig = {
             endpoint: process.env.IAM_ENDPOINT || 'https://iam.hanzo.ai',
             loginUrl: process.env.IAM_LOGIN_URL || 'https://hanzo.id',
             clientId: process.env.IAM_CLIENT_ID || 'hanzo-mcp',
@@ -104,11 +104,11 @@ export class StandaloneAuthManager {
 
     private async refreshToken(refreshToken: string): Promise<AuthToken | null> {
         try {
-            const response = await axios.post(`${this.casdoorConfig.endpoint}/oauth/token`, {
+            const response = await axios.post(`${this.iamConfig.endpoint}/oauth/token`, {
                 grant_type: 'refresh_token',
                 refresh_token: refreshToken,
-                client_id: this.casdoorConfig.clientId,
-                client_secret: this.casdoorConfig.clientSecret
+                client_id: this.iamConfig.clientId,
+                client_secret: this.iamConfig.clientSecret
             });
 
             if (response.data?.access_token) {
@@ -166,8 +166,8 @@ export class StandaloneAuthManager {
             const codeVerifier = crypto.randomBytes(32).toString('base64url');
             const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
 
-            const authUrl = new URL(`${this.casdoorConfig.loginUrl}/oauth/authorize`);
-            authUrl.searchParams.append('client_id', this.casdoorConfig.clientId);
+            const authUrl = new URL(`${this.iamConfig.loginUrl}/oauth/authorize`);
+            authUrl.searchParams.append('client_id', this.iamConfig.clientId);
             authUrl.searchParams.append('response_type', 'code');
             authUrl.searchParams.append('redirect_uri', 'http://localhost:8765/callback');
             authUrl.searchParams.append('scope', 'read write');
@@ -208,9 +208,9 @@ export class StandaloneAuthManager {
     }
 
     private async startCallbackServer(expectedState: string, codeVerifier?: string): Promise<{ accessToken: string; refreshToken?: string; expiresAt?: number } | null> {
-        const endpoint = this.casdoorConfig.endpoint;
-        const clientId = this.casdoorConfig.clientId;
-        const clientSecret = this.casdoorConfig.clientSecret;
+        const endpoint = this.iamConfig.endpoint;
+        const clientId = this.iamConfig.clientId;
+        const clientSecret = this.iamConfig.clientSecret;
 
         return new Promise((resolve) => {
             const http = require('http');

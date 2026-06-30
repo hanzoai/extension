@@ -286,7 +286,7 @@ async function refreshAccessToken(storage: BrowserStorage, refreshToken: string)
 
 /** Fetch user info from IAM via the canonical HIP-0111 OIDC userinfo
  *  endpoint `${iamApiUrl}/v1/iam/oauth/userinfo`. Returns standard OIDC
- *  claims (sub, email, name, picture); never the Casdoor `/api/` shape. */
+ *  claims (sub, email, name, picture); never the legacy IAM `/api/` shape. */
 async function fetchUserInfo(storage: BrowserStorage, accessToken: string): Promise<UserInfo> {
   const config = await getRuntimeConfig(storage);
   const headers = { Authorization: `Bearer ${accessToken}` };
