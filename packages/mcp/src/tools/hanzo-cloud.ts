@@ -937,7 +937,7 @@ export const authTool: Tool = {
         case 'sessions':
         case 'permissions':
         case 'mfa':
-          // No OIDC equivalent; the legacy Casdoor `/api/get-sessions`,
+          // No OIDC equivalent; the legacy IAM `/api/get-sessions`,
           // `/api/get-permissions`, `/api/mfa-status` endpoints are not part
           // of the canonical HIP-0111 surface. Read claims from the token /
           // userinfo instead.
