@@ -3,7 +3,7 @@ import { test, expect } from './fixtures';
 /**
  * End-to-end tests for the login + chat flow.
  *
- * These tests exercise the real Casdoor OAuth2 flow using the z@hanzo.ai
+ * These tests exercise the real Hanzo IAM OAuth2 flow using the z@hanzo.ai
  * test account. They verify:
  *   1. Login tab opens correctly
  *   2. Password auth succeeds
@@ -40,13 +40,13 @@ descFn('Auth + Chat', () => {
       sidebar.locator('#auth-btn').click(),
     ]);
 
-    // Wait for the Casdoor login page to load
+    // Wait for the Hanzo IAM login page to load
     await authPage.waitForLoadState('networkidle');
     const authUrl = authPage.url();
     expect(authUrl).toContain('hanzo.id');
 
-    // Fill in credentials on the Casdoor login page
-    // Casdoor uses a form with username + password inputs
+    // Fill in credentials on the Hanzo IAM login page
+    // IAM uses a form with username + password inputs
     const usernameInput = authPage.locator('input[name="username"], input#input');
     const passwordInput = authPage.locator('input[name="password"], input[type="password"]');
 
@@ -64,8 +64,8 @@ descFn('Auth + Chat', () => {
         // Tab might not close if redirect is to a real page
       });
     } else {
-      // If no form visible, Casdoor might have a different UI — skip
-      test.skip(true, 'Casdoor login form not found');
+      // If no form visible, IAM might have a different UI — skip
+      test.skip(true, 'IAM login form not found');
     }
 
     // Back on sidebar — verify auth state
