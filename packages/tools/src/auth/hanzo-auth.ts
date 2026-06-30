@@ -8,7 +8,7 @@ import * as crypto from 'crypto';
 
 export interface HanzoAuthConfig {
     apiUrl: string;
-    iamUrl: string;      // Casdoor API (iam.hanzo.ai)
+    iamUrl: string;      // Hanzo IAM API (iam.hanzo.ai)
     iamLoginUrl: string;  // Login UI (hanzo.id)
     clientId: string;
     scope: string;
@@ -242,7 +242,7 @@ export class HanzoAuth extends EventEmitter {
         const headers = { 'Authorization': `Bearer ${this.credentials.accessToken}` };
 
         // HIP-0111 canonical OIDC userinfo. Returns standard claims (sub,
-        // email, name); no Casdoor `/api/get-account` profile shape.
+        // email, name); no legacy IAM `/api/get-account` profile shape.
         const response = await fetch(`${this.config.iamUrl}/v1/iam/oauth/userinfo`, { headers });
         if (response.ok) {
             const user = await response.json() as any;
