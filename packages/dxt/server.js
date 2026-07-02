@@ -5695,20 +5695,20 @@ ${d.map((x) => `${x.key || x.name}: ${x.size || 0}b ${x.lastModified || ""}`).jo
           switch (args.action) {
             case "whoami":
             case "token":
-              return ok(j(await api(IAM_URL, "/api/userinfo")));
+              return ok(j(await api(IAM_URL, "/v1/iam/oauth/userinfo")));
             case "account":
               return ok(j(await api(IAM_URL, "/api/get-account")));
             case "login": {
               if (!args.email || !args.password)
                 return fail6("email and password required");
-              return ok(j(await api(IAM_URL, "/api/login", { method: "POST", body: JSON.stringify({ type: "token", username: args.email, password: args.password, application: args.application || "app-hanzo", organization: args.organization || "hanzo" }) })));
+              return ok(j(await api(IAM_URL, "/v1/iam/login", { method: "POST", body: JSON.stringify({ type: "token", username: args.email, password: args.password, application: args.application || "app-hanzo", organization: args.organization || "hanzo" }) })));
             }
             case "logout":
               return ok(j(await api(IAM_URL, "/api/logout", { method: "POST" })));
             case "refresh": {
               if (!args.refreshToken)
                 return fail6("refreshToken required");
-              return ok(j(await api(IAM_URL, "/api/login", { method: "POST", body: JSON.stringify({ type: "refresh_token", refreshToken: args.refreshToken }) })));
+              return ok(j(await api(IAM_URL, "/v1/iam/login", { method: "POST", body: JSON.stringify({ type: "refresh_token", refreshToken: args.refreshToken }) })));
             }
             case "sessions":
               return ok(j(await api(IAM_URL, "/api/get-sessions")));
