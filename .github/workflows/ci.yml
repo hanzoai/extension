@@ -35,8 +35,15 @@ jobs:
 
     - name: Test VS Code extension
       run: |
-        # extension-host tests need a display; not every arc node ships xvfb
-        command -v xvfb-run >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq xvfb)
+        # The extension host is Electron: it needs a display plus the
+        # chromium-class shared libraries. Arc nodes are minimal (no xvfb,
+        # no libnspr4/libnss3), so provision explicitly (noble t64 names).
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq xvfb libnss3 libnspr4 libatk1.0-0t64 \
+          libatk-bridge2.0-0t64 libcups2t64 libdrm2 libxkbcommon0 \
+          libatspi2.0-0t64 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+          libgbm1 libasound2t64 libgtk-3-0t64 libxshmfence1 libsecret-1-0 \
+          libxkbfile1
         xvfb-run -a pnpm --filter hanzo-ide test
 
   # ─── Playwright E2E ───
