@@ -2,6 +2,7 @@
 // Enables Playwright to control browser via Chrome DevTools Protocol
 import { ActionRateLimiter, debugLog, loadDebugFlagFromStorage } from './runtime-guard';
 import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
+import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 
 interface CDPSession {
   tabId: number;
@@ -239,7 +240,7 @@ export class CDPBridge {
     // success from failure. unwrapEvaluateResult further normalises every
     // shape (Chrome / CDP / hanzo-tools) to the bare value.
     const result = await this.send(tabId, 'Runtime.evaluate', {
-      expression,
+      expression: wrapEvaluable(expression),
       returnByValue: true,
       awaitPromise: true,
     });
@@ -389,14 +390,21 @@ export class CDPBridge {
           break;
 
         case 'Runtime.evaluate':
+        case 'evaluate':
           // Must enable Runtime domain and set returnByValue for actual
           // values. `awaitPromise: true` makes CDP wait for async IIFEs
           // to resolve so callers passing `(async () => {...})()` get
           // the resolved value instead of an empty {} (the previous bug
           // — caller saw a serialized Promise placeholder).
+          // pickEvaluable + wrapEvaluable: accept every code-param alias
+          // and let statement bodies (`const b=…; b.click()`) evaluate
+          // instead of tripping SpiderMonkey/V8 expression parsing — the
+          // same rule background-firefox.ts applies, so both browsers
+          // accept identical caller JS.
           await this.send(tabId, 'Runtime.enable');
-          result = await this.send(tabId, method, {
+          result = await this.send(tabId, 'Runtime.evaluate', {
             ...params,
+            expression: wrapEvaluable(pickEvaluable(params)),
             returnByValue: true,
             awaitPromise: true,
           });
