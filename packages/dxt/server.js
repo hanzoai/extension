@@ -5667,7 +5667,7 @@ ${d.map((x) => `${x.key || x.name}: ${x.size || 0}b ${x.lastModified || ""}`).jo
     };
     authTool = {
       name: "auth",
-      description: "Authentication: whoami, token info, account, sessions, login, logout, refresh, permissions, MFA status",
+      description: "Authentication (canonical OIDC, HIP-0111): whoami/token/account read claims from /v1/iam/oauth/userinfo; refresh exchanges a refresh_token at /v1/iam/oauth/token; logout. Token issuance is via OAuth2 authorization-code + PKCE only.",
       inputSchema: {
         type: "object",
         properties: {
@@ -5682,10 +5682,6 @@ ${d.map((x) => `${x.key || x.name}: ${x.size || 0}b ${x.lastModified || ""}`).jo
             "permissions",
             "mfa"
           ] },
-          email: { type: "string" },
-          password: { type: "string" },
-          application: { type: "string", default: "app-hanzo" },
-          organization: { type: "string", default: "hanzo" },
           refreshToken: { type: "string" }
         },
         required: ["action"]
@@ -5695,27 +5691,21 @@ ${d.map((x) => `${x.key || x.name}: ${x.size || 0}b ${x.lastModified || ""}`).jo
           switch (args.action) {
             case "whoami":
             case "token":
-              return ok(j(await api(IAM_URL, "/v1/iam/oauth/userinfo")));
             case "account":
-              return ok(j(await api(IAM_URL, "/api/get-account")));
-            case "login": {
-              if (!args.email || !args.password)
-                return fail6("email and password required");
-              return ok(j(await api(IAM_URL, "/v1/iam/login", { method: "POST", body: JSON.stringify({ type: "token", username: args.email, password: args.password, application: args.application || "app-hanzo", organization: args.organization || "hanzo" }) })));
-            }
+              return ok(j(await api(IAM_URL, "/v1/iam/oauth/userinfo")));
+            case "login":
+              return fail6("login: use OAuth2 authorization-code + PKCE via /v1/iam/oauth/authorize \u2014 password login is not supported (HIP-0111)");
             case "logout":
-              return ok(j(await api(IAM_URL, "/api/logout", { method: "POST" })));
+              return ok(j(await api(IAM_URL, "/v1/iam/oauth/logout", { method: "POST" })));
             case "refresh": {
               if (!args.refreshToken)
                 return fail6("refreshToken required");
-              return ok(j(await api(IAM_URL, "/v1/iam/login", { method: "POST", body: JSON.stringify({ type: "refresh_token", refreshToken: args.refreshToken }) })));
+              return ok(j(await api(IAM_URL, "/v1/iam/oauth/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: args.refreshToken }).toString() })));
             }
             case "sessions":
-              return ok(j(await api(IAM_URL, "/api/get-sessions")));
             case "permissions":
-              return ok(j(await api(IAM_URL, "/api/get-permissions")));
             case "mfa":
-              return ok(j(await api(IAM_URL, "/api/mfa-status")));
+              return fail6(`${args.action}: not available via canonical OIDC (HIP-0111); inspect token claims or use the IAM admin API`);
             default:
               return fail6(`Unknown action: ${args.action}`);
           }
@@ -10014,9 +10004,9 @@ var init_rust = __esm({
   }
 });
 
-// node_modules/jsautogui/index.js
+// ../../node_modules/.pnpm/jsautogui@1.0.6/node_modules/jsautogui/index.js
 var require_jsautogui = __commonJS({
-  "node_modules/jsautogui/index.js"(exports, module) {
+  "../../node_modules/.pnpm/jsautogui@1.0.6/node_modules/jsautogui/index.js"(exports, module) {
     var child_process = __require("child_process");
     var fs18 = __require("fs");
     var path19 = __require("path");
@@ -15126,7 +15116,35 @@ async function getSystemPrompt(projectPath = process.cwd()) {
 
 // src/zap-server.ts
 import { WebSocketServer } from "ws";
-var ZAP_MAGIC = Buffer.from([90, 65, 80, 1]);
+var ZAP_MAGIC = new Uint8Array([90, 65, 80, 1]);
+var HEADER_SIZE = 9;
+var textEncoder = new TextEncoder();
+var textDecoder = new TextDecoder();
+function zapEncode(type, payload) {
+  const json = textEncoder.encode(JSON.stringify(payload));
+  const frame = new Uint8Array(HEADER_SIZE + json.length);
+  const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
+  frame.set(ZAP_MAGIC, 0);
+  view.setUint8(4, type);
+  view.setUint32(5, json.length, false);
+  frame.set(json, HEADER_SIZE);
+  return frame;
+}
+function zapDecode(data) {
+  if (data.length < HEADER_SIZE)
+    return null;
+  if (data[0] !== 90 || data[1] !== 65 || data[2] !== 80 || data[3] !== 1) {
+    return null;
+  }
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const type = view.getUint8(4);
+  const length = view.getUint32(5, false);
+  if (data.length < HEADER_SIZE + length)
+    return null;
+  const jsonBytes = data.subarray(HEADER_SIZE, HEADER_SIZE + length);
+  const payload = length > 0 ? JSON.parse(textDecoder.decode(jsonBytes)) : null;
+  return { type, payload };
+}
 var MSG_HANDSHAKE = 1;
 var MSG_HANDSHAKE_OK = 2;
 var MSG_REQUEST = 16;
@@ -15135,52 +15153,6 @@ var MSG_PING = 254;
 var MSG_PONG = 255;
 var ZAP_PORTS = [9999, 9998, 9997, 9996, 9995];
 var SERVER_ID = `mcp-${Date.now().toString(36)}`;
-function encode(type, payload) {
-  const json = Buffer.from(JSON.stringify(payload), "utf8");
-  const buf = Buffer.alloc(9 + json.length);
-  ZAP_MAGIC.copy(buf, 0);
-  buf[4] = type;
-  buf.writeUInt32BE(json.length, 5);
-  json.copy(buf, 9);
-  return buf;
-}
-function decode(data) {
-  if (data.length < 5)
-    return null;
-  if (data[0] === 90 && data[1] === 65 && data[2] === 80 && data[3] === 1) {
-    if (data.length < 9)
-      return null;
-    const type = data[4];
-    const length = data.readUInt32BE(5);
-    if (data.length < 9 + length)
-      return null;
-    try {
-      const payload = JSON.parse(data.subarray(9, 9 + length).toString("utf8"));
-      return { type, payload };
-    } catch {
-      return null;
-    }
-  }
-  const leLength = data.readUInt32LE(0);
-  if (leLength > 0 && leLength <= 16 * 1024 * 1024 && data.length >= 5 + leLength) {
-    const type = data[4];
-    if (type <= 69 || type >= 254) {
-      const payloadBuf = data.subarray(5, 5 + leLength);
-      try {
-        const payload = JSON.parse(payloadBuf.toString("utf8"));
-        return { type, payload };
-      } catch {
-        return { type, payload: { raw: payloadBuf } };
-      }
-    }
-  }
-  try {
-    const payload = JSON.parse(data.toString("utf8"));
-    return { type: MSG_REQUEST, payload };
-  } catch {
-    return null;
-  }
-}
 async function startZapServer(options) {
   const { tools, callTool, handleMethod, name = "hanzo-mcp" } = options;
   const clients = /* @__PURE__ */ new Map();
@@ -15189,30 +15161,37 @@ async function startZapServer(options) {
     description: t.description || "",
     inputSchema: t.inputSchema || {}
   }));
+  function sendFrame(ws, type, payload) {
+    ws.send(zapEncode(type, payload));
+  }
   function handleMessage(ws, raw) {
     const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
-    const msg = decode(buf);
+    const data = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+    const msg = zapDecode(data);
     if (!msg)
       return;
     switch (msg.type) {
       case MSG_HANDSHAKE: {
-        const { clientId = "unknown", browser = "unknown", version = "0" } = msg.payload || {};
+        const p = msg.payload || {};
+        const clientId = p["clientId"] || "unknown";
+        const browser = p["browser"] || "unknown";
+        const version = p["version"] || "0";
         clients.set(ws, { ws, clientId, browser, version, connectedAt: Date.now() });
         console.error(`[ZAP] Client connected: ${clientId} (${browser} v${version})`);
-        ws.send(encode(MSG_HANDSHAKE_OK, {
+        sendFrame(ws, MSG_HANDSHAKE_OK, {
           serverId: SERVER_ID,
           name,
           tools: toolManifest
-        }));
+        });
         break;
       }
       case MSG_REQUEST: {
-        const { id, method, params } = msg.payload || {};
-        handleRequest(ws, id, method, params);
+        const p = msg.payload || {};
+        handleRequest(ws, p["id"], p["method"], p["params"]);
         break;
       }
       case MSG_PING:
-        ws.send(encode(MSG_PONG, {}));
+        sendFrame(ws, MSG_PONG, {});
         break;
       default:
         break;
@@ -15245,12 +15224,12 @@ async function startZapServer(options) {
           }
           break;
       }
-      ws.send(encode(MSG_RESPONSE, { id, result }));
+      sendFrame(ws, MSG_RESPONSE, { id, result });
     } catch (err) {
-      ws.send(encode(MSG_RESPONSE, {
+      sendFrame(ws, MSG_RESPONSE, {
         id,
         error: { code: -1, message: err?.message || String(err) }
-      }));
+      });
     }
   }
   const ports = options.preferredPort ? [options.preferredPort, ...ZAP_PORTS.filter((p) => p !== options.preferredPort)] : ZAP_PORTS;
