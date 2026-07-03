@@ -22,3 +22,18 @@ describe('canonical endpoints', () => {
     expect(CLIENT_ID).toBe('hanzo-office');
   });
 });
+
+import { pickBearer } from '../src/config';
+
+describe('pickBearer', () => {
+  it('API key wins over the OAuth token', () => {
+    expect(pickBearer('hk-abc', 'jwt-xyz')).toBe('hk-abc');
+  });
+  it('falls back to the OAuth token when no key', () => {
+    expect(pickBearer('', 'jwt-xyz')).toBe('jwt-xyz');
+    expect(pickBearer('   ', 'jwt-xyz')).toBe('jwt-xyz');
+  });
+  it('empty when neither is present (anonymous)', () => {
+    expect(pickBearer('', '')).toBe('');
+  });
+});

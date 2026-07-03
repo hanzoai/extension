@@ -4,7 +4,7 @@
 
 /* global Office */
 
-import { TOKEN_SETTING_KEY, iamTokenURL, CLIENT_ID } from './config.js';
+import { TOKEN_SETTING_KEY, APIKEY_SETTING_KEY, iamTokenURL, CLIENT_ID, pickBearer } from './config.js';
 import { createPkce, buildAuthorizeURL } from './pkce.js';
 
 // getToken / setToken / clearToken persist the IAM access token. roamingSettings
@@ -16,6 +16,39 @@ export function getToken(): string {
   } catch {
     return '';
   }
+}
+
+// getApiKey / setApiKey / clearApiKey persist a pasted Hanzo API key (`hk-…`).
+// This is the zero-setup credential — no OAuth client registration required —
+// used by the downloadable test kit.
+export function getApiKey(): string {
+  try {
+    return (Office.context.roamingSettings.get(APIKEY_SETTING_KEY) as string) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setApiKey(key: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    Office.context.roamingSettings.set(APIKEY_SETTING_KEY, key.trim());
+    Office.context.roamingSettings.saveAsync((r) => {
+      r.status === Office.AsyncResultStatus.Succeeded ? resolve() : reject(new Error('save key failed'));
+    });
+  });
+}
+
+export function clearApiKey(): Promise<void> {
+  return new Promise((resolve) => {
+    Office.context.roamingSettings.remove(APIKEY_SETTING_KEY);
+    Office.context.roamingSettings.saveAsync(() => resolve());
+  });
+}
+
+// bearer is the credential the chat call sends: the pasted API key wins over the
+// OAuth token (see pickBearer), else empty for anonymous.
+export function bearer(): string {
+  return pickBearer(getApiKey(), getToken());
 }
 
 export function setToken(token: string): Promise<void> {
