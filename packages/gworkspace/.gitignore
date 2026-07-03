@@ -1,0 +1,5 @@
+# Per-developer clasp state — scriptId + auth are not shared. Commit only
+# .clasp.json.example.
+.clasp.json
+.clasprc.json
+node_modules/
