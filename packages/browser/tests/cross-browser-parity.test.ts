@@ -3,8 +3,8 @@
  *
  * These tests assert that the things which were broken in 1.8.x stay
  * fixed in 1.9.0 and beyond. They probe BOTH the Chrome (background.ts +
- * cdp-bridge.ts) and Firefox (background-firefox.ts) source files for
- * the structural patterns that distinguish a working build from a
+ * browser-dispatch.ts) and Firefox (background-firefox.ts) source files
+ * for the structural patterns that distinguish a working build from a
  * regressed one.
  *
  * Why string-search instead of behavior tests? The actual page execution
@@ -23,8 +23,7 @@ function read(p: string): string {
 
 const chromeBg = read('src/background.ts');
 const firefoxBg = read('src/background-firefox.ts');
-const cdpBridge = read('src/cdp-bridge.ts');
-const cdpBridgeServer = read('src/cdp-bridge-server.ts');
+const cdpBridge = read('src/browser-dispatch.ts');
 const browserControl = read('src/browser-control.ts');
 const popupTs = read('src/popup.ts');
 const contentScript = read('src/content-script.ts');
@@ -38,23 +37,24 @@ describe('IAM URL conventions', () => {
     expect(sharedConfig).toContain("IAM_API_PATH = '/v1/iam'");
   });
 
-  it('shared auth uses /login/oauth/access_token (not bare /oauth/token)', () => {
-    expect(sharedAuth).toContain('/login/oauth/access_token');
-    // The bare /oauth/token path 404'd before 1.8.7. We only care about
-    // the URL appearing in non-comment code lines (the doc-comment
-    // intentionally references it to explain the bug). Strip comments
-    // and re-scan.
+  it('shared auth uses the HIP-0111 canonical ${IAM_API_PATH}/oauth/token endpoint', () => {
+    // Pre-HIP-0111 shapes are both dead: the Casdoor
+    // /login/oauth/access_token path and a bare (un-prefixed) /oauth/token
+    // that 404'd before 1.8.7. Strip comments before scanning — the
+    // doc-comments intentionally reference the old paths to explain the bug.
+    expect(sharedAuth).toContain('${IAM_API_PATH}/oauth/token');
     const stripped = sharedAuth
       .replace(/\/\*[\s\S]*?\*\//g, '')   // block comments
       .replace(/(^|\n)\s*\/\/.*?(?=\n|$)/g, '$1'); // line comments
+    expect(stripped).not.toContain('/login/oauth/access_token');
     expect(stripped).not.toMatch(/['"`]\/oauth\/token['"`]/);
   });
 
   it('token exchange uses application/x-www-form-urlencoded (RFC 6749)', () => {
     // application/json was the bug pre-1.8.7. Verify the body shape.
     const tokenBlock = sharedAuth.slice(
-      sharedAuth.indexOf('login/oauth/access_token'),
-      sharedAuth.indexOf('login/oauth/access_token') + 1500,
+      sharedAuth.indexOf('${IAM_API_PATH}/oauth/token'),
+      sharedAuth.indexOf('${IAM_API_PATH}/oauth/token') + 1500,
     );
     expect(tokenBlock).toContain('application/x-www-form-urlencoded');
     expect(tokenBlock).toContain('URLSearchParams');
@@ -74,11 +74,11 @@ describe('IAM URL conventions', () => {
 });
 
 describe('parseTabId centralization', () => {
-  it('cdp-bridge.ts imports parseTabId from shared/tab-id', () => {
+  it('browser-dispatch.ts imports parseTabId from shared/tab-id', () => {
     expect(cdpBridge).toMatch(/import\s+\{[^}]*parseTabId[^}]*\}\s+from\s+['"]\.\/shared\/tab-id\.js['"]/);
   });
 
-  it('cdp-bridge.ts no longer defines its own parseTabId', () => {
+  it('browser-dispatch.ts no longer defines its own parseTabId', () => {
     // The class private parseTabId existed as a duplicate before 1.9.0.
     expect(cdpBridge).not.toMatch(/private\s+parseTabId\s*\(/);
   });
@@ -100,7 +100,7 @@ describe('parseTabId centralization', () => {
 });
 
 describe('awaitPromise propagation', () => {
-  it('cdp-bridge.ts handleBridgeMessage Runtime.evaluate sets awaitPromise: true', () => {
+  it('browser-dispatch.ts handleBridgeMessage Runtime.evaluate sets awaitPromise: true', () => {
     // Find the handleBridgeMessage Runtime.evaluate path.
     const evalSection = cdpBridge.slice(
       cdpBridge.indexOf("case 'Runtime.evaluate':"),
@@ -109,24 +109,38 @@ describe('awaitPromise propagation', () => {
     expect(evalSection).toContain('awaitPromise: true');
   });
 
-  it('cdp-bridge.ts evaluate() helper uses awaitPromise: true', () => {
+  it('browser-dispatch.ts evaluate() helper uses awaitPromise: true', () => {
     // The local `evaluate(tabId, expression)` method was the one missed
     // before 1.9.0 — the bridge handler had it but this method didn't.
     const helperSection = cdpBridge.slice(
       cdpBridge.indexOf('async evaluate(tabId: number'),
-      cdpBridge.indexOf('async evaluate(tabId: number') + 600,
+      cdpBridge.indexOf('async evaluate(tabId: number') + 900,
     );
     expect(helperSection).toContain('awaitPromise: true');
     expect(helperSection).toContain('unwrapEvaluateResult');
   });
 
-  it('cdp-bridge-server.ts evaluate action sets awaitPromise: true', () => {
-    const evalSection = cdpBridgeServer.slice(
-      cdpBridgeServer.indexOf("case 'evaluate':"),
-      cdpBridgeServer.indexOf("case 'evaluate':") + 800,
+  it('both browsers route caller JS through wrapEvaluable (one canonical rule)', () => {
+    // The forgiving-evaluate rule (statement bodies → async IIFE, trailing
+    // value auto-returned) lives ONCE in shared/evaluable.ts. Each engine's
+    // evaluate surface must consume it — a fork here is how the browsers
+    // drift apart on what caller JS they accept.
+    for (const src of [cdpBridge, firefoxBg]) {
+      expect(src).toMatch(/import\s+\{[^}]*wrapEvaluable[^}]*\}\s+from\s+['"]\.\/shared\/evaluable\.js['"]/);
+      expect(src).toContain('wrapEvaluable(pickEvaluable(params))');
+    }
+  });
+
+  it('Firefox evaluate always resolves promises in-page before serialization', () => {
+    // executeScript's structured clone cannot transfer a Promise — the
+    // in-page body must settle it and hand back the value. Rejections ride
+    // the __hanzo_error channel runInPage throws on.
+    const evalSection = firefoxBg.slice(
+      firefoxBg.indexOf("case 'Runtime.evaluate':"),
+      firefoxBg.indexOf("case 'Page.captureScreenshot':"),
     );
-    expect(evalSection).toContain('awaitPromise: true');
-    expect(evalSection).toContain('unwrapEvaluateResult');
+    expect(evalSection).toContain('Promise.resolve(');
+    expect(evalSection).toContain('__hanzo_error');
   });
 });
 
@@ -269,25 +283,6 @@ describe('webextension-polyfill integration', () => {
     // We cannot break callers that imported them.
     expect(sharedAuth).toMatch(/export\s+function\s+chromeAdapter\s*\(/);
     expect(sharedAuth).toMatch(/export\s+function\s+firefoxAdapter\s*\(/);
-  });
-});
-
-describe('Bridge server hygiene', () => {
-  it('no duplicate switch case for go_back / go_forward / etc.', () => {
-    // Count occurrences of the dead-duplicate cases. Each name MUST appear
-    // at most once as `case 'X':`.
-    const tokens = [
-      'go_back', 'go_forward', 'navigate_back', 'navigate_forward',
-      'get_url', 'get_title', 'get_tab_info', 'get_history',
-      'wait_for_navigation', 'create_tab',
-      // close_tab is allowed twice because the mid-section uses it as an
-      // alias on the navigation block AND the tabs block. Same for tab_info.
-    ];
-    for (const t of tokens) {
-      const re = new RegExp(`case ['"]${t}['"]:`, 'g');
-      const count = (cdpBridgeServer.match(re) || []).length;
-      expect(count, `case '${t}' appears ${count} times in cdp-bridge-server.ts`).toBeLessThanOrEqual(1);
-    }
   });
 });
 
