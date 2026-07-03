@@ -81,9 +81,23 @@ describe('searchOllamaLibrary', () => {
 
 // ---------------------------------------------------------------------------
 // HuggingFace API integration tests (real network calls)
+//
+// These verify OUR client against the live API. When HF itself refuses
+// service (rate-limit 429, outage, no network) there is nothing of ours to
+// verify — skip with the status logged instead of failing on the weather.
+// Any failure while HF answers 200 is still a real failure. Live calls get
+// a 15s budget (HF routinely exceeds vitest's 5s default under load).
 // ---------------------------------------------------------------------------
 
-describe('HuggingFace API', () => {
+const HF_LIVE_TIMEOUT = 15_000;
+const hfStatus = await fetch('https://huggingface.co/api/models?limit=1', {
+  signal: AbortSignal.timeout(5000),
+}).then((r) => r.status, () => 0);
+if (hfStatus !== 200) {
+  console.warn(`[model-hub.test] skipping live HF tests — huggingface.co status ${hfStatus || 'unreachable'}`);
+}
+
+describe.skipIf(hfStatus !== 200)('HuggingFace API', () => {
   it('searchHuggingFace returns models', async () => {
     const models = await searchHuggingFace('llama', { limit: 2 });
     expect(models.length).toBeGreaterThan(0);
@@ -92,7 +106,7 @@ describe('HuggingFace API', () => {
       expect(m.id).toBeTruthy();
       expect(m.source).toBe('huggingface');
     }
-  });
+  }, HF_LIVE_TIMEOUT);
 
   it('searchGGUF returns GGUF-tagged models', async () => {
     const models = await searchGGUF('qwen', 3);
@@ -100,12 +114,12 @@ describe('HuggingFace API', () => {
     for (const m of models) {
       expect(m.tags).toBeInstanceOf(Array);
     }
-  });
+  }, HF_LIVE_TIMEOUT);
 
   it('searchMLX returns MLX models', async () => {
     const models = await searchMLX('llama', 3);
     expect(models.length).toBeGreaterThan(0);
-  });
+  }, HF_LIVE_TIMEOUT);
 
   it('getHuggingFaceModel returns model with files', async () => {
     // Use a well-known public model that doesn't require auth
@@ -124,18 +138,18 @@ describe('HuggingFace API', () => {
       ).toBe(true);
       expect(f.downloadUrl).toContain('huggingface.co');
     }
-  });
+  }, HF_LIVE_TIMEOUT);
 
   it('getModelCard returns markdown', async () => {
     const card = await getModelCard('TheBloke/Llama-2-7B-Chat-GGUF');
     expect(typeof card).toBe('string');
     // Card may be empty for some models; just verify it's a string
     expect(card).toBeDefined();
-  });
+  }, HF_LIVE_TIMEOUT);
 
   it('getModelStats returns download count', async () => {
     const stats = await getModelStats('TheBloke/Llama-2-7B-Chat-GGUF');
     expect(stats.downloads).toBeGreaterThan(0);
     expect(stats.tags).toBeInstanceOf(Array);
-  });
+  }, HF_LIVE_TIMEOUT);
 });

@@ -32,7 +32,7 @@ function detectProviders(): ProviderConfig[] {
     const found: ProviderConfig[] = [];
     if (process.env.OPENAI_API_KEY) found.push({ name: 'OpenAI', url: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini', 'o3-mini'] });
     if (process.env.ANTHROPIC_API_KEY) found.push({ name: 'Anthropic', url: 'https://api.anthropic.com', models: ['claude-opus-4-6', 'claude-sonnet-4-6'] });
-    if (process.env.HANZO_API_KEY) found.push({ name: 'Hanzo', url: 'https://llm.hanzo.ai/v1', models: ['zen-400b', 'zen-70b'] });
+    if (process.env.HANZO_API_KEY) found.push({ name: 'Hanzo', url: 'https://api.hanzo.ai/v1', models: ['zen-400b', 'zen-70b'] });
     try { execSync('curl -sf http://localhost:11434/api/tags', { timeout: 2000, stdio: 'pipe' }); found.push({ name: 'Ollama', url: 'http://localhost:11434' }); } catch {}
     try { execSync('curl -sf http://localhost:1234/v1/models', { timeout: 2000, stdio: 'pipe' }); found.push({ name: 'LM Studio', url: 'http://localhost:1234/v1' }); } catch {}
     return found;
@@ -71,7 +71,7 @@ export function createLLMTools(context: vscode.ExtensionContext): MCPTool[] {
 
                 // Route to Hanzo LLM gateway (unified proxy for all providers)
                 const apiKey = process.env.HANZO_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-                const baseUrl = process.env.HANZO_LLM_URL || 'https://llm.hanzo.ai/v1';
+                const baseUrl = process.env.HANZO_LLM_URL || 'https://api.hanzo.ai/v1';
 
                 try {
                     const body = JSON.stringify({
@@ -108,7 +108,7 @@ export function createLLMTools(context: vscode.ExtensionContext): MCPTool[] {
                     return `Need at least 2 providers for consensus. Found: ${providers.map(p => p.name).join(', ') || 'none'}. Configure API keys for multiple providers.`;
                 }
                 const models = args.models || providers.slice(0, 3).flatMap(p => p.models?.slice(0, 1) || [p.name]);
-                return `Consensus query across ${models.length} models: ${models.join(', ')}\n\nTo use consensus, configure the Hanzo LLM gateway at https://llm.hanzo.ai which supports routing to 100+ providers with built-in consensus and fallback.`;
+                return `Consensus query across ${models.length} models: ${models.join(', ')}\n\nTo use consensus, configure the Hanzo LLM gateway at https://api.hanzo.ai which supports routing to 100+ providers with built-in consensus and fallback.`;
             }
         },
 
