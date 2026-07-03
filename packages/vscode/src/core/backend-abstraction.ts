@@ -114,24 +114,27 @@ export class LocalBackend implements IBackend {
         const provider = config.get<string>('provider', 'local');
         
         switch (provider) {
-            case 'openai':
+            case 'openai': {
                 const openaiKey = config.get<string>('openaiApiKey');
                 if (openaiKey) {
                     return new CloudEmbeddingServer('openai', openaiKey);
                 }
                 break;
-            case 'cohere':
+            }
+            case 'cohere': {
                 const cohereKey = config.get<string>('cohereApiKey');
                 if (cohereKey) {
                     return new CloudEmbeddingServer('cohere', cohereKey);
                 }
                 break;
-            case 'hanzo':
+            }
+            case 'hanzo': {
                 const hanzoKey = config.get<string>('apiKey') || vscode.workspace.getConfiguration('hanzo').get<string>('apiKey');
                 if (hanzoKey) {
                     return new CloudEmbeddingServer('hanzo', hanzoKey);
                 }
                 break;
+            }
         }
         
         // Default to local

@@ -201,7 +201,7 @@ async function performSQLSearch(
         
         return allDocs
             .filter(doc => {
-                if (seen.has(doc.id)) return false;
+                if (seen.has(doc.id)) {return false;}
                 seen.add(doc.id);
                 return true;
             })

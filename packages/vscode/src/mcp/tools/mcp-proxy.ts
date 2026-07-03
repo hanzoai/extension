@@ -188,8 +188,8 @@ Install with: @hanzo mcp_install --package <package-name>` :
                     output += `- Package: \`${server.package}\`\n`;
                     output += `- Type: ${server.type}\n`;
                     output += `- Installed: ${server.installed ? '✅' : '❌'}\n`;
-                    if (server.version) output += `- Version: ${server.version}\n`;
-                    if (server.path) output += `- Path: ${server.path}\n`;
+                    if (server.version) {output += `- Version: ${server.version}\n`;}
+                    if (server.path) {output += `- Path: ${server.path}\n`;}
                     output += '\n';
                 }
                 
@@ -358,7 +358,7 @@ async function installMCPServer(
                 { cwd: serverDir }
             );
             version = versionOut.trim();
-        } catch {}
+        } catch { /* best-effort — deliberately ignored */ }
         
         return {
             version,

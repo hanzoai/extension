@@ -57,7 +57,7 @@ export class Graphene {
 
     addTransformer((program: stepType[]) => {
       return program.reduce(function (acc: stepType[], step: stepType) {
-        if (step[0] != newname) return acc.concat([step]);
+        if (step[0] != newname) {return acc.concat([step]);}
         return acc.concat(newprogram);
       }, []);
     }, 100); // these need to run early, so they get a high priority
@@ -73,7 +73,7 @@ export class Graphene {
     addTransformer((program: stepType[]) => {
       return program.map((step: stepType) => {
         // If the name of this step is not the new name, return it as it is.
-        if (step[0] != newName) return step;
+        if (step[0] != newName) {return step;}
         // otherwise, return a step with the equivalent old name, with the args.
         return [oldName, extend(step[1], defaults as any[])];
       });

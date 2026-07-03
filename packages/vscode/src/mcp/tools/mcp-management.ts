@@ -17,14 +17,14 @@ interface MCPServerConfig {
 
 function loadServers(): Record<string, MCPServerConfig> {
     try {
-        if (fs.existsSync(CONFIG_PATH)) return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-    } catch {}
+        if (fs.existsSync(CONFIG_PATH)) {return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));}
+    } catch { /* best-effort — deliberately ignored */ }
     return {};
 }
 
 function saveServers(servers: Record<string, MCPServerConfig>): void {
     const dir = path.dirname(CONFIG_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(dir)) {fs.mkdirSync(dir, { recursive: true });}
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(servers, null, 2) + '\n', 'utf-8');
 }
 
@@ -76,9 +76,9 @@ export function createMCPManagementTools(context: vscode.ExtensionContext): MCPT
                     }
 
                     case 'remove': {
-                        if (!args.server) return 'Error: server name required';
+                        if (!args.server) {return 'Error: server name required';}
                         const servers = loadServers();
-                        if (!servers[args.server]) return `Error: Server not found: ${args.server}`;
+                        if (!servers[args.server]) {return `Error: Server not found: ${args.server}`;}
                         delete servers[args.server];
                         saveServers(servers);
                         return `Removed MCP server: ${args.server}`;
@@ -143,7 +143,7 @@ export function createMCPManagementTools(context: vscode.ExtensionContext): MCPT
             },
             handler: async (args: { name: string }) => {
                 const servers = loadServers();
-                if (!servers[args.name]) return `Error: Server not found: ${args.name}\nUse 'mcp list' to see available servers.`;
+                if (!servers[args.name]) {return `Error: Server not found: ${args.name}\nUse 'mcp list' to see available servers.`;}
                 const cmd = servers[args.name].command;
                 delete servers[args.name];
                 saveServers(servers);
@@ -164,7 +164,7 @@ export function createMCPManagementTools(context: vscode.ExtensionContext): MCPT
                 const servers = loadServers();
                 if (args.server) {
                     const s = servers[args.server];
-                    if (!s) return `Error: Server not found: ${args.server}`;
+                    if (!s) {return `Error: Server not found: ${args.server}`;}
                     return [
                         `Server: ${s.name}`,
                         `  Command: ${s.command}`,

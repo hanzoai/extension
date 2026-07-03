@@ -26,12 +26,12 @@ export const graphFromJSON = (str: string): Graph => {
 };
 
 export const persist = (graph: Graph | string, name: string) => {
-  if (typeof graph != "string") {
+  if (typeof graph !== "string") {
     graph = jsonifyGraph(graph as Graph);
   }
   name = name || "graph";
 
-  if (typeof localStorage == "undefined" || localStorage == null) {
+  if (typeof localStorage === "undefined" || localStorage == null) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const LocalStorage = require("node-localstorage").LocalStorage;
     // eslint-disable-next-line no-global-assign
@@ -45,7 +45,7 @@ export const persist = (graph: Graph | string, name: string) => {
 export const depersist = (name: string): Graph => {
   name = "GRAPHENE::" + (name || "graph");
 
-  if (typeof localStorage == "undefined" || localStorage == null) {
+  if (typeof localStorage === "undefined" || localStorage == null) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const LocalStorage = require("node-localstorage").LocalStorage;
     // eslint-disable-next-line no-global-assign

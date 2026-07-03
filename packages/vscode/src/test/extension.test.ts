@@ -1,80 +1,65 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import * as vscode from 'vscode';
-import * as path from 'path';
 
+// The extension's activate() starts the MCP server / chat participant and
+// awaits auth, which never resolves in the headless `--disable-extensions`
+// test host, so we cannot assert on runtime command registration here.
+// Instead we pin the shipped contract: the extension identity, its declared
+// commands, and its registered configuration. Publisher/name are
+// hanzo-ai/hanzo-ide (id hanzo-ai.hanzo-ide).
 suite('Extension Test Suite', () => {
-    vscode.window.showInformationMessage('Start all tests.');
+    const EXT_ID = 'hanzo-ai.hanzo-ide';
 
-    test('Extension should be present', () => {
-        assert.ok(vscode.extensions.getExtension('hanzoai.hanzo-ai'));
+    test('Extension is present under its published id', () => {
+        assert.ok(vscode.extensions.getExtension(EXT_ID));
     });
 
-    test('Should activate extension', async () => {
-        const ext = vscode.extensions.getExtension('hanzoai.hanzo-ai');
-        assert.ok(ext);
-        await ext!.activate();
-        assert.ok(ext!.isActive);
+    test('Manifest declares the current command set', () => {
+        const ext = vscode.extensions.getExtension(EXT_ID)!;
+        const commands: string[] = (ext.packageJSON.contributes.commands || []).map((c: any) => c.command);
+
+        for (const expected of [
+            'hanzo.openManager',
+            'hanzo.openWelcomeGuide',
+            'hanzo.reanalyzeProject',
+            'hanzo.triggerReminder',
+            'hanzo.checkMetrics',
+            'hanzo.resetMetrics',
+            'hanzo.login',
+            'hanzo.logout',
+            'hanzo.debug.authState',
+            'hanzo.debug.clearAuth'
+        ]) {
+            assert.ok(commands.includes(expected), `manifest should declare ${expected}`);
+        }
     });
 
-    test('Should register all commands', async () => {
-        const commands = await vscode.commands.getCommands();
-        
-        // Core commands
-        assert.ok(commands.includes('hanzo.agent'));
-        assert.ok(commands.includes('hanzo.mode'));
-        assert.ok(commands.includes('hanzo.browser'));
-        assert.ok(commands.includes('hanzo.search'));
-        assert.ok(commands.includes('hanzo.symbols'));
-        assert.ok(commands.includes('hanzo.mcp'));
-        assert.ok(commands.includes('hanzo.login'));
-        assert.ok(commands.includes('hanzo.logout'));
-        assert.ok(commands.includes('hanzo.showAPIKey'));
-    });
-
-    test('Should have configuration', () => {
+    test('Registered configuration exposes the hanzo.mcp / hanzo.ide keys', () => {
         const config = vscode.workspace.getConfiguration('hanzo');
-        assert.ok(config);
-        assert.ok(config.has('apiKey'));
-        assert.ok(config.has('defaultModel'));
-        assert.ok(config.has('enableMCP'));
+        assert.ok(config.has('mcp.enabled'));
+        assert.ok(config.has('mcp.transport'));
+        assert.ok(config.has('mcp.port'));
+        assert.ok(config.has('ide'));
+        // A config key the old contract used but which no longer exists.
+        assert.ok(!config.has('apiKey'));
     });
 
-    test('API key management', async () => {
+    test('mcp.enabled resolves to a boolean and mcp.transport to a string', () => {
         const config = vscode.workspace.getConfiguration('hanzo');
-        
-        // Test setting and getting API key
-        await config.update('apiKey', 'test_key_123', vscode.ConfigurationTarget.Global);
-        const apiKey = config.get<string>('apiKey');
-        assert.strictEqual(apiKey, 'test_key_123');
-        
-        // Clean up
-        await config.update('apiKey', undefined, vscode.ConfigurationTarget.Global);
+        assert.strictEqual(typeof config.get('mcp.enabled'), 'boolean');
+        assert.strictEqual(typeof config.get('mcp.transport'), 'string');
     });
 
-    test('Default model configuration', () => {
+    test('A registered config value can be written and read back', async () => {
         const config = vscode.workspace.getConfiguration('hanzo');
-        const defaultModel = config.get<string>('defaultModel');
-        assert.ok(defaultModel);
-        assert.ok(typeof defaultModel === 'string');
-    });
-
-    test('MCP configuration', () => {
-        const config = vscode.workspace.getConfiguration('hanzo');
-        const enableMCP = config.get<boolean>('enableMCP');
-        assert.strictEqual(typeof enableMCP, 'boolean');
-    });
-
-    test('Mode list should contain legendary modes', () => {
-        // This would test the modes functionality
-        const expectedModes = [
-            'carmack', 'norvig', 'hotz', 'karpathy', 'ritchie',
-            'thompson', 'kernighan', 'pike', 'fowler', 'martin'
-        ];
-        
-        // In real implementation, we'd call the getModes function
-        // For now, we just verify the expected structure
-        assert.ok(expectedModes.length >= 10);
-        assert.ok(expectedModes.includes('carmack'));
-        assert.ok(expectedModes.includes('norvig'));
+        try {
+            await config.update('mcp.port', 9999, vscode.ConfigurationTarget.Global);
+            assert.strictEqual(
+                vscode.workspace.getConfiguration('hanzo').get<number>('mcp.port'),
+                9999
+            );
+        } finally {
+            await config.update('mcp.port', undefined, vscode.ConfigurationTarget.Global);
+        }
     });
 });
