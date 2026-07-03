@@ -194,6 +194,15 @@ importers:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@20.19.9)(jsdom@26.1.0)(terser@5.43.1)
 
+  packages/auth:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@20.19.9)(jsdom@26.1.0)(terser@5.43.1)
+
   packages/browser:
     dependencies:
       '@supabase/supabase-js':
@@ -333,6 +342,10 @@ importers:
         version: 5.8.3
 
   packages/office:
+    dependencies:
+      '@hanzo/auth':
+        specifier: workspace:*
+        version: link:../auth
     devDependencies:
       '@types/office-js':
         specifier: ^1.0.377
