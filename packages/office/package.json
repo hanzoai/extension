@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Hanzo AI for Microsoft Office — Word, Excel, and PowerPoint task pane. AI over your document, wired to the same api.hanzo.ai gateway and hanzo.id IAM as the browser extension.",
   "private": true,
+  "dependencies": {
+    "@hanzo/auth": "workspace:*"
+  },
   "scripts": {
     "build": "node src/build.js",
     "watch": "node src/build.js --watch",
