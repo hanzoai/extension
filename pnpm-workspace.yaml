@@ -7,6 +7,7 @@ packages:
   - 'packages/jetbrains'
   - 'packages/mcp'
   - 'packages/office'
+  - 'packages/outlook'
   - 'packages/tools'
   - 'packages/vscode'
   - 'apps/*'
