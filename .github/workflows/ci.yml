@@ -36,6 +36,12 @@ jobs:
     - name: Test Office add-in
       run: pnpm --filter @hanzo/office-addin test
 
+    - name: Test Outlook add-in
+      run: pnpm --filter @hanzo/outlook-addin test
+
+    - name: Test Google Workspace add-on
+      run: pnpm --filter @hanzo/gworkspace-addon test
+
     - name: Test tools package
       run: pnpm --filter @hanzo/cli-tools test
 
