@@ -23,13 +23,31 @@ export class BrowserExtensionServer extends EventEmitter {
     super();
     this.projectRoot = projectRoot;
     
-    this.wss = new WebSocketServer({ 
+    this.wss = new WebSocketServer({
       port,
       path: '/browser-extension'
     });
 
     this.setupWebSocket();
-    console.log(`[Hanzo] Browser extension server listening on ws://localhost:${port}/browser-extension`);
+    this.wss.on('listening', () => {
+      console.log(`[Hanzo] Browser extension server listening on ws://localhost:${this.port}/browser-extension`);
+    });
+  }
+
+  /** Actual bound port. Pass port 0 to the constructor to let the OS pick. */
+  get port(): number {
+    const addr = this.wss.address();
+    return addr && typeof addr === 'object' ? addr.port : 0;
+  }
+
+  /** Resolves once the server is accepting connections; rejects on bind failure
+   *  (e.g. EADDRINUSE) instead of crashing the process with an unhandled error. */
+  ready(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.wss.address()) return resolve();
+      this.wss.once('listening', () => resolve());
+      this.wss.once('error', reject);
+    });
   }
 
   private setupWebSocket() {
