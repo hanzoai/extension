@@ -7,7 +7,7 @@
 
 import { askStream, listModels } from './chat.js';
 import { readSelection, insertResult, currentHost, type InsertMode } from './host.js';
-import { bearer, getApiKey, setApiKey, clearApiKey, signIn, clearToken, getToken } from './auth.js';
+import { bearer, getApiKey, setApiKey, clearApiKey, signIn, clearToken, hasApiKey, hasSession } from './auth.js';
 import { DEFAULT_MODEL } from './config.js';
 
 Office.onReady((info) => {
@@ -58,7 +58,7 @@ Office.onReady((info) => {
       await askStream(
         task,
         selection,
-        bearer(),
+        await bearer(),
         (delta) => { outputEl.value += delta; outputEl.scrollTop = outputEl.scrollHeight; },
         { model: modelEl.value || DEFAULT_MODEL, signal: controller.signal },
       );
@@ -85,7 +85,7 @@ Office.onReady((info) => {
 
   async function populateModels() {
     try {
-      const ids = (await listModels(bearer())).sort();
+      const ids = (await listModels(await bearer())).sort();
       if (!ids.length) return;
       modelEl.innerHTML = '';
       for (const id of ids) {
@@ -143,13 +143,15 @@ Office.onReady((info) => {
   };
 
   function reflectAuth() {
-    // Signed-in state is either an OAuth token or a saved API key.
-    const authed = !!bearer();
-    const oauth = !!getToken();
+    // Sync reflect only (no refresh/network): signed in via OAuth session or a
+    // saved API key. bearer()/getToken() do the real (async) resolution at call
+    // time; this just renders which credential is live.
+    const oauth = hasSession();
+    const keyed = hasApiKey();
     signInBtn.style.display = oauth ? 'none' : '';
     signOutBtn.style.display = oauth ? '' : 'none';
-    $('authhint').textContent = authed
-      ? 'Ready — using ' + (getApiKey() ? 'your API key.' : 'your Hanzo sign-in.')
+    $('authhint').textContent = (oauth || keyed)
+      ? 'Ready — using ' + (keyed ? 'your API key.' : 'your Hanzo sign-in.')
       : 'Paste a Hanzo API key or sign in to use your models.';
   }
   function setBusy(busy: boolean, msg?: string) {

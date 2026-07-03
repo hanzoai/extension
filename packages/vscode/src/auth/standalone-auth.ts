@@ -5,6 +5,20 @@ import * as os from 'os';
 import axios from 'axios';
 import { execSync } from 'child_process';
 
+// The canonical HIP-0111 OAuth path prefix. Both the login UI (authorize) and
+// the API (token) carry it — this file previously omitted it (hitting
+// hanzo.id/oauth/authorize, which 404s), the exact drift @hanzo/auth exists to
+// prevent. Kept as a local const here because this MCP-standalone auth compiles
+// without the workspace bundler; the value MUST equal @hanzo/auth's IAM_API_PATH.
+const IAM_API_PATH = '/v1/iam';
+
+// form() encodes a token-endpoint body as application/x-www-form-urlencoded —
+// RFC 6749 requires it; posting a JSON object (axios's default) is rejected by
+// IAM. axios serializes URLSearchParams as form and sets the header itself.
+function form(body: Record<string, string>): URLSearchParams {
+  return new URLSearchParams(body);
+}
+
 interface AuthToken {
     token: string;
     refreshToken?: string;
@@ -104,12 +118,14 @@ export class StandaloneAuthManager {
 
     private async refreshToken(refreshToken: string): Promise<AuthToken | null> {
         try {
-            const response = await axios.post(`${this.iamConfig.endpoint}/oauth/token`, {
-                grant_type: 'refresh_token',
-                refresh_token: refreshToken,
-                client_id: this.iamConfig.clientId,
-                client_secret: this.iamConfig.clientSecret
-            });
+            const response = await axios.post(
+                `${this.iamConfig.endpoint}${IAM_API_PATH}/oauth/token`,
+                form({
+                    grant_type: 'refresh_token',
+                    refresh_token: refreshToken,
+                    client_id: this.iamConfig.clientId,
+                }),
+            );
 
             if (response.data?.access_token) {
                 const token: AuthToken = {
@@ -166,11 +182,11 @@ export class StandaloneAuthManager {
             const codeVerifier = crypto.randomBytes(32).toString('base64url');
             const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
 
-            const authUrl = new URL(`${this.iamConfig.loginUrl}/oauth/authorize`);
+            const authUrl = new URL(`${this.iamConfig.loginUrl}${IAM_API_PATH}/oauth/authorize`);
             authUrl.searchParams.append('client_id', this.iamConfig.clientId);
             authUrl.searchParams.append('response_type', 'code');
             authUrl.searchParams.append('redirect_uri', 'http://localhost:8765/callback');
-            authUrl.searchParams.append('scope', 'read write');
+            authUrl.searchParams.append('scope', 'openid profile email offline_access');
             authUrl.searchParams.append('state', state);
             authUrl.searchParams.append('code_challenge', codeChallenge);
             authUrl.searchParams.append('code_challenge_method', 'S256');
@@ -247,9 +263,8 @@ export class StandaloneAuthManager {
                             redirect_uri: 'http://localhost:8765/callback',
                             code_verifier: codeVerifier,
                         };
-                        if (clientSecret) {body.client_secret = clientSecret;}
-
-                        const tokenResp = await axios.post(`${endpoint}/oauth/token`, body);
+                        // Public PKCE client: NO client_secret (the verifier is the proof).
+                        const tokenResp = await axios.post(`${endpoint}${IAM_API_PATH}/oauth/token`, form(body));
                         const tokens = tokenResp.data;
                         res.writeHead(200, { 'Content-Type': 'text/html' });
                         res.end(successHtml);
