@@ -51,6 +51,15 @@ tasks {
         gradleVersion = properties("gradleVersion").get()
     }
 
+    // buildSearchableOptions launches a headless IDE (JCEF) to pre-index plugin
+    // settings — it needs native font libs (libfreetype) the CI runners lack, so
+    // it crashes buildPlugin non-deterministically (only passing when the task is
+    // cache-UP-TO-DATE). The index is optional; the IDE rebuilds it at runtime.
+    // Disable it so buildPlugin reliably produces the distributable zip.
+    buildSearchableOptions {
+        enabled = false
+    }
+
     patchPluginXml {
         version = properties("pluginVersion")
         sinceBuild = properties("pluginSinceBuild")
