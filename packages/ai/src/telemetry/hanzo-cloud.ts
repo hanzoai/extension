@@ -6,8 +6,8 @@
 import { Telemetry, TelemetryConfig } from './index';
 import * as opentelemetry from '@opentelemetry/api';
 import { DiagConsoleLogger, DiagLogLevel, diag } from '@opentelemetry/api';
-import { Resource } from '@opentelemetry/resources';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+import { resourceFromAttributes } from '@opentelemetry/resources';
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
@@ -92,14 +92,15 @@ export class HanzoCloudTelemetry extends Telemetry {
     }
     
     // Create resource
-    const resource = new Resource({
-      [SemanticResourceAttributes.SERVICE_NAME]: config.serviceName || 'hanzo-ai',
-      [SemanticResourceAttributes.SERVICE_VERSION]: config.serviceVersion || '1.0.0',
-      [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: config.environment || 'development',
+    const resource = resourceFromAttributes({
+      [ATTR_SERVICE_NAME]: config.serviceName || 'hanzo-ai',
+      [ATTR_SERVICE_VERSION]: config.serviceVersion || '1.0.0',
+      // stable semconv dropped deployment.environment; keep the raw key
+      'deployment.environment': config.environment || 'development',
       'hanzo.project.id': config.projectId,
       'hanzo.cloud.region': process.env.HANZO_CLOUD_REGION || 'us-east-1'
     });
-    
+
     // Create OTLP exporter
     this.exporter = new OTLPTraceExporter({
       url: `${config.cloudUrl}/v1/traces`,
@@ -108,21 +109,20 @@ export class HanzoCloudTelemetry extends Telemetry {
         'x-project-id': config.projectId
       }
     });
-    
-    // Create provider
+
+    // Create provider with batch processor (SDK 2.x: processors are
+    // constructor-only; addSpanProcessor was removed)
     this.provider = new NodeTracerProvider({
-      resource
+      resource,
+      spanProcessors: [
+        new BatchSpanProcessor(this.exporter, {
+          maxQueueSize: 1000,
+          maxExportBatchSize: 512,
+          scheduledDelayMillis: 5000,
+          exportTimeoutMillis: 30000
+        })
+      ]
     });
-    
-    // Add batch processor
-    this.provider.addSpanProcessor(
-      new BatchSpanProcessor(this.exporter, {
-        maxQueueSize: 1000,
-        maxExportBatchSize: 512,
-        scheduledDelayMillis: 5000,
-        exportTimeoutMillis: 30000
-      })
-    );
     
     // Register as global provider
     this.provider.register();
