@@ -26,14 +26,28 @@
     .status.ok { color: #1a7f37; } .status.warn { color: #9a6700; } .status.error { color: #cf222e; }
     .spacer { flex: 1; }
     footer { margin-top: 10px; font-size: 11px; color: var(--muted); }
+    select#model { width: auto; max-width: 150px; margin-left: auto; padding: 4px 8px; font-size: 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip { padding: 5px 10px; border-radius: 999px; font-size: 13px; background: transparent; color: var(--fg); border: 1px solid var(--line); }
+    .chip:hover:not(:disabled) { border-color: var(--accent); }
   </style>
 </head>
 <body>
   <header>
     <img src="assets/icon-32.png" alt="Hanzo" />
     <span class="title">Hanzo AI</span>
+    <select id="model" aria-label="Model"></select>
     <span class="host" id="hostname">Office</span>
   </header>
+
+  <!-- One-click actions over the selection (drafting/review, e.g. a law office). -->
+  <div class="chips">
+    <button class="chip" data-task="Continue drafting this document in the same voice and formatting. Return only the continuation.">Draft</button>
+    <button class="chip" data-task="Summarize the following, preserving parties, dates, defined terms and obligations.">Summarize</button>
+    <button class="chip" data-task="Explain this in plain, non-jargon language, and note any risks or obligations.">Explain plainly</button>
+    <button class="chip" data-task="Tighten and clarify this text without changing its legal meaning. Return only the revised text.">Tighten / redline</button>
+    <button class="chip" data-task="Continue writing from here in the same voice, tense and formatting. Return only the continuation.">Continue</button>
+  </div>
 
   <label for="prompt">What should Hanzo do with your selection?</label>
   <textarea id="prompt" placeholder="e.g. Rewrite this clause in plain English · Summarize the selected rows · Draft a mutual NDA section about confidentiality"></textarea>
