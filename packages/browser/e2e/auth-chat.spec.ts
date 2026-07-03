@@ -8,11 +8,11 @@ import { test, expect } from './fixtures';
  *   1. Login tab opens correctly
  *   2. Password auth succeeds
  *   3. Token is stored and user info is fetched
- *   4. Chat sends a message to a Zen model via llm.hanzo.ai
+ *   4. Chat sends a message to a Zen model via api.hanzo.ai
  *
  * Requirements:
  *   - IAM at iam.hanzo.ai / hanzo.id must be reachable
- *   - LLM gateway at llm.hanzo.ai must be reachable
+ *   - LLM gateway at api.hanzo.ai must be reachable
  *   - Extension must be built: npm run build
  */
 
