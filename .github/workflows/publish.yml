@@ -58,12 +58,17 @@ jobs:
     - name: Package
       working-directory: packages/browser
       run: |
+        # web-ext (already used for linting below) does the zipping — the
+        # arc runner image has no `zip` binary. The old `zip -r ../../../…`
+        # also escaped dist/, so the artifact globs and the store upload
+        # never saw the files. The Safari bundle comes from the dedicated
+        # macOS job — the Linux build has no Xcode and emits no safari
+        # manifest, so packaging it here would ship junk.
         VERSION=$(node -p "require('./package.json').version")
-        cd dist/browser-extension/chrome && zip -r ../../../hanzo-ai-chrome-v${VERSION}.zip .
-        cd ../../browser-extension/firefox && zip -r ../../../hanzo-ai-firefox-v${VERSION}.zip .
-        cd ../../browser-extension/safari && zip -r ../../../hanzo-ai-safari-v${VERSION}.zip .
-        # Edge uses Chrome zip (Chromium-compatible)
-        cd ../../.. && cp hanzo-ai-chrome-v${VERSION}.zip hanzo-ai-edge-v${VERSION}.zip
+        npx web-ext build --source-dir dist/browser-extension/chrome  --artifacts-dir dist --filename hanzo-ai-chrome-v${VERSION}.zip  --overwrite-dest
+        npx web-ext build --source-dir dist/browser-extension/firefox --artifacts-dir dist --filename hanzo-ai-firefox-v${VERSION}.zip --overwrite-dest
+        # Edge uses the Chrome zip (Chromium-compatible)
+        cp dist/hanzo-ai-chrome-v${VERSION}.zip dist/hanzo-ai-edge-v${VERSION}.zip
 
     - name: Upload browser zips
       uses: actions/upload-artifact@v4
@@ -73,7 +78,6 @@ jobs:
           packages/browser/dist/hanzo-ai-chrome-v*.zip
           packages/browser/dist/hanzo-ai-edge-v*.zip
           packages/browser/dist/hanzo-ai-firefox-v*.zip
-          packages/browser/dist/hanzo-ai-safari-v*.zip
 
     - name: Lint Firefox
       working-directory: packages/browser
@@ -89,11 +93,12 @@ jobs:
           -d "client_secret=${{ secrets.CHROME_CLIENT_SECRET }}" \
           -d "refresh_token=${{ secrets.CHROME_REFRESH_TOKEN }}" \
           -d "grant_type=refresh_token" | jq -r '.access_token')
+        VERSION=$(node -p "require('./package.json').version")
         curl -sf -X PUT \
           "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${{ secrets.CHROME_EXTENSION_ID }}" \
           -H "Authorization: Bearer $ACCESS_TOKEN" \
           -H "x-goog-api-version: 2" \
-          -T dist/hanzo-ai-chrome.zip
+          -T dist/hanzo-ai-chrome-v${VERSION}.zip
         curl -sf -X POST \
           "https://www.googleapis.com/chromewebstore/v1.1/items/${{ secrets.CHROME_EXTENSION_ID }}/publish" \
           -H "Authorization: Bearer $ACCESS_TOKEN" \
