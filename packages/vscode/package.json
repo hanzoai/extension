@@ -295,7 +295,7 @@
     "vscode:prepublish": "node scripts/compile-main.js || true && npm run build:mcp",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
+    "pretest": "npm run compile && tsc -p tsconfig.test.json && npm run lint",
     "lint": "eslint .",
     "test": "node ./out/test/runTest.js",
     "test:simple": "node test-simple.js",
@@ -306,7 +306,7 @@
     "test:mcp-proxy": "cross-env MOCHA_TEST_FILE=\"MCP.*Proxy Test\" node ./out/test/runTest.js",
     "test:mcp-integration": "cross-env MOCHA_TEST_FILE=\"MCP Proxy Integration\" node ./out/test/runTest.js",
     "test:coverage": "c8 npm test",
-    "test:vitest": "vitest",
+    "test:vitest": "vitest run",
     "test:vitest:coverage": "vitest --coverage",
     "test:vitest:run": "vitest run --coverage",
     "build:mcp": "node scripts/build-mcp-standalone.js",
@@ -329,7 +329,8 @@
     "start:prod": "cross-env VSCODE_ENV=production npm run watch",
     "preview": "npx serve . -p 3000",
     "deploy": "vercel --prod",
-    "deploy:preview": "vercel"
+    "deploy:preview": "vercel",
+    "posttest": "vitest run"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
@@ -381,7 +382,8 @@
     "tree-sitter": "^0.21.1",
     "tree-sitter-javascript": "^0.23.1",
     "tree-sitter-typescript": "^0.23.2",
-    "zod": "^3.25.71"
+    "zod": "^3.25.71",
+    "ws": "^8.21.0"
   },
   "__metadata": {
     "id": "fd0ca99f-75f0-4318-af8c-660c5e883c16",

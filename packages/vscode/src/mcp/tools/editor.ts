@@ -34,7 +34,7 @@ export function createEditorTools(context: vscode.ExtensionContext): MCPTool[] {
                 required: ['path', 'commands']
             },
             handler: async (args: { path: string; commands: string[] }) => {
-                if (!nvimAvailable()) return 'Error: nvim not found in PATH';
+                if (!nvimAvailable()) {return 'Error: nvim not found in PATH';}
                 const cmds = args.commands.map(c => `+${JSON.stringify(c)}`).join(' ');
                 try {
                     execSync(`nvim --headless ${cmds} +wq ${JSON.stringify(args.path)}`, {
@@ -65,9 +65,9 @@ export function createEditorTools(context: vscode.ExtensionContext): MCPTool[] {
                 required: ['command']
             },
             handler: async (args: { command: string; server?: string }) => {
-                if (!nvimAvailable()) return 'Error: nvim not found in PATH';
+                if (!nvimAvailable()) {return 'Error: nvim not found in PATH';}
                 const addr = args.server || findNvimSocket();
-                if (!addr) return 'Error: No running Neovim instance found. Start nvim with --listen /tmp/nvim.sock';
+                if (!addr) {return 'Error: No running Neovim instance found. Start nvim with --listen /tmp/nvim.sock';}
                 try {
                     const result = execSync(
                         `nvim --server ${JSON.stringify(addr)} --remote-send ':${args.command}<CR>'`,
@@ -99,12 +99,12 @@ export function createEditorTools(context: vscode.ExtensionContext): MCPTool[] {
                 required: ['action']
             },
             handler: async (args: { action: string; name?: string }) => {
-                if (!nvimAvailable()) return 'Error: nvim not found in PATH';
+                if (!nvimAvailable()) {return 'Error: nvim not found in PATH';}
                 switch (args.action) {
                     case 'list': {
                         try {
                             const sockets = execSync("ls /tmp/nvim.*/0 2>/dev/null || echo ''", { stdio: 'pipe', shell: '/bin/sh' }).toString().trim();
-                            if (!sockets) return 'No active Neovim sessions found.';
+                            if (!sockets) {return 'No active Neovim sessions found.';}
                             const sessions = sockets.split('\n').filter(Boolean);
                             return `Active Neovim sessions (${sessions.length}):\n${sessions.map((s, i) => `  ${i}: ${s}`).join('\n')}`;
                         } catch { return 'No active Neovim sessions found.'; }
@@ -115,7 +115,7 @@ export function createEditorTools(context: vscode.ExtensionContext): MCPTool[] {
                     }
                     case 'attach': {
                         const addr = args.name || findNvimSocket();
-                        if (!addr) return 'Error: No session to attach to. Specify a name or socket path.';
+                        if (!addr) {return 'Error: No session to attach to. Specify a name or socket path.';}
                         return `To attach to session, run:\n  nvim --server ${addr} --remote-ui`;
                     }
                     case 'detach':

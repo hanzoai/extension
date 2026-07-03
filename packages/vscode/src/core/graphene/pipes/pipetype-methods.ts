@@ -100,7 +100,7 @@ export const propertyPipeTypeMethod: TypePipeMethod = (
   _state: IGraphState
 ) => {
   // no gremlin, so we need to pull (query initialization).
-  if (!gremlin) return "pull";
+  if (!gremlin) {return "pull";}
 
   // If there is a gremlin, we'll set its result to the property's value.
   gremlin.result = gremlin.vertex[args[0]];
@@ -164,17 +164,17 @@ export const filterPipeTypeMethod: TypePipeMethod = (
   }
 
   // filter by object
-  if (typeof args[0] == "object") {
+  if (typeof args[0] === "object") {
     return objectFilter(gremlin.vertex, args[0]) ? gremlin : "pull";
   }
 
-  if (typeof args[0] != "function") {
+  if (typeof args[0] !== "function") {
     grapheneError("Filter is not a function: " + args[0]);
     return gremlin; // keep things going.
   }
 
   // gremlin fails if the filter function returns false.
-  if (!args[0](gremlin.vertex, gremlin)) return "pull";
+  if (!args[0](gremlin.vertex, gremlin)) {return "pull";}
 
   // gremlin passed.
   return gremlin;
@@ -209,7 +209,7 @@ export const takePipeTypeMethod: TypePipeMethod = (
   }
 
   // query initialization.
-  if (!gremlin) return "pull";
+  if (!gremlin) {return "pull";}
   state.taken++;
 
   return gremlin;
@@ -231,7 +231,7 @@ export const asPipeTypeMethod: TypePipeMethod = (
   _state: IGraphState
 ) => {
   // query initialization.
-  if (!gremlin) return "pull";
+  if (!gremlin) {return "pull";}
 
   // init the 'as' state.
   gremlin.state.as = gremlin.state.as || {};
@@ -257,7 +257,7 @@ export const mergePipeTypeMethod: TypePipeMethod = (
   state: IGraphState
 ) => {
   // query initialization.
-  if (!state.vertices && !gremlin) return "pull";
+  if (!state.vertices && !gremlin) {return "pull";}
 
   // state initialization.
   if (!state.vertices || !state.vertices.length) {
@@ -266,7 +266,7 @@ export const mergePipeTypeMethod: TypePipeMethod = (
   }
 
   // done with this batch.
-  if (!state.vertices.length) return "pull";
+  if (!state.vertices.length) {return "pull";}
 
   const vertex = state.vertices.pop();
   return makeGremlin(vertex as vertexType, gremlin.state);
@@ -288,8 +288,8 @@ export const exceptPipeTypeMethod: TypePipeMethod = (
   _state: IGraphState
 ) => {
   // query initialization.
-  if (!gremlin) return "pull";
-  if (gremlin.vertex == gremlin.state.as[args[0]]) return "pull";
+  if (!gremlin) {return "pull";}
+  if (gremlin.vertex == gremlin.state.as[args[0]]) {return "pull";}
   return gremlin;
 };
 
@@ -308,7 +308,7 @@ export const backPipeTypeMethod: TypePipeMethod = (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _state: IGraphState
 ) => {
-  if (!gremlin) return "pull";
+  if (!gremlin) {return "pull";}
 
   // Go to the vertex stored in the "as" label.
   return gotoVertex(gremlin, gremlin.state.as[args[0]]);

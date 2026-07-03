@@ -255,10 +255,11 @@ function generateActionCode(action: BrowserAction): string {
             return `await page.goto('${action.url}', { timeout: ${action.timeout} });
                     console.log('Navigated to:', '${action.url}');`;
         
-        case 'screenshot':
+        case 'screenshot': {
             const screenshotPath = action.outputPath || 'screenshot.png';
             return `await page.screenshot({ path: '${screenshotPath}' });
                     console.log('Screenshot saved to:', '${screenshotPath}');`;
+            }
         
         case 'click':
             return `await page.click('${action.selector}', { timeout: ${action.timeout} });

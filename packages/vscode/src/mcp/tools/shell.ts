@@ -29,8 +29,8 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
             const { stdout, stderr } = await execAsync(args.command, options);
 
             let result = '';
-            if (stdout) result += stdout;
-            if (stderr) result += '\n[stderr]\n' + stderr;
+            if (stdout) {result += stdout;}
+            if (stderr) {result += '\n[stderr]\n' + stderr;}
 
             return result.trim() || 'Command completed successfully';
         } catch (error: any) {

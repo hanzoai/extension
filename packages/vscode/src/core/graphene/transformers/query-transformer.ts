@@ -5,10 +5,10 @@ import { TypeTransformer } from "./types";
 export const T: TypeTransformer[] = []; // Transformers
 
 export const addTransformer = (
-  fun: Function,
+  fun: (query: any) => any,
   priority: number
 ): void | false => {
-  if (typeof fun != "function") {
+  if (typeof fun !== "function") {
     return grapheneError("Invalid transformer function encountered.");
   }
 
@@ -35,7 +35,7 @@ export const transform = (program: stepType[]): stepType[] => {
 
 export const extend = (list: TypeStepArguments, defaults: any[]) => {
   return Object.keys(defaults).reduce((acc, key) => {
-    if (typeof list[parseInt(key)] != "undefined") return acc;
+    if (typeof list[parseInt(key)] !== "undefined") {return acc;}
     acc[parseInt(key)] = defaults[parseInt(key)];
     return acc;
   }, list);

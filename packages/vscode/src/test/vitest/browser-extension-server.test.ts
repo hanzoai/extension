@@ -7,18 +7,18 @@ import * as path from 'path';
 describe('BrowserExtensionServer Coverage', () => {
   let server: BrowserExtensionServer;
   let ws: WebSocket;
-  const TEST_PORT = 3003;
-  
   beforeEach(async () => {
-    server = new BrowserExtensionServer(TEST_PORT, process.cwd());
-    await new Promise(resolve => setTimeout(resolve, 100));
-    ws = new WebSocket(`ws://localhost:${TEST_PORT}/browser-extension`);
+    // Port 0 = OS-assigned; a fixed port races teardown across runs (same
+    // EADDRINUSE class fixed in packages/browser/test/claude-integration).
+    server = new BrowserExtensionServer(0, process.cwd());
+    await server.ready();
+    ws = new WebSocket(`ws://localhost:${server.port}/browser-extension`);
     await new Promise(resolve => ws.on('open', resolve));
   });
-  
-  afterEach(() => {
-    ws.close();
-    server.close();
+
+  afterEach(async () => {
+    ws.terminate();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   });
   
   describe('Edge cases', () => {
@@ -49,7 +49,7 @@ describe('BrowserExtensionServer Coverage', () => {
     
     it('should handle lookupByHanzoId when file does not exist', async () => {
       const elementSelected = new Promise((resolve, reject) => {
-        let timeout = setTimeout(() => {
+        const timeout = setTimeout(() => {
           resolve(null);
         }, 200);
         
@@ -86,7 +86,7 @@ describe('BrowserExtensionServer Coverage', () => {
       fs.writeFileSync(mapFile, 'invalid json content');
       
       const elementSelected = new Promise((resolve, reject) => {
-        let timeout = setTimeout(() => {
+        const timeout = setTimeout(() => {
           resolve(null);
         }, 200);
         

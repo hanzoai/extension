@@ -49,7 +49,7 @@ export abstract class BaseService {
     protected async retrieveData<T>(key: string, defaultValue: T): Promise<T> {
         try {
             const stored = this.context.globalState.get<string>(key);
-            if (!stored) return defaultValue;
+            if (!stored) {return defaultValue;}
             
             return JSON.parse(stored) as T;
         } catch (error) {

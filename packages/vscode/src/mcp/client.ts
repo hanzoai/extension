@@ -16,7 +16,7 @@ export class MCPClient extends EventEmitter {
     private options?: { port?: number; host?: string };
     private socket?: net.Socket;
     private messageId: number = 0;
-    private pendingRequests: Map<number, { resolve: Function; reject: Function }> = new Map();
+    private pendingRequests: Map<number, { resolve: (value: any) => void; reject: (reason?: any) => void }> = new Map();
     private buffer: string = '';
 
     constructor(transport: 'stdio' | 'tcp', options?: { port?: number; host?: string }) {

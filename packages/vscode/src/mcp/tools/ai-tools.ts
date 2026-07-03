@@ -333,7 +333,7 @@ Provide:
                 };
                 
             case 'add':
-            case 'update':
+            case 'update': {
                 if (!args.provider || !args.config) {
                     return { success: false, error: 'Provider and config required' };
                 }
@@ -345,8 +345,9 @@ Provide:
                 await config.update(`llm.${args.provider}`, args.config, true);
                 
                 return { success: true, message: `Provider ${args.provider} ${action}d` };
+            }
                 
-            case 'remove':
+            case 'remove': {
                 if (!args.provider) {
                     return { success: false, error: 'Provider required' };
                 }
@@ -358,8 +359,9 @@ Provide:
                 await removeConfig.update(`llm.${args.provider}`, undefined, true);
                 
                 return { success: true, message: `Provider ${args.provider} removed` };
+            }
                 
-            case 'test':
+            case 'test': {
                 if (!args.provider) {
                     return { success: false, error: 'Provider required' };
                 }
@@ -370,6 +372,7 @@ Provide:
                 });
                 
                 return testResult;
+            }
                 
             default:
                 return { success: false, error: `Unknown action: ${action}` };
@@ -460,13 +463,14 @@ Provide:
                     }))
                 };
                 
-            case 'get':
+            case 'get': {
                 const currentMode = await this.context.globalState.get('development_mode', 'pragmatic');
                 return {
                     success: true,
                     current_mode: currentMode,
                     config: modes[currentMode]
                 };
+            }
                 
             case 'set':
                 if (!args.mode) {
@@ -489,7 +493,7 @@ Provide:
                     config: modes[args.mode] || args.custom_config
                 };
                 
-            case 'describe':
+            case 'describe': {
                 if (!args.mode) {
                     return { success: false, error: 'Mode required' };
                 }
@@ -504,6 +508,7 @@ Provide:
                     mode: args.mode,
                     ...mode
                 };
+            }
                 
             default:
                 return { success: false, error: `Unknown action: ${action}` };

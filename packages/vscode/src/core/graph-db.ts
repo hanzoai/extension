@@ -169,7 +169,7 @@ export class GraphDatabase {
             const outEdges = this.edgeIndex.get(`from:${nodeId}`) || new Set();
             outEdges.forEach(id => {
                 const edge = this.edges.get(id);
-                if (edge) edges.push(edge);
+                if (edge) {edges.push(edge);}
             });
         }
         
@@ -177,7 +177,7 @@ export class GraphDatabase {
             const inEdges = this.edgeIndex.get(`to:${nodeId}`) || new Set();
             inEdges.forEach(id => {
                 const edge = this.edges.get(id);
-                if (edge) edges.push(edge);
+                if (edge) {edges.push(edge);}
             });
         }
         
@@ -192,8 +192,8 @@ export class GraphDatabase {
         while (queue.length > 0) {
             const { node, path } = queue.shift()!;
             
-            if (path.length > maxDepth) continue;
-            if (visited.has(node)) continue;
+            if (path.length > maxDepth) {continue;}
+            if (visited.has(node)) {continue;}
             visited.add(node);
             
             if (node === toId) {
@@ -263,7 +263,7 @@ export class GraphDatabase {
         
         while (stack.length > 0) {
             const nodeId = stack.pop()!;
-            if (visited.has(nodeId)) continue;
+            if (visited.has(nodeId)) {continue;}
             
             visited.add(nodeId);
             const node = this.nodes.get(nodeId);

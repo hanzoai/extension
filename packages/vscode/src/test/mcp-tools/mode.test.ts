@@ -1,230 +1,147 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import { createModeTool } from '../../mcp/tools/mode';
 
+// Rewritten against the current mode.ts contract: actions are
+// list / activate / show / current over the DEVELOPMENT_MODES registry
+// (programmer personalities), persisted under globalState key
+// 'hanzo.developmentMode' (default 'fullstack'). The old get/set/'normal'
+// emoji contract no longer exists.
 suite('Mode Tool Test Suite', () => {
     let context: vscode.ExtensionContext;
     let modeTool: any;
+    let store: Map<string, any>;
     let sandbox: sinon.SinonSandbox;
-    let globalStateGetStub: sinon.SinonStub;
-    let globalStateUpdateStub: sinon.SinonStub;
-    let showInformationMessageStub: sinon.SinonStub;
 
     setup(() => {
         sandbox = sinon.createSandbox();
-        
-        // Mock VS Code window
-        showInformationMessageStub = sandbox.stub(vscode.window, 'showInformationMessage');
-        
-        // Mock VS Code context
-        globalStateGetStub = sandbox.stub();
-        globalStateUpdateStub = sandbox.stub().resolves();
-        
+        // activate() persists the mode's tool list to the shared hanzo.mcp
+        // settings; stub getConfiguration so the test does not mutate real
+        // (cross-suite) host configuration.
+        const real = vscode.workspace.getConfiguration.bind(vscode.workspace);
+        sandbox.stub(vscode.workspace, 'getConfiguration').callsFake(
+            ((section?: string, scope?: any) =>
+                (section === 'hanzo.mcp'
+                    ? { get: (_k: string, d?: any) => d, has: () => true, inspect: () => undefined, update: async () => undefined }
+                    : real(section as any, scope))) as any
+        );
+        store = new Map();
         context = {
             subscriptions: [],
             workspaceState: {
-                get: sandbox.stub(),
-                update: sandbox.stub().resolves()
+                get: (_k: string, d?: any) => d,
+                update: async () => undefined
             },
             globalState: {
-                get: globalStateGetStub,
-                update: globalStateUpdateStub,
-                setKeysForSync: sandbox.stub()
+                get: (key: string, d?: any) => (store.has(key) ? store.get(key) : d),
+                update: async (key: string, value: any) => { store.set(key, value); },
+                setKeysForSync: () => undefined
             },
-            extensionPath: '/test/extension',
-            extensionUri: vscode.Uri.file('/test/extension'),
-            storageUri: vscode.Uri.file('/test/storage'),
-            globalStorageUri: vscode.Uri.file('/test/global-storage'),
-            logUri: vscode.Uri.file('/test/logs'),
-            extensionMode: vscode.ExtensionMode.Test,
-            asAbsolutePath: (path: string) => `/test/extension/${path}`,
-            storagePath: '/test/storage',
-            globalStoragePath: '/test/global-storage',
-            logPath: '/test/logs'
+            extensionPath: '/test/extension'
         } as any;
-        
-        // Default to normal mode
-        globalStateGetStub.withArgs('hanzo.development_mode').returns('normal');
-        
+
         modeTool = createModeTool(context);
     });
 
-    teardown(() => {
-        sandbox.restore();
-    });
+    teardown(() => { sandbox.restore(); });
 
-    test('Mode tool should get current mode', async () => {
-        globalStateGetStub.withArgs('hanzo.development_mode').returns('focused');
-        
-        const result = await modeTool.handler({
-            action: 'get'
-        });
-        
-        assert.ok(result.includes('Current mode: focused'));
-        assert.ok(result.includes('Stay laser-focused'));
-    });
+    test('list is the default action and groups the registry with the active mode', async () => {
+        const result = await modeTool.handler({});
 
-    test('Mode tool should set development mode', async () => {
-        const result = await modeTool.handler({
-            action: 'set',
-            mode: 'architect'
-        });
-        
-        assert.ok(result.includes('Development mode set to: architect'));
-        assert.ok(result.includes('Think big picture'));
-        assert.ok(globalStateUpdateStub.calledWith('hanzo.development_mode', 'architect'));
-        assert.ok(showInformationMessageStub.calledWith('Development mode: architect 🏗️'));
-    });
-
-    test('Mode tool should list all available modes', async () => {
-        const result = await modeTool.handler({
-            action: 'list'
-        });
-        
         assert.ok(result.includes('Available development modes:'));
-        assert.ok(result.includes('normal - Standard development mode'));
-        assert.ok(result.includes('focused - Deep focus mode'));
-        assert.ok(result.includes('creative - Creative exploration mode'));
-        assert.ok(result.includes('debug - Debugging mode'));
-        assert.ok(result.includes('review - Code review mode'));
-        assert.ok(result.includes('refactor - Refactoring mode'));
-        assert.ok(result.includes('test - Test writing mode'));
-        assert.ok(result.includes('docs - Documentation mode'));
-        assert.ok(result.includes('architect - System design mode'));
-        assert.ok(result.includes('speed - Rapid development mode'));
+        assert.ok(result.includes('**Language Creators**:'));
+        assert.ok(result.includes('**Special Configurations**:'));
+        // Known registry members render as "- **name**: Programmer - description"
+        assert.ok(result.includes('- **ritchie**: Dennis Ritchie - C creator - UNIX philosophy'));
+        assert.ok(result.includes('- **hickey**'));
+        // Default current mode is fullstack, marked active.
+        assert.ok(result.includes('Current mode: **fullstack**'));
+        assert.ok(result.includes('- **fullstack** *(active)*'));
+        assert.ok(result.includes("Use 'mode --action activate --name <mode>'"));
     });
 
-    test('Mode tool should validate mode names', async () => {
-        const result = await modeTool.handler({
-            action: 'set',
-            mode: 'invalid-mode'
-        });
-        
-        assert.ok(result.includes('Error: Invalid mode'));
-        assert.ok(result.includes('Available modes:'));
-        assert.ok(!globalStateUpdateStub.called);
+    test('activate persists the mode and reports programmer/philosophy/tools', async () => {
+        const result = await modeTool.handler({ action: 'activate', name: 'hickey' });
+
+        assert.ok(result.includes('Activated mode: **hickey**'));
+        assert.ok(result.includes('Programmer: Rich Hickey'));
+        assert.ok(result.includes('Description: Clojure creator - simplicity matters'));
+        assert.ok(result.includes('Philosophy: *"Simple Made Easy"*'));
+        // hickey.tools has 7 entries.
+        assert.ok(result.includes('Enabled tools (7):'));
+        assert.ok(result.includes('- critic'));
+        // Persisted to globalState under the canonical key.
+        assert.strictEqual(store.get('hanzo.developmentMode'), 'hickey');
     });
 
-    test('Mode tool should handle missing mode for set action', async () => {
-        const result = await modeTool.handler({
-            action: 'set'
-        });
-        
-        assert.ok(result.includes('Error: Mode name required'));
+    test('activate throws when the mode name is missing', async () => {
+        await assert.rejects(
+            modeTool.handler({ action: 'activate' }),
+            /Mode name required for activate action/
+        );
     });
 
-    test('Mode tool should handle invalid actions', async () => {
-        const result = await modeTool.handler({
-            action: 'invalid'
-        });
-        
-        assert.ok(result.includes('Error: Invalid action'));
-        assert.ok(result.includes('Valid actions: get, set, list'));
+    test('activate throws on an unknown mode', async () => {
+        await assert.rejects(
+            modeTool.handler({ action: 'activate', name: 'not-a-real-mode' }),
+            /Unknown mode: not-a-real-mode/
+        );
+        assert.ok(!store.has('hanzo.developmentMode'));
     });
 
-    test('Mode tool should show current mode when no mode is set', async () => {
-        globalStateGetStub.withArgs('hanzo.development_mode').returns(undefined);
-        
-        const result = await modeTool.handler({
-            action: 'get'
-        });
-        
-        assert.ok(result.includes('Current mode: normal'));
-        assert.ok(result.includes('Standard development mode'));
+    test('show renders full detail including config for a known mode', async () => {
+        const result = await modeTool.handler({ action: 'show', name: 'guido' });
+
+        assert.ok(result.includes('## Mode: guido'));
+        assert.ok(result.includes('**Programmer**: Guido van Rossum'));
+        assert.ok(result.includes('**Philosophy**:'));
+        assert.ok(result.includes('### Tools ('));
+        assert.ok(result.includes('### Configuration'));
+        assert.ok(result.includes('readability: 10/10'));
     });
 
-    test('Mode tool should provide detailed mode descriptions', async () => {
-        // Test each mode's description
-        const modes = [
-            { name: 'focused', emoji: '🎯', description: 'Stay laser-focused' },
-            { name: 'creative', emoji: '🎨', description: 'Think outside the box' },
-            { name: 'debug', emoji: '🐛', description: 'Systematic debugging' },
-            { name: 'review', emoji: '👀', description: 'Critical code review' },
-            { name: 'refactor', emoji: '♻️', description: 'Clean code refactoring' },
-            { name: 'test', emoji: '🧪', description: 'Comprehensive testing' },
-            { name: 'docs', emoji: '📚', description: 'Clear documentation' },
-            { name: 'architect', emoji: '🏗️', description: 'Think big picture' },
-            { name: 'speed', emoji: '⚡', description: 'Move fast' }
-        ];
-        
-        for (const mode of modes) {
-            const result = await modeTool.handler({
-                action: 'set',
-                mode: mode.name
-            });
-            
-            assert.ok(result.includes(mode.description));
-            assert.ok(showInformationMessageStub.calledWith(`Development mode: ${mode.name} ${mode.emoji}`));
-        }
+    test('show throws when name is missing or unknown', async () => {
+        await assert.rejects(
+            modeTool.handler({ action: 'show' }),
+            /Mode name required for show action/
+        );
+        await assert.rejects(
+            modeTool.handler({ action: 'show', name: 'nope' }),
+            /Unknown mode: nope/
+        );
     });
 
-    test('Mode tool should persist mode across sessions', async () => {
-        // Set mode
-        await modeTool.handler({
-            action: 'set',
-            mode: 'test'
-        });
-        
-        // Verify it was saved
-        assert.ok(globalStateUpdateStub.calledWith('hanzo.development_mode', 'test'));
-        
-        // Simulate new session with saved mode
-        globalStateGetStub.withArgs('hanzo.development_mode').returns('test');
-        
-        const result = await modeTool.handler({
-            action: 'get'
-        });
-        
-        assert.ok(result.includes('Current mode: test'));
+    test('current returns the default fullstack mode when nothing is stored', async () => {
+        const result = await modeTool.handler({ action: 'current' });
+
+        assert.ok(result.includes('Current mode: **fullstack**'));
+        assert.ok(result.includes('Programmer: Full Stack Developer'));
+        // fullstack.tools has 12 entries.
+        assert.ok(result.includes('Enabled tools: 12'));
     });
 
-    test('Mode tool should handle normal mode properly', async () => {
-        const result = await modeTool.handler({
-            action: 'set',
-            mode: 'normal'
-        });
-        
-        assert.ok(result.includes('Development mode set to: normal'));
-        assert.ok(result.includes('Standard development mode'));
-        assert.ok(showInformationMessageStub.calledWith('Development mode: normal 💻'));
+    test('current reflects a stored known mode', async () => {
+        store.set('hanzo.developmentMode', 'linus');
+
+        const result = await modeTool.handler({ action: 'current' });
+
+        assert.ok(result.includes('Current mode: **linus**'));
+        assert.ok(result.includes('Programmer: Linus Torvalds'));
     });
 
-    test('Mode tool should show mode characteristics in list', async () => {
-        const result = await modeTool.handler({
-            action: 'list'
-        });
-        
-        // Check that each mode has its emoji and description
-        assert.ok(result.includes('💻 normal'));
-        assert.ok(result.includes('🎯 focused'));
-        assert.ok(result.includes('🎨 creative'));
-        assert.ok(result.includes('🐛 debug'));
-        assert.ok(result.includes('👀 review'));
-        assert.ok(result.includes('♻️ refactor'));
-        assert.ok(result.includes('🧪 test'));
-        assert.ok(result.includes('📚 docs'));
-        assert.ok(result.includes('🏗️ architect'));
-        assert.ok(result.includes('⚡ speed'));
+    test('current reports a stored unknown mode as custom', async () => {
+        store.set('hanzo.developmentMode', 'my-custom-mode');
+
+        const result = await modeTool.handler({ action: 'current' });
+
+        assert.strictEqual(result, 'Current mode: my-custom-mode (custom mode)');
     });
 
-    test('Mode tool should trim whitespace from mode names', async () => {
-        const result = await modeTool.handler({
-            action: 'set',
-            mode: '  focused  '
-        });
-        
-        assert.ok(result.includes('Development mode set to: focused'));
-        assert.ok(globalStateUpdateStub.calledWith('hanzo.development_mode', 'focused'));
-    });
-
-    test('Mode tool should be case-insensitive for mode names', async () => {
-        const result = await modeTool.handler({
-            action: 'set',
-            mode: 'FOCUSED'
-        });
-        
-        assert.ok(result.includes('Development mode set to: focused'));
-        assert.ok(globalStateUpdateStub.calledWith('hanzo.development_mode', 'focused'));
+    test('an unknown action throws with the valid-actions hint', async () => {
+        await assert.rejects(
+            modeTool.handler({ action: 'set' }),
+            /Unknown action: set\. Use 'list', 'activate', 'show', or 'current'/
+        );
     });
 });
