@@ -7,27 +7,24 @@ import * as fs from 'fs';
 describe('Claude Code Browser Extension Integration', () => {
   let server: BrowserExtensionServer;
   let ws: WebSocket;
-  const TEST_PORT = 3002;
-  
+
   beforeEach(async () => {
-    // Start server
-    server = new BrowserExtensionServer(TEST_PORT, process.cwd());
-    
-    // Wait for server to be ready
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Connect WebSocket
-    ws = new WebSocket(`ws://localhost:${TEST_PORT}/browser-extension`);
+    // Port 0 = OS-assigned. A fixed port raced the previous test's teardown
+    // (EADDRINUSE → unhandled 'error' → hook timeout); ready() waits for the
+    // actual bind instead of sleeping and hoping.
+    server = new BrowserExtensionServer(0, process.cwd());
+    await server.ready();
+
+    ws = new WebSocket(`ws://localhost:${server.port}/browser-extension`);
     await new Promise(resolve => ws.on('open', resolve));
   });
-  
+
   afterEach(async () => {
-    ws.close();
-    await new Promise<void>((resolve) => {
-      server.close(() => resolve());
-      // Fallback if close callback never fires
-      setTimeout(resolve, 500);
-    });
+    // terminate() drops the client immediately so wss.close() isn't left
+    // waiting on a close handshake — the callback then reliably fires and
+    // no fallback timer is needed.
+    ws.terminate();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   });
   
   describe('React source-map integration', () => {
