@@ -326,11 +326,37 @@ jobs:
         name: hanzo-ai-office
         path: /tmp/hanzo-ai-office-v*.zip
 
+  # ─── Microsoft Outlook mail add-in ───
+  outlook:
+    name: Outlook Add-in
+    runs-on: hanzo-build-linux-amd64
+    needs: secrets
+    steps:
+    - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'pnpm'
+    - run: pnpm install --frozen-lockfile
+
+    - name: Build + package
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        pnpm --filter @hanzo/outlook-addin build
+        cd packages/outlook/dist && npx --yes bestzip "/tmp/hanzo-ai-outlook-v${VERSION}.zip" .
+
+    - name: Upload Outlook add-in
+      uses: actions/upload-artifact@v4
+      with:
+        name: hanzo-ai-outlook
+        path: /tmp/hanzo-ai-outlook-v*.zip
+
   # ─── GitHub Release with downloadable artifacts ───
   release:
     name: GitHub Release
     runs-on: hanzo-build-linux-amd64
-    needs: [browser, safari, vscode, jetbrains, office]
+    needs: [browser, safari, vscode, jetbrains, office, outlook]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
     - uses: actions/checkout@v4
@@ -364,6 +390,7 @@ jobs:
           | App | Platform | Download |
           |-----|----------|----------|
           | **Word · Excel · PowerPoint** | Windows / macOS / Web / iPad | [`hanzo-ai-office-v${{ steps.version.outputs.version }}.zip`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-office-v${{ steps.version.outputs.version }}.zip) |
+          | **Outlook** | Windows / macOS / Web | [`hanzo-ai-outlook-v${{ steps.version.outputs.version }}.zip`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-outlook-v${{ steps.version.outputs.version }}.zip) |
 
           > Office: unzip and sideload `manifest.xml` via the M365 admin center, or Insert → Add-ins → Upload My Add-in.
 
@@ -386,4 +413,5 @@ jobs:
           artifacts/hanzo-ai-ide/*
           artifacts/hanzo-ai-jetbrains/*
           artifacts/hanzo-ai-office/*
+          artifacts/hanzo-ai-outlook/*
           artifacts/hanzo-ai-safari/*
