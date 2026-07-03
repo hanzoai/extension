@@ -167,11 +167,15 @@ jobs:
     # ── Microsoft Office add-in (Word/Excel/PowerPoint) ──
     - name: Build Office add-in
       run: |
-        pnpm --filter @hanzo/office-addin build
         VER="${{ steps.version.outputs.ver }}"
-        # Bundle dist/ (manifest.xml + taskpane + assets) into a sideloadable
-        # zip with node-based bestzip — the arc image has no `zip` binary.
-        cd packages/office/dist && npx --yes bestzip /tmp/hanzo-ai-office-v${VER}.zip .
+        # Two builds, two zips (node-based bestzip — the arc image has no `zip`):
+        #  - production: manifest points at office.hanzo.ai (AppSource / admin deploy)
+        #  - localhost:  manifest points at https://localhost:3000 + serve.mjs +
+        #                SIDELOAD-WINDOWS.md — the self-contained "test on my machine" kit
+        pnpm --filter @hanzo/office-addin build
+        (cd packages/office/dist && npx --yes bestzip /tmp/hanzo-ai-office-v${VER}.zip .)
+        HANZO_OFFICE_BASE=https://localhost:3000 pnpm --filter @hanzo/office-addin build
+        (cd packages/office/dist && npx --yes bestzip /tmp/hanzo-ai-office-localhost-v${VER}.zip .)
       continue-on-error: true
 
     # ── MCP npm package ──

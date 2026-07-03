@@ -7,7 +7,7 @@
 
 import { ask } from './chat.js';
 import { readSelection, insertResult, currentHost, type InsertMode } from './host.js';
-import { getToken, signIn, clearToken } from './auth.js';
+import { bearer, getApiKey, setApiKey, clearApiKey, signIn, clearToken, getToken } from './auth.js';
 
 Office.onReady((info) => {
   if (
@@ -27,8 +27,11 @@ Office.onReady((info) => {
   const modeEl = $('mode') as HTMLSelectElement;
   const signInBtn = $('signin') as HTMLButtonElement;
   const signOutBtn = $('signout') as HTMLButtonElement;
+  const apiKeyEl = $('apikey') as HTMLInputElement;
+  const saveKeyBtn = $('savekey') as HTMLButtonElement;
 
   $('hostname').textContent = hostLabel(currentHost());
+  apiKeyEl.value = getApiKey();
   reflectAuth();
 
   let controller: AbortController | null = null;
@@ -45,7 +48,7 @@ Office.onReady((info) => {
     try {
       const selection = await readSelection();
       setStatus('Asking Hanzo…');
-      const result = await ask(task, selection, getToken(), { signal: controller.signal });
+      const result = await ask(task, selection, bearer(), { signal: controller.signal });
       outputEl.value = result;
       insertBtn.disabled = false;
       setStatus('Done — review, then Insert.', 'ok');
@@ -85,10 +88,27 @@ Office.onReady((info) => {
     reflectAuth();
   };
 
+  saveKeyBtn.onclick = async () => {
+    const key = apiKeyEl.value.trim();
+    if (key) {
+      await setApiKey(key);
+      setStatus('API key saved — ready to use.', 'ok');
+    } else {
+      await clearApiKey();
+      setStatus('API key cleared.', 'ok');
+    }
+    reflectAuth();
+  };
+
   function reflectAuth() {
-    const signedIn = !!getToken();
-    signInBtn.style.display = signedIn ? 'none' : '';
-    signOutBtn.style.display = signedIn ? '' : 'none';
+    // Signed-in state is either an OAuth token or a saved API key.
+    const authed = !!bearer();
+    const oauth = !!getToken();
+    signInBtn.style.display = oauth ? 'none' : '';
+    signOutBtn.style.display = oauth ? '' : 'none';
+    $('authhint').textContent = authed
+      ? 'Ready — using ' + (getApiKey() ? 'your API key.' : 'your Hanzo sign-in.')
+      : 'Paste a Hanzo API key or sign in to use your models.';
   }
   function setBusy(busy: boolean, msg?: string) {
     runBtn.disabled = busy;

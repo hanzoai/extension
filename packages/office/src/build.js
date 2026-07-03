@@ -45,6 +45,12 @@ async function build() {
     fs.copyFileSync(path.join(__dirname, f), path.join(dist, f));
   }
 
+  // Copy the local-test kit (self-contained HTTPS server + Windows guide) so a
+  // downloaded localhost build is runnable as-is.
+  for (const f of ['serve.mjs', 'SIDELOAD-WINDOWS.md']) {
+    fs.copyFileSync(path.join(root, f), path.join(dist, f));
+  }
+
   // Copy assets/ (icons).
   const assetsSrc = path.join(root, 'assets');
   const assetsDst = path.join(dist, 'assets');
