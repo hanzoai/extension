@@ -60,7 +60,7 @@ export function createVectorTools(context: vscode.ExtensionContext): MCPTool[] {
                 
                 async function indexFile(filePath: string) {
                     const ext = path.extname(filePath);
-                    if (!validExtensions.includes(ext)) return;
+                    if (!validExtensions.includes(ext)) {return;}
                     
                     try {
                         const content = await fs.readFile(filePath, 'utf-8');
@@ -219,7 +219,7 @@ export function createVectorTools(context: vscode.ExtensionContext): MCPTool[] {
                 const store = getDocumentStore(context);
                 
                 switch (args.operation) {
-                    case 'add':
+                    case 'add': {
                         if (!args.chatId || !args.content || !args.type) {
                             throw new Error('chatId, content, and type are required');
                         }
@@ -233,14 +233,16 @@ export function createVectorTools(context: vscode.ExtensionContext): MCPTool[] {
                             documentId: docId,
                             message: 'Document added successfully'
                         };
+            }
                         
-                    case 'get':
-                        if (!args.documentId) throw new Error('documentId required');
+                    case 'get': {
+                        if (!args.documentId) {throw new Error('documentId required');}
                         const doc = store.getDocument(args.documentId);
                         return doc || { error: 'Document not found' };
+            }
                         
-                    case 'search':
-                        if (!args.query) throw new Error('query required');
+                    case 'search': {
+                        if (!args.query) {throw new Error('query required');}
                         const docs = await store.searchDocuments(args.query, {
                             chatId: args.chatId,
                             type: args.type,
@@ -257,6 +259,7 @@ export function createVectorTools(context: vscode.ExtensionContext): MCPTool[] {
                                 metadata: d.metadata
                             }))
                         };
+            }
                         
                     case 'update':
                         if (!args.documentId || !args.updates) {
@@ -266,7 +269,7 @@ export function createVectorTools(context: vscode.ExtensionContext): MCPTool[] {
                         return 'Document updated successfully';
                         
                     case 'save_session':
-                        if (!args.session) throw new Error('session required');
+                        if (!args.session) {throw new Error('session required');}
                         await store.saveSession(args.session);
                         return 'Session saved successfully';
                         

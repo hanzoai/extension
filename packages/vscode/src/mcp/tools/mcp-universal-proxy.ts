@@ -194,7 +194,7 @@ class MCPProxyManager {
                 try {
                     const { stdout } = await exec(`uvx ${packageName} --version`, { cwd: installDir });
                     version = stdout.trim();
-                } catch {}
+                } catch { /* best-effort — deliberately ignored */ }
 
                 command = 'uvx';
                 args = [packageName];
@@ -357,7 +357,7 @@ class MCPProxyManager {
         };
 
         for (const [name, server] of this.servers) {
-            if (!server.installed) continue;
+            if (!server.installed) {continue;}
 
             // Ensure connected
             if (!server.client) {
@@ -489,9 +489,10 @@ export function createMCPUniversalProxyTools(context: vscode.ExtensionContext): 
                             return `❌ Tool call failed: ${error.message}`;
                         }
 
-                    case 'list':
+                    case 'list': {
                         const capabilities = await proxyManager.listAllCapabilities();
                         return formatCapabilities(capabilities);
+            }
 
                     case 'uninstall':
                         // TODO: Implement uninstall

@@ -200,10 +200,10 @@ export class ReminderService implements vscode.Disposable {
     }
 
     private shouldTrackFile(filePath?: string): boolean {
-        if (!filePath) return false;
+        if (!filePath) {return false;}
         
         const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) return false;
+        if (!workspaceFolders) {return false;}
         
         const relativePath = vscode.workspace.asRelativePath(filePath);
         return !this.ignoreFilter.ignores(relativePath);

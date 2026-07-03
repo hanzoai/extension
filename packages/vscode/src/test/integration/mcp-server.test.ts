@@ -1,9 +1,13 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import * as path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import * as net from 'net';
 
-suite('MCP Server Integration Test Suite', () => {
+// This suite spawns the bundled standalone MCP server (out/mcp-server-standalone.js,
+// produced by `npm run build:mcp` -- not part of `npm test`) and binds real TCP
+// ports, so it is opt-in. Set HANZO_E2E_LIVE=1 (after building the standalone
+// server) to run it.
+(process.env.HANZO_E2E_LIVE ? suite : suite.skip)('MCP Server Integration Test Suite', () => {
     let serverProcess: ChildProcess;
     const serverPath = path.join(__dirname, '../../../out/mcp-server-standalone.js');
 

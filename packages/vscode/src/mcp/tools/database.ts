@@ -6,23 +6,23 @@ import { execSync } from 'child_process';
 function detectDbCli(db: string): { cmd: string; type: string } | null {
     const connStr = db.toLowerCase();
     if (connStr.startsWith('postgresql://') || connStr.startsWith('postgres://') || connStr.endsWith('.pg')) {
-        try { execSync('which psql', { stdio: 'pipe' }); return { cmd: 'psql', type: 'postgres' }; } catch {}
+        try { execSync('which psql', { stdio: 'pipe' }); return { cmd: 'psql', type: 'postgres' }; } catch { /* best-effort — deliberately ignored */ }
     }
     if (connStr.startsWith('mysql://') || connStr.endsWith('.mysql')) {
-        try { execSync('which mysql', { stdio: 'pipe' }); return { cmd: 'mysql', type: 'mysql' }; } catch {}
+        try { execSync('which mysql', { stdio: 'pipe' }); return { cmd: 'mysql', type: 'mysql' }; } catch { /* best-effort — deliberately ignored */ }
     }
     if (connStr.endsWith('.db') || connStr.endsWith('.sqlite') || connStr.endsWith('.sqlite3') || connStr.startsWith('sqlite://')) {
-        try { execSync('which sqlite3', { stdio: 'pipe' }); return { cmd: 'sqlite3', type: 'sqlite' }; } catch {}
+        try { execSync('which sqlite3', { stdio: 'pipe' }); return { cmd: 'sqlite3', type: 'sqlite' }; } catch { /* best-effort — deliberately ignored */ }
     }
     // Default: try sqlite3 for file paths, psql for connection strings
-    try { execSync('which sqlite3', { stdio: 'pipe' }); return { cmd: 'sqlite3', type: 'sqlite' }; } catch {}
-    try { execSync('which psql', { stdio: 'pipe' }); return { cmd: 'psql', type: 'postgres' }; } catch {}
+    try { execSync('which sqlite3', { stdio: 'pipe' }); return { cmd: 'sqlite3', type: 'sqlite' }; } catch { /* best-effort — deliberately ignored */ }
+    try { execSync('which psql', { stdio: 'pipe' }); return { cmd: 'psql', type: 'postgres' }; } catch { /* best-effort — deliberately ignored */ }
     return null;
 }
 
 function runQuery(db: string, query: string): string {
     const cli = detectDbCli(db);
-    if (!cli) return 'Error: No database CLI found (install sqlite3, psql, or mysql)';
+    if (!cli) {return 'Error: No database CLI found (install sqlite3, psql, or mysql)';}
 
     try {
         switch (cli.type) {
@@ -79,7 +79,7 @@ export function createDatabaseTools(context: vscode.ExtensionContext): MCPTool[]
             },
             handler: async (args: { database: string; table?: string; query: string }) => {
                 const cli = detectDbCli(args.database);
-                if (!cli) return 'Error: No database CLI found';
+                if (!cli) {return 'Error: No database CLI found';}
 
                 if (args.table) {
                     // Search specific table — generate WHERE clause matching text columns
@@ -121,7 +121,7 @@ export function createDatabaseTools(context: vscode.ExtensionContext): MCPTool[]
                         { stdio: 'pipe', timeout: 30000 }
                     ).toString();
                     return result;
-                } catch {}
+                } catch { /* best-effort — deliberately ignored */ }
 
                 // Try HTTP API
                 try {

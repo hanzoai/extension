@@ -186,7 +186,7 @@ export function createHanzoPlatformMCPTools(context: vscode.ExtensionContext): M
                 const aliases = context.globalState.get<UnixToolAlias[]>('unix-aliases', []);
 
                 switch (args.action) {
-                    case 'create':
+                    case 'create': {
                         if (!args.name || !args.command) {
                             return '❌ Name and command required for alias creation';
                         }
@@ -204,6 +204,7 @@ export function createHanzoPlatformMCPTools(context: vscode.ExtensionContext): M
                         
 This alias is now available as an MCP tool in modes!
 Use in mode configuration: tools: ['${args.name}']`;
+            }
 
                     case 'list':
                         if (aliases.length === 0) {
@@ -215,7 +216,7 @@ Use in mode configuration: tools: ['${args.name}']`;
                                 `- **${a.name}**: \`${a.command}\`${a.description ? `\n  ${a.description}` : ''}`
                             ).join('\n');
 
-                    case 'remove':
+                    case 'remove': {
                         if (!args.name) {
                             return '❌ Name required for removal';
                         }
@@ -223,8 +224,9 @@ Use in mode configuration: tools: ['${args.name}']`;
                         const filtered = aliases.filter(a => a.name !== args.name);
                         await context.globalState.update('unix-aliases', filtered);
                         return `✅ Removed alias '${args.name}'`;
+            }
 
-                    case 'execute':
+                    case 'execute': {
                         if (!args.name) {
                             return '❌ Name required for execution';
                         }
@@ -243,6 +245,7 @@ Use in mode configuration: tools: ['${args.name}']`;
                         return `Executing: ${bashCommand}
                         
 Use @hanzo bash to run: ${bashCommand}`;
+            }
 
                     default:
                         return '❌ Unknown action';

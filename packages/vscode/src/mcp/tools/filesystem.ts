@@ -35,8 +35,8 @@ export function createFileSystemTools(context: vscode.ExtensionContext): MCPTool
                     const content = await fs.readFile(filePath, 'utf-8');
                     const lines = content.split('\n');
                     
-                    let startLine = (args.offset || 1) - 1;
-                    let endLine = args.limit ? startLine + args.limit : lines.length;
+                    const startLine = (args.offset || 1) - 1;
+                    const endLine = args.limit ? startLine + args.limit : lines.length;
                     
                     const selectedLines = lines.slice(startLine, endLine);
                     const result = selectedLines.map((line, index) => 
@@ -227,7 +227,7 @@ export function createFileSystemTools(context: vscode.ExtensionContext): MCPTool
                 const showHidden = args.showHidden || false;
                 
                 async function buildTree(dir: string, prefix: string = '', depth: number = 0): Promise<string> {
-                    if (depth > maxDepth) return '';
+                    if (depth > maxDepth) {return '';}
                     
                     let result = '';
                     const items = await fs.readdir(dir, { withFileTypes: true });

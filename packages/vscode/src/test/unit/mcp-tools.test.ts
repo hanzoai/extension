@@ -1,168 +1,98 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import { MCPTools } from '../../mcp/tools';
 
+// Rewritten against the current MCPTools contract. There is no `filterTools`
+// method; enabling/disabling is driven entirely by the `hanzo.mcp` settings
+// (enabledTools / disabledTools / disableWriteTools / disableSearchTools),
+// applied in the constructor and in getAllTools(). Tools must be initialize()d
+// before getAllTools() returns anything.
 suite('MCP Tools Test Suite', () => {
-    let tools: MCPTools;
-    let context: vscode.ExtensionContext;
     let sandbox: sinon.SinonSandbox;
 
-    setup(() => {
-        sandbox = sinon.createSandbox();
-        
-        // Mock VS Code context
-        context = {
-            globalState: {
-                get: sandbox.stub().returns(undefined),
-                update: sandbox.stub().resolves()
-            },
-            workspaceState: {
-                get: sandbox.stub().returns(undefined),
-                update: sandbox.stub().resolves()
-            },
-            extensionPath: '/mock/extension/path',
-            subscriptions: []
-        } as any;
-        
-        // Mock workspace
-        sandbox.stub(vscode.workspace, 'workspaceFolders').value([{
-            uri: vscode.Uri.file('/mock/workspace'),
-            name: 'MockWorkspace',
-            index: 0
-        }]);
-        
-        tools = new MCPTools(context);
-    });
+    // Faithful Memento: honor the default argument the way real VS Code does.
+    const makeContext = (): vscode.ExtensionContext => ({
+        globalState: { get: (_k: string, d?: any) => d, update: async () => undefined, keys: () => [] },
+        workspaceState: { get: (_k: string, d?: any) => d, update: async () => undefined, keys: () => [] },
+        extensionPath: '/mock/extension',
+        subscriptions: []
+    } as any);
 
-    teardown(() => {
-        sandbox.restore();
-    });
+    // Fake only the `hanzo.mcp` section; delegate every other section to the
+    // real configuration so tool construction keeps working.
+    const stubMcpConfig = (overrides: Record<string, any>) => {
+        const real = vscode.workspace.getConfiguration.bind(vscode.workspace);
+        const fake = {
+            get: (key: string, def?: any) => (key in overrides ? overrides[key] : def),
+            has: () => true,
+            inspect: () => undefined,
+            update: async () => undefined
+        };
+        sandbox.stub(vscode.workspace, 'getConfiguration').callsFake(
+            ((section?: string, scope?: any) =>
+                (section === 'hanzo.mcp' ? fake : real(section as any, scope))) as any
+        );
+    };
 
-    test('Should initialize tools', async () => {
+    // Always stub the hanzo.mcp section (even with no overrides) so the suite
+    // is hermetic: other suites persist real hanzo.mcp settings (e.g. the mode
+    // tool writes enabledTools), which would otherwise leak in here.
+    const build = async (overrides: Record<string, any> = {}): Promise<MCPTools> => {
+        stubMcpConfig(overrides);
+        const tools = new MCPTools(makeContext());
         await tools.initialize();
-        const allTools = tools.getAllTools();
-        
-        assert.ok(allTools.length > 0);
-        assert.ok(allTools.some(t => t.name === 'read'));
-        assert.ok(allTools.some(t => t.name === 'write'));
-        assert.ok(allTools.some(t => t.name === 'search'));
+        return tools;
+    };
+
+    setup(() => { sandbox = sinon.createSandbox(); });
+    teardown(() => { sandbox.restore(); });
+
+    test('initialize registers the core tool set', async () => {
+        const all = (await build()).getAllTools();
+        assert.ok(all.length > 0);
+        for (const name of ['read', 'write', 'edit', 'multi_edit', 'grep', 'search', 'run_command', 'bash']) {
+            assert.ok(all.some(t => t.name === name), `tool ${name} should be enabled`);
+        }
     });
 
-    test('Should get all tools', () => {
-        const allTools = tools.getAllTools();
-        
-        // Check required tools exist
-        const requiredTools = [
-            'read', 'write', 'edit', 'multi_edit',
-            'directory_tree', 'find_files', 'grep', 'search',
-            'run_command', 'bash', 'open'
-        ];
-        
-        requiredTools.forEach(toolName => {
-            assert.ok(
-                allTools.some(t => t.name === toolName),
-                `Tool ${toolName} should exist`
-            );
-        });
+    test('the read tool carries the MCPTool shape', async () => {
+        const read = (await build()).getAllTools().find(t => t.name === 'read');
+        assert.ok(read);
+        assert.strictEqual(read!.name, 'read');
+        assert.ok(read!.description);
+        assert.strictEqual(read!.inputSchema.type, 'object');
+        assert.ok(read!.inputSchema.properties);
+        assert.strictEqual(typeof read!.handler, 'function');
     });
 
-    test('Should respect disabled tools configuration', () => {
-        sandbox.stub(vscode.workspace, 'getConfiguration').returns({
-            get: (key: string) => {
-                if (key === 'mcp.disabledTools') {
-                    return ['write', 'edit'];
-                }
-                return undefined;
-            }
-        } as any);
-        
-        const filteredTools = tools['filterTools'](tools.getAllTools());
-        
-        assert.ok(!filteredTools.some(t => t.name === 'write'));
-        assert.ok(!filteredTools.some(t => t.name === 'edit'));
-        assert.ok(filteredTools.some(t => t.name === 'read'));
+    test('disableWriteTools removes the write-family tools', async () => {
+        const all = (await build({ disableWriteTools: true })).getAllTools();
+        for (const name of ['write', 'edit', 'multi_edit']) {
+            assert.ok(!all.some(t => t.name === name), `${name} should be filtered out`);
+        }
+        assert.ok(all.some(t => t.name === 'read'));
     });
 
-    test('Should disable write tools when configured', () => {
-        sandbox.stub(vscode.workspace, 'getConfiguration').returns({
-            get: (key: string) => {
-                if (key === 'mcp.disableWriteTools') {
-                    return true;
-                }
-                return undefined;
-            }
-        } as any);
-        
-        const filteredTools = tools['filterTools'](tools.getAllTools());
-        
-        const writeTools = ['write', 'edit', 'multi_edit', 'update_rules'];
-        writeTools.forEach(toolName => {
-            assert.ok(
-                !filteredTools.some(t => t.name === toolName),
-                `Write tool ${toolName} should be disabled`
-            );
-        });
+    test('disableSearchTools removes the search-family tools', async () => {
+        const all = (await build({ disableSearchTools: true })).getAllTools();
+        for (const name of ['search', 'grep', 'symbols', 'git_search']) {
+            assert.ok(!all.some(t => t.name === name), `${name} should be filtered out`);
+        }
+        assert.ok(all.some(t => t.name === 'read'));
     });
 
-    test('Should disable search tools when configured', () => {
-        sandbox.stub(vscode.workspace, 'getConfiguration').returns({
-            get: (key: string) => {
-                if (key === 'mcp.disableSearchTools') {
-                    return true;
-                }
-                return undefined;
-            }
-        } as any);
-        
-        const filteredTools = tools['filterTools'](tools.getAllTools());
-        
-        const searchTools = ['search', 'grep', 'unified_search', 'git_search'];
-        searchTools.forEach(toolName => {
-            assert.ok(
-                !filteredTools.some(t => t.name === toolName),
-                `Search tool ${toolName} should be disabled`
-            );
-        });
+    test('an explicit enabledTools allow-list wins', async () => {
+        const all = (await build({ enabledTools: ['read', 'write'] })).getAllTools();
+        assert.strictEqual(all.length, 2);
+        assert.ok(all.some(t => t.name === 'read'));
+        assert.ok(all.some(t => t.name === 'write'));
     });
 
-    test('Should only enable specified tools', () => {
-        sandbox.stub(vscode.workspace, 'getConfiguration').returns({
-            get: (key: string) => {
-                if (key === 'mcp.enabledTools') {
-                    return ['read', 'write'];
-                }
-                return undefined;
-            }
-        } as any);
-        
-        const filteredTools = tools['filterTools'](tools.getAllTools());
-        
-        assert.strictEqual(filteredTools.length, 2);
-        assert.ok(filteredTools.some(t => t.name === 'read'));
-        assert.ok(filteredTools.some(t => t.name === 'write'));
-    });
-
-    test('Tool should have required properties', () => {
-        const allTools = tools.getAllTools();
-        const readTool = allTools.find(t => t.name === 'read');
-        
-        assert.ok(readTool);
-        assert.strictEqual(readTool.name, 'read');
-        assert.ok(readTool.description);
-        assert.ok(readTool.inputSchema);
-        assert.ok(readTool.handler);
-        assert.strictEqual(typeof readTool.handler, 'function');
-    });
-
-    test('Should validate tool input schema', () => {
-        const allTools = tools.getAllTools();
-        const readTool = allTools.find(t => t.name === 'read');
-        
-        assert.ok(readTool);
-        assert.ok(readTool.inputSchema);
-        assert.strictEqual(readTool.inputSchema.type, 'object');
-        assert.ok(readTool.inputSchema.properties);
-        assert.ok(readTool.inputSchema.required);
+    test('disabledTools subtracts from the default set', async () => {
+        const all = (await build({ disabledTools: ['write', 'edit'] })).getAllTools();
+        assert.ok(!all.some(t => t.name === 'write'));
+        assert.ok(!all.some(t => t.name === 'edit'));
+        assert.ok(all.some(t => t.name === 'read'));
     });
 });

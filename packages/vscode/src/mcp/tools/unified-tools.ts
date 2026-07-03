@@ -313,7 +313,7 @@ async function detectProjectType(projectPath: string): Promise<string> {
 }
 
 async function generateTreeStructure(dirPath: string, maxDepth: number, currentDepth: number = 0): Promise<string> {
-    if (currentDepth >= maxDepth) return '';
+    if (currentDepth >= maxDepth) {return '';}
     
     const fs = require('fs').promises;
     const path = require('path');
@@ -423,7 +423,7 @@ async function detectFrameworks(projectPath: string): Promise<string[]> {
     // Check for Python frameworks
     try {
         const files = await fs.readdir(projectPath);
-        if (files.includes('manage.py')) frameworks.push('Django');
+        if (files.includes('manage.py')) {frameworks.push('Django');}
         if (files.includes('app.py') || files.includes('application.py')) {
             // Could be Flask or FastAPI
             try {
@@ -431,11 +431,11 @@ async function detectFrameworks(projectPath: string): Promise<string[]> {
                     path.join(projectPath, files.includes('app.py') ? 'app.py' : 'application.py'),
                     'utf-8'
                 );
-                if (content.includes('flask')) frameworks.push('Flask');
-                if (content.includes('fastapi')) frameworks.push('FastAPI');
-            } catch {}
+                if (content.includes('flask')) {frameworks.push('Flask');}
+                if (content.includes('fastapi')) {frameworks.push('FastAPI');}
+            } catch { /* best-effort — deliberately ignored */ }
         }
-    } catch {}
+    } catch { /* best-effort — deliberately ignored */ }
     
     return frameworks.length > 0 ? frameworks : ['No frameworks detected'];
 }

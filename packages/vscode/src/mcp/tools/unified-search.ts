@@ -61,7 +61,7 @@ export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTo
                 query
             );
             
-            if (!symbols) return [];
+            if (!symbols) {return [];}
             
             return symbols.slice(0, 30).map(symbol => ({
                 type: 'symbol' as const,

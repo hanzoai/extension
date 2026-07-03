@@ -17,24 +17,24 @@ interface ProviderConfig {
 
 function loadConfig(): Record<string, ProviderConfig> {
     try {
-        if (fs.existsSync(CONFIG_PATH)) return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-    } catch {}
+        if (fs.existsSync(CONFIG_PATH)) {return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));}
+    } catch { /* best-effort — deliberately ignored */ }
     return {};
 }
 
 function saveConfig(config: Record<string, ProviderConfig>): void {
     const dir = path.dirname(CONFIG_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(dir)) {fs.mkdirSync(dir, { recursive: true });}
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', 'utf-8');
 }
 
 function detectProviders(): ProviderConfig[] {
     const found: ProviderConfig[] = [];
-    if (process.env.OPENAI_API_KEY) found.push({ name: 'OpenAI', url: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini', 'o3-mini'] });
-    if (process.env.ANTHROPIC_API_KEY) found.push({ name: 'Anthropic', url: 'https://api.anthropic.com', models: ['claude-opus-4-6', 'claude-sonnet-4-6'] });
-    if (process.env.HANZO_API_KEY) found.push({ name: 'Hanzo', url: 'https://api.hanzo.ai/v1', models: ['zen-400b', 'zen-70b'] });
-    try { execSync('curl -sf http://localhost:11434/api/tags', { timeout: 2000, stdio: 'pipe' }); found.push({ name: 'Ollama', url: 'http://localhost:11434' }); } catch {}
-    try { execSync('curl -sf http://localhost:1234/v1/models', { timeout: 2000, stdio: 'pipe' }); found.push({ name: 'LM Studio', url: 'http://localhost:1234/v1' }); } catch {}
+    if (process.env.OPENAI_API_KEY) {found.push({ name: 'OpenAI', url: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini', 'o3-mini'] });}
+    if (process.env.ANTHROPIC_API_KEY) {found.push({ name: 'Anthropic', url: 'https://api.anthropic.com', models: ['claude-opus-4-6', 'claude-sonnet-4-6'] });}
+    if (process.env.HANZO_API_KEY) {found.push({ name: 'Hanzo', url: 'https://api.hanzo.ai/v1', models: ['zen-400b', 'zen-70b'] });}
+    try { execSync('curl -sf http://localhost:11434/api/tags', { timeout: 2000, stdio: 'pipe' }); found.push({ name: 'Ollama', url: 'http://localhost:11434' }); } catch { /* best-effort — deliberately ignored */ }
+    try { execSync('curl -sf http://localhost:1234/v1/models', { timeout: 2000, stdio: 'pipe' }); found.push({ name: 'LM Studio', url: 'http://localhost:1234/v1' }); } catch { /* best-effort — deliberately ignored */ }
     return found;
 }
 
@@ -139,14 +139,14 @@ export function createLLMTools(context: vscode.ExtensionContext): MCPTool[] {
                         return lines.join('\n');
                     }
                     case 'add': {
-                        if (!args.provider || !args.config?.url) return 'Error: provider name and config.url required';
+                        if (!args.provider || !args.config?.url) {return 'Error: provider name and config.url required';}
                         const config = loadConfig();
                         config[args.provider] = { name: args.provider, ...args.config, enabled: true };
                         saveConfig(config);
                         return `Added provider: ${args.provider} (${args.config.url})`;
                     }
                     case 'remove': {
-                        if (!args.provider) return 'Error: provider name required';
+                        if (!args.provider) {return 'Error: provider name required';}
                         const config = loadConfig();
                         delete config[args.provider];
                         saveConfig(config);
