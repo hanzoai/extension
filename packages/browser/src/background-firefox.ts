@@ -27,6 +27,7 @@ import {
   type ZapManager,
 } from './shared/zap.js';
 import { connectNativeZap, type NativeZapState } from './shared/native-zap.js';
+import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 import {
   getRagConfig,
   normalizeRagSnippets,
@@ -607,34 +608,26 @@ class HanzoFirefoxExtension {
       case 'Runtime.evaluate':
       case 'evaluate': {
         if (!tabId) throw new Error('No active tab');
-        // Accept both `expression` (CDP) and `code` (MCP/SDK convention).
-        const expression = (params.expression as string) ?? (params.code as string) ?? '';
         // Default 30s — Porkbun-class pages with 1500+ DOM nodes routinely
         // need more than 10s for first-paint queries. Caller can override.
         const timeout = (params.timeout as number) || 30000;
-        // Caller can opt into Promise-await semantics. CDP names this flag
-        // `awaitPromise`; the MCP/SDK callers pass `await_promise`.
-        const awaitPromise = Boolean(params.awaitPromise ?? params.await_promise);
 
-        // If the caller already wrote a `return` or wrote a function/IIFE,
-        // wrap differently so we don't double-wrap and break syntax.
-        const trimmed = expression.trim();
-        const code = /^\s*return\b/.test(trimmed)
-          ? trimmed
-          : trimmed.endsWith(';')
-            ? `${trimmed} return undefined;`
-            : `return (${trimmed});`;
-
-        // When awaitPromise is requested, resolve in-page so executeScript's
-        // structured-clone serialization sees the resolved value rather than
-        // a Promise (which it can't transfer).
-        const evalCode = awaitPromise
-          ? `
-            return Promise.resolve((function(){ ${code} })()).then(function(__v){
-              try { return JSON.parse(JSON.stringify(__v)); } catch(e) { return String(__v); }
-            });
-          `
-          : code;
+        // pickEvaluable accepts every code-param alias (expression / code /
+        // script / function / js); wrapEvaluable is the ONE cross-browser
+        // rule that turns statement bodies (`const b=…; b.click()`) into an
+        // async IIFE with the trailing value auto-returned — the previous
+        // `return (${code})` wrap was a SyntaxError on any multi-statement
+        // body. Always resolve in-page so executeScript's structured-clone
+        // serialization sees the settled value, never a Promise; rejections
+        // ride the __hanzo_error channel runInPage already throws on.
+        const evalCode = `
+          return Promise.resolve(${wrapEvaluable(pickEvaluable(params))}).then(function(__v){
+            if (__v === undefined || __v === null) return null;
+            try { return JSON.parse(JSON.stringify(__v)); } catch(e) { return String(__v); }
+          }, function(__e){
+            return { __hanzo_error: (__e && __e.message) || String(__e) };
+          });
+        `;
 
         let value: unknown;
         let evalError: string | null = null;
