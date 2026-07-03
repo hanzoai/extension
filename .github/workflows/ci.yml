@@ -30,6 +30,9 @@ jobs:
     - name: Test AI package
       run: pnpm --filter @hanzo/ai test
 
+    - name: Test Office add-in
+      run: pnpm --filter @hanzo/office-addin test
+
     - name: Test tools package
       run: pnpm --filter @hanzo/cli-tools test
 
@@ -160,6 +163,16 @@ jobs:
         npm run build:dxt || true
         VER="${{ steps.version.outputs.ver }}"
         cp dist/hanzoai-*.dxt /tmp/hanzo-ai-claude-v${VER}.dxt 2>/dev/null || true
+
+    # ── Microsoft Office add-in (Word/Excel/PowerPoint) ──
+    - name: Build Office add-in
+      run: |
+        pnpm --filter @hanzo/office-addin build
+        VER="${{ steps.version.outputs.ver }}"
+        # Bundle dist/ (manifest.xml + taskpane + assets) into a sideloadable
+        # zip with node-based bestzip — the arc image has no `zip` binary.
+        cd packages/office/dist && npx --yes bestzip /tmp/hanzo-ai-office-v${VER}.zip .
+      continue-on-error: true
 
     # ── MCP npm package ──
     - name: Build MCP server
