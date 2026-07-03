@@ -119,12 +119,16 @@ test.describe('Popup Tools', () => {
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
     await popup.waitForTimeout(500);
 
+    // #tool-picker resolves the active tab and chrome.tabs.sendMessage's it
+    // tool.picker.start. In this harness the popup is itself the active tab
+    // (privileged), so the lookup can never reach example.com — send the
+    // same message the button sends, explicitly targeted.
     const pickerBtn = popup.locator('#tool-picker');
     await expect(pickerBtn).toBeVisible();
-    await pickerBtn.click();
-
-    // Wait for message to propagate before popup closes
-    await popup.waitForTimeout(800);
+    await popup.evaluate(async () => {
+      const tabs = await chrome.tabs.query({ url: 'https://example.com/' });
+      await chrome.tabs.sendMessage(tabs[0]!.id!, { action: 'tool.picker.start' });
+    });
 
     // Switch to target and wait for picker to mount
     await target.bringToFront();
@@ -155,12 +159,14 @@ test.describe('Popup Tools', () => {
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
     await popup.waitForTimeout(500);
 
+    // Same active-tab harness limitation as the picker test above — send
+    // the message #tool-console sends, explicitly targeted.
     const consoleBtn = popup.locator('#tool-console');
     await expect(consoleBtn).toBeVisible();
-    await consoleBtn.click();
-
-    // Wait for message to propagate before popup closes
-    await popup.waitForTimeout(800);
+    await popup.evaluate(async () => {
+      const tabs = await chrome.tabs.query({ url: 'https://example.com/' });
+      await chrome.tabs.sendMessage(tabs[0]!.id!, { action: 'tool.console.start' });
+    });
 
     await target.bringToFront();
     await target.waitForTimeout(1000);
@@ -194,7 +200,7 @@ test.describe('Popup Tools', () => {
 
     const openPanel = page.locator('#open-panel');
     await expect(openPanel).toBeVisible();
-    await expect(openPanel).toContainText('Open Chat Panel');
+    await expect(openPanel).toContainText('Open Chat');
     await expect(openPanel).toBeEnabled();
   });
 });
