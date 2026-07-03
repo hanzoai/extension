@@ -30,6 +30,9 @@ jobs:
     - name: Test AI package
       run: pnpm --filter @hanzo/ai test
 
+    - name: Test auth core
+      run: pnpm --filter @hanzo/auth test
+
     - name: Test Office add-in
       run: pnpm --filter @hanzo/office-addin test
 
