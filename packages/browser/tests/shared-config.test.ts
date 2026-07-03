@@ -39,8 +39,11 @@ describe('IAM constants', () => {
     expect(KMS_API_URL).toBe('https://kms.hanzo.ai');
   });
 
-  it('DEFAULT_CLIENT_ID is app-hanzo', () => {
-    expect(DEFAULT_CLIENT_ID).toBe('app-hanzo');
+  it('DEFAULT_CLIENT_ID is hanzo-browser (a registered IAM client)', () => {
+    // Must match an application seeded in IAM (init_data.json → "hanzo-browser")
+    // whose redirectUris include DEFAULT_REDIRECT_URI. `app-hanzo` was never a
+    // real client and made the PKCE token exchange fail with invalid_client.
+    expect(DEFAULT_CLIENT_ID).toBe('hanzo-browser');
   });
 
   it('DEFAULT_SCOPES includes openid', () => {
