@@ -1,10 +1,10 @@
 {
   "name": "@hanzo/dxt",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "Hanzo AI DXT Bundle",
-  "main": "dist/index.js",
+  "main": "server.js",
   "scripts": {
-    "build": "echo 'DXT bundle created successfully'",
+    "build": "pnpm --filter @hanzo/mcp run build:cli && cp ../mcp/dist/cli.js server.js && chmod +x server.js",
     "package": "npm run build"
   },
   "devDependencies": {
