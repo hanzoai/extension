@@ -161,13 +161,15 @@ jobs:
       run: |
         VERSION=${GITHUB_REF_NAME#v}
         cd dist
-        # Prefer the built .app products; fall back to the Xcode source project.
-        APPS=$(find safari-build-macos safari-build-ios -name '*.app' -type d 2>/dev/null || true)
-        if [ -n "$APPS" ]; then
-          zip -r -y "/tmp/hanzo-ai-safari-v${VERSION}.zip" $APPS
-        else
-          zip -r "/tmp/hanzo-ai-safari-v${VERSION}.zip" "safari/Hanzo AI"
+        # Zip the whole Safari output tree: the Xcode project (build.js always
+        # emits dist/safari — a developer opens it to build+sign+sideload) plus any
+        # built .app products. Guard so a `zip` exit code (e.g. 12 "nothing to do")
+        # never blanks the release asset; only skip if there is genuinely nothing.
+        TARGETS=$(ls -d safari safari-build-macos safari-build-ios 2>/dev/null || true)
+        if [ -n "$TARGETS" ]; then
+          zip -r -y "/tmp/hanzo-ai-safari-v${VERSION}.zip" $TARGETS || true
         fi
+        ls -la /tmp/hanzo-ai-safari-v*.zip 2>/dev/null || echo "no Safari output produced"
       continue-on-error: true
 
     - name: Upload Safari bundle
