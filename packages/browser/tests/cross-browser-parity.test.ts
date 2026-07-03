@@ -235,8 +235,11 @@ describe('Inspect-modifier shortcut', () => {
 });
 
 describe('OAuth client ID convention', () => {
-  it('client ID is `app-hanzo` (Hanzo IAM <org>-<app> convention)', () => {
-    expect(sharedConfig).toContain("DEFAULT_CLIENT_ID = 'app-hanzo'");
+  it('client ID is `hanzo-browser` (registered IAM <org>-<app> client)', () => {
+    // hanzo-browser is the IAM application seeded for the extension, with
+    // redirectUris including https://hanzo.ai/callback. The earlier value
+    // `app-hanzo` was unregistered → token exchange returned invalid_client.
+    expect(sharedConfig).toContain("DEFAULT_CLIENT_ID = 'hanzo-browser'");
   });
 });
 
