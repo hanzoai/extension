@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hanzo AI for Microsoft Office — task-pane add-in for Word, Excel and
+  PowerPoint (desktop + Office on the web). The task pane is served from
+  __HANZO_OFFICE_BASE__ (build.js stamps this: the production office.hanzo.ai
+  host, or https://localhost:3000 for sideloaded dev). One add-in, three hosts:
+  Document (Word), Workbook (Excel), Presentation (PowerPoint).
+
+  Outlook (mail) is a DIFFERENT host category with its own manifest shape; it is
+  a tracked follow-up, not this file.
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>729f93c2-86e9-4f00-8fcc-d0306ffe7129</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Hanzo AI</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Hanzo AI" />
+  <Description DefaultValue="AI over your document — draft, rewrite, summarize, and analyze in Word, Excel and PowerPoint. Powered by Hanzo (api.hanzo.ai)." />
+  <IconUrl DefaultValue="__HANZO_OFFICE_BASE__/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="__HANZO_OFFICE_BASE__/assets/icon-128.png" />
+  <SupportUrl DefaultValue="https://hanzo.ai/support" />
+
+  <!-- Domains the task pane may navigate to (IAM login, the API gateway). -->
+  <AppDomains>
+    <AppDomain>https://hanzo.id</AppDomain>
+    <AppDomain>https://iam.hanzo.ai</AppDomain>
+    <AppDomain>https://api.hanzo.ai</AppDomain>
+    <AppDomain>https://hanzo.ai</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Document" />
+    <Host Name="Workbook" />
+    <Host Name="Presentation" />
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="__HANZO_OFFICE_BASE__/taskpane.html" />
+  </DefaultSettings>
+
+  <!-- Read AND write: the add-in reads the selection/range and inserts AI output. -->
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="Hanzo.GetStarted.Title" />
+            <Description resid="Hanzo.GetStarted.Description" />
+            <LearnMoreUrl resid="Hanzo.SupportUrl" />
+          </GetStarted>
+          <FunctionFile resid="Hanzo.CommandsUrl" />
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Hanzo.Group">
+                <Label resid="Hanzo.Group.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Hanzo.Icon.16" />
+                  <bt:Image size="32" resid="Hanzo.Icon.32" />
+                  <bt:Image size="80" resid="Hanzo.Icon.80" />
+                </Icon>
+                <Control xsi:type="Button" id="Hanzo.TaskpaneButton">
+                  <Label resid="Hanzo.TaskpaneButton.Label" />
+                  <Supertip>
+                    <Title resid="Hanzo.TaskpaneButton.Label" />
+                    <Description resid="Hanzo.TaskpaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Hanzo.Icon.16" />
+                    <bt:Image size="32" resid="Hanzo.Icon.32" />
+                    <bt:Image size="80" resid="Hanzo.Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Hanzo.Taskpane</TaskpaneId>
+                    <SourceLocation resid="Hanzo.TaskpaneUrl" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <FunctionFile resid="Hanzo.CommandsUrl" />
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Hanzo.Group">
+                <Label resid="Hanzo.Group.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Hanzo.Icon.16" />
+                  <bt:Image size="32" resid="Hanzo.Icon.32" />
+                  <bt:Image size="80" resid="Hanzo.Icon.80" />
+                </Icon>
+                <Control xsi:type="Button" id="Hanzo.TaskpaneButton">
+                  <Label resid="Hanzo.TaskpaneButton.Label" />
+                  <Supertip>
+                    <Title resid="Hanzo.TaskpaneButton.Label" />
+                    <Description resid="Hanzo.TaskpaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Hanzo.Icon.16" />
+                    <bt:Image size="32" resid="Hanzo.Icon.32" />
+                    <bt:Image size="80" resid="Hanzo.Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Hanzo.Taskpane</TaskpaneId>
+                    <SourceLocation resid="Hanzo.TaskpaneUrl" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+
+      <Host xsi:type="Presentation">
+        <DesktopFormFactor>
+          <FunctionFile resid="Hanzo.CommandsUrl" />
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Hanzo.Group">
+                <Label resid="Hanzo.Group.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Hanzo.Icon.16" />
+                  <bt:Image size="32" resid="Hanzo.Icon.32" />
+                  <bt:Image size="80" resid="Hanzo.Icon.80" />
+                </Icon>
+                <Control xsi:type="Button" id="Hanzo.TaskpaneButton">
+                  <Label resid="Hanzo.TaskpaneButton.Label" />
+                  <Supertip>
+                    <Title resid="Hanzo.TaskpaneButton.Label" />
+                    <Description resid="Hanzo.TaskpaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Hanzo.Icon.16" />
+                    <bt:Image size="32" resid="Hanzo.Icon.32" />
+                    <bt:Image size="80" resid="Hanzo.Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Hanzo.Taskpane</TaskpaneId>
+                    <SourceLocation resid="Hanzo.TaskpaneUrl" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Hanzo.Icon.16" DefaultValue="__HANZO_OFFICE_BASE__/assets/icon-16.png" />
+        <bt:Image id="Hanzo.Icon.32" DefaultValue="__HANZO_OFFICE_BASE__/assets/icon-32.png" />
+        <bt:Image id="Hanzo.Icon.80" DefaultValue="__HANZO_OFFICE_BASE__/assets/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Hanzo.TaskpaneUrl" DefaultValue="__HANZO_OFFICE_BASE__/taskpane.html" />
+        <bt:Url id="Hanzo.CommandsUrl" DefaultValue="__HANZO_OFFICE_BASE__/commands.html" />
+        <bt:Url id="Hanzo.SupportUrl" DefaultValue="https://hanzo.ai/support" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Hanzo.Group.Label" DefaultValue="Hanzo AI" />
+        <bt:String id="Hanzo.TaskpaneButton.Label" DefaultValue="Hanzo AI" />
+        <bt:String id="Hanzo.GetStarted.Title" DefaultValue="Hanzo AI is ready" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Hanzo.TaskpaneButton.Tooltip" DefaultValue="Open the Hanzo AI pane to draft, rewrite, summarize, or analyze your selection." />
+        <bt:String id="Hanzo.GetStarted.Description" DefaultValue="Select text or a range, open the Hanzo AI pane from the Home tab, and ask." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
