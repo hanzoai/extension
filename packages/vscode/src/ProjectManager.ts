@@ -48,14 +48,16 @@ export class ProjectManager {
             case 'openFile':
                 await this.openFile(message.path);
                 break;
-            case 'login':
+            case 'login': {
                 const authManager = AuthManager.getInstance(this.context);
                 await authManager.initiateAuth();
                 break;
-            case 'logout':
+            }
+            case 'logout': {
                 const authMgr = AuthManager.getInstance(this.context);
                 await authMgr.logout();
                 break;
+            }
         }
     }
 

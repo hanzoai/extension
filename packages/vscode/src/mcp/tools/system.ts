@@ -42,7 +42,7 @@ export function createSystemTools(context: vscode.ExtensionContext): MCPTool[] {
                 try {
                     const parsed = JSON.parse(todos || '[]');
                     todoCount = parsed.length;
-                } catch {}
+                } catch { /* best-effort — deliberately ignored */ }
                 
                 const extensionInfo = {
                     thoughtsRecorded: thoughts.length,

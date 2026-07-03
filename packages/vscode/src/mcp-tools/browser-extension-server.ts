@@ -44,7 +44,7 @@ export class BrowserExtensionServer extends EventEmitter {
    *  (e.g. EADDRINUSE) instead of crashing the process with an unhandled error. */
   ready(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.wss.address()) return resolve();
+      if (this.wss.address()) {return resolve();}
       this.wss.once('listening', () => resolve());
       this.wss.once('error', reject);
     });
@@ -103,7 +103,7 @@ export class BrowserExtensionServer extends EventEmitter {
     // Fallback to data-hanzo-id lookup
     if (payload.fallbackId) {
       const location = await this.lookupByHanzoId(payload.fallbackId);
-      if (location) return location;
+      if (location) {return location;}
     }
 
     console.warn('[Hanzo] Could not resolve file location for element');
@@ -113,7 +113,7 @@ export class BrowserExtensionServer extends EventEmitter {
   private resolveSourcePath(sourcePath: string): string | null {
     // Handle webpack:// protocol
     if (sourcePath.startsWith('webpack://')) {
-      sourcePath = sourcePath.replace(/^webpack:\/\/[^\/]+\//, '');
+      sourcePath = sourcePath.replace(/^webpack:\/\/[^/]+\//, '');
     }
 
     // Try various path resolutions

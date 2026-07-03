@@ -42,7 +42,7 @@ Session Statistics:
                 placeHolder: 'Search in session history...'
             });
             
-            if (!query) return;
+            if (!query) {return;}
             
             const results = await tracker.searchSessions(query, { limit: 20 });
             

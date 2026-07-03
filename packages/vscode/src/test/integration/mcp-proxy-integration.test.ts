@@ -1,17 +1,20 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { createMCPUniversalProxyTools } from '../../mcp/tools/mcp-universal-proxy';
 
-describe('MCP Proxy Integration Tests', function() {
+// These tests install real MCP servers over the network (npm/uvx), so they are
+// opt-in. Set HANZO_E2E_LIVE=1 to run them. Non-network proxy behavior is
+// covered deterministically in src/test/mcp-proxy.test.ts.
+(process.env.HANZO_E2E_LIVE ? suite : suite.skip)('MCP Proxy Integration Tests', function() {
     this.timeout(60000); // 60 seconds for real installations
 
     let context: vscode.ExtensionContext;
     let mcpTool: any;
     let testStoragePath: string;
 
-    before(async () => {
+    suiteSetup(async () => {
         // Create test storage directory
         testStoragePath = path.join(__dirname, '../../../.test-storage');
         await fs.promises.mkdir(testStoragePath, { recursive: true });
@@ -38,15 +41,15 @@ describe('MCP Proxy Integration Tests', function() {
         mcpTool = tools.find(t => t.name === 'mcp');
     });
 
-    after(async () => {
+    suiteTeardown(async () => {
         // Cleanup test storage
         try {
             await fs.promises.rm(testStoragePath, { recursive: true, force: true });
-        } catch {}
+        } catch { /* best-effort — deliberately ignored */ }
     });
 
-    describe('Real Server Installation', () => {
-        it('should install and connect to filesystem MCP server', async function() {
+    suite('Real Server Installation', () => {
+        test('should install and connect to filesystem MCP server', async function() {
             this.timeout(120000); // 2 minutes for npm install
 
             // Install the filesystem server
@@ -70,7 +73,7 @@ describe('MCP Proxy Integration Tests', function() {
             assert(fs.existsSync(path.join(serverPath, 'node_modules')));
         });
 
-        it('should handle Python package installation', async function() {
+        test('should handle Python package installation', async function() {
             // Skip if uvx not available
             try {
                 const { execSync } = require('child_process');
@@ -91,8 +94,8 @@ describe('MCP Proxy Integration Tests', function() {
         });
     });
 
-    describe('Server Communication', () => {
-        it('should discover server capabilities after connection', async function() {
+    suite('Server Communication', () => {
+        test('should discover server capabilities after connection', async function() {
             // Ensure filesystem server is installed
             await mcpTool.handler({
                 action: 'install',
@@ -110,17 +113,19 @@ describe('MCP Proxy Integration Tests', function() {
         });
     });
 
-    describe('Error Recovery', () => {
-        it('should handle invalid package names gracefully', async () => {
-            const result = await mcpTool.handler({
-                action: 'install',
-                package: '@invalid/package-that-does-not-exist-12345'
-            });
-
-            assert(result.includes('Failed to install'));
+    suite('Error Recovery', () => {
+        test('should handle invalid package names gracefully', async () => {
+            // installServer throws (rather than returning) when npm/uvx fails.
+            await assert.rejects(
+                mcpTool.handler({
+                    action: 'install',
+                    package: '@invalid/package-that-does-not-exist-12345'
+                }),
+                /Failed to install/
+            );
         });
 
-        it('should recover from server crashes', async function() {
+        test('should recover from server crashes', async function() {
             // This test would require mocking server crashes
             // For now, we just verify the error handling path exists
             const result = await mcpTool.handler({
@@ -132,8 +137,8 @@ describe('MCP Proxy Integration Tests', function() {
         });
     });
 
-    describe('Multiple Server Management', () => {
-        it('should manage multiple servers simultaneously', async function() {
+    suite('Multiple Server Management', () => {
+        test('should manage multiple servers simultaneously', async function() {
             this.timeout(180000); // 3 minutes for multiple installs
 
             // Install multiple servers
@@ -161,8 +166,8 @@ describe('MCP Proxy Integration Tests', function() {
         });
     });
 
-    describe('Persistence', () => {
-        it('should persist installed servers across sessions', async () => {
+    suite('Persistence', () => {
+        test('should persist installed servers across sessions', async () => {
             // Install a server
             await mcpTool.handler({
                 action: 'install',
@@ -180,27 +185,6 @@ describe('MCP Proxy Integration Tests', function() {
     });
 });
 
-describe('MCP Proxy Examples', () => {
-    it('should demonstrate usage patterns', () => {
-        const examples = `
-# Install GitHub MCP server
-@hanzo mcp --action install --package @modelcontextprotocol/server-github
-
-# Install Python-based Git server
-@hanzo mcp --action install --package mcp-server-git --type python
-
-# List all installed servers and capabilities
-@hanzo mcp --action list
-
-# Call a tool from any installed server
-@hanzo mcp --action call --tool github_search --args '{"query": "MCP servers"}'
-
-# Auto-install and use in one command (future feature)
-@hanzo mcp --action call --tool sqlite_query --args '{"query": "SELECT * FROM users"}' --auto-install
-        `;
-
-        assert(examples.includes('install'));
-        assert(examples.includes('list'));
-        assert(examples.includes('call'));
-    });
-});
+// Removed the former 'MCP Proxy Examples' suite: it asserted a local example
+// string literal included the words install/list/call -- a tautology with no
+// live subject.

@@ -1,110 +1,92 @@
-import * as assert from 'assert';
-import * as sinon from 'sinon';
-import { StandaloneAuthManager } from '../../auth/standalone-auth';
+import assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { StandaloneAuthManager } from '../../auth/standalone-auth';
 
+// os.homedir() is non-configurable in the electron test host, so instead of
+// stubbing it we redirect $HOME to a throwaway directory (os.homedir honors
+// $HOME on POSIX). Every test then exercises the real filesystem-backed
+// behavior: config dir ~/.hanzo-mcp with auth.json + device.json.
 suite('StandaloneAuthManager Test Suite', () => {
-    let authManager: StandaloneAuthManager;
-    let sandbox: sinon.SinonSandbox;
+    let origHome: string | undefined;
+    let tmpHome: string;
+    let configDir: string;
 
     setup(() => {
-        sandbox = sinon.createSandbox();
-        // Mock home directory
-        sandbox.stub(os, 'homedir').returns('/mock/home');
+        origHome = process.env.HOME;
+        tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hanzo-auth-'));
+        process.env.HOME = tmpHome;
+        configDir = path.join(tmpHome, '.hanzo-mcp');
     });
 
     teardown(() => {
-        sandbox.restore();
+        if (origHome === undefined) { delete process.env.HOME; }
+        else { process.env.HOME = origHome; }
+        fs.rmSync(tmpHome, { recursive: true, force: true });
     });
 
-    test('Should create auth manager in anonymous mode', () => {
-        authManager = new StandaloneAuthManager(true);
-        assert.strictEqual(authManager['isAnonymous'], true);
+    test('constructor creates the config directory', () => {
+        // eslint-disable-next-line no-new
+        new StandaloneAuthManager(true);
+        assert.ok(fs.existsSync(configDir));
     });
 
-    test('Should create auth manager in authenticated mode', () => {
-        authManager = new StandaloneAuthManager(false);
-        assert.strictEqual(authManager['isAnonymous'], false);
+    test('anonymous flag is recorded', () => {
+        assert.strictEqual(new StandaloneAuthManager(true)['isAnonymous'], true);
+        assert.strictEqual(new StandaloneAuthManager(false)['isAnonymous'], false);
     });
 
-    test('Should always return authenticated in anonymous mode', async () => {
-        authManager = new StandaloneAuthManager(true);
-        const isAuth = await authManager.isAuthenticated();
-        assert.strictEqual(isAuth, true);
+    test('anonymous mode is always authenticated with a null token', async () => {
+        const mgr = new StandaloneAuthManager(true);
+        assert.strictEqual(await mgr.isAuthenticated(), true);
+        assert.strictEqual(await mgr.getAuthToken(), null);
     });
 
-    test('Should return null token in anonymous mode', async () => {
-        authManager = new StandaloneAuthManager(true);
-        const token = await authManager.getAuthToken();
-        assert.strictEqual(token, null);
+    test('getDeviceId generates and persists a 32-char hex id', () => {
+        const mgr = new StandaloneAuthManager(false);
+        const deviceId = mgr['getDeviceId']();
+        assert.strictEqual(deviceId.length, 32);
+        assert.match(deviceId, /^[0-9a-f]{32}$/);
+        assert.ok(fs.existsSync(path.join(configDir, 'device.json')));
+        // Stable across calls once persisted.
+        assert.strictEqual(mgr['getDeviceId'](), deviceId);
     });
 
-    test('Should generate device ID', () => {
-        const fsExistsStub = sandbox.stub(fs, 'existsSync').returns(false);
-        const fsWriteStub = sandbox.stub(fs, 'writeFileSync');
-        
-        authManager = new StandaloneAuthManager(false);
-        const deviceId = authManager['getDeviceId']();
-        
-        assert.ok(deviceId);
-        assert.strictEqual(deviceId.length, 32); // 16 bytes hex = 32 chars
-        assert.ok(fsWriteStub.called);
+    test('getDeviceId reads a pre-existing device id', () => {
+        const mgr = new StandaloneAuthManager(false);
+        fs.writeFileSync(path.join(configDir, 'device.json'), JSON.stringify({ deviceId: 'preexisting-id' }));
+        assert.strictEqual(mgr['getDeviceId'](), 'preexisting-id');
     });
 
-    test('Should read existing device ID', () => {
-        const mockDeviceId = 'mock-device-id-12345';
-        sandbox.stub(fs, 'existsSync').returns(true);
-        sandbox.stub(fs, 'readFileSync').returns(JSON.stringify({ deviceId: mockDeviceId }));
-        
-        authManager = new StandaloneAuthManager(false);
-        const deviceId = authManager['getDeviceId']();
-        
-        assert.strictEqual(deviceId, mockDeviceId);
-    });
-
-    test('Should return anonymous headers in anonymous mode', () => {
-        authManager = new StandaloneAuthManager(true);
-        sandbox.stub(authManager as any, 'getDeviceId').returns('test-device-id');
-        
-        const headers = authManager.getHeaders();
-        
+    test('anonymous headers carry the mode and device id but no Authorization', () => {
+        const headers = new StandaloneAuthManager(true).getHeaders();
         assert.strictEqual(headers['X-Mode'], 'anonymous');
-        assert.strictEqual(headers['X-Device-Id'], 'test-device-id');
+        assert.match(headers['X-Device-Id'], /^[0-9a-f]{32}$/);
         assert.strictEqual(headers['Authorization'], undefined);
     });
 
-    test('Should return auth headers when authenticated', () => {
-        const mockToken = 'mock-auth-token';
-        sandbox.stub(fs, 'existsSync').returns(true);
-        sandbox.stub(fs, 'readFileSync').returns(JSON.stringify({ token: mockToken }));
-        
-        authManager = new StandaloneAuthManager(false);
-        sandbox.stub(authManager as any, 'getDeviceId').returns('test-device-id');
-        
-        const headers = authManager.getHeaders();
-        
-        assert.strictEqual(headers['Authorization'], `Bearer ${mockToken}`);
-        assert.strictEqual(headers['X-Device-Id'], 'test-device-id');
+    test('authenticated headers carry a Bearer token when one is stored', () => {
+        const mgr = new StandaloneAuthManager(false);
+        fs.writeFileSync(path.join(configDir, 'auth.json'), JSON.stringify({ token: 'stored-token' }));
+        const headers = mgr.getHeaders();
+        assert.strictEqual(headers['Authorization'], 'Bearer stored-token');
+        assert.match(headers['X-Device-Id'], /^[0-9a-f]{32}$/);
     });
 
-    test('Should handle logout', async () => {
-        const unlinkStub = sandbox.stub(fs, 'unlinkSync');
-        sandbox.stub(fs, 'existsSync').returns(true);
-        
-        authManager = new StandaloneAuthManager(false);
-        await authManager.logout();
-        
-        assert.ok(unlinkStub.called);
+    test('logout removes the stored token file', async () => {
+        const mgr = new StandaloneAuthManager(false);
+        const tokenFile = path.join(configDir, 'auth.json');
+        fs.writeFileSync(tokenFile, JSON.stringify({ token: 'x' }));
+        await mgr.logout();
+        assert.ok(!fs.existsSync(tokenFile));
     });
 
-    test('Should not logout in anonymous mode', async () => {
-        const unlinkStub = sandbox.stub(fs, 'unlinkSync');
-        
-        authManager = new StandaloneAuthManager(true);
-        await authManager.logout();
-        
-        assert.ok(unlinkStub.notCalled);
+    test('logout is a no-op in anonymous mode', async () => {
+        const mgr = new StandaloneAuthManager(true);
+        const tokenFile = path.join(configDir, 'auth.json');
+        fs.writeFileSync(tokenFile, JSON.stringify({ token: 'x' }));
+        await mgr.logout();
+        assert.ok(fs.existsSync(tokenFile));
     });
 });

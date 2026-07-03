@@ -314,7 +314,7 @@ function selectProvider(providers: LLMProvider[], requestedModel?: string): LLMP
         
         if (providerPrefix) {
             const provider = providers.find(p => p.name === providerPrefix);
-            if (provider) return provider;
+            if (provider) {return provider;}
         }
         
         // Find provider that has this model

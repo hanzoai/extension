@@ -177,8 +177,8 @@ export class DocumentStore {
     ): Promise<ChatDocument[]> {
         const filter: Record<string, any> = {};
         
-        if (options?.chatId) filter.chatId = options.chatId;
-        if (options?.type) filter.type = options.type;
+        if (options?.chatId) {filter.chatId = options.chatId;}
+        if (options?.type) {filter.type = options.type;}
         
         const results = await this.vectorStore.search(query, {
             topK: options?.limit || 20,
@@ -195,7 +195,7 @@ export class DocumentStore {
                     const hasAllTags = options.tags.every(tag => 
                         doc.metadata.tags.includes(tag)
                     );
-                    if (!hasAllTags) continue;
+                    if (!hasAllTags) {continue;}
                 }
                 documents.push(doc);
             }
@@ -284,7 +284,7 @@ export class DocumentStore {
             if (relDoc) {
                 related.push(relDoc);
             }
-            if (related.length >= limit) break;
+            if (related.length >= limit) {break;}
         }
         
         return related;
@@ -385,19 +385,21 @@ export class DocumentStore {
     
     private generateTitle(content: string, type: ChatDocument['type']): string {
         const lines = content.split('\n').filter(l => l.trim());
-        if (lines.length === 0) return 'Untitled';
+        if (lines.length === 0) {return 'Untitled';}
         
         switch (type) {
-            case 'code':
+            case 'code': {
                 // Try to find function/class name
                 const codeMatch = lines[0].match(/(?:function|class|def|const|let|var)\s+(\w+)/);
-                if (codeMatch) return codeMatch[1];
+                if (codeMatch) {return codeMatch[1];}
                 break;
-            case 'markdown':
+            }
+            case 'markdown': {
                 // Try to find heading
                 const heading = lines.find(l => l.startsWith('#'));
-                if (heading) return heading.replace(/^#+\s*/, '');
+                if (heading) {return heading.replace(/^#+\s*/, '');}
                 break;
+            }
         }
         
         // Default: first line truncated

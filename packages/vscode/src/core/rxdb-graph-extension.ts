@@ -50,10 +50,10 @@ export const graphSchemas = {
                 
                 edges.forEach((edge: any) => {
                     if (direction === 'out' || direction === 'both') {
-                        if (edge.from === (this as any).id) nodeIds.add(edge.to);
+                        if (edge.from === (this as any).id) {nodeIds.add(edge.to);}
                     }
                     if (direction === 'in' || direction === 'both') {
-                        if (edge.to === (this as any).id) nodeIds.add(edge.from);
+                        if (edge.to === (this as any).id) {nodeIds.add(edge.from);}
                     }
                 });
                 
@@ -139,8 +139,8 @@ export class GraphAlgorithms {
                 }
             }
             
-            if (!current || minDistance === Infinity) break;
-            if (current === endId) break;
+            if (!current || minDistance === Infinity) {break;}
+            if (current === endId) {break;}
             
             unvisited.delete(current);
             
@@ -152,7 +152,7 @@ export class GraphAlgorithms {
                 .exec();
                 
             for (const edge of edges) {
-                if (!unvisited.has(edge.to)) continue;
+                if (!unvisited.has(edge.to)) {continue;}
                 
                 const alt = distances.get(current)! + (edge.weight || 1);
                 if (alt < distances.get(edge.to)!) {
@@ -209,7 +209,7 @@ export class GraphAlgorithms {
         
         while (stack.length > 0) {
             const nodeId = stack.pop()!;
-            if (visited.has(nodeId)) continue;
+            if (visited.has(nodeId)) {continue;}
             
             visited.add(nodeId);
             const node = await this.nodes.findOne(nodeId).exec();

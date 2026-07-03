@@ -101,7 +101,7 @@ const documentsSchema = {
     methods: {
         // Calculate similarity with another document
         similarity: function(this: any, otherEmbedding: number[]): number {
-            if (!this.embedding || !otherEmbedding) return 0;
+            if (!this.embedding || !otherEmbedding) {return 0;}
             
             let dotProduct = 0;
             let normA = 0;
@@ -273,7 +273,7 @@ export class CloudEmbeddingServer implements EmbeddingServer {
     private async callAPI(texts: string[]): Promise<number[][]> {
         let url: string;
         let body: any;
-        let headers: any = {
+        const headers: any = {
             'Content-Type': 'application/json'
         };
         
@@ -371,7 +371,7 @@ export class UnifiedRxDBBackend {
                 methods: {
                     // Vector search method
                     async findSimilar(this: any, limit: number = 10): Promise<any[]> {
-                        if (!this.embedding) return [];
+                        if (!this.embedding) {return [];}
                         
                         const allDocs = await this.collection.find().exec();
                         const results = allDocs
@@ -575,11 +575,11 @@ export class UnifiedRxDBBackend {
         while (queue.length > 0) {
             const { id, level } = queue.shift()!;
             
-            if (visited.has(id) || level > depth) continue;
+            if (visited.has(id) || level > depth) {continue;}
             visited.add(id);
             
             const doc = await this.documents!.findOne(id).exec();
-            if (!doc) continue;
+            if (!doc) {continue;}
             
             results.push(doc);
             
@@ -660,7 +660,7 @@ export class UnifiedRxDBBackend {
     
     // Helper methods
     private cosineSimilarity(a: number[], b: number[]): number {
-        if (a.length !== b.length) return 0;
+        if (a.length !== b.length) {return 0;}
         
         let dotProduct = 0;
         let normA = 0;

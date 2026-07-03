@@ -107,7 +107,7 @@ export class Graph implements IGraph {
    * Vertex finder helper function.
    */
   findVertices = (args: any[]): verticesType => {
-    if (typeof args[0] == "object") {
+    if (typeof args[0] === "object") {
       return this.searchVertices(args[0]);
     } else if (args.length == 0) {
       return this.vertices.slice(); // Note: slice is costly.

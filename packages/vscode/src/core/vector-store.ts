@@ -121,7 +121,7 @@ export class VectorStore {
             }
             
             const docEmbedding = this.embeddings.get(id);
-            if (!docEmbedding) continue;
+            if (!docEmbedding) {continue;}
             
             const score = this.cosineSimilarity(queryEmbedding, docEmbedding);
             
@@ -167,10 +167,10 @@ export class VectorStore {
         const results: SearchResult[] = [];
         
         for (const [otherId, otherDoc] of this.documents) {
-            if (otherId === id) continue;
+            if (otherId === id) {continue;}
             
             const otherEmbedding = this.embeddings.get(otherId);
-            if (!otherEmbedding) continue;
+            if (!otherEmbedding) {continue;}
             
             const score = this.cosineSimilarity(embedding, otherEmbedding);
             results.push({ document: otherDoc, score });

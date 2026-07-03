@@ -72,8 +72,8 @@ export class PatternMatcher {
         
         // Process patterns from most specific to least specific source
         const sources = Array.from(patternsBySource.keys()).sort((a, b) => {
-            if (a === 'default') return -1;
-            if (b === 'default') return 1;
+            if (a === 'default') {return -1;}
+            if (b === 'default') {return 1;}
             return b.length - a.length;
         });
         

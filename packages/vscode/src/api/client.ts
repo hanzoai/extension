@@ -220,14 +220,14 @@ export class ApiClient {
         }
 
         console.warn('[Hanzo] Entering makeChunkedRequest');
-        console.warn('[Hanzo] Has files property:', originalData.hasOwnProperty('files'));
+        console.warn('[Hanzo] Has files property:', Object.prototype.hasOwnProperty.call(originalData, 'files'));
         console.warn('[Hanzo] Files is array:', Array.isArray(originalData.files));
         
         if (originalData.files && Array.isArray(originalData.files)) {
             console.warn(`[Hanzo] Files array length: ${originalData.files.length}`);
         }
 
-        let dataToChunk = originalData;
+        const dataToChunk = originalData;
         console.warn(`[Hanzo] Data to chunk: ${JSON.stringify(dataToChunk, null, 2)}`);
 
         // Now check if we have files to chunk
@@ -243,7 +243,7 @@ export class ApiClient {
 
         // Prepare for chunked upload
         const totalChunks = fileChunks.length;
-        let chunkResponses: AxiosResponse[] = [];
+        const chunkResponses: AxiosResponse[] = [];
 
         // Function to make a request for a single chunk
         const makeChunkRequest = async (chunkIndex: number, filesChunk: any[]): Promise<AxiosResponse> => {
@@ -377,7 +377,7 @@ export class ApiClient {
 
                 // Process known keys that might be in the response
                 for (const key of knownKeys) {
-                    if (currentResponse.data.hasOwnProperty(key)) {
+                    if (Object.prototype.hasOwnProperty.call(currentResponse.data, key)) {
                         const value = currentResponse.data[key];
 
                         // If the property is an array, concatenate it
@@ -463,7 +463,7 @@ export class ApiClient {
 
         // Prepare for chunked upload
         const totalChunks = fileChunks.length;
-        let chunkResponses: AxiosResponse[] = [];
+        const chunkResponses: AxiosResponse[] = [];
 
         // Function to make a request for a single gzipped chunk
         const makeGzippedChunkRequest = async (chunkIndex: number, filesChunk: any[]): Promise<AxiosResponse> => {
