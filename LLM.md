@@ -17,6 +17,10 @@ tests: vitest.
   "debugging this browser" banner; WebKit-incompatible). **To be removed** — see WXT plan.
 - `background-firefox.ts` — native `browser.*` dispatch (no banner). The correct model.
 - `browser-dispatch.ts` — `chrome.debugger` actuation (Chrome-only).
+- `shared/evaluable.ts` — the ONE evaluate rule: `pickEvaluable` (code-param
+  aliases) + `wrapEvaluable` (bare expression passes through; statement bodies
+  → async IIFE with the trailing value auto-returned). Both dispatch paths
+  consume it, so Chrome and Firefox accept identical caller JS.
 
 Wire to zapd: the binary ZAP router envelope (`zap-proto/zapd/src/frame.rs`); the
 browser↔host hop is native-messaging JSON, base64'd, quarantined in the host. Host +
