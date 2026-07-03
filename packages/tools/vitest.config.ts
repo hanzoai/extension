@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
   test: {
@@ -10,7 +11,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      'vscode': './test/mocks/vscode.ts'
+      // must be absolute — vitest 3 no longer resolves relative aliases
+      'vscode': path.resolve(__dirname, 'test/mocks/vscode.ts')
     }
   }
 });
