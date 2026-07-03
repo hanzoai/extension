@@ -1,6 +1,7 @@
 packages:
   - 'packages/ai'
   - 'packages/aci'
+  - 'packages/auth'
   - 'packages/browser'
   - 'packages/dxt'
   - 'packages/jetbrains'
