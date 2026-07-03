@@ -18,9 +18,19 @@ export const OAUTH_SCOPES = 'openid profile email';
 // Default model. Overridable per-request; the gateway routes it.
 export const DEFAULT_MODEL = 'zen-1';
 
-// Roaming-settings key the token is stored under (Office.context.roamingSettings
-// persists per-user across the user's devices).
+// Roaming-settings keys (Office.context.roamingSettings persists per-user across
+// the user's devices). Two auth paths: the IAM OAuth access token, and a pasted
+// Hanzo API key (`hk-…`) for zero-setup use — the key needs no registered OAuth
+// client, which is why the downloadable Windows test kit uses it.
 export const TOKEN_SETTING_KEY = 'hanzo.accessToken';
+export const APIKEY_SETTING_KEY = 'hanzo.apiKey';
+
+// pickBearer chooses the credential to send: a pasted API key wins over the
+// OAuth token (an explicit key is a deliberate override), else the OAuth token,
+// else empty (anonymous). Pure — unit-tested.
+export function pickBearer(apiKey: string, oauthToken: string): string {
+  return (apiKey && apiKey.trim()) || (oauthToken && oauthToken.trim()) || '';
+}
 
 // chatCompletionsURL / modelsURL / iamTokenURL / iamAuthorizeURL are the exact
 // endpoints the add-in calls. Centralized so a path never drifts between the
