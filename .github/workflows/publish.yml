@@ -154,6 +154,29 @@ jobs:
           -derivedDataPath dist/safari-build-ios
       continue-on-error: true
 
+    # Package the built .app(s) so the GitHub Release Safari link resolves — the
+    # unsigned bundle a developer sideloads (source + built products).
+    - name: Package Safari for release
+      working-directory: packages/browser
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        cd dist
+        # Prefer the built .app products; fall back to the Xcode source project.
+        APPS=$(find safari-build-macos safari-build-ios -name '*.app' -type d 2>/dev/null || true)
+        if [ -n "$APPS" ]; then
+          zip -r -y "/tmp/hanzo-ai-safari-v${VERSION}.zip" $APPS
+        else
+          zip -r "/tmp/hanzo-ai-safari-v${VERSION}.zip" "safari/Hanzo AI"
+        fi
+      continue-on-error: true
+
+    - name: Upload Safari bundle
+      uses: actions/upload-artifact@v4
+      with:
+        name: hanzo-ai-safari
+        path: /tmp/hanzo-ai-safari-v*.zip
+      continue-on-error: true
+
   # ─── VS Code + Cursor + Windsurf + Antigravity + Open VSX ───
   vscode:
     name: VS Code Marketplace
@@ -243,7 +266,6 @@ jobs:
     name: JetBrains
     runs-on: hanzo-build-linux-amd64
     needs: secrets
-    if: needs.secrets.outputs.has-jetbrains == 'true'
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
@@ -251,18 +273,64 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Build and publish
+    # Always build the downloadable plugin zip so the GitHub Release link works
+    # even when the Marketplace token is absent (publish below is token-gated).
+    - name: Build plugin
+      working-directory: packages/jetbrains
+      run: ./gradlew buildPlugin
+
+    - name: Package for release
+      working-directory: packages/jetbrains
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        ZIP=$(ls build/distributions/*.zip | head -1)
+        cp "$ZIP" "/tmp/hanzo-ai-jetbrains-v${VERSION}.zip"
+
+    - name: Upload JetBrains plugin
+      uses: actions/upload-artifact@v4
+      with:
+        name: hanzo-ai-jetbrains
+        path: /tmp/hanzo-ai-jetbrains-v*.zip
+
+    - name: Publish to JetBrains Marketplace
+      if: needs.secrets.outputs.has-jetbrains == 'true'
       working-directory: packages/jetbrains
       run: ./gradlew publishPlugin
       env:
         PUBLISH_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
       continue-on-error: true
 
+  # ─── Microsoft Office add-in (Word / Excel / PowerPoint) ───
+  office:
+    name: Office Add-in
+    runs-on: hanzo-build-linux-amd64
+    needs: secrets
+    steps:
+    - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'pnpm'
+    - run: pnpm install --frozen-lockfile
+
+    - name: Build + package
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        pnpm --filter @hanzo/office-addin build
+        cd packages/office/dist && npx --yes bestzip "/tmp/hanzo-ai-office-v${VERSION}.zip" .
+
+    - name: Upload Office add-in
+      uses: actions/upload-artifact@v4
+      with:
+        name: hanzo-ai-office
+        path: /tmp/hanzo-ai-office-v*.zip
+
   # ─── GitHub Release with downloadable artifacts ───
   release:
     name: GitHub Release
     runs-on: hanzo-build-linux-amd64
-    needs: [browser, safari, vscode]
+    needs: [browser, safari, vscode, jetbrains, office]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
     - uses: actions/checkout@v4
@@ -291,6 +359,14 @@ jobs:
           | **Claude Desktop/Code** | Windows / macOS / Linux | [`hanzo-ai-claude-v${{ steps.version.outputs.version }}.dxt`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-claude-v${{ steps.version.outputs.version }}.dxt) |
           | **JetBrains** | Windows / macOS / Linux | [`hanzo-ai-jetbrains-v${{ steps.version.outputs.version }}.zip`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-jetbrains-v${{ steps.version.outputs.version }}.zip) |
 
+          ## Microsoft Office
+
+          | App | Platform | Download |
+          |-----|----------|----------|
+          | **Word · Excel · PowerPoint** | Windows / macOS / Web / iPad | [`hanzo-ai-office-v${{ steps.version.outputs.version }}.zip`](https://github.com/hanzoai/extension/releases/download/${{ github.ref_name }}/hanzo-ai-office-v${{ steps.version.outputs.version }}.zip) |
+
+          > Office: unzip and sideload `manifest.xml` via the M365 admin center, or Insert → Add-ins → Upload My Add-in.
+
           ## Browser Extensions
 
           | Browser | Platform | Download |
@@ -308,3 +384,6 @@ jobs:
         files: |
           artifacts/hanzo-ai-browser/*
           artifacts/hanzo-ai-ide/*
+          artifacts/hanzo-ai-jetbrains/*
+          artifacts/hanzo-ai-office/*
+          artifacts/hanzo-ai-safari/*
