@@ -34,7 +34,10 @@ jobs:
       run: pnpm --filter @hanzo/cli-tools test
 
     - name: Test VS Code extension
-      run: xvfb-run -a pnpm --filter hanzo-ide test
+      run: |
+        # extension-host tests need a display; not every arc node ships xvfb
+        command -v xvfb-run >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq xvfb)
+        xvfb-run -a pnpm --filter hanzo-ide test
 
   # ─── Playwright E2E ───
   e2e:
