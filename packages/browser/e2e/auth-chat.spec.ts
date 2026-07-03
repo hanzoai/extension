@@ -114,7 +114,7 @@ descFn('Auth + Chat', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            application: 'app-hanzo',
+            application: 'hanzo-browser',
             organization: 'hanzo',
             username: 'z',
             password: '***REMOVED***',
