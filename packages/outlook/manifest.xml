@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hanzo AI for Microsoft Outlook — a MAIL add-in (Outlook desktop, Mac, and
+  Outlook on the web / new Outlook). Distinct host category from Word/Excel/
+  PowerPoint: a Mail add-in uses xsi:type="MailApp", <Rule> activation, and
+  message Read + Compose command surfaces.
+
+  The task pane is served from __HANZO_OUTLOOK_BASE__ (build.js stamps this: the
+  production outlook.hanzo.ai host, or https://localhost:3000 for a sideloaded
+  dev build). The same origin serves auth-callback.html — the IAM redirect
+  target registered on the hanzo-office IAM client, which this add-in reuses.
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+  xsi:type="MailApp">
+
+  <Id>b1e4c8a2-3f57-4d61-9a2e-7c0d5f6a2b13</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Hanzo AI</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Hanzo AI" />
+  <Description DefaultValue="AI over your email — summarize threads, draft replies, and extract deadlines and action items in Outlook. Powered by Hanzo (api.hanzo.ai)." />
+  <IconUrl DefaultValue="__HANZO_OUTLOOK_BASE__/assets/icon-80.png" />
+  <HighResolutionIconUrl DefaultValue="__HANZO_OUTLOOK_BASE__/assets/icon-128.png" />
+  <SupportUrl DefaultValue="https://hanzo.ai/support" />
+
+  <!-- Domains the task pane may navigate to (IAM login, the API gateway). -->
+  <AppDomains>
+    <AppDomain>https://hanzo.id</AppDomain>
+    <AppDomain>https://iam.hanzo.ai</AppDomain>
+    <AppDomain>https://api.hanzo.ai</AppDomain>
+    <AppDomain>https://hanzo.ai</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox" />
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.5" />
+    </Sets>
+  </Requirements>
+
+  <!-- Base (legacy) form: activate the add-in on any read or compose message so
+       older Outlook clients still surface it. VersionOverrides below adds the
+       modern ribbon buttons for read + compose. -->
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="__HANZO_OUTLOOK_BASE__/taskpane.html" />
+        <RequestedHeight>450</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+    <Form xsi:type="ItemEdit">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="__HANZO_OUTLOOK_BASE__/taskpane.html" />
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <!-- ReadWriteItem: read the open message body/subject/from AND write the AI
+       draft into a compose reply. Not ReadWriteMailbox — we never touch other
+       items or make EWS calls. -->
+  <Permissions>ReadWriteItem</Permissions>
+
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit" />
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.5">
+        <bt:Set Name="Mailbox" />
+      </bt:Sets>
+    </Requirements>
+
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+          <FunctionFile resid="Hanzo.CommandsUrl" />
+
+          <!-- Reading a message: ribbon button opens the Hanzo pane to
+               summarize, extract deadlines, or draft a reply. -->
+          <ExtensionPoint xsi:type="MessageReadCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="Hanzo.MsgRead.Group">
+                <Label resid="Hanzo.Group.Label" />
+                <Control xsi:type="Button" id="Hanzo.MsgRead.Button">
+                  <Label resid="Hanzo.TaskpaneButton.Label" />
+                  <Supertip>
+                    <Title resid="Hanzo.TaskpaneButton.Label" />
+                    <Description resid="Hanzo.TaskpaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Hanzo.Icon.16" />
+                    <bt:Image size="32" resid="Hanzo.Icon.32" />
+                    <bt:Image size="80" resid="Hanzo.Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Hanzo.TaskpaneUrl" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+          <!-- Composing a message: ribbon button opens the Hanzo pane to draft
+               or refine the reply, inserting the result into the body. -->
+          <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="Hanzo.MsgCompose.Group">
+                <Label resid="Hanzo.Group.Label" />
+                <Control xsi:type="Button" id="Hanzo.MsgCompose.Button">
+                  <Label resid="Hanzo.TaskpaneButton.Label" />
+                  <Supertip>
+                    <Title resid="Hanzo.TaskpaneButton.Label" />
+                    <Description resid="Hanzo.TaskpaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Hanzo.Icon.16" />
+                    <bt:Image size="32" resid="Hanzo.Icon.32" />
+                    <bt:Image size="80" resid="Hanzo.Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Hanzo.TaskpaneUrl" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Hanzo.Icon.16" DefaultValue="__HANZO_OUTLOOK_BASE__/assets/icon-16.png" />
+        <bt:Image id="Hanzo.Icon.32" DefaultValue="__HANZO_OUTLOOK_BASE__/assets/icon-32.png" />
+        <bt:Image id="Hanzo.Icon.80" DefaultValue="__HANZO_OUTLOOK_BASE__/assets/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Hanzo.TaskpaneUrl" DefaultValue="__HANZO_OUTLOOK_BASE__/taskpane.html" />
+        <bt:Url id="Hanzo.CommandsUrl" DefaultValue="__HANZO_OUTLOOK_BASE__/commands.html" />
+        <bt:Url id="Hanzo.SupportUrl" DefaultValue="https://hanzo.ai/support" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Hanzo.Group.Label" DefaultValue="Hanzo AI" />
+        <bt:String id="Hanzo.TaskpaneButton.Label" DefaultValue="Hanzo AI" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Hanzo.TaskpaneButton.Tooltip" DefaultValue="Open the Hanzo AI pane to summarize the thread, draft a reply, or extract deadlines and action items." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

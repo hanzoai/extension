@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Signing in…</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+</head>
+<body>
+  <p>Completing sign-in…</p>
+  <script>
+    // The IAM redirect lands here inside the Office auth dialog. Hand the full
+    // callback URL (carrying ?code=&state=) back to the task pane via
+    // messageParent, then the pane exchanges the code for a token.
+    Office.onReady(function () {
+      try {
+        Office.context.ui.messageParent(window.location.href);
+      } catch (e) {
+        document.body.innerText = 'Sign-in could not return to the add-in: ' + e;
+      }
+    });
+  </script>
+</body>
+</html>
