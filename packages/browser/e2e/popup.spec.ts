@@ -78,13 +78,16 @@ test.describe('Popup', () => {
     await expect(openPanel).toBeAttached();
   });
 
-  test('on-page overlay toggle button exists', async ({ context, extensionId }) => {
+  test('on-page overlay toggle exists', async ({ context, extensionId }) => {
+    // 1.9.3 killed the on-page FAB (#open-page-overlay). The on-page surface
+    // is now controlled by the #overlay-enabled checkbox (overlay vs new
+    // tab) and opened via the single #open-panel button.
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
 
-    const openOverlay = page.locator('#open-page-overlay');
-    await expect(openOverlay).toBeAttached();
-    await expect(openOverlay).toContainText('Overlay');
+    const overlayEnabled = page.locator('#overlay-enabled');
+    await expect(overlayEnabled).toBeAttached();
+    await expect(overlayEnabled).toBeChecked();
   });
 
   test('toggles on-page overlay on a live webpage', async ({ context, extensionId }) => {
@@ -98,9 +101,22 @@ test.describe('Popup', () => {
     const popupPage = await context.newPage();
     await popupPage.goto(`chrome-extension://${extensionId}/popup.html`);
 
-    const toggleOverlayBtn = popupPage.locator('#open-page-overlay');
-    await expect(toggleOverlayBtn).toBeVisible();
-    await toggleOverlayBtn.click();
+    // #open-panel resolves the active tab and relays page.overlay.show to
+    // its content script. In this harness the popup is itself the active
+    // tab (a privileged chrome-extension:// page), so the active-tab lookup
+    // can never reach example.com — drive the same relay the button sends,
+    // explicitly targeted, and let background + content script do the rest.
+    const openPanelBtn = popupPage.locator('#open-panel');
+    await expect(openPanelBtn).toBeVisible();
+    await popupPage.evaluate(async () => {
+      const tabs = await chrome.tabs.query({ url: 'https://example.com/' });
+      await chrome.runtime.sendMessage({
+        action: 'page.overlay.show',
+        tabId: tabs[0]?.id,
+        side: 'right',
+        width: 'default',
+      });
+    });
 
     await targetPage.bringToFront();
     const overlayRoot = targetPage.locator('#hanzo-page-overlay-root');
