@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildMessages, requestBody, extractContent, ask } from '../src/chat';
+import { buildMessages, requestBody, extractContent, ask, streamDelta, listModels } from '../src/chat';
 import { DEFAULT_MODEL } from '../src/config';
 
 describe('buildMessages', () => {
@@ -34,6 +34,43 @@ describe('requestBody', () => {
     const b = requestBody(buildMessages('x', ''), { model: 'zen-pro', temperature: 0.2 });
     expect(b.model).toBe('zen-pro');
     expect(b.temperature).toBe(0.2);
+  });
+  it('enables streaming only when opts.stream is true', () => {
+    expect(requestBody(buildMessages('x', ''), { stream: true }).stream).toBe(true);
+    expect(requestBody(buildMessages('x', ''), { stream: false }).stream).toBe(false);
+  });
+});
+
+describe('streamDelta', () => {
+  it('reads choices[0].delta.content from an SSE frame', () => {
+    expect(streamDelta(JSON.stringify({ choices: [{ delta: { content: 'Hel' } }] }))).toBe('Hel');
+  });
+  it('returns empty string for a role-only / empty delta', () => {
+    expect(streamDelta(JSON.stringify({ choices: [{ delta: { role: 'assistant' } }] }))).toBe('');
+    expect(streamDelta(JSON.stringify({ choices: [{}] }))).toBe('');
+  });
+});
+
+describe('listModels', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('returns ids from the /v1/models data array with the bearer', async () => {
+    const fetchMock = vi.fn(async (url: string, init: any) => {
+      expect(url).toBe('https://api.hanzo.ai/v1/models');
+      expect(init.headers.Authorization).toBe('Bearer t');
+      return { ok: true, json: async () => ({ data: [{ id: 'zen-1' }, { id: 'zen-pro' }] }) } as any;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await listModels('t')).toEqual(['zen-1', 'zen-pro']);
+  });
+
+  it('tolerates a bare string array and omits the bearer when unauthenticated', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: any) => {
+      expect(init.headers.Authorization).toBeUndefined();
+      return { ok: true, json: async () => ['a', 'b'] } as any;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await listModels('')).toEqual(['a', 'b']);
   });
 });
 
