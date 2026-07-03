@@ -69,7 +69,10 @@ suite('Shell Tools Test Suite', () => {
         assert.ok(result.includes('bash'));
     });
 
-    test('zsh executes through /bin/zsh', async () => {
+    test('zsh executes through /bin/zsh', async function () {
+        // the tool's whole subject is delegation to /bin/zsh — without zsh
+        // on the host (e.g. CI runners) there is nothing to verify
+        if (!fs.existsSync('/bin/zsh')) { this.skip(); }
         const result = await tool('zsh').handler({ command: 'echo zshtest' });
         assert.strictEqual(result, 'zshtest');
     });
