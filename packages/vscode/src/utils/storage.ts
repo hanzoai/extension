@@ -31,7 +31,7 @@ export class StorageUtil {
     ): Promise<T> {
         try {
             const stored = context.globalState.get<string>(key);
-            if (!stored) return defaultValue;
+            if (!stored) {return defaultValue;}
             
             return JSON.parse(stored) as T;
         } catch (error) {
@@ -67,7 +67,7 @@ export class StorageUtil {
     ): Promise<T> {
         try {
             const stored = context.workspaceState.get<string>(key);
-            if (!stored) return defaultValue;
+            if (!stored) {return defaultValue;}
             
             return JSON.parse(stored) as T;
         } catch (error) {

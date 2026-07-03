@@ -69,9 +69,9 @@ export function createGitSearchTools(context: vscode.ExtensionContext): MCPTool[
                 switch (type) {
                     case 'commits':
                         command = `git log --grep="${args.pattern}" --oneline -n ${maxCount}`;
-                        if (args.author) command += ` --author="${args.author}"`;
-                        if (args.since) command += ` --since="${args.since}"`;
-                        if (args.until) command += ` --until="${args.until}"`;
+                        if (args.author) {command += ` --author="${args.author}"`;}
+                        if (args.since) {command += ` --since="${args.since}"`;}
+                        if (args.until) {command += ` --until="${args.until}"`;}
                         break;
                         
                     case 'diff':
@@ -335,13 +335,14 @@ export function createGitSearchTools(context: vscode.ExtensionContext): MCPTool[
                 const action = args.action || 'start';
                 
                 switch (action) {
-                    case 'start':
+                    case 'start': {
                         const watchPath = args.path || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '.';
                         const watcherId = `watch-${Date.now()}`;
                         
                         // VS Code already provides file watching through workspace.createFileSystemWatcher
                         // This is a placeholder for the actual implementation
                         return `Started watching pattern '${args.pattern}' in ${watchPath}\nWatcher ID: ${watcherId}\n\nNote: File watching in VS Code extension context is limited. Consider using VS Code's built-in file watching APIs.`;
+            }
                     
                     case 'stop':
                         if (!args.id) {

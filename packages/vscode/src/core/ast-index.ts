@@ -8,7 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { GraphDatabase, GraphNode, GraphEdge } from './graph-db';
 
-export interface Symbol {
+export interface CodeSymbol {
     name: string;
     kind: ts.SyntaxKind;
     kindName: string;
@@ -37,10 +37,10 @@ export interface FunctionCall {
 }
 
 export class ASTIndex {
-    private symbols: Map<string, Symbol[]> = new Map();
+    private symbols: Map<string, CodeSymbol[]> = new Map();
     private imports: Map<string, ImportInfo[]> = new Map();
     private calls: Map<string, FunctionCall[]> = new Map();
-    private fileSymbols: Map<string, Symbol[]> = new Map();
+    private fileSymbols: Map<string, CodeSymbol[]> = new Map();
     private graphDb: GraphDatabase;
     
     constructor() {
@@ -61,7 +61,7 @@ export class ASTIndex {
         
         // Clear existing symbols for this file
         this.fileSymbols.delete(filePath);
-        const fileSymbolsList: Symbol[] = [];
+        const fileSymbolsList: CodeSymbol[] = [];
         
         // Add file node to graph
         this.graphDb.addNode({
@@ -169,8 +169,8 @@ export class ASTIndex {
         kind?: ts.SyntaxKind | ts.SyntaxKind[];
         exact?: boolean;
         caseSensitive?: boolean;
-    }): Symbol[] {
-        const results: Symbol[] = [];
+    }): CodeSymbol[] {
+        const results: CodeSymbol[] = [];
         const { kind, exact = false, caseSensitive = false } = options || {};
         
         const normalizedQuery = caseSensitive ? query : query.toLowerCase();
@@ -258,11 +258,11 @@ export class ASTIndex {
     /**
      * Find symbol definition
      */
-    findDefinition(symbolName: string, fromFile: string): Symbol | null {
+    findDefinition(symbolName: string, fromFile: string): CodeSymbol | null {
         // First check local file
         const fileSymbols = this.fileSymbols.get(fromFile) || [];
         const localSymbol = fileSymbols.find(s => s.name === symbolName);
-        if (localSymbol) return localSymbol;
+        if (localSymbol) {return localSymbol;}
         
         // Check imports
         const fileImports = Array.from(this.imports.values())
@@ -276,7 +276,7 @@ export class ASTIndex {
                     const resolvedPath = path.resolve(path.dirname(fromFile), imp.from);
                     const importedSymbols = this.fileSymbols.get(resolvedPath) || [];
                     const imported = importedSymbols.find(s => s.name === symbolName);
-                    if (imported) return imported;
+                    if (imported) {return imported;}
                 }
             }
         }
@@ -290,10 +290,10 @@ export class ASTIndex {
      * Get call hierarchy for a function
      */
     getCallHierarchy(functionName: string): {
-        callers: Array<{ symbol: Symbol; calls: FunctionCall[] }>;
+        callers: Array<{ symbol: CodeSymbol; calls: FunctionCall[] }>;
         callees: string[];
     } {
-        const callers: Array<{ symbol: Symbol; calls: FunctionCall[] }> = [];
+        const callers: Array<{ symbol: CodeSymbol; calls: FunctionCall[] }> = [];
         const callees = new Set<string>();
         
         // Find all calls to this function
@@ -352,17 +352,17 @@ export class ASTIndex {
      * Get type hierarchy
      */
     getTypeHierarchy(typeName: string): {
-        parents: Symbol[];
-        children: Symbol[];
-        implementations: Symbol[];
+        parents: CodeSymbol[];
+        children: CodeSymbol[];
+        implementations: CodeSymbol[];
     } {
         const typeSymbols = (this.symbols.get(typeName) || [])
             .filter(s => s.kind === ts.SyntaxKind.ClassDeclaration ||
                         s.kind === ts.SyntaxKind.InterfaceDeclaration);
                         
-        const parents: Symbol[] = [];
-        const children: Symbol[] = [];
-        const implementations: Symbol[] = [];
+        const parents: CodeSymbol[] = [];
+        const children: CodeSymbol[] = [];
+        const implementations: CodeSymbol[] = [];
         
         // Find inheritance relationships using graph
         for (const typeSymbol of typeSymbols) {
@@ -374,7 +374,7 @@ export class ASTIndex {
                 const parentNode = this.graphDb.getNode(edge.to);
                 if (parentNode) {
                     const parentSymbol = this.findSymbolFromNode(parentNode);
-                    if (parentSymbol) parents.push(parentSymbol);
+                    if (parentSymbol) {parents.push(parentSymbol);}
                 }
             }
             
@@ -384,7 +384,7 @@ export class ASTIndex {
                 const childNode = this.graphDb.getNode(edge.from);
                 if (childNode) {
                     const childSymbol = this.findSymbolFromNode(childNode);
-                    if (childSymbol) children.push(childSymbol);
+                    if (childSymbol) {children.push(childSymbol);}
                 }
             }
             
@@ -395,7 +395,7 @@ export class ASTIndex {
                     const implNode = this.graphDb.getNode(edge.from);
                     if (implNode) {
                         const implSymbol = this.findSymbolFromNode(implNode);
-                        if (implSymbol) implementations.push(implSymbol);
+                        if (implSymbol) {implementations.push(implSymbol);}
                     }
                 }
             }
@@ -496,9 +496,9 @@ export class ASTIndex {
                ts.isSetAccessorDeclaration(node);
     }
     
-    private extractSymbol(node: ts.Node, sourceFile: ts.SourceFile, filePath: string): Symbol | null {
+    private extractSymbol(node: ts.Node, sourceFile: ts.SourceFile, filePath: string): CodeSymbol | null {
         let name: string | undefined;
-        let kind = node.kind;
+        const kind = node.kind;
         
         // Extract name based on node type
         if ('name' in node && (node as any).name && ts.isIdentifier((node as any).name)) {
@@ -507,11 +507,11 @@ export class ASTIndex {
             name = node.name.text;
         }
         
-        if (!name) return null;
+        if (!name) {return null;}
         
         const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.pos);
         
-        const symbol: Symbol = {
+        const symbol: CodeSymbol = {
             name,
             kind,
             kindName: ts.SyntaxKind[kind],
@@ -587,7 +587,7 @@ export class ASTIndex {
             name = node.expression.name.text;
         }
         
-        if (!name) return null;
+        if (!name) {return null;}
         
         const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.pos);
         
@@ -600,7 +600,7 @@ export class ASTIndex {
         };
     }
     
-    private addSymbol(symbol: Symbol): void {
+    private addSymbol(symbol: CodeSymbol): void {
         if (!this.symbols.has(symbol.name)) {
             this.symbols.set(symbol.name, []);
         }
@@ -622,7 +622,7 @@ export class ASTIndex {
         this.calls.get(call.name)!.push(call);
     }
     
-    private findSymbolFromNode(node: GraphNode): Symbol | null {
+    private findSymbolFromNode(node: GraphNode): CodeSymbol | null {
         const { name, filePath, line } = node.properties;
         const fileSymbols = this.fileSymbols.get(filePath) || [];
         return fileSymbols.find(s => s.name === name && s.line === line) || null;

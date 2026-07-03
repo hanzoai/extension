@@ -1,340 +1,146 @@
-import * as assert from 'assert';
-import * as sinon from 'sinon';
-import * as vscode from 'vscode';
+import assert from 'assert';
+import * as http from 'http';
+import { AddressInfo } from 'net';
 import { createWebFetchTool } from '../../mcp/tools/web-fetch';
 
+// Rewritten to pin the real web-fetch.ts behavior. That tool uses the raw
+// node http/https modules (not global.fetch), returns error strings rather
+// than rejecting, has no cache, emits no ``` code fences, and sends a
+// 'Hanzo-MCP/1.0' User-Agent. We exercise it end-to-end against a real
+// loopback server instead of mocking the transport.
 suite('Web Fetch Tool Test Suite', () => {
-    let context: vscode.ExtensionContext;
+    let server: http.Server;
+    let base: string;
     let webFetchTool: any;
-    let sandbox: sinon.SinonSandbox;
-    let fetchStub: sinon.SinonStub;
-    let globalStateGetStub: sinon.SinonStub;
-    let globalStateUpdateStub: sinon.SinonStub;
+    let last: { method?: string; headers?: http.IncomingHttpHeaders; body?: string };
 
-    setup(() => {
-        sandbox = sinon.createSandbox();
-        
-        // Mock fetch
-        fetchStub = sandbox.stub(global, 'fetch' as any);
-        
-        // Mock VS Code context
-        globalStateGetStub = sandbox.stub();
-        globalStateUpdateStub = sandbox.stub().resolves();
-        
-        context = {
-            subscriptions: [],
-            workspaceState: {
-                get: sandbox.stub(),
-                update: sandbox.stub().resolves()
-            },
-            globalState: {
-                get: globalStateGetStub,
-                update: globalStateUpdateStub,
-                setKeysForSync: sandbox.stub()
-            },
-            extensionPath: '/test/extension',
-            extensionUri: vscode.Uri.file('/test/extension'),
-            storageUri: vscode.Uri.file('/test/storage'),
-            globalStorageUri: vscode.Uri.file('/test/global-storage'),
-            logUri: vscode.Uri.file('/test/logs'),
-            extensionMode: vscode.ExtensionMode.Test,
-            asAbsolutePath: (path: string) => `/test/extension/${path}`,
-            storagePath: '/test/storage',
-            globalStoragePath: '/test/global-storage',
-            logPath: '/test/logs'
-        } as any;
-        
-        // Default empty cache
-        globalStateGetStub.returns({});
-        
-        webFetchTool = createWebFetchTool(context);
+    setup(async () => {
+        last = {};
+        server = http.createServer((req, res) => {
+            let body = '';
+            req.on('data', (c) => { body += c; });
+            req.on('end', () => {
+                last = { method: req.method, headers: req.headers, body };
+                const url = req.url || '/';
+                if (url === '/html') {
+                    res.writeHead(200, { 'Content-Type': 'text/html' });
+                    res.end('<html><head><title>Test Page</title>' +
+                        '<meta name="description" content="A test description"></head>' +
+                        '<body><h1>Hello World</h1><p>This is a test page.</p></body></html>');
+                } else if (url === '/json') {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ name: 'Test API', version: '1.0.0', features: ['a', 'b'] }));
+                } else if (url === '/text') {
+                    res.writeHead(200, { 'Content-Type': 'text/plain' });
+                    res.end('This is plain text content.\nWith multiple lines.');
+                } else if (url === '/notfound') {
+                    res.writeHead(404, 'Not Found');
+                    res.end('nope');
+                } else if (url === '/redirect') {
+                    res.writeHead(302, { Location: `${base}/html` });
+                    res.end();
+                } else if (url === '/large') {
+                    res.writeHead(200, { 'Content-Type': 'text/plain' });
+                    res.end('x'.repeat(5000));
+                } else if (url === '/echo') {
+                    res.writeHead(200, { 'Content-Type': 'text/plain' });
+                    res.end('ok');
+                } else {
+                    res.writeHead(200, { 'Content-Type': 'text/plain' });
+                    res.end('root');
+                }
+            });
+        });
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+        webFetchTool = createWebFetchTool({} as any);
     });
 
-    teardown(() => {
-        sandbox.restore();
+    teardown(async () => {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
     });
 
-    test('Web fetch tool should fetch HTML content', async () => {
-        const htmlContent = `
-            <html>
-                <head><title>Test Page</title></head>
-                <body>
-                    <h1>Hello World</h1>
-                    <p>This is a test page.</p>
-                </body>
-            </html>
-        `;
-        
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'text/html']]),
-            text: () => Promise.resolve(htmlContent)
-        });
-        
-        const result = await webFetchTool.handler({
-            url: 'https://example.com'
-        });
-        
+    test('text format extracts title, url header and body text from HTML', async () => {
+        const result = await webFetchTool.handler({ url: `${base}/html` });
+
         assert.ok(result.includes('# Test Page'));
-        assert.ok(result.includes('## Hello World'));
+        assert.ok(result.includes(`URL: ${base}/html`));
+        assert.ok(result.includes('Description: A test description'));
+        assert.ok(result.includes('Hello World'));
         assert.ok(result.includes('This is a test page.'));
-        assert.ok(fetchStub.calledOnce);
-        assert.ok(fetchStub.calledWith('https://example.com'));
     });
 
-    test('Web fetch tool should handle JSON content', async () => {
-        const jsonData = {
-            name: 'Test API',
-            version: '1.0.0',
-            features: ['auth', 'search', 'export']
-        };
-        
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'application/json']]),
-            text: () => Promise.resolve(JSON.stringify(jsonData))
-        });
-        
-        const result = await webFetchTool.handler({
-            url: 'https://api.example.com/info'
-        });
-        
-        assert.ok(result.includes('```json'));
+    test('json format returns pretty JSON with no code fences', async () => {
+        const result = await webFetchTool.handler({ url: `${base}/json`, format: 'json' });
+
+        assert.ok(!result.includes('```'));
         assert.ok(result.includes('"name": "Test API"'));
         assert.ok(result.includes('"version": "1.0.0"'));
         assert.ok(result.includes('"features"'));
     });
 
-    test('Web fetch tool should use cache for repeated requests', async () => {
-        const url = 'https://example.com/cached';
-        const content = '<html><body>Cached content</body></html>';
-        
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'text/html']]),
-            text: () => Promise.resolve(content)
-        });
-        
-        // First request
-        await webFetchTool.handler({ url });
-        assert.ok(fetchStub.calledOnce);
-        assert.ok(globalStateUpdateStub.called);
-        
-        // Set up cache for second request
-        const cache = {};
-        cache[url] = {
-            content: '# Cached content',
-            timestamp: Date.now()
-        };
-        globalStateGetStub.returns(cache);
-        
-        // Second request should use cache
-        const result = await webFetchTool.handler({ url });
-        assert.strictEqual(fetchStub.callCount, 1); // Still only called once
-        assert.ok(result.includes('Cached content'));
+    test('raw format returns the untransformed body', async () => {
+        const result = await webFetchTool.handler({ url: `${base}/text`, format: 'raw' });
+        assert.strictEqual(result, 'This is plain text content.\nWith multiple lines.');
     });
 
-    test('Web fetch tool should respect cache expiry', async () => {
-        const url = 'https://example.com/expired';
-        
-        // Set up expired cache (16 minutes old)
-        const cache = {};
-        cache[url] = {
-            content: 'Old cached content',
-            timestamp: Date.now() - (16 * 60 * 1000)
-        };
-        globalStateGetStub.returns(cache);
-        
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'text/html']]),
-            text: () => Promise.resolve('<html><body>Fresh content</body></html>')
-        });
-        
-        const result = await webFetchTool.handler({ url });
-        
-        assert.ok(fetchStub.calledOnce);
-        assert.ok(result.includes('Fresh content'));
-        assert.ok(!result.includes('Old cached content'));
+    test('metadata format returns the extracted metadata as JSON', async () => {
+        const result = await webFetchTool.handler({ url: `${base}/html`, format: 'metadata' });
+        const meta = JSON.parse(result);
+        assert.strictEqual(meta.title, 'Test Page');
+        assert.strictEqual(meta.description, 'A test description');
+        assert.strictEqual(meta.url, `${base}/html`);
     });
 
-    test('Web fetch tool should handle fetch errors', async () => {
-        fetchStub.rejects(new Error('Network error'));
-        
-        await assert.rejects(
-            webFetchTool.handler({ url: 'https://example.com' }),
-            /Network error/
-        );
+    test('follows 3xx redirects to the final content', async () => {
+        const result = await webFetchTool.handler({ url: `${base}/redirect` });
+        assert.ok(result.includes('# Test Page'));
+        assert.ok(result.includes('Hello World'));
     });
 
-    test('Web fetch tool should handle HTTP errors', async () => {
-        fetchStub.resolves({
-            ok: false,
-            status: 404,
-            statusText: 'Not Found',
-            text: () => Promise.resolve('Page not found')
-        });
-        
-        await assert.rejects(
-            webFetchTool.handler({ url: 'https://example.com/notfound' }),
-            /HTTP error! status: 404/
-        );
-    });
-
-    test('Web fetch tool should handle redirects', async () => {
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            redirected: true,
-            url: 'https://example.com/redirected',
-            headers: new Map([['content-type', 'text/html']]),
-            text: () => Promise.resolve('<html><body>Redirected page</body></html>')
-        });
-        
-        const result = await webFetchTool.handler({
-            url: 'https://example.com/original'
-        });
-        
-        assert.ok(result.includes('Redirected page'));
-    });
-
-    test('Web fetch tool should handle plain text content', async () => {
-        const textContent = 'This is plain text content.\nWith multiple lines.\nAnd some data.';
-        
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'text/plain']]),
-            text: () => Promise.resolve(textContent)
-        });
-        
-        const result = await webFetchTool.handler({
-            url: 'https://example.com/text.txt'
-        });
-        
+    test('plain text content is returned in the text envelope', async () => {
+        const result = await webFetchTool.handler({ url: `${base}/text` });
         assert.ok(result.includes('This is plain text content'));
         assert.ok(result.includes('With multiple lines'));
-        assert.ok(result.includes('And some data'));
     });
 
-    test('Web fetch tool should validate URLs', async () => {
-        await assert.rejects(
-            webFetchTool.handler({ url: 'not-a-valid-url' }),
-            /Invalid URL/
-        );
-        
-        await assert.rejects(
-            webFetchTool.handler({ url: 'ftp://example.com' }),
-            /Only http/
-        );
+    test('rejects non-http(s) protocols with a clear message', async () => {
+        const result = await webFetchTool.handler({ url: 'ftp://example.com/file' });
+        assert.strictEqual(result, 'Error: Only HTTP and HTTPS URLs are supported');
     });
 
-    test('Web fetch tool should handle large content', async () => {
-        const largeContent = '<html><body>' + 'x'.repeat(1000000) + '</body></html>';
-        
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'text/html']]),
-            text: () => Promise.resolve(largeContent)
-        });
-        
-        const result = await webFetchTool.handler({
-            url: 'https://example.com/large'
-        });
-        
-        // Should be truncated
-        assert.ok(result.length < largeContent.length);
-        assert.ok(result.includes('[Content truncated'));
+    test('malformed URLs are caught and reported, not thrown', async () => {
+        const result = await webFetchTool.handler({ url: 'not-a-valid-url' });
+        assert.ok(result.startsWith('Error fetching URL:'));
+        assert.ok(result.includes('Invalid URL'));
     });
 
-    test('Web fetch tool should set proper headers', async () => {
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'text/html']]),
-            text: () => Promise.resolve('<html></html>')
-        });
-        
-        await webFetchTool.handler({ url: 'https://example.com' });
-        
-        const fetchCall = fetchStub.firstCall;
-        const options = fetchCall.args[1];
-        
-        assert.ok(options.headers);
-        assert.strictEqual(options.headers['User-Agent'], 'HanzoMCP/1.0');
-        assert.strictEqual(options.headers['Accept'], 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8');
+    test('HTTP error statuses are reported, not thrown', async () => {
+        const result = await webFetchTool.handler({ url: `${base}/notfound` });
+        assert.ok(result.startsWith('Error fetching URL:'));
+        assert.ok(result.includes('HTTP 404'));
     });
 
-    test('Web fetch tool should handle XML content', async () => {
-        const xmlContent = `<?xml version="1.0"?>
-            <root>
-                <item>Test 1</item>
-                <item>Test 2</item>
-            </root>`;
-        
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'application/xml']]),
-            text: () => Promise.resolve(xmlContent)
-        });
-        
-        const result = await webFetchTool.handler({
-            url: 'https://example.com/data.xml'
-        });
-        
-        assert.ok(result.includes('```xml'));
-        assert.ok(result.includes('<item>Test 1</item>'));
-        assert.ok(result.includes('<item>Test 2</item>'));
+    test('content over max_length is truncated with a marker', async () => {
+        const result = await webFetchTool.handler({ url: `${base}/large`, format: 'raw', max_length: 100 });
+        assert.ok(result.length < 5000);
+        assert.ok(result.includes('[Content truncated]'));
     });
 
-    test('Web fetch tool should handle binary content types', async () => {
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'image/png']]),
-            text: () => Promise.resolve('binary data')
-        });
-        
-        await assert.rejects(
-            webFetchTool.handler({ url: 'https://example.com/image.png' }),
-            /Content type image\/png is not supported/
-        );
+    test('sends the Hanzo-MCP User-Agent and Accept headers', async () => {
+        await webFetchTool.handler({ url: `${base}/html` });
+        assert.strictEqual(last.headers!['user-agent'], 'Hanzo-MCP/1.0');
+        assert.ok((last.headers!['accept'] as string).includes('application/json'));
     });
 
-    test('Web fetch tool should clean up old cache entries', async () => {
-        const cache = {};
-        
-        // Add multiple cache entries with different ages
-        for (let i = 0; i < 10; i++) {
-            cache[`https://example.com/page${i}`] = {
-                content: `Content ${i}`,
-                timestamp: Date.now() - (i * 5 * 60 * 1000) // 0, 5, 10, 15, 20... minutes old
-            };
-        }
-        
-        globalStateGetStub.returns(cache);
-        
-        fetchStub.resolves({
-            ok: true,
-            status: 200,
-            headers: new Map([['content-type', 'text/html']]),
-            text: () => Promise.resolve('<html><body>New content</body></html>')
-        });
-        
-        await webFetchTool.handler({ url: 'https://example.com/new' });
-        
-        // Check that old entries were cleaned up
-        const updateCall = globalStateUpdateStub.lastCall;
-        const updatedCache = updateCall.args[1];
-        
-        // Should have removed entries older than 15 minutes
-        const remainingUrls = Object.keys(updatedCache);
-        assert.ok(remainingUrls.length < 11); // Less than original 10 + 1 new
+    test('passes caller-supplied headers through', async () => {
+        await webFetchTool.handler({ url: `${base}/html`, headers: { 'X-Custom': 'abc' } });
+        assert.strictEqual(last.headers!['x-custom'], 'abc');
+    });
+
+    test('POST sends the request body to the server', async () => {
+        await webFetchTool.handler({ url: `${base}/echo`, method: 'POST', body: 'hello world', format: 'raw' });
+        assert.strictEqual(last.method, 'POST');
+        assert.strictEqual(last.body, 'hello world');
     });
 });

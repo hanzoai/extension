@@ -94,25 +94,26 @@ export function createGraphDatabaseTool(context: vscode.ExtensionContext): MCPTo
             
             switch (args.operation) {
                 case 'add_node':
-                    if (!args.node) throw new Error('Node data required');
+                    if (!args.node) {throw new Error('Node data required');}
                     db.addNode(args.node);
                     return `Node ${args.node.id} added successfully`;
                     
                 case 'add_edge':
-                    if (!args.edge) throw new Error('Edge data required');
+                    if (!args.edge) {throw new Error('Edge data required');}
                     db.addEdge(args.edge);
                     return `Edge ${args.edge.id} added successfully`;
                     
-                case 'query':
+                case 'query': {
                     const nodes = db.queryNodes(args.query || {});
                     return {
                         count: nodes.length,
                         nodes: nodes.slice(0, 100), // Limit results
                         message: nodes.length > 100 ? `Showing first 100 of ${nodes.length} results` : undefined
                     };
+            }
                     
-                case 'find_path':
-                    if (!args.from || !args.to) throw new Error('From and to node IDs required');
+                case 'find_path': {
+                    if (!args.from || !args.to) {throw new Error('From and to node IDs required');}
                     const foundPath = db.findPath(args.from, args.to, args.maxDepth);
                     if (foundPath) {
                         return {
@@ -123,8 +124,9 @@ export function createGraphDatabaseTool(context: vscode.ExtensionContext): MCPTo
                     } else {
                         return { found: false, message: 'No path found' };
                     }
+            }
                     
-                case 'analyze':
+                case 'analyze': {
                     const stats = db.getStats();
                     const components = db.getConnectedComponents();
                     return {
@@ -135,8 +137,9 @@ export function createGraphDatabaseTool(context: vscode.ExtensionContext): MCPTo
                             largest: components[0]?.length || 0
                         }
                     };
+            }
                     
-                case 'index_code':
+                case 'index_code': {
                     const indexPath = args.path ? path.resolve(workspaceRoot, args.path) : workspaceRoot;
                     if (args.recursive !== false) {
                         await ast.indexDirectory(indexPath);
@@ -151,9 +154,10 @@ export function createGraphDatabaseTool(context: vscode.ExtensionContext): MCPTo
                         imports: indexStats.totalImports,
                         calls: indexStats.totalCalls
                     };
+            }
                     
-                case 'search_symbols':
-                    if (!args.symbolQuery) throw new Error('Symbol query required');
+                case 'search_symbols': {
+                    if (!args.symbolQuery) {throw new Error('Symbol query required');}
                     const symbols = ast.searchSymbols(args.symbolQuery, {
                         exact: args.exact,
                         caseSensitive: args.caseSensitive
@@ -168,9 +172,10 @@ export function createGraphDatabaseTool(context: vscode.ExtensionContext): MCPTo
                             type: s.type
                         }))
                     };
+            }
                     
-                case 'get_references':
-                    if (!args.symbolName) throw new Error('Symbol name required');
+                case 'get_references': {
+                    if (!args.symbolName) {throw new Error('Symbol name required');}
                     const refs = ast.findReferences(args.symbolName, args.filePath);
                     return {
                         count: refs.length,
@@ -181,9 +186,10 @@ export function createGraphDatabaseTool(context: vscode.ExtensionContext): MCPTo
                             type: r.type
                         }))
                     };
+            }
                     
-                case 'get_hierarchy':
-                    if (!args.symbolName) throw new Error('Symbol name required');
+                case 'get_hierarchy': {
+                    if (!args.symbolName) {throw new Error('Symbol name required');}
                     const hierarchy = ast.getTypeHierarchy(args.symbolName);
                     return {
                         parents: hierarchy.parents.map(s => ({
@@ -202,6 +208,7 @@ export function createGraphDatabaseTool(context: vscode.ExtensionContext): MCPTo
                             line: s.line
                         }))
                     };
+            }
                     
                 case 'clear':
                     db.clear();

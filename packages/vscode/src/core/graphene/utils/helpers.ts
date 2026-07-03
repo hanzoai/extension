@@ -28,10 +28,10 @@ export const gotoVertex = (gremlin: IGremlin, vertex: vertexType): IGremlin => {
 export const filterEdges = (filter: any) => {
   return (edge: edgeType): boolean => {
     // no filter, everything is valid.
-    if (!filter) return true;
+    if (!filter) {return true;}
 
     // string filter: label must match.
-    if (typeof filter == "string") {
+    if (typeof filter === "string") {
       return edge._label == filter;
     }
 
@@ -47,7 +47,7 @@ export const filterEdges = (filter: any) => {
 
 export const objectFilter = (thing: any, filter: any): boolean => {
   for (const key in filter) {
-    if (thing[key] !== filter[key]) return false;
+    if (thing[key] !== filter[key]) {return false;}
   }
   return true;
 };

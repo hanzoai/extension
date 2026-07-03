@@ -19,7 +19,7 @@ interface NotebookData {
 }
 
 function resolvePath(p: string): string {
-    if (path.isAbsolute(p)) return p;
+    if (path.isAbsolute(p)) {return p;}
     const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     return ws ? path.resolve(ws, p) : path.resolve(p);
 }
@@ -54,11 +54,11 @@ export function createJupyterTools(context: vscode.ExtensionContext): MCPTool[] 
                 if (args.cellId) {
                     const idx = parseInt(args.cellId, 10);
                     const cell = !isNaN(idx) ? nb.cells[idx] : nb.cells.find(c => c.id === args.cellId);
-                    if (!cell) return `Error: Cell not found: ${args.cellId}`;
+                    if (!cell) {return `Error: Cell not found: ${args.cellId}`;}
                     const src = Array.isArray(cell.source) ? cell.source.join('') : cell.source;
                     const out = (cell.outputs || []).map((o: any) => {
-                        if (o.text) return (Array.isArray(o.text) ? o.text.join('') : o.text);
-                        if (o.data?.['text/plain']) return (Array.isArray(o.data['text/plain']) ? o.data['text/plain'].join('') : o.data['text/plain']);
+                        if (o.text) {return (Array.isArray(o.text) ? o.text.join('') : o.text);}
+                        if (o.data?.['text/plain']) {return (Array.isArray(o.data['text/plain']) ? o.data['text/plain'].join('') : o.data['text/plain']);}
                         return '';
                     }).filter(Boolean).join('\n');
                     return `[${cell.cell_type}] Cell ${args.cellId}:\n${src}${out ? `\n--- Output ---\n${out}` : ''}`;
@@ -117,7 +117,7 @@ export function createJupyterTools(context: vscode.ExtensionContext): MCPTool[] 
 
                 const cell = nb.cells[cellIndex];
                 cell.source = args.content.split('\n').map((line, i, arr) => i < arr.length - 1 ? line + '\n' : line);
-                if (args.cellType) cell.cell_type = args.cellType;
+                if (args.cellType) {cell.cell_type = args.cellType;}
                 cell.outputs = [];
 
                 fs.writeFileSync(filePath, JSON.stringify(nb, null, 1) + '\n', 'utf-8');

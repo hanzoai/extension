@@ -83,7 +83,7 @@ export class MCPServer {
     }
 
     private async selectBackend(backend: string): Promise<string> {
-        if (backend !== 'auto') return backend;
+        if (backend !== 'auto') {return backend;}
 
         // Auto-detect: prefer Python (uvx) if available, fallback to TypeScript
         try {
@@ -204,7 +204,7 @@ export class MCPServer {
     }
 
     private async setupServerProcessHandlers() {
-        if (!this.serverProcess) return;
+        if (!this.serverProcess) {return;}
 
         this.serverProcess.on('error', (error) => {
             console.error('[MCPServer] Server process error:', error);
@@ -235,7 +235,7 @@ export class MCPServer {
     }
 
     private async registerTools() {
-        if (!this.client) return;
+        if (!this.client) {return;}
         
         console.log('[MCPServer] Registering tools');
         
