@@ -332,6 +332,21 @@ importers:
         specifier: ^5.3.3
         version: 5.8.3
 
+  packages/office:
+    devDependencies:
+      '@types/office-js':
+        specifier: ^1.0.377
+        version: 1.0.598
+      esbuild:
+        specifier: ^0.25.8
+        version: 0.25.8
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@20.19.9)(jsdom@26.1.0)(terser@5.43.1)
+
   packages/tools:
     dependencies:
       '@modelcontextprotocol/sdk':
@@ -1763,6 +1778,7 @@ packages:
   '@lancedb/lancedb@0.21.0':
     resolution: {integrity: sha512-3c65DfAsTzGb3/Y2WtpJeqPFb2BgoTsYweg3gj9zP6t8CCaKQSeVWEGE8Nowtdj5Jkj9/nmHUoKPv4jCsds2yQ==}
     engines: {node: '>= 18'}
+    cpu: [x64, arm64]
     os: [darwin, linux, win32]
     peerDependencies:
       apache-arrow: '>=15.0.0 <=18.1.0'
@@ -1806,16 +1822,19 @@ packages:
   '@nut-tree-fork/libnut-darwin@2.7.5':
     resolution: {integrity: sha512-LbqtPtMPTJUcg4XoPP2jsU1wc8flBcGyKTerKsIfK9cD7nBHROnO0QksbrsbSWEpLym8T8fRtuU7XEY83l6Z2Q==}
     engines: {node: '>=10.15.3'}
+    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-linux@2.7.5':
     resolution: {integrity: sha512-uxaXEcRKnFObAljsoR6tLOBUU1dJ2sctloG6gFgCBGN7+k6Jdv6jZfOuNjd/fpdq2C5WPMm0rtn9EE7h5J3Jcg==}
     engines: {node: '>=10.15.3'}
+    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-win32@2.7.5':
     resolution: {integrity: sha512-yqC87zvmFcDPwFrRU40DYhN0xmEVM3aSkOuyF0IX+y1x+HWSu/i0PNklATpPBhGid3QVb/TOHuVoaraMrUFCNw==}
     engines: {node: '>=10.15.3'}
+    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut@4.2.6':
@@ -1829,6 +1848,7 @@ packages:
   '@nut-tree-fork/nut-js@4.2.6':
     resolution: {integrity: sha512-aI/WCX7gE1HFGPH3EZP/UWqpNMM1NMoM/EkXqp7pKMgXFCi8e5+o5p+jd/QOYpmALv9bQg7+s69nI7FONbMqDg==}
     engines: {node: '>=16'}
+    cpu: [x64, arm64]
     os: [linux, darwin, win32]
 
   '@nut-tree-fork/provider-interfaces@4.2.6':
@@ -2270,6 +2290,9 @@ packages:
 
   '@types/node@20.19.9':
     resolution: {integrity: sha512-cuVNgarYWZqxRJDQHEB58GEONhOK79QVR/qYx4S7kcUObQvUwvFnYxJuuHUKm2aieN9X3yZB4LZsuYNU1Qphsw==}
+
+  '@types/office-js@1.0.598':
+    resolution: {integrity: sha512-8TPclNW2KJdk0InhTMlpwX5vkCxKwSR+3wPCx6PLZnHIP0yZGRLrwgO+b2enHvdNzcZl5cx5yw+ZvRsqG3dLyA==}
 
   '@types/phoenix@1.6.6':
     resolution: {integrity: sha512-PIzZZlEppgrpoT2QgbnDU+MMzuR6BbCjllj0bM70lWoejMeNJAxCchxnv7J3XFkI8MpygtRpzXrIlmWUBclP5A==}
@@ -8406,6 +8429,8 @@ snapshots:
   '@types/node@20.19.9':
     dependencies:
       undici-types: 6.21.0
+
+  '@types/office-js@1.0.598': {}
 
   '@types/phoenix@1.6.6': {}
 
