@@ -1,0 +1,4 @@
+# clasp pushes rootDir (src/) — everything outside it is dev-only tooling.
+**/**
+!appsscript.json
+!*.gs
