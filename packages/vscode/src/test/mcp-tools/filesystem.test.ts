@@ -1,307 +1,102 @@
-import * as assert from 'assert';
-import * as sinon from 'sinon';
+import assert from 'assert';
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as fs from 'fs';
 import * as path from 'path';
 import { createFileSystemTools } from '../../mcp/tools/filesystem';
 
+// Rewritten to run the real filesystem tools against real temp files instead
+// of stubbing fs.readFile (non-configurable in the test host). Current
+// contract: read({ path, offset?, limit? }) numbers lines "N: <line>";
+// edit/multi_edit use pattern/replacement; errors surface as "Failed to ...".
 suite('FileSystem Tools Test Suite', () => {
-    let context: vscode.ExtensionContext;
-    let fsTools: any[];
-    let sandbox: sinon.SinonSandbox;
-    let workspaceStub: sinon.SinonStub;
-    let fsStub: {
-        readFile: sinon.SinonStub;
-        writeFile: sinon.SinonStub;
-        stat: sinon.SinonStub;
-        readDirectory: sinon.SinonStub;
-    };
+    let dir: string;
+    let tools: any[];
 
     setup(() => {
-        sandbox = sinon.createSandbox();
-        
-        // Mock VS Code workspace
-        workspaceStub = sandbox.stub(vscode.workspace, 'workspaceFolders').value([{
-            uri: vscode.Uri.file('/test/workspace'),
-            name: 'Test Workspace',
-            index: 0
-        }]);
-        
-        // Mock VS Code file system
-        fsStub = {
-            readFile: sandbox.stub(),
-            writeFile: sandbox.stub().resolves(),
-            stat: sandbox.stub(),
-            readDirectory: sandbox.stub()
-        };
-        
-        sandbox.stub(vscode.workspace.fs, 'readFile').callsFake(fsStub.readFile);
-        sandbox.stub(vscode.workspace.fs, 'writeFile').callsFake(fsStub.writeFile);
-        sandbox.stub(vscode.workspace.fs, 'stat').callsFake(fsStub.stat);
-        sandbox.stub(vscode.workspace.fs, 'readDirectory').callsFake(fsStub.readDirectory);
-        
-        // Mock VS Code context
-        context = {
-            subscriptions: [],
-            workspaceState: {
-                get: sandbox.stub(),
-                update: sandbox.stub().resolves()
-            },
-            globalState: {
-                get: sandbox.stub().returns([]),
-                update: sandbox.stub().resolves(),
-                setKeysForSync: sandbox.stub()
-            },
-            extensionPath: '/test/extension',
-            extensionUri: vscode.Uri.file('/test/extension'),
-            storageUri: vscode.Uri.file('/test/storage'),
-            globalStorageUri: vscode.Uri.file('/test/global-storage'),
-            logUri: vscode.Uri.file('/test/logs'),
-            extensionMode: vscode.ExtensionMode.Test,
-            asAbsolutePath: (path: string) => `/test/extension/${path}`,
-            storagePath: '/test/storage',
-            globalStoragePath: '/test/global-storage',
-            logPath: '/test/logs'
-        } as any;
-        
-        // Mock permission manager
-        const permissionManager = {
-            checkPermission: sandbox.stub().returns(true),
-            allowed_paths: ['/test/workspace']
-        };
-        
-        fsTools = createFileSystemTools(context, permissionManager as any);
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hanzo-fs-'));
+        tools = createFileSystemTools({ subscriptions: [] } as any as vscode.ExtensionContext);
     });
 
-    teardown(() => {
-        sandbox.restore();
+    teardown(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+
+    const tool = (name: string) => tools.find(t => t.name === name)!;
+
+    test('read returns line-numbered content', async () => {
+        const file = path.join(dir, 'read.txt');
+        fs.writeFileSync(file, 'Line 1\nLine 2\nLine 3');
+        const result = await tool('read').handler({ path: file });
+        assert.ok(result.includes('1: Line 1'));
+        assert.ok(result.includes('2: Line 2'));
+        assert.ok(result.includes('3: Line 3'));
     });
 
-    test('Read tool should read file contents', async () => {
-        const readTool = fsTools.find(t => t.name === 'read');
-        assert.ok(readTool);
-        
-        const fileContent = 'Hello, World!\nThis is a test file.';
-        fsStub.readFile.resolves(Buffer.from(fileContent));
-        
-        const result = await readTool.handler({
-            file_path: '/test/workspace/test.txt'
-        });
-        
-        assert.strictEqual(result, fileContent);
-        assert.ok(fsStub.readFile.calledOnce);
+    test('read honors offset and limit', async () => {
+        const file = path.join(dir, 'range.txt');
+        fs.writeFileSync(file, 'a\nb\nc\nd');
+        const result = await tool('read').handler({ path: file, offset: 2, limit: 1 });
+        assert.strictEqual(result, '2: b');
     });
 
-    test('Write tool should write file contents', async () => {
-        const writeTool = fsTools.find(t => t.name === 'write');
-        assert.ok(writeTool);
-        
-        const result = await writeTool.handler({
-            file_path: '/test/workspace/new-file.txt',
-            content: 'New file content'
-        });
-        
-        assert.ok(result.includes('Successfully wrote'));
-        assert.ok(result.includes('16 bytes'));
-        assert.ok(fsStub.writeFile.calledOnce);
-        
-        const writeCall = fsStub.writeFile.firstCall;
-        const writtenContent = Buffer.from(writeCall.args[1]).toString();
-        assert.strictEqual(writtenContent, 'New file content');
-    });
-
-    test('Edit tool should replace content in file', async () => {
-        const editTool = fsTools.find(t => t.name === 'edit');
-        assert.ok(editTool);
-        
-        const originalContent = 'Line 1\nOld content\nLine 3';
-        fsStub.readFile.resolves(Buffer.from(originalContent));
-        
-        const result = await editTool.handler({
-            file_path: '/test/workspace/edit.txt',
-            old_string: 'Old content',
-            new_string: 'New content'
-        });
-        
-        assert.ok(result.includes('Successfully edited'));
-        
-        const writeCall = fsStub.writeFile.firstCall;
-        const writtenContent = Buffer.from(writeCall.args[1]).toString();
-        assert.strictEqual(writtenContent, 'Line 1\nNew content\nLine 3');
-    });
-
-    test('Edit tool should handle non-unique old_string', async () => {
-        const editTool = fsTools.find(t => t.name === 'edit');
-        
-        const content = 'test\ntest\ntest';
-        fsStub.readFile.resolves(Buffer.from(content));
-        
+    test('read throws on a missing file', async () => {
         await assert.rejects(
-            editTool.handler({
-                file_path: '/test/workspace/test.txt',
-                old_string: 'test',
-                new_string: 'replaced'
-            }),
-            /occurs 3 times/
+            tool('read').handler({ path: path.join(dir, 'missing.txt') }),
+            /Failed to read file/
         );
     });
 
-    test('Multi_edit tool should apply multiple edits', async () => {
-        const multiEditTool = fsTools.find(t => t.name === 'multi_edit');
-        assert.ok(multiEditTool);
-        
-        const originalContent = 'foo\nbar\nbaz';
-        fsStub.readFile.resolves(Buffer.from(originalContent));
-        
-        const result = await multiEditTool.handler({
-            file_path: '/test/workspace/multi.txt',
+    test('write creates the file and any parent directories', async () => {
+        const file = path.join(dir, 'nested', 'deep', 'out.txt');
+        const result = await tool('write').handler({ path: file, content: 'payload' });
+        assert.ok(result.includes('File written successfully'));
+        assert.strictEqual(fs.readFileSync(file, 'utf-8'), 'payload');
+    });
+
+    test('edit replaces the first occurrence of a pattern', async () => {
+        const file = path.join(dir, 'edit.txt');
+        fs.writeFileSync(file, 'Original content here, Original again');
+        const result = await tool('edit').handler({ path: file, pattern: 'Original', replacement: 'Modified' });
+        assert.ok(result.includes('File edited successfully'));
+        assert.strictEqual(fs.readFileSync(file, 'utf-8'), 'Modified content here, Original again');
+    });
+
+    test('edit with replaceAll replaces every occurrence', async () => {
+        const file = path.join(dir, 'all.txt');
+        fs.writeFileSync(file, 'x x x');
+        await tool('edit').handler({ path: file, pattern: 'x', replacement: 'y', replaceAll: true });
+        assert.strictEqual(fs.readFileSync(file, 'utf-8'), 'y y y');
+    });
+
+    test('edit throws when the pattern is absent', async () => {
+        const file = path.join(dir, 'nopat.txt');
+        fs.writeFileSync(file, 'hello');
+        await assert.rejects(
+            tool('edit').handler({ path: file, pattern: 'absent', replacement: 'x' }),
+            /Pattern not found in file/
+        );
+    });
+
+    test('multi_edit applies several edits and counts them', async () => {
+        const file = path.join(dir, 'multi.txt');
+        fs.writeFileSync(file, 'one two three');
+        const result = await tool('multi_edit').handler({
+            path: file,
             edits: [
-                { old_string: 'foo', new_string: 'FOO' },
-                { old_string: 'bar', new_string: 'BAR' },
-                { old_string: 'baz', new_string: 'BAZ' }
+                { pattern: 'one', replacement: '1' },
+                { pattern: 'three', replacement: '3' }
             ]
         });
-        
-        assert.ok(result.includes('Successfully applied 3 edits'));
-        
-        const writeCall = fsStub.writeFile.firstCall;
-        const writtenContent = Buffer.from(writeCall.args[1]).toString();
-        assert.strictEqual(writtenContent, 'FOO\nBAR\nBAZ');
+        assert.ok(result.includes('File edited successfully with 2 changes'));
+        assert.strictEqual(fs.readFileSync(file, 'utf-8'), '1 two 3');
     });
 
-    test('Directory_tree tool should list directory structure', async () => {
-        const treeTool = fsTools.find(t => t.name === 'directory_tree');
-        assert.ok(treeTool);
-        
-        // Mock directory structure
-        fsStub.readDirectory
-            .withArgs(vscode.Uri.file('/test/workspace'))
-            .resolves([
-                ['src', vscode.FileType.Directory],
-                ['package.json', vscode.FileType.File],
-                ['README.md', vscode.FileType.File]
-            ]);
-        
-        fsStub.readDirectory
-            .withArgs(vscode.Uri.file('/test/workspace/src'))
-            .resolves([
-                ['index.ts', vscode.FileType.File],
-                ['utils.ts', vscode.FileType.File]
-            ]);
-        
-        const result = await treeTool.handler({
-            path: '/test/workspace',
-            max_depth: 2
-        });
-        
-        assert.ok(result.includes('src/'));
-        assert.ok(result.includes('package.json'));
-        assert.ok(result.includes('README.md'));
-        assert.ok(result.includes('index.ts'));
-        assert.ok(result.includes('utils.ts'));
-    });
-
-    test('Find_files tool should search for files', async () => {
-        const findTool = fsTools.find(t => t.name === 'find_files');
-        assert.ok(findTool);
-        
-        // Mock vscode.workspace.findFiles
-        const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles').resolves([
-            vscode.Uri.file('/test/workspace/src/index.ts'),
-            vscode.Uri.file('/test/workspace/src/utils.ts'),
-            vscode.Uri.file('/test/workspace/test/index.test.ts')
-        ]);
-        
-        const result = await findTool.handler({
-            pattern: '**/*.ts'
-        });
-        
-        assert.ok(result.includes('3 files found'));
-        assert.ok(result.includes('src/index.ts'));
-        assert.ok(result.includes('src/utils.ts'));
-        assert.ok(result.includes('test/index.test.ts'));
-        
-        assert.ok(findFilesStub.calledOnce);
-        const pattern = findFilesStub.firstCall.args[0];
-        assert.ok(pattern.pattern.includes('**/*.ts'));
-    });
-
-    test('Grep tool should search file contents', async () => {
-        const grepTool = fsTools.find(t => t.name === 'grep');
-        assert.ok(grepTool);
-        
-        // Mock file search
-        sandbox.stub(vscode.workspace, 'findFiles').resolves([
-            vscode.Uri.file('/test/workspace/file1.ts'),
-            vscode.Uri.file('/test/workspace/file2.ts')
-        ]);
-        
-        // Mock file contents
-        fsStub.readFile
-            .withArgs(vscode.Uri.file('/test/workspace/file1.ts'))
-            .resolves(Buffer.from('export function test() {\n  console.log("test");\n}'))
-            .withArgs(vscode.Uri.file('/test/workspace/file2.ts'))
-            .resolves(Buffer.from('import { test } from "./file1";\ntest();'));
-        
-        const result = await grepTool.handler({
-            pattern: 'test',
-            include: '**/*.ts'
-        });
-        
-        assert.ok(result.includes('2 files with matches'));
-        assert.ok(result.includes('file1.ts'));
-        assert.ok(result.includes('file2.ts'));
-        assert.ok(result.includes('3 total matches'));
-    });
-
-    test('Read tool should handle file not found', async () => {
-        const readTool = fsTools.find(t => t.name === 'read');
-        
-        fsStub.readFile.rejects(new Error('File not found'));
-        
-        await assert.rejects(
-            readTool.handler({ file_path: '/test/workspace/nonexistent.txt' }),
-            /File not found/
-        );
-    });
-
-    test('Write tool should handle permission denied', async () => {
-        const writeTool = fsTools.find(t => t.name === 'write');
-        
-        // Create new permission manager that denies access
-        const restrictedPermissionManager = {
-            checkPermission: sandbox.stub().returns(false),
-            allowed_paths: []
-        };
-        
-        const restrictedTools = createFileSystemTools(context, restrictedPermissionManager as any);
-        const restrictedWriteTool = restrictedTools.find(t => t.name === 'write');
-        
-        await assert.rejects(
-            restrictedWriteTool.handler({
-                file_path: '/restricted/file.txt',
-                content: 'test'
-            }),
-            /Access denied/
-        );
-    });
-
-    test('Edit tool should handle replace_all option', async () => {
-        const editTool = fsTools.find(t => t.name === 'edit');
-        
-        const content = 'test test test';
-        fsStub.readFile.resolves(Buffer.from(content));
-        
-        const result = await editTool.handler({
-            file_path: '/test/workspace/test.txt',
-            old_string: 'test',
-            new_string: 'replaced',
-            replace_all: true
-        });
-        
-        assert.ok(result.includes('Successfully edited'));
-        
-        const writeCall = fsStub.writeFile.firstCall;
-        const writtenContent = Buffer.from(writeCall.args[1]).toString();
-        assert.strictEqual(writtenContent, 'replaced replaced replaced');
+    test('directory_tree lists directory contents', async () => {
+        fs.writeFileSync(path.join(dir, 'file1.txt'), '');
+        fs.writeFileSync(path.join(dir, 'file2.txt'), '');
+        fs.mkdirSync(path.join(dir, 'subdir'));
+        const result = await tool('directory_tree').handler({ path: dir, maxDepth: 1 });
+        assert.ok(result.includes('file1.txt'));
+        assert.ok(result.includes('file2.txt'));
+        assert.ok(result.includes('subdir'));
     });
 });

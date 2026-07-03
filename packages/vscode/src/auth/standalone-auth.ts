@@ -71,7 +71,7 @@ export class StandaloneAuthManager {
     }
 
     private async getStoredToken(): Promise<AuthToken | null> {
-        if (this.isAnonymous) return null;
+        if (this.isAnonymous) {return null;}
         
         try {
             if (fs.existsSync(this.tokenFile)) {
@@ -95,7 +95,7 @@ export class StandaloneAuthManager {
     }
 
     private async storeToken(token: AuthToken): Promise<void> {
-        if (this.isAnonymous) return;
+        if (this.isAnonymous) {return;}
         
         fs.writeFileSync(this.tokenFile, JSON.stringify(token, null, 2));
         // Secure the file
@@ -129,14 +129,14 @@ export class StandaloneAuthManager {
     }
 
     public async isAuthenticated(): Promise<boolean> {
-        if (this.isAnonymous) return true;
+        if (this.isAnonymous) {return true;}
         
         const token = await this.getStoredToken();
         return !!token;
     }
 
     public async getAuthToken(): Promise<string | null> {
-        if (this.isAnonymous) return null;
+        if (this.isAnonymous) {return null;}
         
         const tokenData = await this.getStoredToken();
         return tokenData?.token || null;
@@ -223,7 +223,7 @@ export class StandaloneAuthManager {
 
             const server = http.createServer(async (req: any, res: any) => {
                 const parsedUrl = url.parse(req.url, true);
-                if (parsedUrl.pathname !== '/callback') return;
+                if (parsedUrl.pathname !== '/callback') {return;}
 
                 const state = parsedUrl.query.state;
                 if (state !== expectedState) {
@@ -247,7 +247,7 @@ export class StandaloneAuthManager {
                             redirect_uri: 'http://localhost:8765/callback',
                             code_verifier: codeVerifier,
                         };
-                        if (clientSecret) body.client_secret = clientSecret;
+                        if (clientSecret) {body.client_secret = clientSecret;}
 
                         const tokenResp = await axios.post(`${endpoint}/oauth/token`, body);
                         const tokens = tokenResp.data;
@@ -307,7 +307,7 @@ export class StandaloneAuthManager {
     }
 
     public async logout(): Promise<void> {
-        if (this.isAnonymous) return;
+        if (this.isAnonymous) {return;}
         
         try {
             if (fs.existsSync(this.tokenFile)) {

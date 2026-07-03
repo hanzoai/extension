@@ -32,11 +32,9 @@ jobs:
 
     - name: Test tools package
       run: pnpm --filter @hanzo/cli-tools test
-      continue-on-error: true
 
     - name: Test VS Code extension
-      run: pnpm --filter hanzo-ide test
-      continue-on-error: true
+      run: xvfb-run -a pnpm --filter hanzo-ide test
 
   # ─── Playwright E2E ───
   e2e:

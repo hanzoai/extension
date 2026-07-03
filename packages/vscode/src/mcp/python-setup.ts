@@ -117,7 +117,7 @@ export class PythonSdkSetup {
         try {
             const { stdout } = await exec('which python3');
             pythonPath = stdout.trim();
-        } catch { }
+        } catch { /* best-effort — deliberately ignored */  }
 
         const serverConfig = {
             name: this.serverName,

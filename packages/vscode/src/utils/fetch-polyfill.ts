@@ -24,7 +24,7 @@ export const fetchPolyfill = (globalThis as any).fetch || (async (url: string, o
         });
         
         request.on('error', reject);
-        if (options?.body) request.write(options.body);
+        if (options?.body) {request.write(options.body);}
         request.end();
     });
 });

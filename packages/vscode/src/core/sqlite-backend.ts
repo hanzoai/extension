@@ -222,7 +222,7 @@ export class SQLiteBackend {
     }
     
     async initialize(): Promise<void> {
-        if (this.initialized) return;
+        if (this.initialized) {return;}
         
         try {
             // Create database with Dexie storage (IndexedDB/WebSQL)
@@ -614,7 +614,7 @@ export class SQLiteBackend {
     }
     
     private cosineSimilarity(a: number[], b: number[]): number {
-        if (a.length !== b.length) return 0;
+        if (a.length !== b.length) {return 0;}
         
         let dotProduct = 0;
         let normA = 0;
@@ -629,7 +629,7 @@ export class SQLiteBackend {
         normA = Math.sqrt(normA);
         normB = Math.sqrt(normB);
         
-        if (normA === 0 || normB === 0) return 0;
+        if (normA === 0 || normB === 0) {return 0;}
         
         return dotProduct / (normA * normB);
     }

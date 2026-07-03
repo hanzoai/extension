@@ -15,7 +15,7 @@ export function createUnifiedTodoTool(context: vscode.ExtensionContext): MCPTool
 
     const getTodos = (): TodoItem[] => {
         const stored = context.globalState.get<string>(TODO_KEY);
-        if (!stored) return [];
+        if (!stored) {return [];}
         
         try {
             const parsed = JSON.parse(stored);
@@ -178,9 +178,9 @@ export function createUnifiedTodoTool(context: vscode.ExtensionContext): MCPTool
                         const existing = todos.find(t => t.id === task.id);
                         if (existing) {
                             // Update
-                            if (task.content !== undefined) existing.content = task.content;
-                            if (task.status !== undefined) existing.status = task.status;
-                            if (task.priority !== undefined) existing.priority = task.priority;
+                            if (task.content !== undefined) {existing.content = task.content;}
+                            if (task.status !== undefined) {existing.status = task.status;}
+                            if (task.priority !== undefined) {existing.priority = task.priority;}
                             existing.updatedAt = new Date();
                             updated++;
                         } else {
@@ -213,9 +213,9 @@ export function createUnifiedTodoTool(context: vscode.ExtensionContext): MCPTool
                         return `Error: Todo ${args.id} not found`;
                     }
                     
-                    if (args.status) todo.status = args.status as any;
-                    if (args.priority) todo.priority = args.priority as any;
-                    if (args.task) todo.content = args.task;
+                    if (args.status) {todo.status = args.status as any;}
+                    if (args.priority) {todo.priority = args.priority as any;}
+                    if (args.task) {todo.content = args.task;}
                     todo.updatedAt = new Date();
                     
                     saveTodos(todos);

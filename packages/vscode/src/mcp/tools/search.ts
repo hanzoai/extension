@@ -52,8 +52,8 @@ export function createSearchTools(context: vscode.ExtensionContext): MCPTool[] {
                 // Try to use ripgrep first, fall back to VS Code search
                 try {
                     let command = `rg "${args.pattern}" "${searchPath}"`;
-                    if (args.ignoreCase) command += ' -i';
-                    if (args.fileType) command += ` -t ${args.fileType}`;
+                    if (args.ignoreCase) {command += ' -i';}
+                    if (args.fileType) {command += ` -t ${args.fileType}`;}
                     command += ` -m ${maxResults} --no-heading --line-number`;
                     
                     const { stdout } = await execAsync(command);

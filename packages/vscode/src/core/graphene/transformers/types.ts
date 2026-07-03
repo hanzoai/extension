@@ -1,4 +1,4 @@
 export type TypeTransformer = {
-  fun: Function;
+  fun: (query: any) => any;
   priority: number;
 };
