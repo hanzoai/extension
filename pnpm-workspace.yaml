@@ -4,6 +4,7 @@ packages:
   - 'packages/auth'
   - 'packages/browser'
   - 'packages/dxt'
+  - 'packages/gworkspace'
   - 'packages/jetbrains'
   - 'packages/mcp'
   - 'packages/office'
