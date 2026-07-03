@@ -5,6 +5,7 @@ packages:
   - 'packages/dxt'
   - 'packages/jetbrains'
   - 'packages/mcp'
+  - 'packages/office'
   - 'packages/tools'
   - 'packages/vscode'
   - 'apps/*'

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    :root { color-scheme: light dark; --fg:#1a1a1a; --muted:#666; --bg:#fff; --line:#e3e3e3; --accent:#111; }
+    @media (prefers-color-scheme: dark) { :root { --fg:#eaeaea; --muted:#9a9a9a; --bg:#1e1e1e; --line:#333; --accent:#fff; } }
+    * { box-sizing: border-box; }
+    body { font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); margin: 0; padding: 12px; }
+    header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    header img { width: 22px; height: 22px; }
+    header .title { font-weight: 600; }
+    header .host { color: var(--muted); font-size: 12px; margin-left: auto; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+    textarea, select { width: 100%; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+    textarea#prompt { min-height: 72px; resize: vertical; }
+    textarea#output { min-height: 120px; resize: vertical; }
+    .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+    button { font: inherit; border: 1px solid var(--line); background: var(--accent); color: var(--bg); border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+    button.secondary { background: transparent; color: var(--fg); }
+    button:disabled { opacity: .5; cursor: default; }
+    .status { min-height: 18px; font-size: 12px; margin-top: 8px; color: var(--muted); }
+    .status.ok { color: #1a7f37; } .status.warn { color: #9a6700; } .status.error { color: #cf222e; }
+    .spacer { flex: 1; }
+    footer { margin-top: 10px; font-size: 11px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="assets/icon-32.png" alt="Hanzo" />
+    <span class="title">Hanzo AI</span>
+    <span class="host" id="hostname">Office</span>
+  </header>
+
+  <label for="prompt">What should Hanzo do with your selection?</label>
+  <textarea id="prompt" placeholder="e.g. Rewrite this clause in plain English · Summarize the selected rows · Draft a mutual NDA section about confidentiality"></textarea>
+
+  <div class="row">
+    <button id="run">Ask Hanzo</button>
+    <button id="signin" class="secondary">Sign in</button>
+    <button id="signout" class="secondary" style="display:none">Sign out</button>
+    <span class="spacer"></span>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <label for="output">Result</label>
+  <textarea id="output" placeholder="Hanzo's output appears here — review before inserting."></textarea>
+
+  <div class="row">
+    <select id="mode" aria-label="Insert mode">
+      <option value="after">Insert after selection</option>
+      <option value="replace">Replace selection</option>
+    </select>
+    <button id="insert" disabled>Insert into document</button>
+  </div>
+
+  <footer>Routed through api.hanzo.ai · sign in with Hanzo (hanzo.id) for your models.</footer>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>
