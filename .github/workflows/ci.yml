@@ -106,10 +106,15 @@ jobs:
     - name: Package browser extensions
       working-directory: packages/browser
       run: |
-        VER="${{ steps.version.outputs.ver }}"
-        cd dist/browser-extension/chrome && zip -r /tmp/hanzo-ai-chrome-v${VER}.zip .
-        cd ../firefox && zip -r /tmp/hanzo-ai-firefox-v${VER}.zip .
-        cd ../chrome && zip -r /tmp/hanzo-ai-edge-v${VER}.zip .
+        # web-ext (already used for linting below) does the zipping — the
+        # arc runner image has no `zip` binary. Version comes from the
+        # browser package.json, the single source of truth build.js stamps
+        # into the manifests (the root version can lag it).
+        VER=$(node -p "require('./package.json').version")
+        npx web-ext build --source-dir dist/browser-extension/chrome  --artifacts-dir /tmp --filename hanzo-ai-chrome-v${VER}.zip  --overwrite-dest
+        npx web-ext build --source-dir dist/browser-extension/firefox --artifacts-dir /tmp --filename hanzo-ai-firefox-v${VER}.zip --overwrite-dest
+        # Edge uses the Chrome zip (Chromium-compatible)
+        cp /tmp/hanzo-ai-chrome-v${VER}.zip /tmp/hanzo-ai-edge-v${VER}.zip
 
     - name: Lint Firefox
       working-directory: packages/browser
