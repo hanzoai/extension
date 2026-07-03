@@ -24,8 +24,24 @@ export const IAM_API_URL = 'https://iam.hanzo.ai';
  */
 export const IAM_API_PATH = '/v1/iam';
 
-/** OAuth2 client ID — override via storage key 'hanzo_config_client_id' */
-export const DEFAULT_CLIENT_ID = 'app-hanzo';
+/**
+ * OAuth2 client ID — override via storage key 'hanzo_config_client_id'.
+ *
+ * MUST be a client_id registered in Hanzo IAM whose redirectUris include
+ * DEFAULT_REDIRECT_URI. The canonical browser-extension client is
+ * `hanzo-browser` (universe/infra/k8s/iam/init_data.json → application
+ * "hanzo-browser", redirectUris: https://hanzo.ai/callback,
+ * https://hanzo.app/callback, http://localhost:3000/callback).
+ *
+ * NOTE: the prior value `app-hanzo` was never a registered IAM client, so the
+ * PKCE token exchange always failed with `invalid_client` — login was broken
+ * for every build since v1.8.0. Verify with:
+ *   curl -X POST https://iam.hanzo.ai/v1/iam/oauth/token \
+ *     -d 'grant_type=authorization_code&client_id=hanzo-browser&code=x&code_verifier=y&redirect_uri=https://hanzo.ai/callback'
+ * A registered client returns `invalid_grant` (code rejected); an unregistered
+ * one returns `invalid_client`.
+ */
+export const DEFAULT_CLIENT_ID = 'hanzo-browser';
 
 /** OAuth2 scopes */
 export const DEFAULT_SCOPES = 'openid profile email';
