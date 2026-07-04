@@ -9,6 +9,7 @@ packages:
   - 'packages/mcp'
   - 'packages/office'
   - 'packages/outlook'
+  - 'packages/pdf'
   - 'packages/tools'
   - 'packages/vscode'
   - 'apps/*'
