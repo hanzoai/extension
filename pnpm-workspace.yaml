@@ -12,6 +12,7 @@ packages:
   - 'packages/office'
   - 'packages/outlook'
   - 'packages/pdf'
+  - 'packages/teams'
   - 'packages/tools'
   - 'packages/vscode'
   - 'apps/*'
