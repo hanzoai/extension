@@ -13,6 +13,7 @@ packages:
   - 'packages/office'
   - 'packages/outlook'
   - 'packages/pdf'
+  - 'packages/salesforce'
   - 'packages/slack'
   - 'packages/teams'
   - 'packages/tools'
