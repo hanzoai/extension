@@ -1,0 +1,7 @@
+.hanzo-output {
+    white-space: pre-wrap;
+    max-height: 24rem;
+    overflow-y: auto;
+    background: var(--slds-g-color-neutral-base-95, #f3f3f3);
+    line-height: 1.4;
+}
