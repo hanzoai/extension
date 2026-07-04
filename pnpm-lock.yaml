@@ -412,6 +412,25 @@ importers:
         specifier: ^3.2.6
         version: 3.2.6(@types/node@20.19.9)(jsdom@26.1.0)(sass@1.60.0)(terser@5.43.1)
 
+  packages/gitlab:
+    dependencies:
+      '@hanzo/ai':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@hanzo/iam':
+        specifier: ^0.13.2
+        version: 0.13.2(react@19.2.7)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.9
+      typescript:
+        specifier: ^5.3.0
+        version: 5.8.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@20.19.9)(jsdom@26.1.0)(sass@1.60.0)(terser@5.43.1)
+
   packages/gworkspace:
     devDependencies:
       '@google/clasp':
@@ -3583,6 +3602,7 @@ packages:
   '@lancedb/lancedb@0.21.0':
     resolution: {integrity: sha512-3c65DfAsTzGb3/Y2WtpJeqPFb2BgoTsYweg3gj9zP6t8CCaKQSeVWEGE8Nowtdj5Jkj9/nmHUoKPv4jCsds2yQ==}
     engines: {node: '>= 18'}
+    cpu: [x64, arm64]
     os: [darwin, linux, win32]
     peerDependencies:
       apache-arrow: '>=15.0.0 <=18.1.0'
@@ -3862,16 +3882,19 @@ packages:
   '@nut-tree-fork/libnut-darwin@2.7.5':
     resolution: {integrity: sha512-LbqtPtMPTJUcg4XoPP2jsU1wc8flBcGyKTerKsIfK9cD7nBHROnO0QksbrsbSWEpLym8T8fRtuU7XEY83l6Z2Q==}
     engines: {node: '>=10.15.3'}
+    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-linux@2.7.5':
     resolution: {integrity: sha512-uxaXEcRKnFObAljsoR6tLOBUU1dJ2sctloG6gFgCBGN7+k6Jdv6jZfOuNjd/fpdq2C5WPMm0rtn9EE7h5J3Jcg==}
     engines: {node: '>=10.15.3'}
+    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-win32@2.7.5':
     resolution: {integrity: sha512-yqC87zvmFcDPwFrRU40DYhN0xmEVM3aSkOuyF0IX+y1x+HWSu/i0PNklATpPBhGid3QVb/TOHuVoaraMrUFCNw==}
     engines: {node: '>=10.15.3'}
+    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut@4.2.6':
@@ -3885,6 +3908,7 @@ packages:
   '@nut-tree-fork/nut-js@4.2.6':
     resolution: {integrity: sha512-aI/WCX7gE1HFGPH3EZP/UWqpNMM1NMoM/EkXqp7pKMgXFCi8e5+o5p+jd/QOYpmALv9bQg7+s69nI7FONbMqDg==}
     engines: {node: '>=16'}
+    cpu: [x64, arm64]
     os: [linux, darwin, win32]
 
   '@nut-tree-fork/provider-interfaces@4.2.6':

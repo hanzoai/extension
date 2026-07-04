@@ -10,6 +10,7 @@ packages:
   - 'packages/dxt'
   - 'packages/figma'
   - 'packages/github'
+  - 'packages/gitlab'
   - 'packages/gworkspace'
   - 'packages/hubspot'
   - 'packages/jetbrains'
