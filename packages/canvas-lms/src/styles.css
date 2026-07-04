@@ -1,0 +1,50 @@
+:root {
+  color-scheme: light dark;
+  --fg: #1a1a1a; --muted: #666; --bg: #fff; --line: #e3e3e3; --accent: #111;
+  --ok: #1a7f37; --warn: #9a6700; --error: #cf222e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #eaeaea; --muted: #9a9a9a; --bg: #1e1e1e; --line: #333; --accent: #fff;
+    --ok: #3fb950; --warn: #d29922; --error: #f85149;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--fg); background: var(--bg); margin: 0 auto; padding: 14px;
+  max-width: 720px;
+}
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+header .title { font-weight: 600; font-size: 15px; }
+header .host { color: var(--muted); font-size: 12px; margin-left: auto; }
+label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+textarea, select, input {
+  width: 100%; font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px;
+}
+textarea#prompt { min-height: 56px; resize: vertical; }
+textarea#output { min-height: 220px; resize: vertical; }
+.row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.row.scope { margin-top: 4px; }
+.row.scope select { flex: 1; min-width: 160px; }
+button {
+  font: inherit; border: 1px solid var(--line); background: var(--accent);
+  color: var(--bg); border-radius: 6px; padding: 8px 14px; cursor: pointer;
+}
+button.secondary { background: transparent; color: var(--fg); }
+button:disabled { opacity: .5; cursor: default; }
+.spacer { flex: 1; }
+.records { font-size: 11px; color: var(--muted); margin-top: 6px; min-height: 14px; }
+.status { min-height: 18px; font-size: 12px; margin-top: 10px; color: var(--muted); }
+.status.ok { color: var(--ok); } .status.warn { color: var(--warn); } .status.error { color: var(--error); }
+.hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+footer { margin-top: 12px; font-size: 11px; color: var(--muted); }
+select#model { width: auto; max-width: 150px; padding: 4px 8px; font-size: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip {
+  padding: 5px 10px; border-radius: 999px; font-size: 13px;
+  background: transparent; color: var(--fg); border: 1px solid var(--line);
+}
+.chip:hover:not(:disabled) { border-color: var(--accent); }
+details summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-top: 10px; }

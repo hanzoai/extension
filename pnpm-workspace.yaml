@@ -3,6 +3,7 @@ packages:
   - 'packages/auth'
   - 'packages/browser'
   - 'packages/canva'
+  - 'packages/canvas-lms'
   - 'packages/cards'
   - 'packages/clio'
   - 'packages/desktop'
