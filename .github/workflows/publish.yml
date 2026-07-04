@@ -579,17 +579,24 @@ jobs:
       continue-on-error: true
       run: python -m pip install --upgrade jupyterlab build
 
-    - name: Build labextension
+    # Build the PROD labextension via pnpm (NOT jlpm). jlpm is yarn, which refuses to
+    # `install` inside this pnpm monorepo ("not part of the project"). Running the
+    # scripts through pnpm uses the already-installed node_modules and produces
+    # hanzo_jupyter/labextension/static/style.js — the hook's skip-if-exists target,
+    # so the wheel build below skips jlpm entirely.
+    - name: Build labextension (prod, via pnpm)
       continue-on-error: true
-      run: pnpm --filter @hanzo/jupyter build
+      run: |
+        pnpm --filter @hanzo/jupyter run build:lib:prod
+        pnpm --filter @hanzo/jupyter run build:labextension
 
     - name: Build wheel
       continue-on-error: true
       working-directory: packages/jupyter
       run: |
         VERSION=${GITHUB_REF_NAME#v}
-        # hatch-jupyter-builder runs `jlpm build:prod` during the wheel build; the
-        # pre-built labextension above satisfies its skip-if-exists check.
+        # skip-if-exists (hanzo_jupyter/labextension/static/style.js) is satisfied by
+        # the prod labextension above, so hatch-jupyter-builder does NOT invoke jlpm.
         python -m build --wheel
         mkdir -p /tmp/jupyter
         WHL=$(ls dist/hanzo_jupyter-*.whl dist/hanzo_ai_jupyter-*.whl 2>/dev/null | head -1)
