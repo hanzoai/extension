@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/teams",
   "version": "0.1.0",
-  "description": "Hanzo AI for Microsoft Teams — a Bot Framework app with chat, message extensions, and Adaptive Card actions, built on @hanzo/ai, @hanzo/iam, and @hanzo/cards.",
+  "description": "Hanzo AI for Microsoft Teams \u2014 a Bot Framework app with chat, message extensions, and Adaptive Card actions, built on @hanzo/ai, @hanzo/iam, and @hanzo/cards.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -32,7 +32,7 @@
     "package": "node manifest/build.mjs"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.1.1",
+    "@hanzo/ai": "^0.2.0",
     "@hanzo/cards": "workspace:*",
     "@hanzo/iam": "^0.13.2",
     "botbuilder": "^4.23.3",
