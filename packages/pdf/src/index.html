@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI · PDF</title>
+  <link rel="icon" href="assets/icon-32.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="workspace">
+    <!-- LEFT: the PDF viewer -->
+    <section class="viewer" aria-label="PDF viewer">
+      <div class="toolbar">
+        <label class="filebtn">
+          Open PDF
+          <input id="file" type="file" accept="application/pdf,.pdf" hidden />
+        </label>
+        <div class="pager">
+          <button id="prev" disabled aria-label="Previous page">‹</button>
+          <span id="pagelabel" class="pagelabel">—</span>
+          <button id="next" disabled aria-label="Next page">›</button>
+        </div>
+        <div id="docstatus" class="docstatus">Open a PDF filing, contract, or discovery document to begin.</div>
+      </div>
+      <div id="viewer-scroll" class="viewer-scroll">
+        <canvas id="page" class="page"></canvas>
+      </div>
+    </section>
+
+    <!-- RIGHT: the Hanzo AI panel -->
+    <aside class="panel" aria-label="Hanzo AI">
+      <header class="panel-head">
+        <img src="assets/icon-32.png" alt="Hanzo" class="logo" />
+        <span class="brand">Hanzo AI</span>
+        <select id="model" class="model" aria-label="Model"></select>
+      </header>
+
+      <div id="chips" class="chips" role="group" aria-label="Quick actions"></div>
+
+      <label for="prompt">Ask about this document</label>
+      <textarea id="prompt" placeholder="e.g. What is the term and how does it renew? · Who indemnifies whom? · List every deadline. · Explain the highlighted clause."></textarea>
+
+      <div class="row">
+        <select id="scope" aria-label="Context scope">
+          <option value="doc">Whole document</option>
+          <option value="page">Current page only</option>
+        </select>
+        <button id="run">Ask Hanzo</button>
+        <button id="stop" class="secondary" style="display:none">Stop</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div id="output" class="output" aria-live="polite"></div>
+
+      <details class="auth">
+        <summary>Hanzo API key</summary>
+        <div class="row">
+          <input id="apikey" type="password" placeholder="hk-…" autocomplete="off" />
+          <button id="savekey" class="secondary">Save</button>
+        </div>
+        <div id="authhint" class="authhint"></div>
+      </details>
+
+      <footer class="foot">Routed through api.hanzo.ai · text stays in your browser except the pages sent with your question.</footer>
+    </aside>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
