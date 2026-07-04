@@ -1,0 +1,44 @@
+{
+  "name": "@hanzo/workday",
+  "version": "0.1.0",
+  "description": "Hanzo AI for Workday — AI over your people data: summarize a worker or team, draft a job description / requisition, summarize an org and headcount, answer HR / policy questions, and draft review feedback. An embedded-app panel plus a read-only OAuth + API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "^0.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "esbuild": "^0.25.8",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "hanzo",
+    "workday",
+    "hcm",
+    "hr",
+    "people",
+    "ai",
+    "oauth",
+    "raas"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/workday"
+  }
+}
