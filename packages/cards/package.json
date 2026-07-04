@@ -1,0 +1,51 @@
+{
+  "name": "@hanzo/cards",
+  "version": "0.1.0",
+  "description": "One canonical panel spec, three host card formats — Slack Block Kit, Microsoft Teams Adaptive Cards, and Google Workspace CardService — for Hanzo card-host chat surfaces.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.6"
+  },
+  "keywords": [
+    "hanzo",
+    "cards",
+    "slack",
+    "block-kit",
+    "adaptive-cards",
+    "teams",
+    "cardservice",
+    "google-workspace"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/cards"
+  }
+}
