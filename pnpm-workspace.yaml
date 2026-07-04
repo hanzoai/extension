@@ -20,6 +20,7 @@ packages:
   - 'packages/teams'
   - 'packages/tools'
   - 'packages/vscode'
+  - 'packages/zendesk'
   - 'apps/*'
 
 onlyBuiltDependencies:
