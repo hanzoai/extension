@@ -1,0 +1,28 @@
+{
+  "jupyter.lab.setting-icon": "hanzo:logo",
+  "jupyter.lab.setting-icon-label": "Hanzo AI",
+  "title": "Hanzo AI",
+  "description": "Settings for the Hanzo AI in-notebook assistant.",
+  "type": "object",
+  "properties": {
+    "apiKey": {
+      "type": "string",
+      "title": "Hanzo API key",
+      "description": "Your Hanzo `hk-` API key (from https://hanzo.ai). Leave blank to use the gateway's public/limited models. Sent as a Bearer token to api.hanzo.ai; never stored in source.",
+      "default": ""
+    },
+    "model": {
+      "type": "string",
+      "title": "Default model",
+      "description": "The default model id used for cell actions and the assistant panel. Pick any id returned by /v1/models.",
+      "default": "zen5"
+    },
+    "baseUrl": {
+      "type": "string",
+      "title": "Gateway base URL",
+      "description": "The Hanzo AI gateway origin. Override only for a self-hosted gateway.",
+      "default": "https://api.hanzo.ai"
+    }
+  },
+  "additionalProperties": false
+}
