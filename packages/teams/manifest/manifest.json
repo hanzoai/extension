@@ -1,0 +1,101 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "0.1.0",
+  "id": "${{TEAMS_APP_ID}}",
+  "packageName": "ai.hanzo.teams",
+  "developer": {
+    "name": "Hanzo AI",
+    "websiteUrl": "https://hanzo.ai",
+    "privacyUrl": "https://hanzo.ai/privacy",
+    "termsOfUseUrl": "https://hanzo.ai/terms"
+  },
+  "name": {
+    "short": "Hanzo",
+    "full": "Hanzo AI Assistant"
+  },
+  "description": {
+    "short": "AI assistant for Teams — chat, summarize, draft, extract action items.",
+    "full": "Hanzo brings frontier AI into Microsoft Teams. Chat with Hanzo in a DM or @mention it in a channel, run quick actions (draft a reply, summarize, explain, extract action items) on any message, and insert an AI draft while composing — all answered by Hanzo AI (api.hanzo.ai) and rendered as native Adaptive Cards."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#0B0B0F",
+  "bots": [
+    {
+      "botId": "${{MICROSOFT_APP_ID}}",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupChat"],
+          "commands": [
+            {
+              "title": "Ask Hanzo",
+              "description": "Ask Hanzo AI anything"
+            },
+            {
+              "title": "Summarize",
+              "description": "Summarize the message or thread"
+            },
+            {
+              "title": "Draft reply",
+              "description": "Draft a reply to the message"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "composeExtensions": [
+    {
+      "botId": "${{MICROSOFT_APP_ID}}",
+      "commands": [
+        {
+          "id": "askHanzo",
+          "type": "action",
+          "title": "Ask Hanzo",
+          "description": "Run a Hanzo quick action on this message",
+          "context": ["message", "compose", "commandBox"],
+          "fetchTask": false,
+          "parameters": [
+            {
+              "name": "chip",
+              "title": "Action",
+              "description": "Which Hanzo action to run",
+              "inputType": "choiceset",
+              "value": "summarize",
+              "choices": [
+                { "title": "Summarize", "value": "summarize" },
+                { "title": "Draft reply", "value": "draft" },
+                { "title": "Explain", "value": "explain" },
+                { "title": "Extract action items", "value": "action_items" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "composeHanzo",
+          "type": "query",
+          "title": "Compose with Hanzo",
+          "description": "Generate an AI draft to insert into your message",
+          "initialRun": false,
+          "context": ["compose", "commandBox"],
+          "parameters": [
+            {
+              "name": "prompt",
+              "title": "Prompt",
+              "description": "What should Hanzo write?",
+              "inputType": "text"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["api.hanzo.ai", "token.botframework.com"]
+}
