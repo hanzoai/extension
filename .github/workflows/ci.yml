@@ -92,6 +92,9 @@ jobs:
     - name: Test GitLab integration
       run: pnpm --filter @hanzo/gitlab test
 
+    - name: Test Desktop app (frontend)
+      run: pnpm --filter @hanzo/desktop test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
