@@ -99,6 +99,9 @@ jobs:
     - name: Test QuickBooks (finance)
       run: pnpm --filter @hanzo/quickbooks test
 
+    - name: Test Epic (SMART-on-FHIR)
+      run: pnpm --filter @hanzo/epic test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
