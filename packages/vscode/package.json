@@ -405,5 +405,6 @@
     "out",
     "images",
     "README.md"
-  ]
+  ],
+  "private": true
 }
