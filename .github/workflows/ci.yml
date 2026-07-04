@@ -102,6 +102,9 @@ jobs:
     - name: Test Epic (SMART-on-FHIR)
       run: pnpm --filter @hanzo/epic test
 
+    - name: Test Canvas LMS (education)
+      run: pnpm --filter @hanzo/canvas-lms test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
