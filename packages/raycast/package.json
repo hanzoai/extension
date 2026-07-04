@@ -1,11 +1,15 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "hanzo-ai",
+  "version": "1.0.0",
   "title": "Hanzo AI",
   "description": "Hanzo AI in the Raycast command bar — ask Hanzo, and summarize, explain, rewrite, translate, or fix the grammar of your selection or clipboard, wired to the api.hanzo.ai gateway via the published @hanzo/ai.",
   "icon": "hanzo-icon.png",
   "author": "hanzo",
-  "categories": ["Productivity", "Developer Tools"],
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
   "license": "MIT",
   "commands": [
     {
@@ -142,5 +146,13 @@
     "type": "git",
     "url": "https://github.com/hanzoai/extension.git",
     "directory": "packages/raycast"
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "assets",
+    "README.md"
+  ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/gitlab",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hanzo AI on GitLab — a webhook service that reviews merge requests, triages issues, and answers @hanzo mentions, built on @hanzo/ai and @hanzo/iam.",
   "type": "module",
   "main": "./dist/index.js",
