@@ -1,0 +1,56 @@
+# Hanzo AI for Shopify — app configuration (shopify app deploy reads this).
+# The `client_id` is the app's PUBLIC API key from the Partner Dashboard; the
+# API SECRET is never in this file — it lives only in the server's environment
+# (SHOPIFY_API_SECRET). Docs: shopify.dev/docs/apps/build/cli-for-apps/app-configuration
+#
+# Fill `client_id` and the two URLs from your Partner app, then:
+#   shopify app config link      # bind this toml to the Partner app
+#   shopify app deploy           # push scopes, URLs, and the extension
+
+name = "Hanzo AI"
+handle = "hanzo-ai"
+client_id = "REPLACE_WITH_PARTNER_APP_CLIENT_ID"
+application_url = "https://shopify.hanzo.ai/"
+embedded = true
+
+[access_scopes]
+# The only scopes the app uses: read/write products (content write-back) and
+# read orders (support + order insight). Nothing we do not use.
+scopes = "read_products,write_products,read_orders"
+
+[auth]
+# The OAuth callback the server verifies (HMAC + state) and exchanges the code at.
+redirect_urls = [
+  "https://shopify.hanzo.ai/oauth/callback"
+]
+
+[webhooks]
+api_version = "2025-01"
+
+  # Order creation → the server can auto-draft a support summary.
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "https://shopify.hanzo.ai/webhooks"
+
+  # App uninstall → the server drops the shop's stored offline token.
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://shopify.hanzo.ai/webhooks"
+
+  # The three GDPR/privacy topics every public app must handle to pass review.
+  [[webhooks.subscriptions]]
+  topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "https://shopify.hanzo.ai/webhooks"
+
+[app_proxy]
+# Not used — the embedded app talks to the server directly over its own host.
+
+[pos]
+embedded = false
+
+[build]
+# The embedded app is served as static assets over hanzoai/static; the CLI does
+# not build it (build.js does). Point automatically_update_urls_on_dev off so a
+# local `shopify app dev` never rewrites the production application_url.
+automatically_update_urls_on_dev = false
+include_config_on_deploy = true
