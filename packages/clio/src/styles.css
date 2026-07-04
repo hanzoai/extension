@@ -1,0 +1,30 @@
+/* Hanzo AI for Clio — one small stylesheet, mirroring the office add-in look:
+   system font, light/dark auto, black-on-white accent. No framework. */
+:root { color-scheme: light dark; --fg:#1a1a1a; --muted:#666; --bg:#fff; --line:#e3e3e3; --accent:#111; }
+@media (prefers-color-scheme: dark) { :root { --fg:#eaeaea; --muted:#9a9a9a; --bg:#1e1e1e; --line:#333; --accent:#fff; } }
+* { box-sizing: border-box; }
+body { font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); margin: 0; padding: 16px; max-width: 720px; margin-inline: auto; }
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+header img { width: 24px; height: 24px; }
+header .title { font-weight: 600; font-size: 16px; }
+label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+textarea, select, input[type="text"], input[type="password"] {
+  width: 100%; font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px;
+}
+textarea#output { min-height: 180px; resize: vertical; }
+.row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+button { font: inherit; border: 1px solid var(--line); background: var(--accent); color: var(--bg); border-radius: 6px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+button.secondary { background: transparent; color: var(--fg); margin-left: auto; }
+button:disabled { opacity: .5; cursor: default; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.actions .action { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+.actions .action:hover:not(:disabled) { border-color: var(--accent); }
+.status { min-height: 18px; font-size: 12px; margin-top: 10px; color: var(--muted); }
+.status.ok { color: #1a7f37; } .status.warn { color: #9a6700; } .status.error { color: #cf222e; }
+select#model { width: auto; max-width: 140px; margin-left: auto; padding: 4px 8px; font-size: 12px; }
+select#target { width: auto; }
+details { margin-top: 12px; }
+details summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.hint { font-size: 11px; color: var(--muted); margin: 6px 0 0; }
+footer { margin-top: 16px; font-size: 11px; color: var(--muted); }
