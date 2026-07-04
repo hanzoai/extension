@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI · Zendesk</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- ZAFClient global, hosted by Zendesk. `2.0` pins the framework, floats patches. -->
+  <script src="https://static.zdassets.com/zendesk_app_framework_sdk/2.0/zaf_sdk.min.js"></script>
+</head>
+<body>
+  <main class="panel">
+    <header class="panel-head">
+      <img src="logo-small.png" alt="Hanzo" class="logo" />
+      <span class="brand">Hanzo AI</span>
+      <span id="model" class="model" title="Active model">—</span>
+    </header>
+
+    <div id="chips" class="chips" role="group" aria-label="Quick actions"></div>
+
+    <label for="prompt">Ask about this ticket</label>
+    <textarea id="prompt" placeholder="e.g. What is the customer actually blocked on? · Draft a reply resolving the refund. · Is this a known issue?"></textarea>
+    <div class="row">
+      <button id="ask">Ask Hanzo</button>
+      <span id="spinner" class="spinner" style="display:none" aria-label="Working"></span>
+    </div>
+
+    <div id="status" class="status" aria-live="polite"></div>
+
+    <div id="output" class="output" aria-live="polite"></div>
+
+    <div class="row writeback">
+      <button id="insert" class="secondary">Insert as reply</button>
+      <button id="note" class="secondary">Add as note</button>
+    </div>
+
+    <footer class="foot">Routed through api.hanzo.ai · your Hanzo API key is a secure app setting and never leaves Zendesk.</footer>
+  </main>
+
+  <script type="module" src="panel.js"></script>
+</body>
+</html>
