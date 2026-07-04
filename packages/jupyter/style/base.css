@@ -1,0 +1,114 @@
+/* Hanzo AI panel styles. Uses JupyterLab CSS variables so the panel inherits
+   the active theme (light/dark) rather than hard-coding colors. */
+
+.hanzo-panel-widget {
+  min-width: 240px;
+}
+
+.hanzo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  height: 100%;
+  box-sizing: border-box;
+  color: var(--jp-ui-font-color1);
+  font-size: var(--jp-ui-font-size1);
+}
+
+.hanzo-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.hanzo-panel-logo {
+  display: inline-flex;
+}
+
+.hanzo-panel-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.hanzo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  font-size: var(--jp-ui-font-size0);
+}
+
+.hanzo-field select {
+  background: var(--jp-layout-color1);
+  color: var(--jp-ui-font-color1);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 3px;
+  padding: 3px;
+}
+
+.hanzo-panel-prompt {
+  resize: vertical;
+  background: var(--jp-layout-color1);
+  color: var(--jp-ui-font-color1);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 3px;
+  padding: 6px;
+  font-family: var(--jp-code-font-family);
+  font-size: var(--jp-ui-font-size1);
+}
+
+.hanzo-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hanzo-btn {
+  border: none;
+  border-radius: 3px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: var(--jp-ui-font-size1);
+}
+
+.hanzo-btn-send {
+  background: #c80000;
+  color: #fff;
+}
+
+.hanzo-btn-send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.hanzo-btn-stop {
+  background: var(--jp-layout-color2);
+  color: var(--jp-ui-font-color1);
+}
+
+.hanzo-panel-hint {
+  color: var(--jp-ui-font-color2);
+  font-size: var(--jp-ui-font-size0);
+}
+
+.hanzo-panel-error {
+  color: var(--jp-error-color1);
+  font-size: var(--jp-ui-font-size0);
+  white-space: pre-wrap;
+}
+
+.hanzo-panel-output {
+  flex: 1;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--jp-layout-color1);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 3px;
+  padding: 8px;
+  font-family: var(--jp-code-font-family);
+  font-size: var(--jp-code-font-size);
+  margin: 0;
+}

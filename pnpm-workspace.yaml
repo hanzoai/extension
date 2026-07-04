@@ -13,6 +13,7 @@ packages:
   - 'packages/gworkspace'
   - 'packages/hubspot'
   - 'packages/jetbrains'
+  - 'packages/jupyter'
   - 'packages/mcp'
   - 'packages/meetings'
   - 'packages/notion'
