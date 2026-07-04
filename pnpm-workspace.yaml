@@ -9,6 +9,7 @@ packages:
   - 'packages/docusign'
   - 'packages/dxt'
   - 'packages/figma'
+  - 'packages/github'
   - 'packages/gworkspace'
   - 'packages/hubspot'
   - 'packages/jetbrains'
