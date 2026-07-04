@@ -1,0 +1,46 @@
+{
+  "name": "@hanzo/gitlab",
+  "version": "0.1.0",
+  "description": "Hanzo AI on GitLab — a webhook service that reviews merge requests, triages issues, and answers @hanzo mentions, built on @hanzo/ai and @hanzo/iam.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "^0.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.6"
+  },
+  "keywords": [
+    "hanzo",
+    "gitlab",
+    "webhook",
+    "merge-request",
+    "code-review",
+    "issue-triage",
+    "ai"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/gitlab"
+  }
+}
