@@ -362,6 +362,31 @@ importers:
         specifier: ^7.0.1
         version: 7.0.1
 
+  packages/figma:
+    dependencies:
+      '@hanzo/ai':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@hanzo/iam':
+        specifier: ^0.13.2
+        version: 0.13.2(react@18.3.1)
+    devDependencies:
+      '@figma/plugin-typings':
+        specifier: ^1.130.0
+        version: 1.130.0
+      '@types/node':
+        specifier: ^20.19.9
+        version: 20.19.9
+      esbuild:
+        specifier: 0.25.8
+        version: 0.25.8
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vitest:
+        specifier: 3.2.6
+        version: 3.2.6(@types/node@20.19.9)(jsdom@26.1.0)(sass@1.60.0)(terser@5.43.1)
+
   packages/gworkspace:
     devDependencies:
       '@google/clasp':
@@ -622,6 +647,31 @@ importers:
       esbuild:
         specifier: ^0.25.8
         version: 0.25.8
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@20.19.9)(jsdom@26.1.0)(sass@1.60.0)(terser@5.43.1)
+
+  packages/sketch:
+    dependencies:
+      '@hanzo/ai':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@hanzo/iam':
+        specifier: ^0.13.2
+        version: 0.13.2(react@18.3.1)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.14.0
+        version: 20.19.9
+      esbuild:
+        specifier: ^0.25.8
+        version: 0.25.8
+      sketch-module-web-view:
+        specifier: ^3.5.3
+        version: 3.5.3
       typescript:
         specifier: ^5.8.3
         version: 5.8.3
@@ -2052,6 +2102,9 @@ packages:
     resolution: {integrity: sha512-d9zaMRSTIKDLhctzH12MtXvJKSSUhaHcjV+2Z+GK+EEY7XKpP5yR4x+N3TAcHTcu963nIr+TMcCb4DBCYX1z6Q==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
+  '@figma/plugin-typings@1.130.0':
+    resolution: {integrity: sha512-kz+eU4TXBr99YrMyF2/WtcsdS6K4Ksy3datZZtuCUUSDPRknJAVLZpjhBESCd0tCtHRWKeo4l/I7Aze6lHB52A==}
+
   '@firebase/ai@1.3.0':
     resolution: {integrity: sha512-qBxJTtl9hpgZr050kVFTRADX6I0Ss6mEQyp/JEkBgKwwxixKnaRNqEDGFba4OKNL7K8E4Y7LlA/ZW6L8aCKH4A==}
     engines: {node: '>=18.0.0'}
@@ -2894,7 +2947,6 @@ packages:
   '@lancedb/lancedb@0.21.0':
     resolution: {integrity: sha512-3c65DfAsTzGb3/Y2WtpJeqPFb2BgoTsYweg3gj9zP6t8CCaKQSeVWEGE8Nowtdj5Jkj9/nmHUoKPv4jCsds2yQ==}
     engines: {node: '>= 18'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
     peerDependencies:
       apache-arrow: '>=15.0.0 <=18.1.0'
@@ -3060,19 +3112,16 @@ packages:
   '@nut-tree-fork/libnut-darwin@2.7.5':
     resolution: {integrity: sha512-LbqtPtMPTJUcg4XoPP2jsU1wc8flBcGyKTerKsIfK9cD7nBHROnO0QksbrsbSWEpLym8T8fRtuU7XEY83l6Z2Q==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-linux@2.7.5':
     resolution: {integrity: sha512-uxaXEcRKnFObAljsoR6tLOBUU1dJ2sctloG6gFgCBGN7+k6Jdv6jZfOuNjd/fpdq2C5WPMm0rtn9EE7h5J3Jcg==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-win32@2.7.5':
     resolution: {integrity: sha512-yqC87zvmFcDPwFrRU40DYhN0xmEVM3aSkOuyF0IX+y1x+HWSu/i0PNklATpPBhGid3QVb/TOHuVoaraMrUFCNw==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut@4.2.6':
@@ -3086,7 +3135,6 @@ packages:
   '@nut-tree-fork/nut-js@4.2.6':
     resolution: {integrity: sha512-aI/WCX7gE1HFGPH3EZP/UWqpNMM1NMoM/EkXqp7pKMgXFCi8e5+o5p+jd/QOYpmALv9bQg7+s69nI7FONbMqDg==}
     engines: {node: '>=16'}
-    cpu: [x64, arm64]
     os: [linux, darwin, win32]
 
   '@nut-tree-fork/provider-interfaces@4.2.6':
@@ -7996,6 +8044,9 @@ packages:
   mobx@6.16.1:
     resolution: {integrity: sha512-syNcDdX3KT+Jq3je6eGjBhuc24Z68td2VG0zNFqRswaE433D9SNH5VRy/xrGbJsUixfppLLccXhAW9JSf6n+SQ==}
 
+  mocha-js-delegate@0.2.0:
+    resolution: {integrity: sha512-2Sy62SNYHWscIR0UeROWs19RClXhlKofmABgnGzYhNkBauqUr1fysABoWEzyGrTtWTuJTV7conZaWVVIV6cLaw==}
+
   mocha@11.7.1:
     resolution: {integrity: sha512-5EK+Cty6KheMS/YLPPMJC64g5V61gIR25KsRItHw6x4hEKT6Njp1n9LOlH4gpevuwMVS66SXaBBpg+RWZkza4A==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
@@ -9436,6 +9487,9 @@ packages:
 
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
+
+  sketch-module-web-view@3.5.3:
+    resolution: {integrity: sha512-buvBDuHx8gN4qTLkEHrWOCHv5Y25xeV/UQ2M/nql/zWX6JNjbj0TC7aCRzWaYyrbo/ODC49zXKQ+OUO8MdkWbg==}
 
   slash@3.0.0:
     resolution: {integrity: sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==}
@@ -11899,6 +11953,8 @@ snapshots:
       - supports-color
 
   '@eslint/js@8.57.1': {}
+
+  '@figma/plugin-typings@1.130.0': {}
 
   '@firebase/ai@1.3.0(@firebase/app-types@0.9.3)(@firebase/app@0.13.0)':
     dependencies:
@@ -19355,6 +19411,8 @@ snapshots:
 
   mobx@6.16.1: {}
 
+  mocha-js-delegate@0.2.0: {}
+
   mocha@11.7.1:
     dependencies:
       browser-stdout: 1.3.1
@@ -21085,6 +21143,10 @@ snapshots:
       supports-color: 7.2.0
 
   sisteransi@1.0.5: {}
+
+  sketch-module-web-view@3.5.3:
+    dependencies:
+      mocha-js-delegate: 0.2.0
 
   slash@3.0.0: {}
 
