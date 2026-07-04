@@ -93,6 +93,12 @@ jobs:
     - name: Test Desktop app (frontend)
       run: pnpm --filter @hanzo/desktop test
 
+    - name: Test Procore (construction)
+      run: pnpm --filter @hanzo/procore test
+
+    - name: Test QuickBooks (finance)
+      run: pnpm --filter @hanzo/quickbooks test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
