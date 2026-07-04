@@ -21,7 +21,6 @@
 //   PORT                 — listen port                  (default 8787)
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import { clioBase, type ClioRegion } from './config.js';
 import { tokenExchange, tokenRefresh, parseTokenResponse } from './clio-oauth.js';
 import { parseCustomAction } from './custom-action.js';
@@ -52,16 +51,19 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): Env {
   };
 }
 
-// verifyNonce checks Clio's Custom Action HMAC. Clio signs the deep-link params
-// with HMAC-SHA256 keyed by the app's client_secret; the signed string is the
-// concatenation Clio documents (user_id + subject_url ...). Constant-time
-// compare so the check is not a timing oracle. Exposed for a unit test.
-export function verifyNonce(signedPayload: string, nonce: string, secret: string): boolean {
-  const expected = createHmac('sha256', secret).update(signedPayload).digest('hex');
-  const a = Buffer.from(expected);
-  const b = Buffer.from(nonce);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+// customActionRedirect builds the SPA landing URL for a verified Custom Action
+// deep-link. Clio's nonce is NOT locally verifiable — it is a single-use code
+// the SPA must replay to the Clio API (Clio validates server-side, 403 on a bad
+// one). So the server just parses the deep-link and forwards the matter id AND
+// the nonce into the SPA, which carries the nonce on its first authenticated
+// Clio call. Pure (given the query), so it is unit-tested. Returns '' when the
+// deep-link is not a matter action (nothing to open).
+export function customActionRedirect(search: URLSearchParams): string {
+  const ctx = parseCustomAction(search);
+  if (!ctx.matterId) return '';
+  const q = new URLSearchParams({ matter_id: String(ctx.matterId) });
+  if (ctx.nonce) q.set('custom_action_nonce', ctx.nonce);
+  return `/index.html?${q.toString()}`;
 }
 
 async function readBody(req: IncomingMessage): Promise<string> {
@@ -116,17 +118,12 @@ async function handleRefresh(env: Env, base: string, res: ServerResponse, body: 
   }
 }
 
-// GET /custom-action?…  → verify Clio's nonce, then redirect the browser to the
-// SPA landing (index.html) with the matter id, so the button opens the app in
-// the right matter context. A bad nonce is rejected (this is the trust edge).
-function handleCustomAction(env: Env, url: URL, res: ServerResponse): void {
-  const ctx = parseCustomAction(url.searchParams);
-  // Clio's signed string is user_id + subject_url per its Custom Actions spec.
-  const signed = `${ctx.userId}${ctx.subjectUrl}`;
-  if (!ctx.nonce || !verifyNonce(signed, ctx.nonce, env.clientSecret)) {
-    return json(res, 403, { error: 'invalid custom action nonce' });
-  }
-  const dest = `/index.html?matter_id=${ctx.matterId ?? ''}`;
+// GET /custom-action?…  → redirect the browser to the SPA landing (index.html)
+// with the matter id + the single-use nonce, so the app opens on the right
+// matter and replays the nonce to Clio for server-side validation. A non-matter
+// (or malformed) deep-link falls back to the SPA root.
+function handleCustomAction(url: URL, res: ServerResponse): void {
+  const dest = customActionRedirect(url.searchParams) || '/index.html';
   res.writeHead(302, { Location: dest });
   res.end();
 }
@@ -144,7 +141,7 @@ export function createHandler(env: Env) {
         return await handleRefresh(env, base, res, await readBody(req));
       }
       if (req.method === 'GET' && url.pathname === '/custom-action') {
-        return handleCustomAction(env, url, res);
+        return handleCustomAction(url, res);
       }
       if (req.method === 'GET' && url.pathname === '/healthz') {
         return json(res, 200, { ok: true });
@@ -157,7 +154,8 @@ export function createHandler(env: Env) {
 }
 
 // main boots the http server when run directly. Import-safe: only the direct
-// entry starts listening, so tests can import verifyNonce/readEnv without a port.
+// entry starts listening, so tests can import readEnv/customActionRedirect
+// without opening a port.
 export function main(): void {
   const env = readEnv();
   const server = createServer(createHandler(env));
