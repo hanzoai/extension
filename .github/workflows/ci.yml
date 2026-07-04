@@ -21,6 +21,11 @@ jobs:
         cache: 'pnpm'
     - run: pnpm install --frozen-lockfile
 
+    # Build shared workspace libraries first — consumers (slack/teams/…) import
+    # @hanzo/cards via its built dist/, so it must exist before their tests run.
+    - name: Build shared libraries
+      run: pnpm --filter @hanzo/cards build
+
     - name: Test browser extension
       run: pnpm --filter @hanzo/browser-extension test
 
@@ -50,6 +55,12 @@ jobs:
 
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
+
+    - name: Test Slack app
+      run: pnpm --filter @hanzo/slack test
+
+    - name: Test Zoom + Meet
+      run: pnpm --filter @hanzo/meetings test
 
     - name: Test tools package
       run: pnpm --filter @hanzo/cli-tools test
