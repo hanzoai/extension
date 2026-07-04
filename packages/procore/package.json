@@ -1,0 +1,43 @@
+{
+  "name": "@hanzo/procore",
+  "version": "0.1.0",
+  "description": "Hanzo AI for Procore — AI over your construction project: summarize an RFI, draft an RFI response, extract action items and risks, and summarize project status. An embedded-app panel plus an OAuth + API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "^0.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "esbuild": "^0.25.8",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "hanzo",
+    "procore",
+    "construction",
+    "rfi",
+    "submittal",
+    "ai",
+    "oauth"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/procore"
+  }
+}
