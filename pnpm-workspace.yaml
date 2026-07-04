@@ -22,6 +22,7 @@ packages:
   - 'packages/outlook'
   - 'packages/pdf'
   - 'packages/procore'
+  - 'packages/quickbooks'
   - 'packages/raycast'
   - 'packages/salesforce'
   - 'packages/shopify'
