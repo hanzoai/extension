@@ -517,10 +517,10 @@ jobs:
       continue-on-error: true
       run: |
         VERSION=${GITHUB_REF_NAME#v}
-        mkdir -p /tmp/desktop
+        mkdir -p desktop-artifacts
         DMG=$(ls packages/desktop/src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null | head -1)
-        if [ -n "$DMG" ]; then cp "$DMG" "/tmp/desktop/hanzo-ai-desktop-macos-v${VERSION}.dmg"; fi
-        ls -la /tmp/desktop/ || echo "no macOS installer produced"
+        if [ -n "$DMG" ]; then cp "$DMG" "desktop-artifacts/hanzo-ai-desktop-macos-v${VERSION}.dmg"; fi
+        ls -la desktop-artifacts/ || echo "no macOS installer produced"
 
     - name: Package for release (Windows)
       if: matrix.os == 'windows-latest'
@@ -528,30 +528,30 @@ jobs:
       shell: bash
       run: |
         VERSION=${GITHUB_REF_NAME#v}
-        mkdir -p /tmp/desktop
+        mkdir -p desktop-artifacts
         MSI=$(ls packages/desktop/src-tauri/target/release/bundle/msi/*.msi 2>/dev/null | head -1)
         EXE=$(ls packages/desktop/src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null | head -1)
-        if [ -n "$MSI" ]; then cp "$MSI" "/tmp/desktop/hanzo-ai-desktop-windows-v${VERSION}.msi"; fi
-        if [ -n "$EXE" ]; then cp "$EXE" "/tmp/desktop/hanzo-ai-desktop-windows-v${VERSION}.exe"; fi
-        ls -la /tmp/desktop/ || echo "no Windows installer produced"
+        if [ -n "$MSI" ]; then cp "$MSI" "desktop-artifacts/hanzo-ai-desktop-windows-v${VERSION}.msi"; fi
+        if [ -n "$EXE" ]; then cp "$EXE" "desktop-artifacts/hanzo-ai-desktop-windows-v${VERSION}.exe"; fi
+        ls -la desktop-artifacts/ || echo "no Windows installer produced"
 
     - name: Package for release (Linux)
       if: matrix.os == 'ubuntu-latest'
       continue-on-error: true
       run: |
         VERSION=${GITHUB_REF_NAME#v}
-        mkdir -p /tmp/desktop
+        mkdir -p desktop-artifacts
         APPIMAGE=$(ls packages/desktop/src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -1)
         DEB=$(ls packages/desktop/src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | head -1)
-        if [ -n "$APPIMAGE" ]; then cp "$APPIMAGE" "/tmp/desktop/hanzo-ai-desktop-linux-v${VERSION}.AppImage"; fi
-        if [ -n "$DEB" ]; then cp "$DEB" "/tmp/desktop/hanzo-ai-desktop-linux-v${VERSION}.deb"; fi
-        ls -la /tmp/desktop/ || echo "no Linux installer produced"
+        if [ -n "$APPIMAGE" ]; then cp "$APPIMAGE" "desktop-artifacts/hanzo-ai-desktop-linux-v${VERSION}.AppImage"; fi
+        if [ -n "$DEB" ]; then cp "$DEB" "desktop-artifacts/hanzo-ai-desktop-linux-v${VERSION}.deb"; fi
+        ls -la desktop-artifacts/ || echo "no Linux installer produced"
 
     - name: Upload Desktop installer
       uses: actions/upload-artifact@v4
       with:
         name: hanzo-ai-desktop-${{ runner.os }}
-        path: /tmp/desktop/*
+        path: desktop-artifacts/*
         if-no-files-found: ignore
       continue-on-error: true
 
