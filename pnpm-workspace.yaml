@@ -10,6 +10,7 @@ packages:
   - 'packages/jetbrains'
   - 'packages/mcp'
   - 'packages/meetings'
+  - 'packages/notion'
   - 'packages/office'
   - 'packages/outlook'
   - 'packages/pdf'

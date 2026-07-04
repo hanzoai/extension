@@ -1,0 +1,28 @@
+{
+  "name": "@hanzo/notion",
+  "version": "0.1.0",
+  "description": "Hanzo AI for Notion — summarize a page, draft/expand content, extract action items into a database, and ask about a page/workspace. Model calls route through the api.hanzo.ai gateway; Notion access via OAuth2 (public integration) + REST v1 with a server-side token proxy.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "serve": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.1.1",
+    "@hanzo/iam": "^0.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "esbuild": "^0.25.8",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
