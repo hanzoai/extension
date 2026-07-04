@@ -1,0 +1,64 @@
+{
+  "name": "@hanzo/teams",
+  "version": "0.1.0",
+  "description": "Hanzo AI for Microsoft Teams — a Bot Framework app with chat, message extensions, and Adaptive Card actions, built on @hanzo/ai, @hanzo/iam, and @hanzo/cards.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "hanzo-teams": "./dist/server.js"
+  },
+  "files": [
+    "dist",
+    "manifest",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "package": "node manifest/build.mjs"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.1.1",
+    "@hanzo/cards": "workspace:*",
+    "@hanzo/iam": "^0.13.2",
+    "botbuilder": "^4.23.3",
+    "restify": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/restify": "^8.5.12",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.6"
+  },
+  "keywords": [
+    "hanzo",
+    "teams",
+    "microsoft-teams",
+    "bot-framework",
+    "botbuilder",
+    "adaptive-cards",
+    "ai"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/teams"
+  }
+}
