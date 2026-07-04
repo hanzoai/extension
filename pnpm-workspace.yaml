@@ -8,6 +8,7 @@ packages:
   - 'packages/docusign'
   - 'packages/dxt'
   - 'packages/gworkspace'
+  - 'packages/hubspot'
   - 'packages/jetbrains'
   - 'packages/mcp'
   - 'packages/meetings'

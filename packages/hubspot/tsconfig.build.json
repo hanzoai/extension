@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": [
+    "src/index.ts",
+    "src/config.ts",
+    "src/hanzo.ts",
+    "src/oauth.ts",
+    "src/record.ts",
+    "src/api/hubspot-api.ts",
+    "src/api/write-back.ts"
+  ],
+  "exclude": ["src/app/**", "test/**"]
+}
