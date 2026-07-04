@@ -1,0 +1,47 @@
+{
+  "name": "@hanzo/slack",
+  "version": "0.1.0",
+  "description": "Hanzo AI in Slack — slash command, App Home assistant panel, message shortcuts, and interactivity, built on @hanzo/ai, @hanzo/iam, and @hanzo/cards.",
+  "type": "module",
+  "main": "./dist/server.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.1.1",
+    "@hanzo/cards": "workspace:*",
+    "@hanzo/iam": "^0.13.2",
+    "@slack/bolt": "^4.7.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.6"
+  },
+  "keywords": [
+    "hanzo",
+    "slack",
+    "bolt",
+    "block-kit",
+    "ai",
+    "assistant"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/slack"
+  }
+}
