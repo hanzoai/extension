@@ -1,0 +1,56 @@
+{
+  "name": "@hanzo/canva",
+  "version": "0.1.0",
+  "description": "Hanzo AI for Canva — a side-panel Apps SDK app: generate marketing copy, rewrite the selected text, translate, brainstorm content ideas, and ask about the design. An @canva/app-ui-kit React panel that reads the selection/page via @canva/design and adds/replaces text elements, running the model gateway through the published @hanzo/ai over api.hanzo.ai.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "^0.13.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "peerDependencies": {
+    "@canva/app-ui-kit": "^5.0.0",
+    "@canva/asset": "^2.0.0",
+    "@canva/design": "^2.0.0"
+  },
+  "devDependencies": {
+    "@canva/app-ui-kit": "^5.12.0",
+    "@canva/asset": "^2.3.0",
+    "@canva/design": "^2.10.0",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "esbuild": "^0.25.8",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "hanzo",
+    "canva",
+    "apps-sdk",
+    "copywriting",
+    "marketing-copy",
+    "translate",
+    "ai",
+    "design",
+    "app-ui-kit"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/canva"
+  }
+}
