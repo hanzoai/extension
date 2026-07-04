@@ -91,8 +91,19 @@ export function listMatters(p: ListMattersParams): ClioRequest {
   };
 }
 
-export function getMatter(token: string, base: string, id: number, fields: string[] = MATTER_FIELDS): ClioRequest {
-  const query = buildQuery({ fields });
+// getMatter fetches one matter. `nonce` (optional) is a Clio Custom Action
+// single-use code: when present it is replayed as `custom_action_nonce` so this
+// authenticated call doubles as Clio's server-side validation of the click
+// (Clio 403s a bad/stale nonce). This is Clio's documented validation path — a
+// nonce is NOT verified locally.
+export function getMatter(
+  token: string,
+  base: string,
+  id: number,
+  fields: string[] = MATTER_FIELDS,
+  nonce = '',
+): ClioRequest {
+  const query = buildQuery({ fields, custom_action_nonce: nonce });
   return {
     url: `${clioApiRoot(base)}/matters/${id}${query}`,
     method: 'GET',

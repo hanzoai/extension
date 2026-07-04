@@ -17,14 +17,17 @@ export interface AuthorizeParams {
   state: string;
   // Override the default scopes if a firm's app is scoped narrower.
   scope?: string;
-  // Clio supports offline access to get a refresh_token. Default on so the
-  // long-lived integration can refresh without re-consent.
-  offlineAccess?: boolean;
+  // Clio can redirect back even when the user DECLINES consent (with an
+  // `error` param) instead of showing Clio's own decline page — set this so the
+  // app can handle a declined grant gracefully. Off by default.
+  redirectOnDecline?: boolean;
 }
 
 // oauthAuthorizeUrl builds the exact URL to redirect the user's browser to.
 // Clio's authorization endpoint takes response_type=code, client_id,
-// redirect_uri, state, and (for a refresh token) access_type=offline.
+// redirect_uri, state, and optionally redirect_on_decline. Clio returns a
+// refresh_token on the authorization_code grant BY DEFAULT — there is no
+// Google-style `access_type=offline` (Clio would ignore it).
 export function oauthAuthorizeUrl(p: AuthorizeParams): string {
   const params = new URLSearchParams({
     response_type: 'code',
@@ -33,8 +36,7 @@ export function oauthAuthorizeUrl(p: AuthorizeParams): string {
     state: p.state,
     scope: p.scope ?? CLIO_SCOPES,
   });
-  // Clio issues a refresh_token only when access_type=offline is requested.
-  if (p.offlineAccess !== false) params.set('access_type', 'offline');
+  if (p.redirectOnDecline) params.set('redirect_on_decline', 'true');
   return `${clioAuthorizeURL(p.base)}?${params.toString()}`;
 }
 
