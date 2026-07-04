@@ -1,0 +1,8 @@
+# Salesforce CLI local state — per-developer, never shared.
+.sfdx/
+.sf/
+.localdevserver/
+# Node
+node_modules/
+# sf CLI logs / temp
+*.log
