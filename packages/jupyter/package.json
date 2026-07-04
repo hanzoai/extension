@@ -1,0 +1,85 @@
+{
+  "name": "@hanzo/jupyter",
+  "version": "0.1.0",
+  "description": "Hanzo AI for JupyterLab — an in-notebook AI assistant. A side-panel assistant with a model picker and streaming output, plus cell actions (explain, fix/debug from a traceback, document, optimize, generate a cell from a prompt). Model calls route through the api.hanzo.ai gateway via @hanzo/ai; the Hanzo `hk-` key is set in JupyterLab settings.",
+  "keywords": [
+    "jupyter",
+    "jupyterlab",
+    "jupyterlab-extension",
+    "ai",
+    "hanzo",
+    "llm",
+    "notebook"
+  ],
+  "homepage": "https://github.com/hanzoai/extension",
+  "bugs": {
+    "url": "https://github.com/hanzoai/extension/issues"
+  },
+  "license": "MIT",
+  "author": "Hanzo AI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git"
+  },
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "style": "style/index.css",
+  "styleModule": "style/index.js",
+  "sideEffects": [
+    "style/*.css",
+    "style/index.js"
+  ],
+  "files": [
+    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
+    "style/**/*.{css,js,eot,gif,html,jpg,json,png,svg,woff2,ttf}",
+    "schema/*.json"
+  ],
+  "scripts": {
+    "build": "jlpm build:lib && jlpm build:labextension:dev",
+    "build:prod": "jlpm clean && jlpm build:lib:prod && jlpm build:labextension",
+    "build:lib": "tsc --sourceMap",
+    "build:lib:prod": "tsc",
+    "build:labextension": "jupyter labextension build .",
+    "build:labextension:dev": "jupyter labextension build --development True .",
+    "clean": "rimraf lib tsconfig.tsbuildinfo",
+    "clean:all": "jlpm clean && rimraf hanzo_jupyter/labextension",
+    "install:extension": "jlpm build",
+    "watch": "run-p watch:src watch:labextension",
+    "watch:src": "tsc -w --sourceMap",
+    "watch:labextension": "jupyter labextension watch .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "^0.13.2",
+    "@jupyterlab/application": "^4.0.0",
+    "@jupyterlab/apputils": "^4.0.0",
+    "@jupyterlab/cells": "^4.0.0",
+    "@jupyterlab/notebook": "^4.0.0",
+    "@jupyterlab/settingregistry": "^4.0.0",
+    "@jupyterlab/ui-components": "^4.0.0",
+    "@lumino/widgets": "^2.0.0",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@jupyterlab/builder": "^4.0.0",
+    "@types/react": "^18.2.0",
+    "npm-run-all": "^4.1.5",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.6"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "jupyterlab": {
+    "extension": true,
+    "schemaDir": "schema",
+    "outputDir": "hanzo_jupyter/labextension"
+  }
+}
