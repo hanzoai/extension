@@ -18,6 +18,7 @@ packages:
   - 'packages/pdf'
   - 'packages/salesforce'
   - 'packages/shopify'
+  - 'packages/sketch'
   - 'packages/slack'
   - 'packages/teams'
   - 'packages/tools'
