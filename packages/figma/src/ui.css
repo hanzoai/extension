@@ -1,0 +1,119 @@
+/* Panel styling. Uses Figma's injected theme CSS variables (themeColors: true
+   in figma.showUI) so the panel matches the user's light/dark editor without a
+   theme toggle. No external fonts or assets — Figma sandboxes the iframe. */
+
+* { box-sizing: border-box; }
+
+:root {
+  --gap: 8px;
+  --radius: 6px;
+}
+
+body {
+  margin: 0;
+  font: 11px/1.5 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--figma-color-text, #1a1a1a);
+  background: var(--figma-color-bg, #fff);
+}
+
+main { padding: 12px; }
+
+h1 { font-size: 13px; margin: 0 0 6px; }
+
+.muted { color: var(--figma-color-text-secondary, #666); margin: 0 0 10px; }
+.small { font-size: 10px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* --- Key gate --- */
+.gate { display: flex; flex-direction: column; gap: var(--gap); }
+
+input, textarea, select {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--figma-color-border, #ddd);
+  border-radius: var(--radius);
+  background: var(--figma-color-bg, #fff);
+  color: var(--figma-color-text, #1a1a1a);
+  font: inherit;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--figma-color-border-selected, #0d99ff);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+}
+button:disabled { opacity: 0.45; cursor: default; }
+
+.primary {
+  padding: 8px;
+  background: var(--figma-color-bg-brand, #0d99ff);
+  color: var(--figma-color-text-onbrand, #fff);
+  font-weight: 600;
+}
+.link {
+  background: none;
+  color: var(--figma-color-text-brand, #0d99ff);
+  padding: 2px 4px;
+}
+
+.status { min-height: 14px; color: var(--figma-color-text-danger, #d33); margin: 0; }
+
+/* --- Panel --- */
+.bar { display: flex; align-items: center; gap: var(--gap); margin-bottom: 10px; }
+.bar select { flex: 1; }
+
+.context {
+  color: var(--figma-color-text-secondary, #666);
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  background: var(--figma-color-bg-secondary, #f5f5f5);
+  border-radius: var(--radius);
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip {
+  padding: 6px 10px;
+  background: var(--figma-color-bg-secondary, #f0f0f0);
+  color: var(--figma-color-text, #1a1a1a);
+  border: 1px solid var(--figma-color-border, #e0e0e0);
+}
+.chip:not(:disabled):hover { border-color: var(--figma-color-border-selected, #0d99ff); }
+
+.note { margin-bottom: 10px; resize: vertical; }
+
+.output-wrap { position: relative; }
+.cancel { position: absolute; top: -22px; right: 0; }
+
+.output {
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 120px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--figma-color-border, #e0e0e0);
+  border-radius: var(--radius);
+  background: var(--figma-color-bg-secondary, #fafafa);
+}
+
+/* --- Variant list --- */
+.variant {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--figma-color-border, #eee);
+}
+.variant:last-child { border-bottom: none; }
+.variant-text { flex: 1; }
+.variant-insert {
+  flex: none;
+  padding: 4px 8px;
+  background: var(--figma-color-bg-brand, #0d99ff);
+  color: var(--figma-color-text-onbrand, #fff);
+}
