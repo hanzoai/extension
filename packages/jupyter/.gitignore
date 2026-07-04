@@ -1,0 +1,15 @@
+# TypeScript build output (federated labextension consumes lib/)
+lib/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Prebuilt labextension bundle + Python build artifacts (produced by jlpm build / pip)
+hanzo_jupyter/labextension/
+hanzo_jupyter/_version.py
+build/
+dist/
+*.egg-info/
+__pycache__/
+
+# npm lock (this package installs via the root pnpm workspace, not npm)
+package-lock.json
