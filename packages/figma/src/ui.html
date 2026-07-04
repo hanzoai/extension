@@ -1,0 +1,40 @@
+<!-- The plugin iframe shell. Figma loads a SINGLE HTML file as the UI, so
+     build.js inlines the compiled ui.js and the CSS into the tags below — no
+     external requests (Figma sandboxes the iframe and the manifest allowlist
+     only covers api.hanzo.ai for the AI calls). -->
+<style>__HANZO_UI_CSS__</style>
+
+<main>
+  <!-- Key gate: the zero-setup path — paste an hk- key, validated by a real
+       /v1/models call before it's saved to figma.clientStorage. -->
+  <section id="key-gate" class="gate" hidden>
+    <h1>Hanzo AI for Figma</h1>
+    <p class="muted">Paste your Hanzo API key to begin. It is stored only in this plugin (figma.clientStorage) and sent only to api.hanzo.ai.</p>
+    <input id="key-input" type="password" placeholder="hk-…" autocomplete="off" spellcheck="false" />
+    <button id="key-save" class="primary">Connect</button>
+    <p id="key-status" class="status"></p>
+    <p class="muted small">Get a key at <span class="mono">api.hanzo.ai</span>.</p>
+  </section>
+
+  <!-- The working panel. -->
+  <section id="panel" hidden>
+    <header class="bar">
+      <select id="model" title="Model" aria-label="Model"></select>
+      <button id="sign-out" class="link" title="Forget API key">Sign out</button>
+    </header>
+
+    <p id="context" class="context">Select layers or a frame to begin.</p>
+
+    <div id="chips" class="chips" role="group" aria-label="Design actions"></div>
+
+    <textarea id="note" class="note" rows="2"
+      placeholder="Optional note — target language, brand voice, or e.g. &quot;3 headline options&quot;"></textarea>
+
+    <div class="output-wrap">
+      <button id="cancel" class="link cancel" hidden>Cancel</button>
+      <div id="output" class="output" aria-live="polite"></div>
+    </div>
+  </section>
+</main>
+
+<script>__HANZO_UI_JS__</script>
