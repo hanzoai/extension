@@ -1,8 +1,7 @@
 {
   "name": "@hanzo/hubspot",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hanzo AI for HubSpot — AI over your CRM records: summarize a contact/company/deal, draft an email, suggest next steps, and ask anything, with one-click write-back as a Note or Task. A CRM card UI extension plus a serverless backend that holds the Hanzo key and calls @hanzo/ai over the api.hanzo.ai gateway; the key never reaches the browser.",
-  "private": true,
   "type": "module",
   "main": "./dist/cjs/index.js",
   "module": "./dist/index.js",
@@ -64,5 +63,8 @@
     "type": "git",
     "url": "https://github.com/hanzoai/extension.git",
     "directory": "packages/hubspot"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

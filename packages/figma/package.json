@@ -1,8 +1,7 @@
 {
   "name": "@hanzo/figma",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hanzo AI for Figma — a plugin that rewrites, translates, content-fills, critiques (with accessibility notes), renames, and generates copy variants for the selected layers, built on the published @hanzo/ai headless client against api.hanzo.ai. The AI call runs in the plugin iframe; the main thread reads the selection and writes results back onto the canvas.",
-  "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -24,5 +23,14 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "main": "dist/code.js"
 }
