@@ -105,6 +105,9 @@ jobs:
     - name: Test Canvas LMS (education)
       run: pnpm --filter @hanzo/canvas-lms test
 
+    - name: Test Workday (HR)
+      run: pnpm --filter @hanzo/workday test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
