@@ -6,6 +6,7 @@ import {
   noteSubject,
   writeBack,
   runAction,
+  isTextExtractable,
   MAX_DOC_CHARS,
   MAX_CONTEXT_CHARS,
   type MatterContext,
@@ -75,6 +76,26 @@ describe('assembleMatterContext', () => {
     const ctx = assembleMatterContext({ displayNumber: 'ABCDEFGHIJ', documents: [] }, 5);
     expect(ctx.startsWith('Matte')).toBe(true);
     expect(ctx).toContain('truncated');
+  });
+});
+
+describe('isTextExtractable', () => {
+  it('accepts text-ish content types', () => {
+    expect(isTextExtractable('text/plain')).toBe(true);
+    expect(isTextExtractable('text/html')).toBe(true);
+    expect(isTextExtractable('application/json')).toBe(true);
+    expect(isTextExtractable('application/xml')).toBe(true);
+    expect(isTextExtractable('text/markdown')).toBe(true);
+    expect(isTextExtractable('text/csv')).toBe(true);
+    expect(isTextExtractable('application/rtf')).toBe(true);
+    expect(isTextExtractable('text/plain; charset=utf-8')).toBe(true); // strips params
+  });
+  it('rejects binary legal-document types (PDF/DOCX) and missing types', () => {
+    expect(isTextExtractable('application/pdf')).toBe(false);
+    expect(isTextExtractable('application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe(false);
+    expect(isTextExtractable('image/png')).toBe(false);
+    expect(isTextExtractable(undefined)).toBe(false);
+    expect(isTextExtractable('')).toBe(false);
   });
 });
 

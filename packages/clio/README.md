@@ -96,16 +96,22 @@ Clio can render your app's buttons directly on records. In
   Contacts, Documents, and Bills).
 - **URL**: `https://clio.hanzo.ai/custom-action`
 
-When a lawyer clicks it, Clio opens that URL with a **signed** context:
-`subject_url` (the record's API URL, e.g.
-`https://app.clio.com/api/v4/matters/1234.json`), `subject_id`, `user_id`, and
-`custom_action_nonce` — an HMAC-SHA256 of the context keyed by the app's
-`client_secret`. The service (`server.ts`):
+When a lawyer clicks it, Clio opens that URL with four query params:
+`custom_action_id`, `user_id`, `subject_url` (the URL-encoded record API path,
+e.g. `%2Fapi%2Fv4%2Fmatters%2F1234`), and `custom_action_nonce`.
 
-1. **Verifies the nonce** (`verifyNonce`, constant-time) — rejects a forged
-   deep-link with `403`.
-2. Parses the matter id from `subject_url` (`parseSubjectUrl`).
-3. Redirects to `index.html?matter_id=<id>` so the SPA opens on that matter.
+The **nonce is a single-use code (60s expiry), not a locally-verifiable
+signature.** Per Clio's contract, the app validates the click by **replaying
+the nonce to the Clio API** as a `custom_action_nonce` query param on its next
+authenticated request; Clio validates it server-side (confirming the click's
+user matches the OAuth token) and returns `403` for a bad or stale one. So:
+
+1. `server.ts` `/custom-action` parses the matter id from `subject_url`
+   (`parseSubjectUrl`) and redirects to
+   `index.html?matter_id=<id>&custom_action_nonce=<nonce>`.
+2. The SPA's first authenticated Clio call (`getMatter`) carries the nonce
+   (`custom-action.ts`, `clio-api.ts`), so Clio performs the validation. The
+   nonce is single-use — the app clears it after that one call.
 
 ## Hosting
 

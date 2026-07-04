@@ -14,7 +14,7 @@
 /* global window, document, sessionStorage, localStorage, crypto */
 
 import { clioBase, DEFAULT_CLIO_REGION, DEFAULT_MODEL, type ClioRegion } from './config.js';
-import { oauthAuthorizeUrl } from './clio-oauth.js';
+import { oauthAuthorizeUrl, isExpired, type TokenSet } from './clio-oauth.js';
 import {
   listMatters,
   getMatter,
@@ -29,6 +29,7 @@ import {
   runAction,
   writeBack,
   noteSubject,
+  isTextExtractable,
   type ActionId,
   type MatterContext,
   type WriteTarget,
@@ -54,7 +55,7 @@ const CLIO_TOKEN_KEY = 'hanzo.clio.tokens';
 const HANZO_KEY = 'hanzo.apiKey';
 const STATE_KEY = 'hanzo.clio.oauthState';
 
-function clioTokens(): { accessToken: string; refreshToken: string; expiresAt: number } | null {
+function clioTokens(): TokenSet | null {
   const raw = sessionStorage.getItem(CLIO_TOKEN_KEY);
   return raw ? JSON.parse(raw) : null;
 }
@@ -63,30 +64,53 @@ function hanzoKey(): string {
 }
 
 // ── Clio calls through the app (bearer added here) ────────────────────────
-// The token service could proxy these; for the SPA we hold the Clio access
-// token in-tab and call Clio directly with it (the SECRET is never involved in
-// a REST call, only in the token grant). One helper adds the bearer.
+// The SPA holds the Clio access token in-tab and calls Clio directly with it
+// (the SECRET is never involved in a REST call, only in the token grant).
+// clioToken() is the current access token; ensureClioToken() refreshes it via
+// the token service (which holds the secret) when it is at/near expiry, so a
+// long matter session never fails mid-flight on a stale token.
 function clioToken(): string {
   return clioTokens()?.accessToken || '';
 }
 
-async function loadMatterContext(matterId: number): Promise<MatterContext> {
-  const token = clioToken();
-  const matter = unwrapData<any>(await clioFetch(getMatter(token, base, matterId)));
+async function ensureClioToken(): Promise<string> {
+  const t = clioTokens();
+  if (!t || !t.refreshToken || !isExpired(t)) return t?.accessToken || '';
+  const resp = await fetch(`${SERVICE}/oauth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: t.refreshToken }),
+  });
+  if (!resp.ok) return t.accessToken; // let the call fail with Clio's own 401
+  const next: TokenSet = await resp.json();
+  sessionStorage.setItem(CLIO_TOKEN_KEY, JSON.stringify(next));
+  return next.accessToken;
+}
+
+async function loadMatterContext(matterId: number, nonce = ''): Promise<MatterContext> {
+  const token = await ensureClioToken();
+  // The first authenticated call carries the Custom Action nonce (if any) so
+  // Clio validates the click server-side — a bad/stale nonce makes this 403.
+  const matter = unwrapData<any>(await clioFetch(getMatter(token, base, matterId, undefined, nonce)));
   const docsResp = await clioFetch(listDocuments({ token, base, matterId, limit: 25 }));
   const docs = unwrapData<any[]>(docsResp) || [];
 
-  // Pull text for each document (best-effort — a binary that isn't text still
-  // contributes its name to the context so the model knows it exists).
+  // Pull text only for text-extractable documents; a binary (PDF/DOCX) would
+  // download as mojibake, so keep just its name so the model knows it exists.
   const documents: Array<{ name: string; text: string }> = [];
   for (const d of docs.slice(0, 10)) {
+    const name = d.name || `document ${d.id}`;
+    if (!isTextExtractable(d.content_type)) {
+      documents.push({ name, text: `(binary document — ${d.content_type || 'unknown type'}, not extracted)` });
+      continue;
+    }
     let text = '';
     try {
       text = await clioDownload(downloadDocument(token, base, d.id));
     } catch {
       text = '(document content unavailable)';
     }
-    documents.push({ name: d.name || `document ${d.id}`, text });
+    documents.push({ name, text });
   }
 
   return {
@@ -121,6 +145,9 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentMatterLabel = '';
   let currentOutput = '';
   let lastAction: ActionId = 'summarize';
+  // A Custom Action deep-link's single-use nonce — consumed on the first Clio
+  // call (Clio validates it server-side, once), then cleared.
+  let deepLinkNonce = params.get('custom_action_nonce') || '';
 
   function setStatus(msg: string, kind: 'ok' | 'warn' | 'error' | '' = '') {
     statusEl.textContent = msg;
@@ -225,7 +252,8 @@ window.addEventListener('DOMContentLoaded', () => {
     outputEl.value = '';
     try {
       setStatus('Loading matter & documents from Clio…');
-      const context = await loadMatterContext(currentMatterId);
+      const context = await loadMatterContext(currentMatterId, deepLinkNonce);
+      deepLinkNonce = ''; // single-use — do not replay
       setStatus('Asking Hanzo…');
       currentOutput = await runAction({
         id,
@@ -281,11 +309,17 @@ window.addEventListener('DOMContentLoaded', () => {
     const deepMatter = Number(params.get('matter_id')) || ca.matterId || 0;
     if (deepMatter) {
       selectMatter(deepMatter, '');
-      try {
-        const m = unwrapData<any>(await clioFetch(getMatter(clioToken(), base, deepMatter)));
-        currentMatterLabel = `${m.display_number || deepMatter}`;
-      } catch {
-        /* not signed in yet — populated after sign-in */
+      if (clioToken()) {
+        try {
+          // First authenticated call — replay the single-use nonce for Clio's
+          // server-side validation of the Custom Action click, then clear it.
+          const token = await ensureClioToken();
+          const m = unwrapData<any>(await clioFetch(getMatter(token, base, deepMatter, undefined, deepLinkNonce)));
+          deepLinkNonce = '';
+          currentMatterLabel = `${m.display_number || deepMatter}`;
+        } catch (e: any) {
+          setStatus(e?.message || 'Could not open the matter from Clio.', 'error');
+        }
       }
     }
     await populateModels();

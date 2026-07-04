@@ -25,21 +25,24 @@ describe('oauthAuthorizeUrl', () => {
     expect(u.searchParams.get('redirect_uri')).toBe('https://clio.hanzo.ai/oauth/callback');
     expect(u.searchParams.get('state')).toBe('st4te');
     expect(u.searchParams.get('scope')).toBe('read write');
-    // offline access default → refresh token
-    expect(u.searchParams.get('access_type')).toBe('offline');
+    // Clio returns a refresh_token by default — NO Google-style access_type.
+    expect(u.searchParams.has('access_type')).toBe(false);
+    // redirect_on_decline is off unless requested.
+    expect(u.searchParams.has('redirect_on_decline')).toBe(false);
   });
 
-  it('honors a custom scope and can disable offline access', () => {
+  it('honors a custom scope and can opt into redirect_on_decline', () => {
     const url = oauthAuthorizeUrl({
       base,
       clientId: 'CID',
       redirectUri: 'https://x/cb',
       state: 's',
       scope: 'read',
-      offlineAccess: false,
+      redirectOnDecline: true,
     });
     const u = new URL(url);
     expect(u.searchParams.get('scope')).toBe('read');
+    expect(u.searchParams.get('redirect_on_decline')).toBe('true');
     expect(u.searchParams.has('access_type')).toBe(false);
   });
 
