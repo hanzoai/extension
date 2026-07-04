@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/browser-extension",
-  "version": "1.9.30",
+  "version": "1.9.31",
   "description": "Hanzo AI Browser Extension",
   "main": "dist/background.js",
   "scripts": {
