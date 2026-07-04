@@ -1,0 +1,146 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "hanzo-ai",
+  "title": "Hanzo AI",
+  "description": "Hanzo AI in the Raycast command bar — ask Hanzo, and summarize, explain, rewrite, translate, or fix the grammar of your selection or clipboard, wired to the api.hanzo.ai gateway via the published @hanzo/ai.",
+  "icon": "hanzo-icon.png",
+  "author": "hanzo",
+  "categories": ["Productivity", "Developer Tools"],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "ask",
+      "title": "Ask Hanzo",
+      "subtitle": "Hanzo AI",
+      "description": "Ask Hanzo anything, or apply an action to your selection/clipboard, and stream the answer.",
+      "mode": "view"
+    },
+    {
+      "name": "summarize",
+      "title": "Summarize",
+      "subtitle": "Hanzo AI",
+      "description": "Summarize the selected text (or clipboard) and copy the summary.",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "instruction",
+          "placeholder": "Focus (optional)",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "explain",
+      "title": "Explain",
+      "subtitle": "Hanzo AI",
+      "description": "Explain the selected text (or clipboard) in plain language and copy it.",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "instruction",
+          "placeholder": "Audience (optional)",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "rewrite",
+      "title": "Rewrite",
+      "subtitle": "Hanzo AI",
+      "description": "Rewrite the selected text and paste it back over the selection.",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "instruction",
+          "placeholder": "How to rewrite (optional)",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "translate",
+      "title": "Translate",
+      "subtitle": "Hanzo AI",
+      "description": "Translate the selected text into a target language and paste it back.",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "language",
+          "placeholder": "Target language (e.g. Spanish)",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "fix-grammar",
+      "title": "Fix Grammar",
+      "subtitle": "Hanzo AI",
+      "description": "Correct grammar, spelling, and punctuation of the selected text and paste it back.",
+      "mode": "no-view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "apiKey",
+      "title": "Hanzo API Key",
+      "description": "Your Hanzo hk- key from hanzo.id. Stored securely by Raycast; sent only to api.hanzo.ai.",
+      "type": "password",
+      "required": true
+    },
+    {
+      "name": "model",
+      "title": "Model",
+      "description": "Default model id routed by the api.hanzo.ai gateway. Override per request in Ask Hanzo.",
+      "type": "textfield",
+      "default": "zen5",
+      "required": false
+    }
+  ],
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "^0.13.2",
+    "@raycast/api": "^1.104.0",
+    "@raycast/utils": "^2.2.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.2.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.6"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix",
+    "publish": "npx @raycast/api@latest publish",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "hanzo",
+    "raycast",
+    "ai",
+    "assistant",
+    "summarize",
+    "translate",
+    "rewrite",
+    "zen"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/raycast"
+  }
+}
