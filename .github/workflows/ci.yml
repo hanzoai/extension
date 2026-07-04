@@ -42,6 +42,9 @@ jobs:
     - name: Test Google Workspace add-on
       run: pnpm --filter @hanzo/gworkspace-addon test
 
+    - name: Test PDF workspace
+      run: pnpm --filter @hanzo/pdf test
+
     - name: Test tools package
       run: pnpm --filter @hanzo/cli-tools test
 
