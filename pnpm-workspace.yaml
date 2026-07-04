@@ -5,6 +5,7 @@ packages:
   - 'packages/browser'
   - 'packages/cards'
   - 'packages/clio'
+  - 'packages/docusign'
   - 'packages/dxt'
   - 'packages/gworkspace'
   - 'packages/jetbrains'
