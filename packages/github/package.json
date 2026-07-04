@@ -1,0 +1,48 @@
+{
+  "name": "@hanzo/github",
+  "version": "0.1.0",
+  "description": "Hanzo AI on GitHub — a GitHub App that reviews pull requests, triages issues, and answers @hanzo mentions, built on @hanzo/ai and @hanzo/iam.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "^0.13.2",
+    "@octokit/app": "^16.1.2",
+    "@octokit/webhooks": "^14.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.6"
+  },
+  "keywords": [
+    "hanzo",
+    "github",
+    "github-app",
+    "octokit",
+    "code-review",
+    "issue-triage",
+    "ai"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/github"
+  }
+}
