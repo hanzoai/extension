@@ -71,6 +71,15 @@ jobs:
     - name: Test Shopify app
       run: pnpm --filter @hanzo/shopify test
 
+    - name: Test Figma plugin
+      run: pnpm --filter @hanzo/figma test
+
+    - name: Test Sketch plugin
+      run: pnpm --filter @hanzo/sketch test
+
+    - name: Test Canva app
+      run: pnpm --filter @hanzo/canva test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
