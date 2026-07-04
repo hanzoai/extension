@@ -1,0 +1,45 @@
+{
+  "name": "@hanzo/epic",
+  "version": "0.1.0",
+  "description": "Hanzo AI for Epic (SMART on FHIR) — brings Hanzo AI into the clinician's EHR workflow. Reads the launched patient's chart over FHIR R4 (problems, meds, allergies, labs, notes) and assists: summarize the patient, draft a SOAP note, extract problems & meds, and ask about the patient. Read + assist only (no clinical write-back in v1). Model calls route through the api.hanzo.ai gateway via @hanzo/ai; SMART-on-FHIR OAuth2 (auth-code + PKCE) with server-side token exchange; PHI-bearing tokens stay server-side.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "serve": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "0.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "esbuild": "^0.25.8",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "hanzo",
+    "epic",
+    "smart-on-fhir",
+    "fhir",
+    "ehr",
+    "healthcare",
+    "clinical",
+    "ai",
+    "hipaa"
+  ],
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/extension.git",
+    "directory": "packages/epic"
+  }
+}
