@@ -1,0 +1,30 @@
+{
+  "name": "@hanzo/zendesk",
+  "version": "0.1.0",
+  "description": "Hanzo AI for Zendesk — a ticket-sidebar Support app (ZAFv2) that summarizes tickets, drafts replies in the agent's voice, suggests next steps, and writes back into the reply box, built on the published @hanzo/ai headless client against api.hanzo.ai.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "validate": "zcli apps:validate dist",
+    "package": "zcli apps:package dist"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "^0.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.9",
+    "@zendesk/zcli": "^1.0.0",
+    "esbuild": "0.25.8",
+    "typescript": "5.8.3",
+    "vitest": "3.2.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,18 @@
+{
+  "app": {
+    "name": "Hanzo AI",
+    "short_description": "AI in the ticket sidebar: summarize, draft replies, and suggest next steps.",
+    "long_description": "Hanzo AI reads the current ticket and its conversation and helps your agents resolve it faster. Summarize a long thread, draft the next reply in the agent's voice, suggest next steps or a macro, or ask anything about the ticket — then insert the result into the reply editor or add it as an internal note with one click. Powered by the Hanzo AI gateway (api.hanzo.ai). Your Hanzo API key is stored as a secure app setting and is never exposed to the browser.",
+    "installation_instructions": "Enter your Hanzo API key (starts with hk-) as the secure API key setting, optionally set a default model, then save. Generate a key at https://hanzo.ai. The app appears in the ticket sidebar.",
+    "parameters": {
+      "hanzo_api_key": {
+        "label": "Hanzo API key",
+        "helpText": "Your Hanzo API key (hk-…). Stored securely and used server-side; it is never sent to the browser. Generate one at https://hanzo.ai."
+      },
+      "default_model": {
+        "label": "Default model",
+        "helpText": "Optional. The model to route requests to (e.g. zen5). Defaults to zen5."
+      }
+    }
+  }
+}
