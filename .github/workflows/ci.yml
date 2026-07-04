@@ -59,6 +59,9 @@ jobs:
     - name: Test Slack app
       run: pnpm --filter @hanzo/slack test
 
+    - name: Test Teams app
+      run: pnpm --filter @hanzo/teams test
+
     - name: Test Zoom + Meet
       run: pnpm --filter @hanzo/meetings test
 
