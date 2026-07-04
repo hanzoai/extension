@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI for iManage</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <span class="title">Hanzo AI</span>
+    <select id="model" aria-label="Model"></select>
+    <span class="host">iManage Work</span>
+  </header>
+
+  <div class="row scope">
+    <input id="customer" placeholder="Customer id" aria-label="iManage customer id" />
+    <input id="library" placeholder="Library id" aria-label="iManage library id" />
+    <button id="browse" class="secondary">Browse</button>
+  </div>
+  <div class="row scope">
+    <select id="workspace" aria-label="Workspace"></select>
+    <select id="document" aria-label="Document"></select>
+    <button id="load" class="secondary">Load doc</button>
+  </div>
+  <div class="row scope">
+    <input id="search" placeholder="Search the library for documents…" aria-label="Document search" />
+    <button id="searchbtn" class="secondary">Search</button>
+  </div>
+  <div class="records" id="records"></div>
+
+  <!-- One-click actions over the loaded document / result set. Chips built from the catalog. -->
+  <div class="chips" id="chips"></div>
+
+  <label for="prompt">Ask about this matter</label>
+  <textarea id="prompt" placeholder="e.g. What is the governing law and termination notice period? · Does this NDA survive termination? · Summarize the parties' obligations."></textarea>
+
+  <div class="row">
+    <button id="run">Ask Hanzo</button>
+    <button id="stop" class="secondary" disabled>Stop</button>
+    <span class="spacer"></span>
+    <button id="save" class="secondary" disabled title="Load a document to save a comment to">Save to comment</button>
+  </div>
+
+  <details>
+    <summary>Hanzo API key</summary>
+    <div class="row">
+      <input id="apikey" type="password" placeholder="hk-…" autocomplete="off" />
+      <button id="savekey" class="secondary">Save</button>
+    </div>
+    <div id="authhint" class="hint"></div>
+  </details>
+
+  <div class="status" id="status"></div>
+
+  <label for="output">Result</label>
+  <textarea id="output" placeholder="Hanzo's analysis appears here."></textarea>
+
+  <footer>Routed through api.hanzo.ai · grounded in your iManage document records · confidential — informational document review, not legal advice.</footer>
+
+  <script type="module" src="__ENTRY__"></script>
+</body>
+</html>
