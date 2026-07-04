@@ -1,0 +1,28 @@
+{
+  "name": "@hanzo/sketch",
+  "version": "0.1.0",
+  "description": "Hanzo AI for Sketch — critique a selection, rewrite/translate/content-fill text layers, and ask about your design, all inside Sketch. A thin macOS-native adapter over the shared Hanzo design-AI action catalog. Model calls route through the api.hanzo.ai gateway via @hanzo/ai; the Hanzo key is stored with sketch/settings.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hanzo/ai": "^0.2.0",
+    "@hanzo/iam": "^0.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "esbuild": "^0.25.8",
+    "sketch-module-web-view": "^3.5.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
