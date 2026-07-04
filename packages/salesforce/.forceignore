@@ -1,0 +1,16 @@
+# Node + tooling — never deploy these to an org.
+**/node_modules
+**/*.test.mjs
+**/src/**
+**/tests/**
+**/vitest.config.*
+**/package.json
+**/package-lock.json
+**/pnpm-lock.yaml
+**/README.md
+
+# Salesforce build noise
+**/jsconfig.json
+**/.eslintrc.json
+.sfdx
+.sf
