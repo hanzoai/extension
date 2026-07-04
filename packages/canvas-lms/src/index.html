@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI for Canvas</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <span class="title">Hanzo AI</span>
+    <select id="model" aria-label="Model"></select>
+    <span class="host">Canvas</span>
+  </header>
+
+  <div class="row scope">
+    <select id="course" aria-label="Course"></select>
+    <button id="load" class="secondary">Load</button>
+  </div>
+  <div class="row scope">
+    <select id="assignment" aria-label="Assignment"></select>
+    <button id="loadsubs" class="secondary" disabled>Load submissions</button>
+  </div>
+  <div class="records" id="records"></div>
+
+  <!-- One-click actions over the loaded course. Chips are built from the catalog. -->
+  <div class="chips" id="chips"></div>
+
+  <label for="prompt">Ask about this course</label>
+  <textarea id="prompt" placeholder="e.g. Which assignments are due next week? · Summarize what module 3 covers. · What are the common themes in the discussion posts?"></textarea>
+
+  <div class="row">
+    <button id="run">Ask Hanzo</button>
+    <button id="stop" class="secondary" disabled>Stop</button>
+    <span class="spacer"></span>
+    <button id="comment" class="secondary" disabled title="Load an assignment's submissions to enable">Post as submission comment</button>
+    <button id="announce" class="secondary" disabled title="Load a course to enable">Post as announcement</button>
+  </div>
+
+  <details>
+    <summary>Hanzo API key</summary>
+    <div class="row">
+      <input id="apikey" type="password" placeholder="hk-…" autocomplete="off" />
+      <button id="savekey" class="secondary">Save</button>
+    </div>
+    <div id="authhint" class="hint"></div>
+  </details>
+
+  <div class="status" id="status"></div>
+
+  <label for="output">Result</label>
+  <textarea id="output" placeholder="Hanzo's draft appears here."></textarea>
+
+  <footer>Routed through api.hanzo.ai · grounded in your Canvas course records · a draft for an educator to review, not an authoritative grade or decision.</footer>
+
+  <script type="module" src="__ENTRY__"></script>
+</body>
+</html>
