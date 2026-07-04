@@ -108,6 +108,9 @@ jobs:
     - name: Test Workday (HR)
       run: pnpm --filter @hanzo/workday test
 
+    - name: Test iManage (legal DMS)
+      run: pnpm --filter @hanzo/imanage test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
