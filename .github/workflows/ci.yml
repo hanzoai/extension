@@ -45,6 +45,9 @@ jobs:
     - name: Test PDF workspace
       run: pnpm --filter @hanzo/pdf test
 
+    - name: Test Clio integration
+      run: pnpm --filter @hanzo/clio test
+
     - name: Test tools package
       run: pnpm --filter @hanzo/cli-tools test
 
