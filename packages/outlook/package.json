@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/outlook-addin",
-  "version": "1.9.30",
+  "version": "1.9.31",
   "description": "Hanzo AI for Microsoft Outlook \u2014 a mail add-in. AI over your email: summarize threads, draft replies, extract deadlines and action items. Wired to the same api.hanzo.ai gateway and hanzo.id IAM as the Office task pane and the browser extension.",
   "private": true,
   "dependencies": {
