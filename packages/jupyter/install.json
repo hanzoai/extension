@@ -1,0 +1,5 @@
+{
+  "packageManager": "python",
+  "packageName": "hanzo_jupyter",
+  "uninstallInstructions": "Use your Python package manager (pip/conda) to uninstall the package hanzo_jupyter"
+}
