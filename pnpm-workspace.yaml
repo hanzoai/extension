@@ -18,6 +18,7 @@ packages:
   - 'packages/office'
   - 'packages/outlook'
   - 'packages/pdf'
+  - 'packages/raycast'
   - 'packages/salesforce'
   - 'packages/shopify'
   - 'packages/sketch'
