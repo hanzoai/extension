@@ -1,0 +1,3 @@
+# Rust / Tauri build output (dist/ and node_modules/ are covered by the root .gitignore).
+src-tauri/target/
+src-tauri/gen/
