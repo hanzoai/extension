@@ -1,0 +1,93 @@
+:root {
+  color-scheme: light dark;
+  --fg: #1a1a1a; --muted: #666; --bg: #fff; --panel: #fafafa;
+  --line: #e3e3e3; --accent: #111; --viewer-bg: #525659;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #eaeaea; --muted: #9a9a9a; --bg: #1e1e1e; --panel: #242424;
+    --line: #363636; --accent: #fff; --viewer-bg: #2a2a2a;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--fg); background: var(--bg);
+}
+
+/* ── two-pane layout ── */
+.workspace { display: flex; height: 100vh; }
+.viewer { flex: 1 1 60%; display: flex; flex-direction: column; min-width: 0; background: var(--viewer-bg); }
+.panel {
+  flex: 0 0 400px; max-width: 42vw; display: flex; flex-direction: column;
+  background: var(--panel); border-left: 1px solid var(--line); padding: 12px; overflow-y: auto;
+}
+@media (max-width: 820px) {
+  .workspace { flex-direction: column; }
+  .viewer { flex: 1 1 55%; }
+  .panel { flex: 1 1 45%; max-width: none; border-left: none; border-top: 1px solid var(--line); }
+}
+
+/* ── viewer ── */
+.toolbar {
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+  background: var(--bg); border-bottom: 1px solid var(--line); flex-wrap: wrap;
+}
+.filebtn {
+  font: inherit; background: var(--accent); color: var(--bg);
+  border-radius: 6px; padding: 7px 14px; cursor: pointer; white-space: nowrap;
+}
+.pager { display: flex; align-items: center; gap: 6px; }
+.pager button {
+  font: inherit; width: 30px; height: 30px; line-height: 1; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); border-radius: 6px; cursor: pointer;
+}
+.pager button:disabled { opacity: .4; cursor: default; }
+.pagelabel { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; color: var(--fg); }
+.docstatus { font-size: 12px; color: var(--muted); flex: 1 1 200px; min-width: 0; }
+.docstatus.ok { color: #1a7f37; } .docstatus.warn { color: #9a6700; } .docstatus.error { color: #cf222e; }
+
+.viewer-scroll { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 12px; }
+.page { max-width: 100%; height: auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.4); align-self: flex-start; }
+
+/* ── AI panel ── */
+.panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.logo { width: 22px; height: 22px; }
+.brand { font-weight: 600; }
+.model { margin-left: auto; max-width: 150px; font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip {
+  padding: 5px 10px; border-radius: 999px; font: inherit; font-size: 13px;
+  background: transparent; color: var(--fg); border: 1px solid var(--line); cursor: pointer;
+}
+.chip:hover:not(:disabled) { border-color: var(--accent); }
+.chip:disabled { opacity: .5; cursor: default; }
+
+label { display: block; font-size: 12px; color: var(--muted); margin: 6px 0 4px; }
+textarea, input, select { font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px; width: 100%; }
+textarea#prompt { min-height: 70px; resize: vertical; }
+
+.row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.row select#scope { width: auto; flex: 1; font-size: 13px; }
+button { font: inherit; border: 1px solid var(--line); background: var(--accent); color: var(--bg);
+  border-radius: 6px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+button.secondary { background: transparent; color: var(--fg); }
+button:disabled { opacity: .5; cursor: default; }
+
+.status { min-height: 18px; font-size: 12px; margin-top: 8px; color: var(--muted); }
+.status.ok { color: #1a7f37; } .status.warn { color: #9a6700; } .status.error { color: #cf222e; }
+
+.output {
+  flex: 1; min-height: 160px; margin-top: 8px; padding: 10px; overflow-y: auto;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  white-space: pre-wrap; word-break: break-word; font-size: 13.5px; line-height: 1.5;
+}
+
+.auth { margin-top: 10px; font-size: 12px; }
+.auth summary { cursor: pointer; color: var(--muted); }
+.authhint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.foot { margin-top: 10px; font-size: 11px; color: var(--muted); }
