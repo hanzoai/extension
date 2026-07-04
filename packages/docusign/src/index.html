@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI for DocuSign</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <span class="title">Hanzo AI</span>
+    <select id="model" aria-label="Model"></select>
+    <span class="host" id="agreement-title">Agreement</span>
+  </header>
+
+  <!-- One-click actions over the agreement. Chips are built from the catalog. -->
+  <div class="chips" id="chips"></div>
+
+  <label for="doc">Agreement text</label>
+  <textarea id="doc" placeholder="Paste the agreement text here, or open this panel from DocuSign with an envelope in context."></textarea>
+
+  <label for="prompt">Ask about this agreement</label>
+  <textarea id="prompt" placeholder="e.g. What is the notice period for termination? · Is there an auto-renewal clause? · Which party indemnifies the other?"></textarea>
+
+  <div class="row">
+    <button id="run">Ask Hanzo</button>
+    <button id="stop" class="secondary" disabled>Stop</button>
+    <span class="spacer"></span>
+  </div>
+
+  <details>
+    <summary>Hanzo API key</summary>
+    <div class="row">
+      <input id="apikey" type="password" placeholder="hk-…" autocomplete="off" />
+      <button id="savekey" class="secondary">Save</button>
+    </div>
+    <div id="authhint" class="hint"></div>
+  </details>
+
+  <div class="status" id="status"></div>
+
+  <label for="output">Result</label>
+  <textarea id="output" placeholder="Hanzo's analysis appears here." readonly></textarea>
+
+  <footer>Routed through api.hanzo.ai · analysis is grounded in the agreement text · informational, not legal advice.</footer>
+
+  <script type="module" src="__ENTRY__"></script>
+</body>
+</html>
