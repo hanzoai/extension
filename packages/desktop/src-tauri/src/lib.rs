@@ -157,8 +157,11 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
 // register_hotkey wires the global Cmd/Ctrl+Shift+Space to toggle_window. The
 // plugin's handler fires on every registered shortcut; we match ours and act only
 // on Pressed (not Released) so one keypress is one toggle.
+// Returns Box<dyn Error> (not tauri::Result) because the global-shortcut plugin's
+// register() yields a tauri_plugin_global_shortcut::Error that has no From impl into
+// tauri::Error — both convert to Box<dyn Error>, which is what setup() expects anyway.
 #[cfg(desktop)]
-fn register_hotkey(app: &tauri::App) -> tauri::Result<()> {
+fn register_hotkey(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
     // Cmd+Shift+Space on macOS, Ctrl+Shift+Space elsewhere — the modifier the
