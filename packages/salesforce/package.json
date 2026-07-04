@@ -1,8 +1,7 @@
 {
   "name": "@hanzo/salesforce",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hanzo AI for Salesforce — an SFDX package: a Lightning Web Component assistant on Account/Opportunity/Case/Lead/Contact record pages, backed by Apex callouts to the api.hanzo.ai/v1 gateway (same OpenAI-compatible wire format as the browser extension, Office add-in, and Slack app). Summarize, draft, extract next steps, ask — then write back a Task, Note, or Chatter post.",
-  "private": true,
   "type": "module",
   "scripts": {
     "validate": "node scripts/validate-source.mjs",
@@ -20,5 +19,13 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "force-app",
+    "src",
+    "README.md"
+  ]
 }

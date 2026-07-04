@@ -1,8 +1,7 @@
 {
   "name": "@hanzo/docusign",
-  "version": "0.1.0",
-  "description": "Hanzo AI for DocuSign \u2014 AI over agreements and envelopes: summarize, extract key terms, risk-flag clauses, and draft memos. An Extension App panel plus a Connect webhook that auto-summarizes completed envelopes, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Hanzo AI for DocuSign — AI over agreements and envelopes: summarize, extract key terms, risk-flag clauses, and draft memos. An Extension App panel plus a Connect webhook that auto-summarizes completed envelopes, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -40,5 +39,14 @@
     "type": "git",
     "url": "https://github.com/hanzoai/extension.git",
     "directory": "packages/docusign"
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "main": "dist/server.js"
 }

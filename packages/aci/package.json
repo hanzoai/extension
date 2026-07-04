@@ -47,5 +47,12 @@
   "homepage": "https://hanzo.ai",
   "bugs": {
     "url": "https://github.com/hanzoai/aci/issues"
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
 }

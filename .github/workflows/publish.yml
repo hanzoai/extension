@@ -240,7 +240,7 @@ jobs:
       run: ovsx publish *.vsix -p ${{ secrets.OVSX_PAT }}
       continue-on-error: true
 
-  # ─── npm (@hanzo/mcp) ───
+  # ─── npm (all @hanzo/* workspace packages) ───
   npm:
     name: npm
     runs-on: hanzo-build-linux-amd64
@@ -255,13 +255,30 @@ jobs:
         cache: 'pnpm'
         registry-url: 'https://registry.npmjs.org'
     - run: pnpm install --frozen-lockfile
-    - run: pnpm --filter @hanzo/mcp run build
-    - name: Publish @hanzo/mcp
-      working-directory: packages/mcp
-      run: npm publish --access public
+
+    # Shared libraries first: their consumers (slack, teams) import the built
+    # dist at publish time, so @hanzo/cards must exist before the rest build.
+    - name: Build shared libraries
+      run: pnpm --filter @hanzo/cards build
+
+    # Build everything with a build script. Guarded with `|| true` so a package
+    # whose toolchain is absent on the runner (jupyter→jupyterlab, desktop→cargo)
+    # cannot abort the publish of the rest.
+    - name: Build all packages
+      run: pnpm -r --if-present run build || true
+
+    # Recursive publish: skips private (root, apps/site), skips versions already
+    # on npm (e.g. @hanzo/mcp), rewrites workspace:* → the real version, and
+    # publishes in topological order so @hanzo/cards lands before its consumers.
+    # --ignore-scripts is required: raycast (hanzo-ai) and vscode (hanzo-ide)
+    # define a `publish` lifecycle script targeting their own stores (Raycast /
+    # VS Marketplace); without this flag those scripts run mid-publish, fail, and
+    # abort every package after them. Builds already ran above, so no publish-time
+    # script is needed. `|| true` keeps one bad package from blocking the rest.
+    - name: Publish all
+      run: pnpm -r publish --access public --no-git-checks --ignore-scripts || true
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      continue-on-error: true
 
   # ─── JetBrains Marketplace ───
   jetbrains:

@@ -1,8 +1,7 @@
 {
   "name": "@hanzo/imanage",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hanzo AI for iManage Work — AI over your legal document management system: summarize a document, extract key clauses / dates / parties, search-and-synthesize a matter/workspace, and compare a document set. An embedded-app panel plus an OAuth + Work-API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
-  "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -40,5 +39,14 @@
     "type": "git",
     "url": "https://github.com/hanzoai/extension.git",
     "directory": "packages/imanage"
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "main": "dist/server.js"
 }
