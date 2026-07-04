@@ -9,6 +9,7 @@ packages:
   - 'packages/gworkspace'
   - 'packages/jetbrains'
   - 'packages/mcp'
+  - 'packages/meetings'
   - 'packages/office'
   - 'packages/outlook'
   - 'packages/pdf'
