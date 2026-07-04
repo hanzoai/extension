@@ -1,0 +1,28 @@
+{
+  "name": "Hanzo AI for HubSpot",
+  "description": "AI over your CRM records — summarize a contact, company, or deal, draft an email, suggest next steps, and ask anything, with one-click write-back as a Note or Task. Model calls route through the api.hanzo.ai gateway via a serverless function; the Hanzo key never reaches the browser.",
+  "uid": "hanzo_ai_for_hubspot",
+  "allowedUrls": ["https://api.hanzo.ai"],
+  "auth": {
+    "redirectUrls": ["https://hubspot.hanzo.ai/oauth/callback"],
+    "requiredScopes": [
+      "crm.objects.contacts.read",
+      "crm.objects.contacts.write",
+      "crm.objects.companies.read",
+      "crm.objects.companies.write",
+      "crm.objects.deals.read",
+      "crm.objects.deals.write"
+    ],
+    "optionalScopes": [],
+    "conditionallyRequiredScopes": []
+  },
+  "extensions": {
+    "crm": {
+      "cards": [
+        {
+          "file": "extensions/hanzo-assistant-card.json"
+        }
+      ]
+    }
+  }
+}
