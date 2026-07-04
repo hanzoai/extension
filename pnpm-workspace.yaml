@@ -15,6 +15,7 @@ packages:
   - 'packages/gitlab'
   - 'packages/gworkspace'
   - 'packages/hubspot'
+  - 'packages/imanage'
   - 'packages/jetbrains'
   - 'packages/jupyter'
   - 'packages/mcp'
