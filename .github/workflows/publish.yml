@@ -276,7 +276,14 @@ jobs:
     # abort every package after them. Builds already ran above, so no publish-time
     # script is needed. `|| true` keeps one bad package from blocking the rest.
     - name: Publish all
-      run: pnpm -r publish --access public --no-git-checks --ignore-scripts || true
+      run: |
+        # setup-node writes a ${NODE_AUTH_TOKEN}-templated .npmrc that `npm` expands
+        # but `pnpm publish` does not reliably read — write the token literally so
+        # pnpm authenticates (a 404 on PUT is npm's obscured "unauthenticated").
+        echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
+        echo "@hanzo:registry=https://registry.npmjs.org/" >> .npmrc
+        npm whoami || echo "::warning::npm whoami failed — NPM_TOKEN invalid or lacks @hanzo publish rights"
+        pnpm -r publish --access public --no-git-checks --ignore-scripts --report-summary || true
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
