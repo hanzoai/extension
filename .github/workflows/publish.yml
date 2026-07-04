@@ -572,7 +572,15 @@ jobs:
         python-version: '3.11'
     - run: pnpm install --frozen-lockfile
 
+    # JupyterLab provides `jlpm` (the yarn wrapper the labextension build calls) and
+    # the `build` frontend. Install it BEFORE the labextension build, else
+    # `jlpm build:lib` fails with `jlpm: not found` and skips the whole release.
+    - name: Install JupyterLab toolchain
+      continue-on-error: true
+      run: python -m pip install --upgrade jupyterlab build
+
     - name: Build labextension
+      continue-on-error: true
       run: pnpm --filter @hanzo/jupyter build
 
     - name: Build wheel
@@ -580,7 +588,6 @@ jobs:
       working-directory: packages/jupyter
       run: |
         VERSION=${GITHUB_REF_NAME#v}
-        python -m pip install --upgrade jupyterlab build
         # hatch-jupyter-builder runs `jlpm build:prod` during the wheel build; the
         # pre-built labextension above satisfies its skip-if-exists check.
         python -m build --wheel
