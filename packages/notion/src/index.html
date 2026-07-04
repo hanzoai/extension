@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI for Notion</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <img src="assets/icon-32.png" alt="Hanzo" />
+    <span class="title">Hanzo AI for Notion</span>
+    <select id="model" aria-label="Model"></select>
+    <button id="signin" class="secondary">Connect Notion</button>
+  </header>
+
+  <label for="page">Page</label>
+  <select id="page" aria-label="Page"></select>
+
+  <!-- The four AI actions over the selected page. -->
+  <div class="actions">
+    <button class="action" data-action="summarize">Summarize page</button>
+    <button class="action" data-action="draft">Draft / expand</button>
+    <button class="action" data-action="extract">Extract action items</button>
+    <button class="action" data-action="ask">Ask about this page</button>
+  </div>
+
+  <label for="detail">Instruction (for Draft / Ask) — optional</label>
+  <input id="detail" type="text"
+         placeholder="e.g. a launch checklist section · What are the open risks?" />
+
+  <div class="status" id="status"></div>
+
+  <label for="output">Result</label>
+  <textarea id="output" placeholder="Hanzo's output appears here — review before writing back to Notion."></textarea>
+
+  <div class="row">
+    <button id="append">Append to page</button>
+    <select id="database" aria-label="Target database"></select>
+    <button id="rows" disabled>Create rows from action items</button>
+  </div>
+
+  <details>
+    <summary>Hanzo API key (optional — for your models)</summary>
+    <div class="row">
+      <input id="apikey" type="password" placeholder="hk-…" />
+    </div>
+    <p class="hint">Pasted keys stay in your browser. Notion sign-in is handled server-side; the Notion secret and bot token never reach this page.</p>
+  </details>
+
+  <footer>Model calls route through api.hanzo.ai · Notion data via api.notion.com/v1 through the server proxy · nothing stored client-side but an opaque session.</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
