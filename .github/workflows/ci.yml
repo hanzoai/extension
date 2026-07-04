@@ -65,6 +65,12 @@ jobs:
     - name: Test Zendesk app
       run: pnpm --filter @hanzo/zendesk test
 
+    - name: Test HubSpot app
+      run: pnpm --filter @hanzo/hubspot test
+
+    - name: Test Shopify app
+      run: pnpm --filter @hanzo/shopify test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
