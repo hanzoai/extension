@@ -48,6 +48,9 @@ jobs:
     - name: Test Clio integration
       run: pnpm --filter @hanzo/clio test
 
+    - name: Test cards (shared card-builder)
+      run: pnpm --filter @hanzo/cards test
+
     - name: Test tools package
       run: pnpm --filter @hanzo/cli-tools test
 
