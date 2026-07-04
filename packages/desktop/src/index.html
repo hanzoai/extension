@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hanzo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="app" class="panel">
+      <!-- Header: brand + model picker + settings toggle -->
+      <header class="bar">
+        <span class="brand">Hanzo</span>
+        <select id="model" class="model" title="Model" aria-label="Model"></select>
+        <button id="settings-toggle" class="icon" title="Settings" aria-label="Settings">⚙</button>
+      </header>
+
+      <!-- Prompt row: the ask box + send. Enter sends, Shift+Enter newlines. -->
+      <form id="prompt-form" class="prompt">
+        <textarea
+          id="prompt"
+          class="input"
+          rows="1"
+          placeholder="Ask Hanzo, or copy text and pick an action…"
+          autofocus
+        ></textarea>
+        <button id="send" class="send" type="submit" title="Send (Enter)">Ask</button>
+      </form>
+
+      <!-- Quick actions: act on the clipboard. Rendered from the action catalog. -->
+      <nav id="actions" class="actions" aria-label="Quick actions"></nav>
+
+      <!-- Output: streamed reply + a copy button. Hidden until there is output. -->
+      <section id="output-wrap" class="output-wrap" hidden>
+        <div id="output" class="output" aria-live="polite"></div>
+        <div class="output-foot">
+          <span id="status" class="status"></span>
+          <button id="copy" class="ghost" type="button" hidden>Copy</button>
+        </div>
+      </section>
+
+      <!-- Settings pane: paste the hk- key. Hidden by default. -->
+      <section id="settings" class="settings" hidden>
+        <label class="field">
+          <span>Hanzo API key</span>
+          <input
+            id="apikey"
+            class="input"
+            type="password"
+            placeholder="hk-…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+        <p class="hint">
+          Paste your <code>hk-</code> key from hanzo.id. It is stored only on this
+          machine and sent only to api.hanzo.ai.
+        </p>
+        <div class="settings-foot">
+          <span id="settings-status" class="status"></span>
+          <button id="save-settings" class="send" type="button">Save</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
