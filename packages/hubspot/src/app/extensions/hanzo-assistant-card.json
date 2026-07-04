@@ -1,0 +1,16 @@
+{
+  "type": "crm-card",
+  "data": {
+    "title": "Hanzo AI",
+    "uid": "hanzo_ai_assistant_card",
+    "location": "crm.record.tab",
+    "module": {
+      "file": "HanzoAssistant.tsx"
+    },
+    "objectTypes": [
+      { "name": "contacts" },
+      { "name": "companies" },
+      { "name": "deals" }
+    ]
+  }
+}
