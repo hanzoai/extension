@@ -80,6 +80,12 @@ jobs:
     - name: Test Canva app
       run: pnpm --filter @hanzo/canva test
 
+    - name: Test GitHub App
+      run: pnpm --filter @hanzo/github test
+
+    - name: Test Raycast extension
+      run: pnpm --filter hanzo-ai test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
