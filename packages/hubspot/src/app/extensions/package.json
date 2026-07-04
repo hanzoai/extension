@@ -1,0 +1,11 @@
+{
+  "name": "hanzo-hubspot-extensions",
+  "version": "0.1.0",
+  "description": "React UI extension (CRM card) frontend for Hanzo AI for HubSpot.",
+  "author": "Hanzo AI",
+  "license": "MIT",
+  "dependencies": {
+    "@hubspot/ui-extensions": "0.15.0",
+    "react": "18.3.1"
+  }
+}

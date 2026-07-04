@@ -1,0 +1,12 @@
+{
+  "appFunctions": {
+    "hanzo-assistant": {
+      "file": "hanzo-assistant.js",
+      "secrets": ["HANZO_API_KEY"]
+    },
+    "hanzo-writeback": {
+      "file": "hanzo-writeback.js",
+      "secrets": []
+    }
+  }
+}
