@@ -74,6 +74,10 @@ describe('getMatter', () => {
     const r = getMatter(token, base, 1, ['id', 'status']);
     expect(q(r.url).get('fields')).toBe('id,status');
   });
+  it('replays a Custom Action nonce when given, omits it otherwise', () => {
+    expect(q(getMatter(token, base, 1, undefined, 'NONCE').url).get('custom_action_nonce')).toBe('NONCE');
+    expect(q(getMatter(token, base, 1).url).has('custom_action_nonce')).toBe(false);
+  });
 });
 
 describe('listDocuments', () => {

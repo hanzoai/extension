@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createHmac } from 'node:crypto';
-import { readEnv, verifyNonce } from '../src/server';
+import { readEnv, customActionRedirect } from '../src/server';
 
 describe('readEnv', () => {
   const good = {
@@ -30,22 +29,30 @@ describe('readEnv', () => {
   });
 });
 
-describe('verifyNonce', () => {
-  const secret = 'super-secret';
-  const signed = '42https://app.clio.com/api/v4/matters/321.json';
-  const good = createHmac('sha256', secret).update(signed).digest('hex');
+describe('customActionRedirect', () => {
+  it('redirects a matter deep-link to the SPA carrying matter_id + nonce', () => {
+    const search = new URLSearchParams({
+      custom_action_id: '7',
+      user_id: '42',
+      subject_url: encodeURIComponent('/api/v4/matters/321'),
+      custom_action_nonce: 'NONCE1',
+    });
+    const dest = customActionRedirect(search);
+    const u = new URL(dest, 'https://clio.hanzo.ai');
+    expect(u.pathname).toBe('/index.html');
+    expect(u.searchParams.get('matter_id')).toBe('321');
+    expect(u.searchParams.get('custom_action_nonce')).toBe('NONCE1');
+  });
 
-  it('accepts a correctly-signed nonce', () => {
-    expect(verifyNonce(signed, good, secret)).toBe(true);
+  it('omits the nonce param when Clio sent none', () => {
+    const search = new URLSearchParams({ subject_url: '/api/v4/matters/9' });
+    const u = new URL(customActionRedirect(search), 'https://clio.hanzo.ai');
+    expect(u.searchParams.get('matter_id')).toBe('9');
+    expect(u.searchParams.has('custom_action_nonce')).toBe(false);
   });
-  it('rejects a tampered nonce', () => {
-    expect(verifyNonce(signed, good.replace(/.$/, '0'), secret)).toBe(false);
-  });
-  it('rejects a nonce signed with the wrong secret', () => {
-    const wrong = createHmac('sha256', 'other').update(signed).digest('hex');
-    expect(verifyNonce(signed, wrong, secret)).toBe(false);
-  });
-  it('rejects a length-mismatched nonce without throwing', () => {
-    expect(verifyNonce(signed, 'short', secret)).toBe(false);
+
+  it('returns empty for a non-matter deep-link (nothing to open)', () => {
+    expect(customActionRedirect(new URLSearchParams({ subject_url: '/api/v4/contacts/9' }))).toBe('');
+    expect(customActionRedirect(new URLSearchParams())).toBe('');
   });
 });

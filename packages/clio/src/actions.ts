@@ -44,6 +44,22 @@ export function truncate(text: string, max: number): string {
   return text.slice(0, max) + `\n…[truncated ${text.length - max} chars]`;
 }
 
+// isTextExtractable reports whether a Clio document's content_type yields useful
+// text when downloaded as-is. Legal matters are mostly PDF/DOCX (binary); those
+// come back as mojibake that wastes the context budget and teaches the model
+// nothing, so we skip their bytes and keep only the filename. Text, markdown,
+// JSON/XML, CSV, and HTML are worth reading. Matched on the MIME SUBTYPE (after
+// the `/`) so the DOCX type — application/vnd.openxmlformats-…, which contains
+// the substring "xml" in its VENDOR tree — is correctly treated as binary. Pure.
+const TEXT_SUBTYPES = new Set(['json', 'xml', 'csv', 'html', 'markdown', 'x-markdown', 'plain', 'rtf']);
+export function isTextExtractable(contentType: string | undefined): boolean {
+  if (!contentType) return false;
+  const ct = contentType.toLowerCase().split(';')[0].trim(); // drop any ;charset=
+  if (ct.startsWith('text/')) return true;
+  const subtype = ct.slice(ct.indexOf('/') + 1);
+  return TEXT_SUBTYPES.has(subtype);
+}
+
 // assembleMatterContext renders a MatterContext into the single fenced string
 // handed to Hanzo. Header lines carry the matter metadata; each document is
 // per-doc capped, then the whole thing is capped at MAX_CONTEXT_CHARS. Order is

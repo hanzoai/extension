@@ -21,6 +21,12 @@ describe('parseSubjectUrl', () => {
   it('tolerates a bare path', () => {
     expect(parseSubjectUrl('/api/v4/matters/77')).toEqual({ subjectType: 'matters', recordId: 77 });
   });
+  it('decodes a URL-encoded subject_url (how Clio sends it)', () => {
+    expect(parseSubjectUrl(encodeURIComponent('/api/v4/matters/1234'))).toEqual({
+      subjectType: 'matters',
+      recordId: 1234,
+    });
+  });
   it('returns empty for a non-matching URL or empty input', () => {
     expect(parseSubjectUrl('https://app.clio.com/nope')).toEqual({});
     expect(parseSubjectUrl('')).toEqual({});
@@ -28,16 +34,15 @@ describe('parseSubjectUrl', () => {
 });
 
 describe('parseCustomAction', () => {
-  it('parses the full deep-link context and resolves matter_id from subject_url', () => {
+  it('parses the four Clio deep-link params and resolves matter_id', () => {
     const params = new URLSearchParams({
-      subject_url: 'https://app.clio.com/api/v4/matters/321.json',
-      subject_id: '321',
+      custom_action_id: '7',
       user_id: '42',
+      subject_url: encodeURIComponent('/api/v4/matters/321'),
       custom_action_nonce: 'abc123',
     });
     const ctx = parseCustomAction(params);
-    expect(ctx.subjectUrl).toBe('https://app.clio.com/api/v4/matters/321.json');
-    expect(ctx.subjectId).toBe('321');
+    expect(ctx.customActionId).toBe('7');
     expect(ctx.userId).toBe('42');
     expect(ctx.nonce).toBe('abc123');
     expect(ctx.subjectType).toBe('matters');
@@ -46,7 +51,7 @@ describe('parseCustomAction', () => {
 
   it('leaves matterId undefined when the action fired on a non-matter record', () => {
     const ctx = parseCustomAction(
-      new URLSearchParams({ subject_url: 'https://app.clio.com/api/v4/contacts/9', user_id: '1', custom_action_nonce: 'n' }),
+      new URLSearchParams({ subject_url: '/api/v4/contacts/9', user_id: '1', custom_action_nonce: 'n' }),
     );
     expect(ctx.subjectType).toBe('contacts');
     expect(ctx.matterId).toBeUndefined();
@@ -57,6 +62,7 @@ describe('parseCustomAction', () => {
     expect(ctx.userId).toBe('5');
     expect(ctx.subjectUrl).toBe('');
     expect(ctx.nonce).toBe('');
+    expect(ctx.customActionId).toBe('');
     expect(ctx.matterId).toBeUndefined();
   });
 });
