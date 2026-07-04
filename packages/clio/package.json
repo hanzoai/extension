@@ -1,8 +1,7 @@
 {
   "name": "@hanzo/clio",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hanzo AI inside Clio — summarize matters, draft correspondence, extract key dates & obligations, and write the output back as a Clio note or activity. Model calls route through the api.hanzo.ai gateway; Clio access via OAuth2 + REST v4.",
-  "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -20,5 +19,14 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "main": "dist/app.js"
 }
