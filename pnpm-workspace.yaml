@@ -1,5 +1,4 @@
 packages:
-  - 'packages/ai'
   - 'packages/aci'
   - 'packages/auth'
   - 'packages/browser'
