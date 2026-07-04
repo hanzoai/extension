@@ -1,0 +1,59 @@
+# Python packaging for the prebuilt JupyterLab extension. `pip install .` runs
+# `jlpm build:prod` (via hatch-jupyter-builder) to produce the federated bundle
+# under hanzo_jupyter/labextension, then ships it as data files JupyterLab
+# discovers at import. This is the standard JupyterLab 4 prebuilt-extension
+# layout (hatchling + hatch-jupyter-builder).
+
+[build-system]
+requires = ["hatchling>=1.5.0", "jupyterlab>=4.0.0,<5", "hatch-nodejs-version>=0.3.2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hanzo_jupyter"
+version = "0.1.0"
+description = "Hanzo AI for JupyterLab — an in-notebook AI assistant (side panel + cell actions)."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Hanzo AI" }]
+keywords = ["Jupyter", "JupyterLab", "JupyterLab4", "AI", "Hanzo"]
+classifiers = [
+    "Framework :: Jupyter",
+    "Framework :: Jupyter :: JupyterLab",
+    "Framework :: Jupyter :: JupyterLab :: 4",
+    "Framework :: Jupyter :: JupyterLab :: Extensions",
+    "Framework :: Jupyter :: JupyterLab :: Extensions :: Prebuilt",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/hanzoai/extension"
+
+[tool.hatch.build.targets.wheel.shared-data]
+"hanzo_jupyter/labextension" = "share/jupyter/labextensions/@hanzo/jupyter"
+"install.json" = "share/jupyter/labextensions/@hanzo/jupyter/install.json"
+
+[tool.hatch.build.targets.sdist]
+artifacts = ["hanzo_jupyter/labextension"]
+exclude = [".github", "node_modules", "lib"]
+
+[tool.hatch.build.hooks.jupyter-builder]
+dependencies = ["hatch-jupyter-builder>=0.5"]
+build-function = "hatch_jupyter_builder.npm_builder"
+ensured-targets = [
+    "hanzo_jupyter/labextension/static/style.js",
+    "hanzo_jupyter/labextension/package.json",
+]
+skip-if-exists = ["hanzo_jupyter/labextension/static/style.js"]
+
+[tool.hatch.build.hooks.jupyter-builder.build-kwargs]
+build_cmd = "build:prod"
+npm = ["jlpm"]
+
+[tool.hatch.build.hooks.jupyter-builder.editable-build-kwargs]
+build_cmd = "build"
+npm = ["jlpm"]
+source_dir = "src"
+build_dir = "hanzo_jupyter/labextension"
