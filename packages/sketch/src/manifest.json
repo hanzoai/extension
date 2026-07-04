@@ -1,0 +1,55 @@
+{
+  "$schema": "https://raw.githubusercontent.com/sketch-hq/SketchAPI/develop/docs/manifest.schema.json",
+  "name": "Hanzo AI",
+  "identifier": "ai.hanzo.sketch",
+  "version": "0.1.0",
+  "description": "Hanzo AI for Sketch — critique a selection, rewrite/translate/content-fill text layers, and ask about your design. Model calls route through the api.hanzo.ai gateway via @hanzo/ai.",
+  "author": "Hanzo AI",
+  "authorEmail": "hi@hanzo.ai",
+  "homepage": "https://hanzo.ai",
+  "appcast": "https://sketch.hanzo.ai/appcast.xml",
+  "bundleVersion": 1,
+  "icon": "assets/icon.png",
+  "scope": "document",
+  "commands": [
+    {
+      "name": "Summarize / critique selection",
+      "identifier": "critique",
+      "shortcut": "ctrl shift k",
+      "script": "command.js",
+      "handler": "onCritique"
+    },
+    {
+      "name": "Rewrite selected text",
+      "identifier": "rewrite",
+      "shortcut": "ctrl shift r",
+      "script": "command.js",
+      "handler": "onRewrite"
+    },
+    {
+      "name": "Translate text layers",
+      "identifier": "translate",
+      "shortcut": "ctrl shift t",
+      "script": "command.js",
+      "handler": "onTranslate"
+    },
+    {
+      "name": "Content fill",
+      "identifier": "contentfill",
+      "shortcut": "ctrl shift f",
+      "script": "command.js",
+      "handler": "onContentFill"
+    },
+    {
+      "name": "Ask Hanzo…",
+      "identifier": "ask",
+      "shortcut": "ctrl shift a",
+      "script": "command.js",
+      "handler": "onAsk"
+    }
+  ],
+  "menu": {
+    "title": "Hanzo AI",
+    "items": ["critique", "rewrite", "translate", "contentfill", "ask"]
+  }
+}
