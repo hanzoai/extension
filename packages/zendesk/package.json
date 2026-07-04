@@ -1,8 +1,7 @@
 {
   "name": "@hanzo/zendesk",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hanzo AI for Zendesk — a ticket-sidebar Support app (ZAFv2) that summarizes tickets, drafts replies in the agent's voice, suggests next steps, and writes back into the reply box, built on the published @hanzo/ai headless client against api.hanzo.ai.",
-  "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -26,5 +25,15 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "src",
+    "README.md",
+    "manifest.json"
+  ]
 }

@@ -1,8 +1,7 @@
 {
   "name": "@hanzo/office-addin",
   "version": "1.9.31",
-  "description": "Hanzo AI for Microsoft Office \u2014 Word, Excel, and PowerPoint task pane. AI over your document, wired to the same api.hanzo.ai gateway and hanzo.id IAM as the browser extension.",
-  "private": true,
+  "description": "Hanzo AI for Microsoft Office — Word, Excel, and PowerPoint task pane. AI over your document, wired to the same api.hanzo.ai gateway and hanzo.id IAM as the browser extension.",
   "dependencies": {
     "@hanzo/auth": "workspace:*"
   },
@@ -20,5 +19,15 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src",
+    "assets",
+    "manifest.xml",
+    "README.md"
+  ]
 }

@@ -1,8 +1,7 @@
 {
   "name": "@hanzo/canva",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hanzo AI for Canva — a side-panel Apps SDK app: generate marketing copy, rewrite the selected text, translate, brainstorm content ideas, and ask about the design. An @canva/app-ui-kit React panel that reads the selection/page via @canva/design and adds/replaces text elements, running the model gateway through the published @hanzo/ai over api.hanzo.ai.",
-  "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -52,5 +51,14 @@
     "type": "git",
     "url": "https://github.com/hanzoai/extension.git",
     "directory": "packages/canva"
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "main": "dist/app.js"
 }
