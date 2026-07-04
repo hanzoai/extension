@@ -89,6 +89,9 @@ jobs:
     - name: Test JupyterLab extension
       run: pnpm --filter @hanzo/jupyter test
 
+    - name: Test GitLab integration
+      run: pnpm --filter @hanzo/gitlab test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
