@@ -1,0 +1,7 @@
+# Raycast build output + generated types
+dist/
+raycast-env.d.ts
+.eslintcache
+
+# deps (root .gitignore also covers these; kept here for the standalone package)
+node_modules/
