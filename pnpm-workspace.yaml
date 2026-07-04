@@ -3,6 +3,7 @@ packages:
   - 'packages/aci'
   - 'packages/auth'
   - 'packages/browser'
+  - 'packages/clio'
   - 'packages/dxt'
   - 'packages/gworkspace'
   - 'packages/jetbrains'
