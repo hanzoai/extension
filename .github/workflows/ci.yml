@@ -53,6 +53,15 @@ jobs:
     - name: Test Clio integration
       run: pnpm --filter @hanzo/clio test
 
+    - name: Test Notion integration
+      run: pnpm --filter @hanzo/notion test
+
+    - name: Test DocuSign integration
+      run: pnpm --filter @hanzo/docusign test
+
+    - name: Test Salesforce (pure helpers)
+      run: pnpm --filter @hanzo/salesforce test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
