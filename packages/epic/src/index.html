@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI for Epic</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <span class="title">Hanzo AI</span>
+    <select id="model" aria-label="Model"><option value="">default</option></select>
+    <span class="host" id="patient-title">Patient</span>
+  </header>
+
+  <!-- One-click clinical actions over the launched patient's chart. Chips are
+       built from the action catalog and enabled once the chart loads. -->
+  <div class="chips" id="chips"></div>
+
+  <label for="prompt">Ask about this patient · or add a reason-for-visit for the note</label>
+  <textarea id="prompt" placeholder="e.g. What are the abnormal recent labs? · 72yo for HTN follow-up · Any drug interactions to watch?"></textarea>
+
+  <div class="row">
+    <button id="stop" class="secondary" disabled>Stop</button>
+    <span class="spacer"></span>
+  </div>
+
+  <details>
+    <summary>Hanzo API key</summary>
+    <div class="row">
+      <input id="apikey" type="password" placeholder="hk-…" autocomplete="off" />
+      <button id="savekey" class="secondary">Save</button>
+    </div>
+    <div class="hint">The Hanzo model-gateway key. Not the FHIR token — patient data is read server-side and never leaves this app except to api.hanzo.ai.</div>
+  </details>
+
+  <div class="status" id="status">Launch this app from Epic to load a patient.</div>
+
+  <label for="output">Result</label>
+  <textarea id="output" placeholder="Hanzo's clinical assistance appears here." readonly></textarea>
+
+  <footer>Routed through api.hanzo.ai · grounded in the FHIR chart · decision support the clinician reviews — not a diagnosis. Read + assist only; no write-back to the EHR.</footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
