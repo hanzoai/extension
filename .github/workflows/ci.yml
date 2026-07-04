@@ -86,6 +86,9 @@ jobs:
     - name: Test Raycast extension
       run: pnpm --filter hanzo-ai test
 
+    - name: Test JupyterLab extension
+      run: pnpm --filter @hanzo/jupyter test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
