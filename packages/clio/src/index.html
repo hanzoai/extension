@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI for Clio</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <img src="assets/icon-32.png" alt="Hanzo" />
+    <span class="title">Hanzo AI for Clio</span>
+    <select id="model" aria-label="Model"></select>
+    <button id="signin" class="secondary">Sign in to Clio</button>
+  </header>
+
+  <label for="matter">Matter</label>
+  <select id="matter" aria-label="Matter"></select>
+
+  <!-- The four AI actions over the selected matter. -->
+  <div class="actions">
+    <button class="action" data-action="summarize">Summarize matter</button>
+    <button class="action" data-action="draft">Draft correspondence</button>
+    <button class="action" data-action="dates">Key dates &amp; obligations</button>
+    <button class="action" data-action="chat">Ask about this matter</button>
+  </div>
+
+  <label for="detail">Instruction (for Draft / Ask) — optional</label>
+  <input id="detail" type="text"
+         placeholder="e.g. a demand letter to opposing counsel · What is the filing deadline?" />
+
+  <div class="status" id="status"></div>
+
+  <label for="output">Result</label>
+  <textarea id="output" placeholder="Hanzo's output appears here — review before writing back to Clio."></textarea>
+
+  <div class="row">
+    <select id="target" aria-label="Write-back target">
+      <option value="note">Save as matter Note</option>
+      <option value="activity">Log as Activity</option>
+    </select>
+    <button id="writeback" disabled>Write back to Clio</button>
+  </div>
+
+  <details>
+    <summary>Hanzo API key (optional — for your models)</summary>
+    <div class="row">
+      <input id="apikey" type="password" placeholder="hk-…" />
+    </div>
+    <p class="hint">Pasted keys stay in your browser. Clio sign-in is handled server-side; the Clio secret never reaches this page.</p>
+  </details>
+
+  <footer>Model calls route through api.hanzo.ai · Clio data via app.clio.com/api/v4 · nothing stored server-side.</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
