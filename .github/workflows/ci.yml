@@ -62,6 +62,9 @@ jobs:
     - name: Test Salesforce (pure helpers)
       run: pnpm --filter @hanzo/salesforce test
 
+    - name: Test Zendesk app
+      run: pnpm --filter @hanzo/zendesk test
+
     - name: Test cards (shared card-builder)
       run: pnpm --filter @hanzo/cards test
 
