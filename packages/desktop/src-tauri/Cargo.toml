@@ -1,0 +1,41 @@
+[package]
+name = "hanzo-desktop"
+version = "0.1.0"
+description = "Hanzo AI desktop assistant — the ambient omnipresence layer (tray + global hotkey)"
+authors = ["Hanzo AI"]
+license = "MIT"
+repository = "https://github.com/hanzoai/extension"
+edition = "2021"
+rust-version = "1.77.2"
+
+# The binary is a one-liner (main.rs); all shell logic lives in the library
+# (lib.rs) per the Tauri v2 convention, so the crate is reusable and the mobile
+# entrypoint (if ever added) shares one run().
+[lib]
+name = "hanzo_desktop_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "hanzo-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.5", features = ["tray-icon"] }
+tauri-plugin-clipboard-manager = "2.3.2"
+# Synthetic paste keystroke into the frontmost app (rewrite/fix/translate outcome).
+enigo = "0.6.1"
+
+# The global-shortcut plugin is desktop-only (no mobile target for this app).
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-global-shortcut = "2.3.2"
+
+# Release profile tuned for a small, fast native shell — the installers CI ships.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
