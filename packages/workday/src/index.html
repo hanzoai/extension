@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI for Workday</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <span class="title">Hanzo AI</span>
+    <select id="model" aria-label="Model"></select>
+    <span class="host">Workday</span>
+  </header>
+
+  <div class="row scope">
+    <select id="worker" aria-label="Worker"></select>
+    <button id="load" class="secondary">Load</button>
+    <button id="refresh" class="secondary" title="Reload the worker list">Refresh</button>
+  </div>
+  <div class="records" id="records"></div>
+
+  <!-- One-click actions over the loaded worker/team. Chips are built from the catalog. -->
+  <div class="chips" id="chips"></div>
+
+  <label for="prompt">Ask about these people</label>
+  <textarea id="prompt" placeholder="e.g. Summarize this team and its open roles. · What time-off types is this worker eligible for? · Draft a job description for the open requisition."></textarea>
+
+  <div class="row">
+    <button id="run">Ask Hanzo</button>
+    <button id="stop" class="secondary" disabled>Stop</button>
+  </div>
+
+  <details>
+    <summary>Hanzo API key</summary>
+    <div class="row">
+      <input id="apikey" type="password" placeholder="hk-…" autocomplete="off" />
+      <button id="savekey" class="secondary">Save</button>
+    </div>
+    <div id="authhint" class="hint"></div>
+  </details>
+
+  <div class="status" id="status"></div>
+
+  <label for="output">Result</label>
+  <textarea id="output" placeholder="Hanzo's analysis appears here."></textarea>
+
+  <footer>Routed through api.hanzo.ai · grounded in your Workday records · read-only, informational HR support — not an employment, compensation, or legal decision.</footer>
+
+  <script type="module" src="__ENTRY__"></script>
+</body>
+</html>
