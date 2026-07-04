@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Default_Model__c</fullName>
+    <label>Default Model</label>
+    <type>Text</type>
+    <length>80</length>
+    <required>false</required>
+    <description>The model id the assistant defaults to when a user has not chosen one, e.g. zen-1. Non-secret; the API key lives in the Hanzo_API External Credential.</description>
+</CustomField>

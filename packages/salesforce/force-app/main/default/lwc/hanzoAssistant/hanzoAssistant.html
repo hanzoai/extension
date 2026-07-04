@@ -1,0 +1,82 @@
+<template>
+    <lightning-card title="Hanzo AI" icon-name="utility:einstein">
+        <div slot="actions">
+            <lightning-combobox
+                name="model"
+                label="Model"
+                variant="label-hidden"
+                value={selectedModel}
+                options={modelOptions}
+                onchange={handleModelChange}
+                disabled={busy}
+            ></lightning-combobox>
+        </div>
+
+        <div class="slds-var-p-horizontal_small slds-var-p-bottom_small">
+            <!-- Quick actions -->
+            <div class="slds-grid slds-wrap slds-gutters_x-small slds-var-m-bottom_small">
+                <template for:each={quickActions} for:item="action">
+                    <div key={action.id} class="slds-col slds-var-p-bottom_xx-small">
+                        <lightning-button
+                            label={action.label}
+                            data-task={action.task}
+                            onclick={handleQuickAction}
+                            disabled={busy}
+                        ></lightning-button>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Prompt -->
+            <lightning-textarea
+                name="prompt"
+                label="Ask about this record"
+                placeholder="Ask anything about this record…"
+                value={prompt}
+                onchange={handlePromptChange}
+                disabled={busy}
+            ></lightning-textarea>
+            <div class="slds-var-m-top_x-small">
+                <lightning-button
+                    variant="brand"
+                    label="Ask"
+                    onclick={handleAsk}
+                    disabled={runDisabled}
+                ></lightning-button>
+            </div>
+
+            <!-- Loading -->
+            <template if:true={loading}>
+                <div class="slds-var-m-top_small slds-align_absolute-center">
+                    <lightning-spinner alternative-text="Thinking…" size="small"></lightning-spinner>
+                </div>
+            </template>
+
+            <!-- Error -->
+            <template if:true={errorMessage}>
+                <div class="slds-var-m-top_small slds-text-color_error" role="alert">
+                    {errorMessage}
+                </div>
+            </template>
+
+            <!-- Output + write-back -->
+            <template if:true={hasOutput}>
+                <div class="hanzo-output slds-box slds-box_x-small slds-var-m-top_small">
+                    <lightning-formatted-text value={output}></lightning-formatted-text>
+                </div>
+                <div class="slds-grid slds-wrap slds-gutters_x-small slds-var-m-top_x-small">
+                    <template for:each={writeTargets} for:item="target">
+                        <div key={target.kind} class="slds-col slds-var-p-bottom_xx-small">
+                            <lightning-button
+                                label={target.label}
+                                data-kind={target.kind}
+                                onclick={handleWriteBack}
+                                disabled={saving}
+                            ></lightning-button>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

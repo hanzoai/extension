@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Hanzo AI User</label>
+    <description>Grants access to the Hanzo AI assistant: the controller Apex and the External Credential principal used for the api.hanzo.ai callout. Assign to reps who should see the panel.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <classAccesses>
+        <apexClass>HanzoController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>HanzoClient</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>HanzoContext</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <!--
+      External Credential Principal access: without this, the running user's
+      callout gets no Bearer token and api.hanzo.ai returns 401. This is the
+      grant that lets a rep use the injected key without ever seeing it.
+    -->
+    <externalCredentialPrincipalAccesses>
+        <externalCredentialPrincipal>Hanzo_API-HanzoApiPrincipal</externalCredentialPrincipal>
+        <enabled>true</enabled>
+    </externalCredentialPrincipalAccesses>
+</PermissionSet>
