@@ -10,5 +10,13 @@
   "devDependencies": {
     "archiver": "^7.0.1"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "server.js",
+    "manifest.json",
+    "icon.png"
+  ]
 }
