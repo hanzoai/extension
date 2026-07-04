@@ -1,0 +1,23 @@
+# Admin link extension — adds "Hanzo AI" to the product and order detail pages so
+# a merchant opens the assistant with that resource already in context. This is
+# an admin *link* (the simplest, config-only surface): it deep-links the embedded
+# app with ?resource=&id=, which the app reads via parseLaunchContext and jumps
+# straight to. No JS bundle to build — the target is the embedded app itself.
+# Docs: shopify.dev/docs/apps/build/admin/actions-blocks/build-admin-action
+
+api_version = "2025-01"
+
+[[extensions]]
+name = "Hanzo AI"
+handle = "hanzo-ai-assistant"
+type = "admin_link"
+
+  # On a product page → open the app on the Products tab with that product.
+  [[extensions.targeting]]
+  target = "admin.product-details.action.link"
+  url = "app://?resource=product&id={{ resource.id }}"
+
+  # On an order page → open the app on the Orders tab with that order.
+  [[extensions.targeting]]
+  target = "admin.order-details.action.link"
+  url = "app://?resource=order&id={{ resource.id }}"

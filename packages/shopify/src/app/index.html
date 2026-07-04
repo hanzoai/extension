@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI for Shopify</title>
+  <!--
+    App Bridge is loaded from Shopify's CDN and MUST be the first script, with
+    the app's API key in a meta tag. Shopify requires this for an embedded admin
+    app so the iframe registers window.shopify (session tokens, navigation).
+    build.js stamps __SHOPIFY_API_KEY__ (public — the client id, never the secret)
+    and __ENTRY__ / __BASE__.
+  -->
+  <meta name="shopify-api-key" content="__SHOPIFY_API_KEY__" />
+  <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="__ENTRY__"></script>
+</body>
+</html>

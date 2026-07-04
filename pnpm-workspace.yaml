@@ -16,6 +16,7 @@ packages:
   - 'packages/outlook'
   - 'packages/pdf'
   - 'packages/salesforce'
+  - 'packages/shopify'
   - 'packages/slack'
   - 'packages/teams'
   - 'packages/tools'
