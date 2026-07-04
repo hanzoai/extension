@@ -65,3 +65,4 @@ build/
 .next/
 *.log
 tmp/
+.npmrc
