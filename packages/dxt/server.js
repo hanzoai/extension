@@ -8,8 +8,7 @@ var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
   get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
 }) : x)(function(x) {
-  if (typeof require !== "undefined")
-    return require.apply(this, arguments);
+  if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
 var __esm = (fn, res) => function __init() {
@@ -115,8 +114,7 @@ var init_fs = __esm({
           const uri = args.uri || args.path || ".";
           switch (args.action) {
             case "read": {
-              if (!uri || uri === ".")
-                return fail("INVALID_PARAMS", "uri required");
+              if (!uri || uri === ".") return fail("INVALID_PARAMS", "uri required");
               const raw = await fs.readFile(uri, args.encoding || "utf8");
               const text = raw.toString();
               const hash = contentHash(text);
@@ -130,10 +128,8 @@ var init_fs = __esm({
               return envelope({ uri, content, hash, lines: lines.length, size: Buffer.byteLength(text) }, "read");
             }
             case "write": {
-              if (!uri || uri === ".")
-                return fail("INVALID_PARAMS", "uri required");
-              if (args.content === void 0)
-                return fail("INVALID_PARAMS", "content required");
+              if (!uri || uri === ".") return fail("INVALID_PARAMS", "uri required");
+              if (args.content === void 0) return fail("INVALID_PARAMS", "content required");
               if (!args.overwrite) {
                 try {
                   await fs.access(uri);
@@ -147,8 +143,7 @@ var init_fs = __esm({
               return envelope({ uri, hash, size: Buffer.byteLength(args.content) }, "write");
             }
             case "stat": {
-              if (!uri || uri === ".")
-                return fail("INVALID_PARAMS", "uri required");
+              if (!uri || uri === ".") return fail("INVALID_PARAMS", "uri required");
               const stats = await fs.stat(uri);
               let hash;
               if (stats.isFile()) {
@@ -178,8 +173,7 @@ var init_fs = __esm({
                 return envelope({ uri, entries: items, count: items.length }, "list");
               }
               const buildTree = async (dir, prefix = "", d = 0) => {
-                if (d >= depth)
-                  return "";
+                if (d >= depth) return "";
                 const entries = await fs.readdir(dir, { withFileTypes: true });
                 const filtered = args.show_hidden ? entries : entries.filter((e) => !e.name.startsWith("."));
                 let tree2 = "";
@@ -187,8 +181,7 @@ var init_fs = __esm({
                   const e = filtered[i];
                   const last = i === filtered.length - 1;
                   tree2 += prefix + (last ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ") + e.name + "\n";
-                  if (e.isDirectory())
-                    tree2 += await buildTree(path.join(dir, e.name), prefix + (last ? "    " : "\u2502   "), d + 1);
+                  if (e.isDirectory()) tree2 += await buildTree(path.join(dir, e.name), prefix + (last ? "    " : "\u2502   "), d + 1);
                 }
                 return tree2;
               };
@@ -196,16 +189,13 @@ var init_fs = __esm({
               return envelope({ uri, tree, depth }, "list");
             }
             case "mkdir": {
-              if (!uri || uri === ".")
-                return fail("INVALID_PARAMS", "uri required");
+              if (!uri || uri === ".") return fail("INVALID_PARAMS", "uri required");
               await fs.mkdir(uri, { recursive: true });
               return envelope({ uri }, "mkdir");
             }
             case "rm": {
-              if (!uri || uri === ".")
-                return fail("INVALID_PARAMS", "uri required");
-              if (!args.confirm)
-                return fail("CONFIRM_REQUIRED", "rm requires confirm: true");
+              if (!uri || uri === ".") return fail("INVALID_PARAMS", "uri required");
+              if (!args.confirm) return fail("CONFIRM_REQUIRED", "rm requires confirm: true");
               const stats = await fs.stat(uri);
               if (stats.isDirectory()) {
                 await fs.rm(uri, { recursive: args.recursive !== false, force: true });
@@ -215,10 +205,8 @@ var init_fs = __esm({
               return envelope({ uri, removed: true }, "rm");
             }
             case "mv": {
-              if (!uri || uri === ".")
-                return fail("INVALID_PARAMS", "uri required");
-              if (!args.destination)
-                return fail("INVALID_PARAMS", "destination required");
+              if (!uri || uri === ".") return fail("INVALID_PARAMS", "uri required");
+              if (!args.destination) return fail("INVALID_PARAMS", "destination required");
               if (!args.overwrite) {
                 try {
                   await fs.access(args.destination);
@@ -231,8 +219,7 @@ var init_fs = __esm({
               return envelope({ from: uri, to: args.destination }, "mv");
             }
             case "apply_patch": {
-              if (!uri || uri === ".")
-                return fail("INVALID_PARAMS", "uri required");
+              if (!uri || uri === ".") return fail("INVALID_PARAMS", "uri required");
               let content = await fs.readFile(uri, "utf8");
               const currentHash = contentHash(content);
               if (args.base_hash && args.base_hash !== currentHash) {
@@ -253,21 +240,17 @@ var init_fs = __esm({
               }
               const oldText = args.patch || args.old_text || args.oldText;
               const newText = args.new_text || args.newText;
-              if (!oldText || newText === void 0)
-                return fail("INVALID_PARAMS", "patch (old_text) and new_text required, or edits array");
-              if (!content.includes(oldText))
-                return fail("NOT_FOUND", "patch text not found in file");
+              if (!oldText || newText === void 0) return fail("INVALID_PARAMS", "patch (old_text) and new_text required, or edits array");
+              if (!content.includes(oldText)) return fail("NOT_FOUND", "patch text not found in file");
               const count = content.split(oldText).length - 1;
-              if (count > 1)
-                return fail("AMBIGUOUS", `patch text found ${count} times \u2014 include more context`);
+              if (count > 1) return fail("AMBIGUOUS", `patch text found ${count} times \u2014 include more context`);
               content = content.replace(oldText, newText);
               await fs.writeFile(uri, content, "utf8");
               return envelope({ uri, hash: contentHash(content) }, "apply_patch");
             }
             case "search_text": {
               const query = args.query || args.pattern;
-              if (!query)
-                return fail("INVALID_PARAMS", "query required");
+              if (!query) return fail("INVALID_PARAMS", "query required");
               let hasRg = false;
               try {
                 await execAsync("which rg");
@@ -277,19 +260,14 @@ var init_fs = __esm({
               let cmd;
               if (hasRg) {
                 cmd = `rg -n --max-count ${args.max_results || 50}`;
-                if (args.ignore_case)
-                  cmd += " -i";
-                if (args.context_lines)
-                  cmd += ` -C ${args.context_lines}`;
-                if (args.pattern && args.pattern !== query)
-                  cmd += ` -g "${args.pattern}"`;
+                if (args.ignore_case) cmd += " -i";
+                if (args.context_lines) cmd += ` -C ${args.context_lines}`;
+                if (args.pattern && args.pattern !== query) cmd += ` -g "${args.pattern}"`;
                 cmd += ` "${query}" "${uri}"`;
               } else {
                 cmd = `grep -rn`;
-                if (args.ignore_case)
-                  cmd += " -i";
-                if (args.context_lines)
-                  cmd += ` -C ${args.context_lines}`;
+                if (args.ignore_case) cmd += " -i";
+                if (args.context_lines) cmd += ` -C ${args.context_lines}`;
                 cmd += ` "${query}" "${uri}" | head -${args.max_results || 50}`;
               }
               try {
@@ -297,8 +275,7 @@ var init_fs = __esm({
                 const lines = stdout.trim().split("\n").filter(Boolean);
                 return envelope({ query, matches: lines, count: lines.length, backend: hasRg ? "ripgrep" : "grep" }, "search_text");
               } catch (e) {
-                if (e.code === 1)
-                  return envelope({ query, matches: [], count: 0, backend: hasRg ? "ripgrep" : "grep" }, "search_text");
+                if (e.code === 1) return envelope({ query, matches: [], count: 0, backend: hasRg ? "ripgrep" : "grep" }, "search_text");
                 throw e;
               }
             }
@@ -306,10 +283,8 @@ var init_fs = __esm({
               return fail("UNKNOWN_ACTION", `Unknown action: ${args.action}`, { available: ["read", "write", "stat", "list", "mkdir", "rm", "mv", "apply_patch", "search_text"] });
           }
         } catch (error) {
-          if (error.code === "ENOENT")
-            return fail("NOT_FOUND", `Not found: ${args.uri || args.path}`);
-          if (error.code === "EACCES")
-            return fail("PERMISSION_DENIED", error.message);
+          if (error.code === "ENOENT") return fail("NOT_FOUND", `Not found: ${args.uri || args.path}`);
+          if (error.code === "EACCES") return fail("PERMISSION_DENIED", error.message);
           return fail("ERROR", error.message);
         }
       }
@@ -360,13 +335,11 @@ var init_exec = __esm({
         try {
           switch (args.action) {
             case "exec": {
-              if (!args.command)
-                return fail2("INVALID_PARAMS", "command required");
+              if (!args.command) return fail2("INVALID_PARAMS", "command required");
               if (args.background) {
                 procCounter++;
                 const id = args.proc_id || `proc_${procCounter}`;
-                if (processes.has(id))
-                  return fail2("CONFLICT", `Process ${id} already exists`);
+                if (processes.has(id)) return fail2("CONFLICT", `Process ${id} already exists`);
                 const [cmd, ...cmdArgs] = args.command.split(" ");
                 const proc = spawn(cmd, cmdArgs, { cwd: args.cwd, detached: true, stdio: "pipe", env: { ...process.env, ...args.env } });
                 const entry = { process: proc, stdout: [], stderr: [], exitCode: void 0, started: (/* @__PURE__ */ new Date()).toISOString(), command: args.command };
@@ -393,8 +366,7 @@ var init_exec = __esm({
             case "ps": {
               const list = [];
               for (const [id, data] of processes.entries()) {
-                if (args.proc_id && id !== args.proc_id)
-                  continue;
+                if (args.proc_id && id !== args.proc_id) continue;
                 list.push({
                   proc_id: id,
                   pid: data.process.pid,
@@ -407,11 +379,9 @@ var init_exec = __esm({
               return envelope2({ processes: list, count: list.length }, "ps");
             }
             case "kill": {
-              if (!args.proc_id)
-                return fail2("INVALID_PARAMS", "proc_id required");
+              if (!args.proc_id) return fail2("INVALID_PARAMS", "proc_id required");
               const entry = processes.get(args.proc_id);
-              if (!entry)
-                return fail2("NOT_FOUND", `No process: ${args.proc_id}`);
+              if (!entry) return fail2("NOT_FOUND", `No process: ${args.proc_id}`);
               try {
                 const sig = args.signal === "SIGKILL" ? "SIGKILL" : "SIGTERM";
                 entry.process.kill(sig);
@@ -422,11 +392,9 @@ var init_exec = __esm({
               }
             }
             case "logs": {
-              if (!args.proc_id)
-                return fail2("INVALID_PARAMS", "proc_id required");
+              if (!args.proc_id) return fail2("INVALID_PARAMS", "proc_id required");
               const entry = processes.get(args.proc_id);
-              if (!entry)
-                return fail2("NOT_FOUND", `No process: ${args.proc_id}`);
+              if (!entry) return fail2("NOT_FOUND", `No process: ${args.proc_id}`);
               const tail = args.tail || 50;
               return envelope2({
                 proc_id: args.proc_id,
@@ -437,11 +405,9 @@ var init_exec = __esm({
               }, "logs");
             }
             case "wait": {
-              if (!args.proc_id)
-                return fail2("INVALID_PARAMS", "proc_id required");
+              if (!args.proc_id) return fail2("INVALID_PARAMS", "proc_id required");
               const waitEntry = processes.get(args.proc_id);
-              if (!waitEntry)
-                return fail2("NOT_FOUND", `No process: ${args.proc_id}`);
+              if (!waitEntry) return fail2("NOT_FOUND", `No process: ${args.proc_id}`);
               if (waitEntry.exitCode !== void 0) {
                 return envelope2({
                   proc_id: args.proc_id,
@@ -526,14 +492,12 @@ var init_code = __esm({
           const uri = args.uri || args.path || ".";
           switch (args.action) {
             case "search_symbol": {
-              if (!args.query)
-                return fail3("INVALID_PARAMS", "query required");
+              if (!args.query) return fail3("INVALID_PARAMS", "query required");
               const filePattern = args.pattern || "**/*.{ts,js,py,rs,go,java,c,cpp,h}";
               const files = await glob2(path2.join(uri, filePattern), { ignore: ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/target/**"] });
               const results = [];
               for (const file of files) {
-                if (results.length >= (args.max_results || 20))
-                  break;
+                if (results.length >= (args.max_results || 20)) break;
                 try {
                   const content = await fs2.readFile(file, "utf-8");
                   const lines = content.split("\n");
@@ -542,8 +506,7 @@ var init_code = __esm({
                       const match = lines[i].match(SYMBOL_RE);
                       if (match || lines[i].match(new RegExp(`\\b${args.query}\\b`))) {
                         results.push({ uri: file, line: i + 1, text: lines[i].trim(), type: match ? "definition" : "reference" });
-                        if (results.length >= (args.max_results || 20))
-                          break;
+                        if (results.length >= (args.max_results || 20)) break;
                       }
                     }
                   }
@@ -553,8 +516,7 @@ var init_code = __esm({
               return envelope3({ query: args.query, results, count: results.length }, "search_symbol");
             }
             case "outline": {
-              if (!uri || uri === ".")
-                return fail3("INVALID_PARAMS", "uri (file) required");
+              if (!uri || uri === ".") return fail3("INVALID_PARAMS", "uri (file) required");
               const content = await fs2.readFile(uri, "utf-8");
               const lines = content.split("\n");
               const symbols = [];
@@ -572,8 +534,7 @@ var init_code = __esm({
             }
             case "symbols": {
               const filePath = args.path || args.uri;
-              if (!filePath || filePath === ".")
-                return fail3("INVALID_PARAMS", "path or uri required");
+              if (!filePath || filePath === ".") return fail3("INVALID_PARAMS", "path or uri required");
               let content;
               if (args.text) {
                 content = args.text;
@@ -602,8 +563,7 @@ var init_code = __esm({
               return envelope3({ summary, lines: lineCount, words: wordCount }, "summarize");
             }
             case "references": {
-              if (!args.query)
-                return fail3("INVALID_PARAMS", "query (symbol name) required");
+              if (!args.query) return fail3("INVALID_PARAMS", "query (symbol name) required");
               let hasRg = false;
               try {
                 await execAsync3("which rg");
@@ -620,8 +580,7 @@ var init_code = __esm({
                 });
                 return envelope3({ query: args.query, references: refs, count: refs.length }, "references");
               } catch (e) {
-                if (e.code === 1)
-                  return envelope3({ query: args.query, references: [], count: 0 }, "references");
+                if (e.code === 1) return envelope3({ query: args.query, references: [], count: 0 }, "references");
                 throw e;
               }
             }
@@ -634,8 +593,7 @@ var init_code = __esm({
                 try {
                   const content = await fs2.readFile(file, "utf-8");
                   const ext = path2.extname(file) || "other";
-                  if (!byExt[ext])
-                    byExt[ext] = { files: 0, lines: 0 };
+                  if (!byExt[ext]) byExt[ext] = { files: 0, lines: 0 };
                   const lines = content.split("\n").length;
                   byExt[ext].files++;
                   byExt[ext].lines += lines;
@@ -647,8 +605,7 @@ var init_code = __esm({
               return envelope3({ total_files: totalFiles, total_lines: totalLines, by_extension: byExt }, "metrics");
             }
             case "exports": {
-              if (!uri || uri === ".")
-                return fail3("INVALID_PARAMS", "uri (file) required");
+              if (!uri || uri === ".") return fail3("INVALID_PARAMS", "uri (file) required");
               const content = await fs2.readFile(uri, "utf-8");
               const exports = [];
               const lines = content.split("\n");
@@ -660,23 +617,20 @@ var init_code = __esm({
               return envelope3({ uri, exports, count: exports.length }, "exports");
             }
             case "types": {
-              if (!uri || uri === ".")
-                return fail3("INVALID_PARAMS", "uri (file) required");
+              if (!uri || uri === ".") return fail3("INVALID_PARAMS", "uri (file) required");
               const content = await fs2.readFile(uri, "utf-8");
               const types = [];
               const lines = content.split("\n");
               for (let i = 0; i < lines.length; i++) {
                 if (/(?:interface|type|enum|struct)\s+\w+/.test(lines[i])) {
                   const name = lines[i].match(/(?:interface|type|enum|struct)\s+(\w+)/)?.[1];
-                  if (name)
-                    types.push({ name, line: i + 1, text: lines[i].trim() });
+                  if (name) types.push({ name, line: i + 1, text: lines[i].trim() });
                 }
               }
               return envelope3({ uri, types, count: types.length }, "types");
             }
             case "hierarchy": {
-              if (!args.query)
-                return fail3("INVALID_PARAMS", "query (class name) required");
+              if (!args.query) return fail3("INVALID_PARAMS", "query (class name) required");
               const filePattern = args.pattern || "**/*.{ts,js,py,rs,go,java}";
               const files = await glob2(path2.join(uri, filePattern), { ignore: ["**/node_modules/**", "**/dist/**", "**/.git/**"] });
               const classes = {};
@@ -687,27 +641,23 @@ var init_code = __esm({
                   let m;
                   while ((m = classRe.exec(content)) !== null) {
                     if (m[2]) {
-                      if (!classes[m[2]])
-                        classes[m[2]] = [];
+                      if (!classes[m[2]]) classes[m[2]] = [];
                       classes[m[2]].push(m[1]);
                     }
-                    if (!classes[m[1]])
-                      classes[m[1]] = [];
+                    if (!classes[m[1]]) classes[m[1]] = [];
                   }
                 } catch {
                 }
               }
               const build = (name, depth = 0) => {
                 let out = "  ".repeat(depth) + name + "\n";
-                for (const child of classes[name] || [])
-                  out += build(child, depth + 1);
+                for (const child of classes[name] || []) out += build(child, depth + 1);
                 return out;
               };
               return envelope3({ root: args.query, tree: build(args.query), children: classes[args.query] || [] }, "hierarchy");
             }
             case "rename": {
-              if (!args.query || !args.new_name)
-                return fail3("INVALID_PARAMS", "query (old name) and new_name required");
+              if (!args.query || !args.new_name) return fail3("INVALID_PARAMS", "query (old name) and new_name required");
               const filePattern = args.pattern || "**/*.{ts,js,py,rs,go}";
               const files = await glob2(path2.join(uri, filePattern), { ignore: ["**/node_modules/**", "**/dist/**", "**/.git/**"] });
               let totalChanges = 0;
@@ -729,8 +679,7 @@ var init_code = __esm({
               return envelope3({ old_name: args.query, new_name: args.new_name, files_changed: changed.length, total_replacements: totalChanges, changed }, "rename");
             }
             case "grep_replace": {
-              if (!args.query || args.replacement === void 0)
-                return fail3("INVALID_PARAMS", "query (pattern) and replacement required");
+              if (!args.query || args.replacement === void 0) return fail3("INVALID_PARAMS", "query (pattern) and replacement required");
               const filePattern = args.pattern || "**/*.{ts,js,py,rs,go}";
               const files = await glob2(path2.join(uri, filePattern), { ignore: ["**/node_modules/**", "**/dist/**", "**/.git/**"] });
               let totalChanges = 0;
@@ -753,8 +702,7 @@ var init_code = __esm({
               return envelope3({ pattern: args.query, replacement: args.replacement, files_changed: changed.length, total_replacements: totalChanges, changed }, "grep_replace");
             }
             case "parse": {
-              if (!uri || uri === ".")
-                return fail3("INVALID_PARAMS", "uri (file) required");
+              if (!uri || uri === ".") return fail3("INVALID_PARAMS", "uri (file) required");
               const content = args.text || await fs2.readFile(uri, "utf-8");
               const lines = content.split("\n");
               const ext = path2.extname(uri).slice(1) || "text";
@@ -773,11 +721,9 @@ var init_code = __esm({
               return envelope3({ hint: "Serialization requires CST preservation. Use the original source text.", supported: false }, "serialize");
             }
             case "definition": {
-              if (!args.query)
-                return fail3("INVALID_PARAMS", "query (symbol name) required");
+              if (!args.query) return fail3("INVALID_PARAMS", "query (symbol name) required");
               const defPath = args.uri || args.path;
-              if (!defPath || defPath === ".")
-                return fail3("INVALID_PARAMS", "uri (file) required");
+              if (!defPath || defPath === ".") return fail3("INVALID_PARAMS", "uri (file) required");
               const defContent = await fs2.readFile(defPath, "utf-8");
               const defLines = defContent.split("\n");
               for (let i = 0; i < defLines.length; i++) {
@@ -789,14 +735,12 @@ var init_code = __esm({
             }
             case "transform": {
               const tfPath = args.uri || args.path;
-              if (!tfPath || tfPath === ".")
-                return fail3("INVALID_PARAMS", "uri (file) required");
+              if (!tfPath || tfPath === ".") return fail3("INVALID_PARAMS", "uri (file) required");
               const tfContent = args.text || await fs2.readFile(tfPath, "utf-8");
               const tfKind = args.kind || "rename";
               if (tfKind === "rename") {
                 const oldName = args.query || args.old_name;
-                if (!oldName || !args.new_name)
-                  return fail3("INVALID_PARAMS", "query/old_name and new_name required");
+                if (!oldName || !args.new_name) return fail3("INVALID_PARAMS", "query/old_name and new_name required");
                 const re = new RegExp(`\\b${oldName}\\b`, "g");
                 const newContent = tfContent.replace(re, args.new_name);
                 const count = (tfContent.match(re) || []).length;
@@ -806,16 +750,13 @@ var init_code = __esm({
                 for (let i = 0; i < Math.max(origLines.length, newLines.length); i++) {
                   if (origLines[i] !== newLines[i]) {
                     diffLines.push(`@@ -${i + 1} +${i + 1} @@`);
-                    if (origLines[i] !== void 0)
-                      diffLines.push(`-${origLines[i]}`);
-                    if (newLines[i] !== void 0)
-                      diffLines.push(`+${newLines[i]}`);
+                    if (origLines[i] !== void 0) diffLines.push(`-${origLines[i]}`);
+                    if (newLines[i] !== void 0) diffLines.push(`+${newLines[i]}`);
                   }
                 }
                 return envelope3({ patch: diffLines.join("\n"), changes_count: count, kind: "rename" }, "transform");
               } else if (tfKind === "codemod") {
-                if (!args.query || args.replacement === void 0)
-                  return fail3("INVALID_PARAMS", "query (pattern) and replacement required");
+                if (!args.query || args.replacement === void 0) return fail3("INVALID_PARAMS", "query (pattern) and replacement required");
                 const re = new RegExp(args.query, "g");
                 const count = (tfContent.match(re) || []).length;
                 return envelope3({ patch: `${count} replacements of /${args.query}/`, changes_count: count, kind: "codemod" }, "transform");
@@ -877,8 +818,7 @@ var init_fetch = __esm({
                 headers: args.headers || {},
                 signal: AbortSignal.timeout(args.timeout || 3e4)
               };
-              if (args.body)
-                opts.body = args.body;
+              if (args.body) opts.body = args.body;
               const resp = await fetch(args.url, opts);
               const contentType = resp.headers.get("content-type") || "";
               let data;
@@ -899,8 +839,7 @@ var init_fetch = __esm({
                 headers: args.headers || {},
                 signal: AbortSignal.timeout(args.timeout || 3e4)
               };
-              if (args.body)
-                opts.body = args.body;
+              if (args.body) opts.body = args.body;
               const resp = await fetch(args.url, opts);
               const contentType = resp.headers.get("content-type") || "";
               let data;
@@ -927,11 +866,9 @@ var init_fetch = __esm({
               }, "head");
             }
             case "download": {
-              if (!args.output)
-                return fail4("INVALID_PARAMS", "output path required");
+              if (!args.output) return fail4("INVALID_PARAMS", "output path required");
               const resp = await fetch(args.url, { signal: AbortSignal.timeout(args.timeout || 6e4) });
-              if (!resp.ok)
-                return fail4("HTTP_ERROR", `${resp.status} ${resp.statusText}`);
+              if (!resp.ok) return fail4("HTTP_ERROR", `${resp.status} ${resp.statusText}`);
               const buffer = Buffer.from(await resp.arrayBuffer());
               await fs3.mkdir(path3.dirname(args.output), { recursive: true });
               await fs3.writeFile(args.output, buffer);
@@ -944,8 +881,7 @@ var init_fetch = __esm({
               return envelope4({ url: args.url, opened: true }, "open");
             }
             case "search": {
-              if (!args.query)
-                return fail4("INVALID_PARAMS", "query required");
+              if (!args.query) return fail4("INVALID_PARAMS", "query required");
               const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(args.query)}`;
               const searchResp = await fetch(searchUrl, {
                 headers: { "User-Agent": "Mozilla/5.0 (compatible; HanzoBot/1.0)" },
@@ -966,10 +902,8 @@ var init_fetch = __esm({
               return envelope4({ query: args.query, results, count: results.length }, "search");
             }
             case "crawl": {
-              if (!args.url)
-                return fail4("INVALID_PARAMS", "url required");
-              if (!args.output)
-                return fail4("INVALID_PARAMS", "output directory required");
+              if (!args.url) return fail4("INVALID_PARAMS", "url required");
+              if (!args.output) return fail4("INVALID_PARAMS", "output directory required");
               const maxDepth = args.depth || 2;
               const maxPages = args.limit || 100;
               const startUrl = new URL(args.url);
@@ -979,12 +913,10 @@ var init_fetch = __esm({
               await fs3.mkdir(args.output, { recursive: true });
               while (queue.length > 0 && pages.length < maxPages) {
                 const item = queue.shift();
-                if (visited.has(item.url) || item.depth > maxDepth)
-                  continue;
+                if (visited.has(item.url) || item.depth > maxDepth) continue;
                 try {
                   const pageUrl = new URL(item.url);
-                  if (pageUrl.hostname !== startUrl.hostname)
-                    continue;
+                  if (pageUrl.hostname !== startUrl.hostname) continue;
                 } catch {
                   continue;
                 }
@@ -994,8 +926,7 @@ var init_fetch = __esm({
                   const body = await resp.text();
                   const parsed = new URL(item.url);
                   let filePath = parsed.pathname.replace(/\/$/, "/index.html");
-                  if (!path3.extname(filePath))
-                    filePath += ".html";
+                  if (!path3.extname(filePath)) filePath += ".html";
                   const fullPath = path3.join(args.output, filePath);
                   await fs3.mkdir(path3.dirname(fullPath), { recursive: true });
                   await fs3.writeFile(fullPath, body);
@@ -1073,14 +1004,12 @@ var init_workspace = __esm({
               const build = [];
               const test = [];
               let vcs = null;
-              if (await fileExists(path4.join(root, ".git")))
-                vcs = "git";
+              if (await fileExists(path4.join(root, ".git"))) vcs = "git";
               if (await fileExists(path4.join(root, "package.json"))) {
                 languages.push("typescript", "javascript");
                 build.push("npm");
               }
-              if (await fileExists(path4.join(root, "tsconfig.json")))
-                languages.push("typescript");
+              if (await fileExists(path4.join(root, "tsconfig.json"))) languages.push("typescript");
               if (await fileExists(path4.join(root, "pyproject.toml"))) {
                 languages.push("python");
                 build.push("uv");
@@ -1093,18 +1022,12 @@ var init_workspace = __esm({
                 languages.push("go");
                 build.push("go");
               }
-              if (await fileExists(path4.join(root, "Makefile")))
-                build.push("make");
-              if (await fileExists(path4.join(root, "compose.yml")))
-                build.push("docker-compose");
-              if (await fileExists(path4.join(root, "Dockerfile")))
-                build.push("docker");
-              if (await fileExists(path4.join(root, "jest.config.ts")) || await fileExists(path4.join(root, "jest.config.js")))
-                test.push("jest");
-              if (await fileExists(path4.join(root, "vitest.config.ts")))
-                test.push("vitest");
-              if (await fileExists(path4.join(root, "pytest.ini")) || await fileExists(path4.join(root, "conftest.py")))
-                test.push("pytest");
+              if (await fileExists(path4.join(root, "Makefile"))) build.push("make");
+              if (await fileExists(path4.join(root, "compose.yml"))) build.push("docker-compose");
+              if (await fileExists(path4.join(root, "Dockerfile"))) build.push("docker");
+              if (await fileExists(path4.join(root, "jest.config.ts")) || await fileExists(path4.join(root, "jest.config.js"))) test.push("jest");
+              if (await fileExists(path4.join(root, "vitest.config.ts"))) test.push("vitest");
+              if (await fileExists(path4.join(root, "pytest.ini")) || await fileExists(path4.join(root, "conftest.py"))) test.push("pytest");
               return envelope5({
                 root,
                 languages: [...new Set(languages)],
@@ -1281,53 +1204,37 @@ var init_git = __esm({
               break;
             case "diff": {
               let cmd = "diff";
-              if (args.staged)
-                cmd += " --staged";
-              if (args.stat)
-                cmd += " --stat";
-              if (args.target)
-                cmd += ` ${args.target}`;
-              if (args.file)
-                cmd += ` -- ${args.file}`;
+              if (args.staged) cmd += " --staged";
+              if (args.stat) cmd += " --stat";
+              if (args.target) cmd += ` ${args.target}`;
+              if (args.file) cmd += ` -- ${args.file}`;
               out = await git(cmd, cwd) || "No changes";
               break;
             }
             case "log": {
               let cmd = `log -${args.limit || 20}`;
-              if (args.oneline !== false && !args.format)
-                cmd += " --oneline";
-              if (args.graph)
-                cmd += " --graph --decorate";
-              if (args.author)
-                cmd += ` --author="${args.author}"`;
-              if (args.since)
-                cmd += ` --since="${args.since}"`;
-              if (args.until)
-                cmd += ` --until="${args.until}"`;
-              if (args.format)
-                cmd += ` --format=${args.format}`;
-              if (args.pattern)
-                cmd += ` --grep="${args.pattern}"`;
-              if (args.all)
-                cmd += " --all";
-              if (args.file)
-                cmd += ` -- ${args.file}`;
+              if (args.oneline !== false && !args.format) cmd += " --oneline";
+              if (args.graph) cmd += " --graph --decorate";
+              if (args.author) cmd += ` --author="${args.author}"`;
+              if (args.since) cmd += ` --since="${args.since}"`;
+              if (args.until) cmd += ` --until="${args.until}"`;
+              if (args.format) cmd += ` --format=${args.format}`;
+              if (args.pattern) cmd += ` --grep="${args.pattern}"`;
+              if (args.all) cmd += " --all";
+              if (args.file) cmd += ` -- ${args.file}`;
               out = await git(cmd, cwd) || "No commits";
               break;
             }
             case "branch": {
               const sa = args.sub_action || "list";
               if (sa === "create") {
-                if (!args.name)
-                  return { content: [{ type: "text", text: "name required" }], isError: true };
+                if (!args.name) return { content: [{ type: "text", text: "name required" }], isError: true };
                 out = await git(`checkout -b ${args.name}${args.target ? ` ${args.target}` : ""}`, cwd);
               } else if (sa === "checkout") {
-                if (!args.name)
-                  return { content: [{ type: "text", text: "name required" }], isError: true };
+                if (!args.name) return { content: [{ type: "text", text: "name required" }], isError: true };
                 out = await git(`checkout ${args.name}`, cwd);
               } else if (sa === "delete") {
-                if (!args.name)
-                  return { content: [{ type: "text", text: "name required" }], isError: true };
+                if (!args.name) return { content: [{ type: "text", text: "name required" }], isError: true };
                 out = await git(`branch ${args.force ? "-D" : "-d"} ${args.name}`, cwd);
               } else {
                 out = await git(`branch${args.all ? " -a" : ""} -v`, cwd);
@@ -1335,52 +1242,40 @@ var init_git = __esm({
               break;
             }
             case "commit": {
-              if (!args.message)
-                return { content: [{ type: "text", text: "message required" }], isError: true };
-              if (args.files?.length)
-                await git(`add ${args.files.join(" ")}`, cwd);
-              else if (args.all)
-                await git("add -A", cwd);
+              if (!args.message) return { content: [{ type: "text", text: "message required" }], isError: true };
+              if (args.files?.length) await git(`add ${args.files.join(" ")}`, cwd);
+              else if (args.all) await git("add -A", cwd);
               out = await git(`commit -m "${args.message.replace(/"/g, '\\"')}"`, cwd);
               break;
             }
             case "blame": {
-              if (!args.file)
-                return { content: [{ type: "text", text: "file required" }], isError: true };
+              if (!args.file) return { content: [{ type: "text", text: "file required" }], isError: true };
               let cmd = `blame ${args.file}`;
-              if (args.lines)
-                cmd += ` -L ${args.lines}`;
+              if (args.lines) cmd += ` -L ${args.lines}`;
               out = await git(cmd, cwd);
               break;
             }
             case "stash": {
               const sa = args.sub_action || "push";
-              if (sa === "push")
-                out = await git(args.message ? `stash push -m "${args.message}"` : "stash push", cwd);
-              else if (sa === "list")
-                out = await git("stash list", cwd) || "No stashes";
-              else if (sa === "show")
-                out = await git(`stash show -p stash@{${args.index || 0}}`, cwd);
-              else
-                out = await git(`stash ${sa} stash@{${args.index || 0}}`, cwd);
+              if (sa === "push") out = await git(args.message ? `stash push -m "${args.message}"` : "stash push", cwd);
+              else if (sa === "list") out = await git("stash list", cwd) || "No stashes";
+              else if (sa === "show") out = await git(`stash show -p stash@{${args.index || 0}}`, cwd);
+              else out = await git(`stash ${sa} stash@{${args.index || 0}}`, cwd);
               break;
             }
             case "show": {
               const fmt = args.stat ? "--stat" : "-p";
               out = await git(`show ${args.ref || "HEAD"} ${fmt}`, cwd);
-              if (out.length > 5e3)
-                out = out.substring(0, 5e3) + "\n... (truncated)";
+              if (out.length > 5e3) out = out.substring(0, 5e3) + "\n... (truncated)";
               break;
             }
             case "tag": {
               const sa = args.sub_action || "list";
               if (sa === "create") {
-                if (!args.name)
-                  return { content: [{ type: "text", text: "name required" }], isError: true };
+                if (!args.name) return { content: [{ type: "text", text: "name required" }], isError: true };
                 out = args.message ? await git(`tag -a ${args.name} -m "${args.message}" ${args.ref || ""}`, cwd) : await git(`tag ${args.name} ${args.ref || ""}`, cwd);
               } else if (sa === "delete") {
-                if (!args.name)
-                  return { content: [{ type: "text", text: "name required" }], isError: true };
+                if (!args.name) return { content: [{ type: "text", text: "name required" }], isError: true };
                 out = await git(`tag -d ${args.name}`, cwd);
               } else if (sa === "show") {
                 out = await git(`tag -l -n${args.limit || 20}`, cwd);
@@ -1392,12 +1287,10 @@ var init_git = __esm({
             case "remote": {
               const sa = args.sub_action || "list";
               if (sa === "add") {
-                if (!args.name || !args.url)
-                  return { content: [{ type: "text", text: "name and url required" }], isError: true };
+                if (!args.name || !args.url) return { content: [{ type: "text", text: "name and url required" }], isError: true };
                 out = await git(`remote add ${args.name} ${args.url}`, cwd);
               } else if (sa === "remove") {
-                if (!args.name)
-                  return { content: [{ type: "text", text: "name required" }], isError: true };
+                if (!args.name) return { content: [{ type: "text", text: "name required" }], isError: true };
                 out = await git(`remote remove ${args.name}`, cwd);
               } else if (sa === "show") {
                 out = await git(`remote show ${args.name || "origin"}`, cwd);
@@ -1407,21 +1300,18 @@ var init_git = __esm({
               break;
             }
             case "merge": {
-              if (!args.target)
-                return { content: [{ type: "text", text: "target branch required" }], isError: true };
+              if (!args.target) return { content: [{ type: "text", text: "target branch required" }], isError: true };
               out = await git(`merge ${args.target}${args.message ? ` -m "${args.message}"` : ""}`, cwd);
               break;
             }
             case "rebase": {
-              if (!args.target)
-                return { content: [{ type: "text", text: "target branch required" }], isError: true };
+              if (!args.target) return { content: [{ type: "text", text: "target branch required" }], isError: true };
               out = await git(`rebase ${args.target}`, cwd);
               break;
             }
             case "cherry_pick": {
               const sha = args.cherry || args.ref;
-              if (!sha)
-                return { content: [{ type: "text", text: "cherry (commit SHA) required" }], isError: true };
+              if (!sha) return { content: [{ type: "text", text: "cherry (commit SHA) required" }], isError: true };
               out = await git(`cherry-pick ${sha}`, cwd);
               break;
             }
@@ -1441,12 +1331,10 @@ var init_git = __esm({
             case "worktree": {
               const sa = args.sub_action || "list";
               if (sa === "add") {
-                if (!args.name)
-                  return { content: [{ type: "text", text: "name (path) required" }], isError: true };
+                if (!args.name) return { content: [{ type: "text", text: "name (path) required" }], isError: true };
                 out = await git(`worktree add ${args.name}${args.target ? ` ${args.target}` : ""}`, cwd);
               } else if (sa === "remove") {
-                if (!args.name)
-                  return { content: [{ type: "text", text: "name (path) required" }], isError: true };
+                if (!args.name) return { content: [{ type: "text", text: "name (path) required" }], isError: true };
                 out = await git(`worktree remove ${args.name}${args.force ? " --force" : ""}`, cwd);
               } else {
                 out = await git("worktree list", cwd);
@@ -1455,15 +1343,11 @@ var init_git = __esm({
             }
             case "bisect": {
               const sa = args.sub_action || "start";
-              if (sa === "start")
-                out = await git("bisect start", cwd);
-              else if (sa === "good")
-                out = await git(`bisect good ${args.ref || ""}`, cwd);
-              else if (sa === "bad")
-                out = await git(`bisect bad ${args.ref || ""}`, cwd);
+              if (sa === "start") out = await git("bisect start", cwd);
+              else if (sa === "good") out = await git(`bisect good ${args.ref || ""}`, cwd);
+              else if (sa === "bad") out = await git(`bisect bad ${args.ref || ""}`, cwd);
               else if (sa === "run") {
-                if (!args.value)
-                  return { content: [{ type: "text", text: "value (script) required" }], isError: true };
+                if (!args.value) return { content: [{ type: "text", text: "value (script) required" }], isError: true };
                 out = await git(`bisect run ${args.value}`, cwd);
               } else {
                 out = await git("bisect reset", cwd);
@@ -1477,8 +1361,7 @@ var init_git = __esm({
               out = await git(`init${args.name ? ` ${args.name}` : ""}`, cwd);
               break;
             case "clone": {
-              if (!args.url)
-                return { content: [{ type: "text", text: "url required" }], isError: true };
+              if (!args.url) return { content: [{ type: "text", text: "url required" }], isError: true };
               out = await git(`clone ${args.url}${args.name ? ` ${args.name}` : ""}`, cwd);
               break;
             }
@@ -1492,12 +1375,9 @@ var init_git = __esm({
               out = await git(`push ${args.name || "origin"} ${args.target || ""}${args.force ? " --force" : ""}`, cwd);
               break;
             case "config": {
-              if (args.key && args.value)
-                out = await git(`config ${args.key} "${args.value}"`, cwd);
-              else if (args.key)
-                out = await git(`config --get ${args.key}`, cwd);
-              else
-                out = await git("config --list --local", cwd);
+              if (args.key && args.value) out = await git(`config ${args.key} "${args.value}"`, cwd);
+              else if (args.key) out = await git(`config --get ${args.key}`, cwd);
+              else out = await git("config --list --local", cwd);
               break;
             }
             case "shortlog":
@@ -1510,8 +1390,7 @@ var init_git = __esm({
               out = await git(`describe --tags --always ${args.ref || ""}`, cwd).catch(() => "No tags");
               break;
             case "apply": {
-              if (!args.patch)
-                return { content: [{ type: "text", text: "patch content required" }], isError: true };
+              if (!args.patch) return { content: [{ type: "text", text: "patch content required" }], isError: true };
               const { execSync } = await import("child_process");
               try {
                 execSync(`git apply -`, { cwd, input: args.patch, maxBuffer: 5 * 1024 * 1024 });
@@ -1522,8 +1401,7 @@ var init_git = __esm({
               break;
             }
             case "checkout": {
-              if (!args.name && !args.ref)
-                return { content: [{ type: "text", text: "name or ref required" }], isError: true };
+              if (!args.name && !args.ref) return { content: [{ type: "text", text: "name or ref required" }], isError: true };
               const target = args.name || args.ref;
               if (args.create) {
                 out = await git(`checkout -b ${target}`, cwd);
@@ -1604,8 +1482,7 @@ var init_ui_github_api = __esm({
       }
       get(key) {
         const entry = this.cache.get(key);
-        if (!entry)
-          return null;
+        if (!entry) return null;
         if (Date.now() - entry.timestamp > this.ttl) {
           this.cache.delete(key);
           return null;
@@ -3044,8 +2921,7 @@ export function ${name}() {
 `;
               for (const comp of result.components) {
                 output += `\u2022 ${comp.name}`;
-                if (comp.description)
-                  output += ` - ${comp.description}`;
+                if (comp.description) output += ` - ${comp.description}`;
                 output += "\n";
               }
               break;
@@ -3073,8 +2949,7 @@ export function ${name}() {
 `;
               for (const block of result.blocks) {
                 output += `\u2022 ${block.name}`;
-                if (block.category)
-                  output += ` [${block.category}]`;
+                if (block.category) output += ` [${block.category}]`;
                 output += "\n";
               }
               break;
@@ -3087,8 +2962,7 @@ export function ${name}() {
               } else {
                 for (const comp of result.results) {
                   output += `\u2022 ${comp.name}`;
-                  if (comp.description)
-                    output += ` - ${comp.description}`;
+                  if (comp.description) output += ` - ${comp.description}`;
                   output += "\n";
                 }
               }
@@ -3099,8 +2973,7 @@ export function ${name}() {
 `;
               output += `Command: ${result.command}
 `;
-              if (result.output)
-                output += `
+              if (result.output) output += `
 Output:
 ${result.output}`;
               break;
@@ -3116,8 +2989,7 @@ ${result.output}`;
               output += "Available Frameworks:\n";
               for (const fw of result.available) {
                 output += `\u2022 ${fw.key}: ${fw.name}`;
-                if (fw.hasRegistry)
-                  output += " [registry]";
+                if (fw.hasRegistry) output += " [registry]";
                 output += "\n";
               }
               break;
@@ -3201,18 +3073,14 @@ var init_think = __esm({
         const apiKey = process.env.HANZO_API_KEY || process.env.API_KEY || process.env.OPENAI_API_KEY;
         const baseUrl = (process.env.API_URL || "https://api.hanzo.ai") + "/v1";
         async function llm(prompt, opts = {}) {
-          if (!apiKey)
-            throw new Error("HANZO_API_KEY required");
+          if (!apiKey) throw new Error("HANZO_API_KEY required");
           const msgs = [];
-          if (opts.system)
-            msgs.push({ role: "system", content: opts.system });
+          if (opts.system) msgs.push({ role: "system", content: opts.system });
           msgs.push({ role: "user", content: prompt });
           const body = { model: opts.model || args.model || "auto", messages: msgs, max_tokens: opts.maxTokens || args.maxTokens || 1e3 };
-          if (opts.temperature !== void 0 || args.temperature !== void 0)
-            body.temperature = opts.temperature ?? args.temperature;
+          if (opts.temperature !== void 0 || args.temperature !== void 0) body.temperature = opts.temperature ?? args.temperature;
           const r = await fetch(`${baseUrl}/chat/completions`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, body: JSON.stringify(body) });
-          if (!r.ok)
-            throw new Error(`HTTP ${r.status}`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const d = await r.json();
           return d.choices?.[0]?.message?.content || "(empty)";
         }
@@ -3233,10 +3101,8 @@ ${args.code}
 ` : ""}
 Consider: edge cases, security, error handling, performance, readability, patterns, tests, simplicity, OWASP, race conditions, resource leaks.` }] };
             case "consensus": {
-              if (!args.question)
-                return { content: [{ type: "text", text: "question required" }], isError: true };
-              if (!apiKey)
-                return { content: [{ type: "text", text: "HANZO_API_KEY required" }], isError: true };
+              if (!args.question) return { content: [{ type: "text", text: "question required" }], isError: true };
+              if (!apiKey) return { content: [{ type: "text", text: "HANZO_API_KEY required" }], isError: true };
               const models = args.models || ["claude-sonnet-4-20250514", "gpt-4o"];
               const responses = {};
               const errors = {};
@@ -3249,83 +3115,68 @@ Consider: edge cases, security, error handling, performance, readability, patter
               }));
               const out = [`Consensus: "${args.question}"
 `];
-              for (const [m, r] of Object.entries(responses))
-                out.push(`**${m}:**
+              for (const [m, r] of Object.entries(responses)) out.push(`**${m}:**
 ${r}
 `);
-              for (const [m, e] of Object.entries(errors))
-                out.push(`${m}: ${e}`);
+              for (const [m, e] of Object.entries(errors)) out.push(`${m}: ${e}`);
               if (Object.keys(responses).length > 1) {
                 out.push("\n---\nAgreement points and divergences are highlighted above. Cross-reference for confidence.");
               }
               return { content: [{ type: "text", text: out.join("\n") }] };
             }
             case "agent": {
-              if (!args.task)
-                return { content: [{ type: "text", text: "task required" }], isError: true };
-              if (!apiKey)
-                return { content: [{ type: "text", text: "HANZO_API_KEY required" }], isError: true };
+              if (!args.task) return { content: [{ type: "text", text: "task required" }], isError: true };
+              if (!apiKey) return { content: [{ type: "text", text: "HANZO_API_KEY required" }], isError: true };
               const result = await llm(args.task, { system: args.system || `You are a specialized agent. Complete the following task thoroughly and return the result.`, model: args.model, maxTokens: args.maxTokens });
               return { content: [{ type: "text", text: `Agent (${args.model || "auto"}):
 
 ${result}` }] };
             }
             case "summarize": {
-              if (!args.text)
-                return { content: [{ type: "text", text: "text required" }], isError: true };
+              if (!args.text) return { content: [{ type: "text", text: "text required" }], isError: true };
               const result = await llm(args.text, { system: `Summarize the following in ${args.maxLength || 100} words or fewer. Format: ${args.format || "bullets"}. Be concise and capture key points.` });
               return { content: [{ type: "text", text: result }] };
             }
             case "classify": {
-              if (!args.text)
-                return { content: [{ type: "text", text: "text required" }], isError: true };
+              if (!args.text) return { content: [{ type: "text", text: "text required" }], isError: true };
               const cats = args.categories?.length ? `Categories: ${args.categories.join(", ")}` : "Determine the most appropriate categories.";
               const result = await llm(args.text, { system: `Classify the following text. ${cats}
 Return: category, confidence (0-1), reasoning.` });
               return { content: [{ type: "text", text: result }] };
             }
             case "embed": {
-              if (!args.text)
-                return { content: [{ type: "text", text: "text required" }], isError: true };
-              if (!apiKey)
-                return { content: [{ type: "text", text: "HANZO_API_KEY required" }], isError: true };
+              if (!args.text) return { content: [{ type: "text", text: "text required" }], isError: true };
+              if (!apiKey) return { content: [{ type: "text", text: "HANZO_API_KEY required" }], isError: true };
               const r = await fetch(`${baseUrl}/embeddings`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, body: JSON.stringify({ model: args.model || "text-embedding-3-small", input: args.text }) });
-              if (!r.ok)
-                throw new Error(`HTTP ${r.status}`);
+              if (!r.ok) throw new Error(`HTTP ${r.status}`);
               const d = await r.json();
               const emb = d.data?.[0]?.embedding || [];
               return { content: [{ type: "text", text: `Embedding (${emb.length} dims): [${emb.slice(0, 8).map((x) => x.toFixed(4)).join(", ")}...]` }] };
             }
             case "explain": {
               const input = args.text || args.code || args.thought;
-              if (!input)
-                return { content: [{ type: "text", text: "text, code, or thought required" }], isError: true };
+              if (!input) return { content: [{ type: "text", text: "text, code, or thought required" }], isError: true };
               const lang = args.language ? ` (${args.language})` : "";
               const result = await llm(input, { system: `Explain the following${lang} clearly and concisely. Target audience: experienced developer. Cover what it does, how it works, and why.` });
               return { content: [{ type: "text", text: result }] };
             }
             case "translate": {
-              if (!args.text)
-                return { content: [{ type: "text", text: "text required" }], isError: true };
-              if (!args.targetLanguage)
-                return { content: [{ type: "text", text: "targetLanguage required" }], isError: true };
+              if (!args.text) return { content: [{ type: "text", text: "text required" }], isError: true };
+              if (!args.targetLanguage) return { content: [{ type: "text", text: "targetLanguage required" }], isError: true };
               const result = await llm(args.text, { system: `Translate to ${args.targetLanguage}. Preserve tone, technical terms, and formatting.` });
               return { content: [{ type: "text", text: result }] };
             }
             case "compare": {
               const items = args.texts || [];
-              if (items.length < 2)
-                return { content: [{ type: "text", text: "texts array with 2+ items required" }], isError: true };
+              if (items.length < 2) return { content: [{ type: "text", text: "texts array with 2+ items required" }], isError: true };
               const prompt = items.map((t, i) => `--- Item ${i + 1} ---
 ${t}`).join("\n\n");
               const result = await llm(prompt, { system: "Compare the following items. Identify: similarities, differences, strengths, weaknesses, and recommendation." });
               return { content: [{ type: "text", text: result }] };
             }
             case "chain": {
-              if (!args.steps?.length)
-                return { content: [{ type: "text", text: "steps array required" }], isError: true };
-              if (!apiKey)
-                return { content: [{ type: "text", text: "HANZO_API_KEY required" }], isError: true };
+              if (!args.steps?.length) return { content: [{ type: "text", text: "steps array required" }], isError: true };
+              if (!apiKey) return { content: [{ type: "text", text: "HANZO_API_KEY required" }], isError: true };
               const results = [];
               let context = "";
               for (const [i, step] of args.steps.entries()) {
@@ -3369,8 +3220,7 @@ async function save(s) {
   await fs5.writeFile(storePath(), JSON.stringify(s, null, 2));
 }
 function isExpired(e) {
-  if (!e.ttl)
-    return false;
+  if (!e.ttl) return false;
   return new Date(e.ttl) < /* @__PURE__ */ new Date();
 }
 var storePath, memoryTool, memoryTools;
@@ -3423,20 +3273,16 @@ var init_memory = __esm({
           store.entries = store.entries.filter((e) => !isExpired(e));
           switch (args.action) {
             case "store": {
-              if (!args.key || !args.value)
-                return { content: [{ type: "text", text: "key and value required" }], isError: true };
+              if (!args.key || !args.value) return { content: [{ type: "text", text: "key and value required" }], isError: true };
               const now = (/* @__PURE__ */ new Date()).toISOString();
               const idx = store.entries.findIndex((e) => e.key === args.key && e.namespace === ns);
               if (idx >= 0) {
                 const e = store.entries[idx];
                 e.value = args.append ? e.value + "\n" + args.value : args.value;
                 e.updated = now;
-                if (args.tags)
-                  e.tags = args.tags;
-                if (args.metadata)
-                  e.metadata = { ...e.metadata, ...args.metadata };
-                if (args.ttl)
-                  e.ttl = args.ttl;
+                if (args.tags) e.tags = args.tags;
+                if (args.metadata) e.metadata = { ...e.metadata, ...args.metadata };
+                if (args.ttl) e.ttl = args.ttl;
                 await save(store);
                 return { content: [{ type: "text", text: `Updated: ${args.key} (${e.value.length} chars)` }] };
               }
@@ -3447,46 +3293,36 @@ var init_memory = __esm({
             }
             case "recall": {
               let r = store.entries.filter((e) => e.namespace === ns || !args.namespace);
-              if (args.key)
-                r = r.filter((e) => e.key === args.key);
-              if (args.tag)
-                r = r.filter((e) => e.tags.includes(args.tag));
+              if (args.key) r = r.filter((e) => e.key === args.key);
+              if (args.tag) r = r.filter((e) => e.tags.includes(args.tag));
               r = r.slice(0, args.limit || 10);
-              if (!r.length)
-                return { content: [{ type: "text", text: "No memories found" }] };
+              if (!r.length) return { content: [{ type: "text", text: "No memories found" }] };
               const out = r.map((e) => `[${e.namespace}] ${e.key}${e.tags.length ? ` [${e.tags.join(", ")}]` : ""} (${e.updated.split("T")[0]}):
   ${e.value.substring(0, 300)}${e.value.length > 300 ? "..." : ""}`);
               return { content: [{ type: "text", text: out.join("\n\n") }] };
             }
             case "list": {
               let entries = store.entries;
-              if (args.namespace)
-                entries = entries.filter((e) => e.namespace === ns);
-              if (args.tag)
-                entries = entries.filter((e) => e.tags.includes(args.tag));
+              if (args.namespace) entries = entries.filter((e) => e.namespace === ns);
+              if (args.tag) entries = entries.filter((e) => e.tags.includes(args.tag));
               const sortKey = args.sort || "updated";
               entries.sort((a, b) => {
-                if (sortKey === "key")
-                  return a.key.localeCompare(b.key);
-                if (sortKey === "namespace")
-                  return a.namespace.localeCompare(b.namespace);
+                if (sortKey === "key") return a.key.localeCompare(b.key);
+                if (sortKey === "namespace") return a.namespace.localeCompare(b.namespace);
                 return (b[sortKey] || "").localeCompare(a[sortKey] || "");
               });
               const limited = entries.slice(0, args.limit || 50);
               const namespaces = [...new Set(store.entries.map((e) => e.namespace))];
               const out = [`${store.entries.length} entries, namespaces: [${namespaces.join(", ")}]`, ""];
-              for (const e of limited)
-                out.push(`  ${e.key}${e.tags.length ? ` [${e.tags.join(",")}]` : ""} (${e.namespace}) ${e.value.length}ch`);
+              for (const e of limited) out.push(`  ${e.key}${e.tags.length ? ` [${e.tags.join(",")}]` : ""} (${e.namespace}) ${e.value.length}ch`);
               return { content: [{ type: "text", text: out.join("\n") }] };
             }
             case "delete": {
-              if (!args.key && !args.tag)
-                return { content: [{ type: "text", text: "key or tag required" }], isError: true };
+              if (!args.key && !args.tag) return { content: [{ type: "text", text: "key or tag required" }], isError: true };
               let count = 0;
               if (args.key) {
                 const i = store.entries.findIndex((e) => e.key === args.key && e.namespace === ns);
-                if (i < 0)
-                  return { content: [{ type: "text", text: `Not found: ${args.key}` }], isError: true };
+                if (i < 0) return { content: [{ type: "text", text: `Not found: ${args.key}` }], isError: true };
                 store.entries.splice(i, 1);
                 count = 1;
               } else if (args.tag) {
@@ -3498,21 +3334,17 @@ var init_memory = __esm({
               return { content: [{ type: "text", text: `Deleted ${count} entries` }] };
             }
             case "search": {
-              if (!args.query)
-                return { content: [{ type: "text", text: "query required" }], isError: true };
+              if (!args.query) return { content: [{ type: "text", text: "query required" }], isError: true };
               const q = args.query.toLowerCase();
               const terms = q.split(/\s+/);
               let results = store.entries.filter((e) => {
                 const text = `${e.key} ${e.value} ${e.tags.join(" ")} ${e.namespace}`.toLowerCase();
                 return terms.every((t) => text.includes(t));
               });
-              if (args.namespace)
-                results = results.filter((e) => e.namespace === ns);
-              if (args.tag)
-                results = results.filter((e) => e.tags.includes(args.tag));
+              if (args.namespace) results = results.filter((e) => e.namespace === ns);
+              if (args.tag) results = results.filter((e) => e.tags.includes(args.tag));
               results = results.slice(0, args.limit || 20);
-              if (!results.length)
-                return { content: [{ type: "text", text: `No results for: ${args.query}` }] };
+              if (!results.length) return { content: [{ type: "text", text: `No results for: ${args.query}` }] };
               const out = results.map((e) => `[${e.namespace}] ${e.key}${e.tags.length ? ` [${e.tags.join(",")}]` : ""}:
   ${e.value.substring(0, 200)}${e.value.length > 200 ? "..." : ""}`);
               return { content: [{ type: "text", text: `Found ${results.length}:
@@ -3524,8 +3356,7 @@ ${out.join("\n\n")}` }] };
               const tags = [...new Set(store.entries.flatMap((e) => e.tags))];
               const totalSize = store.entries.reduce((s, e) => s + e.value.length, 0);
               const byNs = {};
-              for (const e of store.entries)
-                byNs[e.namespace] = (byNs[e.namespace] || 0) + 1;
+              for (const e of store.entries) byNs[e.namespace] = (byNs[e.namespace] || 0) + 1;
               return { content: [{ type: "text", text: `Memory Stats:
   Entries: ${store.entries.length}
   Size: ${(totalSize / 1024).toFixed(1)}KB
@@ -3546,10 +3377,8 @@ ${out.join("\n\n")}` }] };
             case "export": {
               const filePath = args.file || path5.join(os.homedir(), ".hanzo", "memory-export.json");
               let entries = store.entries;
-              if (args.namespace)
-                entries = entries.filter((e) => e.namespace === ns);
-              if (args.tag)
-                entries = entries.filter((e) => e.tags.includes(args.tag));
+              if (args.namespace) entries = entries.filter((e) => e.namespace === ns);
+              if (args.tag) entries = entries.filter((e) => e.tags.includes(args.tag));
               await fs5.mkdir(path5.dirname(filePath), { recursive: true });
               await fs5.writeFile(filePath, JSON.stringify(entries, null, 2));
               return { content: [{ type: "text", text: `Exported ${entries.length} entries to ${filePath}` }] };
@@ -3564,8 +3393,7 @@ ${out.join("\n\n")}` }] };
                 await save(store);
                 return { content: [{ type: "text", text: `Imported ${Object.keys(args.data).length} entries` }] };
               }
-              if (!args.file)
-                return { content: [{ type: "text", text: "file or data required" }], isError: true };
+              if (!args.file) return { content: [{ type: "text", text: "file or data required" }], isError: true };
               const imported = JSON.parse(await fs5.readFile(args.file, "utf-8"));
               for (const e of imported) {
                 store.lastId++;
@@ -3576,11 +3404,9 @@ ${out.join("\n\n")}` }] };
               return { content: [{ type: "text", text: `Imported ${imported.length} entries from ${args.file}` }] };
             }
             case "merge": {
-              if (!args.key)
-                return { content: [{ type: "text", text: "key required" }], isError: true };
+              if (!args.key) return { content: [{ type: "text", text: "key required" }], isError: true };
               const entries = store.entries.filter((e) => e.key === args.key);
-              if (entries.length < 2)
-                return { content: [{ type: "text", text: `Only ${entries.length} entries with key '${args.key}', nothing to merge` }] };
+              if (entries.length < 2) return { content: [{ type: "text", text: `Only ${entries.length} entries with key '${args.key}', nothing to merge` }] };
               const merged = entries.map((e) => e.value).join("\n---\n");
               const allTags = [...new Set(entries.flatMap((e) => e.tags))];
               const keep = entries[0];
@@ -3592,23 +3418,18 @@ ${out.join("\n\n")}` }] };
               return { content: [{ type: "text", text: `Merged ${entries.length} entries into key '${args.key}'` }] };
             }
             case "tag": {
-              if (!args.key || !args.tag)
-                return { content: [{ type: "text", text: "key and tag required" }], isError: true };
+              if (!args.key || !args.tag) return { content: [{ type: "text", text: "key and tag required" }], isError: true };
               const entry = store.entries.find((e) => e.key === args.key && e.namespace === ns);
-              if (!entry)
-                return { content: [{ type: "text", text: `Not found: ${args.key}` }], isError: true };
-              if (!entry.tags.includes(args.tag))
-                entry.tags.push(args.tag);
+              if (!entry) return { content: [{ type: "text", text: `Not found: ${args.key}` }], isError: true };
+              if (!entry.tags.includes(args.tag)) entry.tags.push(args.tag);
               entry.updated = (/* @__PURE__ */ new Date()).toISOString();
               await save(store);
               return { content: [{ type: "text", text: `Tagged ${args.key} with '${args.tag}'` }] };
             }
             case "untag": {
-              if (!args.key || !args.tag)
-                return { content: [{ type: "text", text: "key and tag required" }], isError: true };
+              if (!args.key || !args.tag) return { content: [{ type: "text", text: "key and tag required" }], isError: true };
               const entry = store.entries.find((e) => e.key === args.key && e.namespace === ns);
-              if (!entry)
-                return { content: [{ type: "text", text: `Not found: ${args.key}` }], isError: true };
+              if (!entry) return { content: [{ type: "text", text: `Not found: ${args.key}` }], isError: true };
               entry.tags = entry.tags.filter((t) => t !== args.tag);
               entry.updated = (/* @__PURE__ */ new Date()).toISOString();
               await save(store);
@@ -3617,17 +3438,14 @@ ${out.join("\n\n")}` }] };
             case "namespaces": {
               const nss = [...new Set(store.entries.map((e) => e.namespace))];
               const counts = {};
-              for (const e of store.entries)
-                counts[e.namespace] = (counts[e.namespace] || 0) + 1;
+              for (const e of store.entries) counts[e.namespace] = (counts[e.namespace] || 0) + 1;
               return { content: [{ type: "text", text: `Namespaces (${nss.length}):
 ${nss.map((n) => `  ${n}: ${counts[n]} entries`).join("\n")}` }] };
             }
             case "history": {
-              if (!args.key)
-                return { content: [{ type: "text", text: "key required" }], isError: true };
+              if (!args.key) return { content: [{ type: "text", text: "key required" }], isError: true };
               const entries = store.entries.filter((e) => e.key === args.key);
-              if (!entries.length)
-                return { content: [{ type: "text", text: `No history for: ${args.key}` }] };
+              if (!entries.length) return { content: [{ type: "text", text: `No history for: ${args.key}` }] };
               return { content: [{ type: "text", text: entries.map((e) => `[${e.namespace}] ${e.updated}: ${e.value.substring(0, 100)}${e.value.length > 100 ? "..." : ""}`).join("\n") }] };
             }
             default:
@@ -3704,8 +3522,7 @@ var init_plan = __esm({
       handler: async (args) => {
         try {
           let findPlan2 = function(id) {
-            if (id === "latest")
-              return store.plans.filter((p) => p.status === "active").pop() || store.plans[store.plans.length - 1];
+            if (id === "latest") return store.plans.filter((p) => p.status === "active").pop() || store.plans[store.plans.length - 1];
             return store.plans.find((p) => p.id === id);
           };
           var findPlan = findPlan2;
@@ -3713,8 +3530,7 @@ var init_plan = __esm({
           const icons = { pending: "[ ]", in_progress: "[~]", completed: "[x]", blocked: "[!]", skipped: "[-]" };
           switch (args.action) {
             case "create": {
-              if (!args.name || !args.goal || !args.steps?.length)
-                return { content: [{ type: "text", text: "name, goal, steps required" }], isError: true };
+              if (!args.name || !args.goal || !args.steps?.length) return { content: [{ type: "text", text: "name, goal, steps required" }], isError: true };
               store.lastId++;
               const pid = String(store.lastId);
               const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -3738,61 +3554,47 @@ var init_plan = __esm({
               return { content: [{ type: "text", text: out.join("\n") }] };
             }
             case "show": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               const done = plan.steps.filter((s) => s.status === "completed").length;
               const out = [`Plan #${plan.id}: ${plan.name} [${plan.status}]`, `Goal: ${plan.goal}`, `Progress: ${done}/${plan.steps.length} (${Math.round(done / plan.steps.length * 100)}%)`, ""];
-              if (plan.tags?.length)
-                out.push(`Tags: ${plan.tags.join(", ")}`);
-              if (plan.notes)
-                out.push(`Notes: ${plan.notes.substring(0, 200)}`);
+              if (plan.tags?.length) out.push(`Tags: ${plan.tags.join(", ")}`);
+              if (plan.notes) out.push(`Notes: ${plan.notes.substring(0, 200)}`);
               out.push("");
               for (const s of plan.steps) {
                 const deps = s.dependencies.length ? ` \u2190 ${s.dependencies.join(",")}` : "";
                 const est = s.estimate ? ` [${s.estimate}]` : "";
                 const assignee = s.assignee ? ` @${s.assignee}` : "";
                 out.push(`  ${icons[s.status] || "[ ]"} ${s.id}. ${s.description}${deps}${est}${assignee}`);
-                if (s.output)
-                  out.push(`       \u2192 ${s.output.substring(0, 120)}`);
+                if (s.output) out.push(`       \u2192 ${s.output.substring(0, 120)}`);
               }
               return { content: [{ type: "text", text: out.join("\n") }] };
             }
             case "update": {
-              if (!args.id || !args.stepId || !args.status)
-                return { content: [{ type: "text", text: "id, stepId, status required" }], isError: true };
+              if (!args.id || !args.stepId || !args.status) return { content: [{ type: "text", text: "id, stepId, status required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               const step = plan.steps.find((s) => s.id === args.stepId);
-              if (!step)
-                return { content: [{ type: "text", text: `Step '${args.stepId}' not found` }], isError: true };
+              if (!step) return { content: [{ type: "text", text: `Step '${args.stepId}' not found` }], isError: true };
               step.status = args.status;
-              if (args.output)
-                step.output = args.output;
+              if (args.output) step.output = args.output;
               plan.updated = (/* @__PURE__ */ new Date()).toISOString();
-              if (plan.steps.every((s) => s.status === "completed" || s.status === "skipped"))
-                plan.status = "completed";
+              if (plan.steps.every((s) => s.status === "completed" || s.status === "skipped")) plan.status = "completed";
               await savePlans(store);
               const done = plan.steps.filter((s) => s.status === "completed").length;
               const next = plan.steps.find((s) => s.status === "pending" && s.dependencies.every((d) => plan.steps.find((x) => x.id === d)?.status === "completed"));
               let text = `Updated ${args.stepId}: ${args.status} (${done}/${plan.steps.length})`;
-              if (next)
-                text += `
+              if (next) text += `
 Next: ${next.id}. ${next.description}`;
-              if (plan.status === "completed")
-                text += "\nPlan completed!";
+              if (plan.status === "completed") text += "\nPlan completed!";
               return { content: [{ type: "text", text }] };
             }
             case "list": {
               let plans = store.plans;
-              if (args.filter && args.filter !== "all")
-                plans = plans.filter((p) => p.status === args.filter);
+              if (args.filter && args.filter !== "all") plans = plans.filter((p) => p.status === args.filter);
               plans = plans.slice(-(args.limit || 20));
-              if (!plans.length)
-                return { content: [{ type: "text", text: "No plans" }] };
+              if (!plans.length) return { content: [{ type: "text", text: "No plans" }] };
               const out = plans.map((p) => {
                 const done = p.steps.filter((s) => s.status === "completed").length;
                 return `#${p.id} [${p.status}] ${p.name} \u2014 ${done}/${p.steps.length} ${p.tags?.length ? `[${p.tags.join(",")}]` : ""}`;
@@ -3801,8 +3603,7 @@ Next: ${next.id}. ${next.description}`;
             }
             case "next": {
               const plan = findPlan2(args.id || "latest");
-              if (!plan)
-                return { content: [{ type: "text", text: "No active plan" }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: "No active plan" }], isError: true };
               const doneIds = new Set(plan.steps.filter((s) => s.status === "completed").map((s) => s.id));
               const actionable = plan.steps.filter((s) => s.status === "pending" && s.dependencies.every((d) => doneIds.has(d)));
               if (!actionable.length) {
@@ -3819,22 +3620,18 @@ Next: ${next.id}. ${next.description}`;
 ${out.join("\n")}` }] };
             }
             case "archive": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               plan.status = "archived";
               plan.updated = (/* @__PURE__ */ new Date()).toISOString();
               await savePlans(store);
               return { content: [{ type: "text", text: `Archived plan #${plan.id}: ${plan.name}` }] };
             }
             case "add_step": {
-              if (!args.id || !args.description)
-                return { content: [{ type: "text", text: "id and description required" }], isError: true };
+              if (!args.id || !args.description) return { content: [{ type: "text", text: "id and description required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               const maxStep = Math.max(...plan.steps.map((s) => parseInt(s.id.split(".")[1]) || 0));
               const newStep = {
                 id: `${plan.id}.${maxStep + 1}`,
@@ -3845,10 +3642,8 @@ ${out.join("\n")}` }] };
               };
               if (args.after) {
                 const idx = plan.steps.findIndex((s) => s.id === args.after);
-                if (idx >= 0)
-                  plan.steps.splice(idx + 1, 0, newStep);
-                else
-                  plan.steps.push(newStep);
+                if (idx >= 0) plan.steps.splice(idx + 1, 0, newStep);
+                else plan.steps.push(newStep);
               } else {
                 plan.steps.push(newStep);
               }
@@ -3857,27 +3652,21 @@ ${out.join("\n")}` }] };
               return { content: [{ type: "text", text: `Added step ${newStep.id}: ${args.description}` }] };
             }
             case "remove_step": {
-              if (!args.id || !args.stepId)
-                return { content: [{ type: "text", text: "id and stepId required" }], isError: true };
+              if (!args.id || !args.stepId) return { content: [{ type: "text", text: "id and stepId required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               const idx = plan.steps.findIndex((s) => s.id === args.stepId);
-              if (idx < 0)
-                return { content: [{ type: "text", text: `Step '${args.stepId}' not found` }], isError: true };
-              for (const s of plan.steps)
-                s.dependencies = s.dependencies.filter((d) => d !== args.stepId);
+              if (idx < 0) return { content: [{ type: "text", text: `Step '${args.stepId}' not found` }], isError: true };
+              for (const s of plan.steps) s.dependencies = s.dependencies.filter((d) => d !== args.stepId);
               plan.steps.splice(idx, 1);
               plan.updated = (/* @__PURE__ */ new Date()).toISOString();
               await savePlans(store);
               return { content: [{ type: "text", text: `Removed step ${args.stepId}` }] };
             }
             case "estimate": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               const estimated = plan.steps.filter((s) => s.estimate);
               const pending = plan.steps.filter((s) => s.status === "pending" || s.status === "in_progress");
               return { content: [{ type: "text", text: `Plan #${plan.id}: ${plan.name}
@@ -3888,8 +3677,7 @@ ${out.join("\n")}` }] };
             }
             case "visualize": {
               let getLevel2 = function(stepId) {
-                if (levels.has(stepId))
-                  return levels.get(stepId);
+                if (levels.has(stepId)) return levels.get(stepId);
                 const step = plan.steps.find((s) => s.id === stepId);
                 if (!step || !step.dependencies.length) {
                   levels.set(stepId, 0);
@@ -3900,17 +3688,14 @@ ${out.join("\n")}` }] };
                 return maxDep + 1;
               };
               var getLevel = getLevel2;
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const maybePlan = findPlan2(args.id);
-              if (!maybePlan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!maybePlan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               const plan = maybePlan;
               const lines = [`Plan #${plan.id}: ${plan.name}
 `];
               const levels = /* @__PURE__ */ new Map();
-              for (const s of plan.steps)
-                getLevel2(s.id);
+              for (const s of plan.steps) getLevel2(s.id);
               const maxLevel = Math.max(...[...levels.values()], 0);
               for (let l = 0; l <= maxLevel; l++) {
                 const atLevel = plan.steps.filter((s) => levels.get(s.id) === l);
@@ -3925,11 +3710,9 @@ ${out.join("\n")}` }] };
               return { content: [{ type: "text", text: lines.join("\n") }] };
             }
             case "clone": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               store.lastId++;
               const newId = String(store.lastId);
               const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -3953,22 +3736,18 @@ ${out.join("\n")}` }] };
               return { content: [{ type: "text", text: `Cloned plan #${plan.id} \u2192 #${newId}` }] };
             }
             case "cancel": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               plan.status = "cancelled";
               plan.updated = (/* @__PURE__ */ new Date()).toISOString();
               await savePlans(store);
               return { content: [{ type: "text", text: `Cancelled plan #${plan.id}: ${plan.name}` }] };
             }
             case "notes": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               if (args.text) {
                 plan.notes = (plan.notes || "") + "\n" + args.text;
                 plan.updated = (/* @__PURE__ */ new Date()).toISOString();
@@ -3978,14 +3757,11 @@ ${out.join("\n")}` }] };
               return { content: [{ type: "text", text: plan.notes || "(no notes)" }] };
             }
             case "progress": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const plan = findPlan2(args.id);
-              if (!plan)
-                return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
+              if (!plan) return { content: [{ type: "text", text: `Plan '${args.id}' not found` }], isError: true };
               const byStatus = {};
-              for (const s of plan.steps)
-                byStatus[s.status] = (byStatus[s.status] || 0) + 1;
+              for (const s of plan.steps) byStatus[s.status] = (byStatus[s.status] || 0) + 1;
               const done = byStatus.completed || 0;
               const total = plan.steps.length;
               const bar = "\u2588".repeat(Math.round(done / total * 20)) + "\u2591".repeat(20 - Math.round(done / total * 20));
@@ -4073,8 +3849,7 @@ var init_tasks = __esm({
           const todos = await load2();
           switch (args.action) {
             case "add": {
-              if (!args.content)
-                return { content: [{ type: "text", text: "content required" }], isError: true };
+              if (!args.content) return { content: [{ type: "text", text: "content required" }], isError: true };
               todos.lastId++;
               const now = (/* @__PURE__ */ new Date()).toISOString();
               todos.items.push({
@@ -4095,79 +3870,53 @@ var init_tasks = __esm({
             }
             case "list": {
               let items = todos.items;
-              if (args.status)
-                items = items.filter((t) => t.status === args.status);
-              if (args.priority)
-                items = items.filter((t) => t.priority === args.priority);
-              if (args.project)
-                items = items.filter((t) => t.project === args.project);
-              if (args.tag)
-                items = items.filter((t) => t.tags?.includes(args.tag));
-              if (args.assignee)
-                items = items.filter((t) => t.assignee === args.assignee);
-              if (args.parent !== void 0)
-                items = items.filter((t) => t.parent === args.parent);
+              if (args.status) items = items.filter((t) => t.status === args.status);
+              if (args.priority) items = items.filter((t) => t.priority === args.priority);
+              if (args.project) items = items.filter((t) => t.project === args.project);
+              if (args.tag) items = items.filter((t) => t.tags?.includes(args.tag));
+              if (args.assignee) items = items.filter((t) => t.assignee === args.assignee);
+              if (args.parent !== void 0) items = items.filter((t) => t.parent === args.parent);
               const po = { high: 0, medium: 1, low: 2 };
               const so = { in_progress: 0, pending: 1, completed: 2, cancelled: 3 };
               const sortKey = args.sort || "priority";
               items.sort((a, b) => {
-                if (sortKey === "due")
-                  return (a.due || "z").localeCompare(b.due || "z");
-                if (sortKey === "created")
-                  return b.created.localeCompare(a.created);
-                if (sortKey === "status")
-                  return so[a.status] - so[b.status];
+                if (sortKey === "due") return (a.due || "z").localeCompare(b.due || "z");
+                if (sortKey === "created") return b.created.localeCompare(a.created);
+                if (sortKey === "status") return so[a.status] - so[b.status];
                 return so[a.status] - so[b.status] || po[a.priority] - po[b.priority];
               });
               items = items.slice(0, args.limit || 50);
-              if (!items.length)
-                return { content: [{ type: "text", text: "No todos" }] };
+              if (!items.length) return { content: [{ type: "text", text: "No todos" }] };
               const out = items.map((t) => {
                 let line = `#${t.id} [${t.priority}] [${t.status}] ${t.content}`;
-                if (t.tags?.length)
-                  line += ` [${t.tags.join(",")}]`;
-                if (t.project)
-                  line += ` (${t.project})`;
-                if (t.assignee)
-                  line += ` @${t.assignee}`;
-                if (t.due)
-                  line += ` due:${t.due.split("T")[0]}`;
-                if (t.parent)
-                  line += ` \u2191${t.parent}`;
+                if (t.tags?.length) line += ` [${t.tags.join(",")}]`;
+                if (t.project) line += ` (${t.project})`;
+                if (t.assignee) line += ` @${t.assignee}`;
+                if (t.due) line += ` due:${t.due.split("T")[0]}`;
+                if (t.parent) line += ` \u2191${t.parent}`;
                 return line;
               });
               return { content: [{ type: "text", text: out.join("\n") }] };
             }
             case "update": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const t = todos.items.find((i) => i.id === args.id);
-              if (!t)
-                return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
-              if (args.content !== void 0)
-                t.content = args.content;
-              if (args.status !== void 0)
-                t.status = args.status;
-              if (args.priority !== void 0)
-                t.priority = args.priority;
-              if (args.due !== void 0)
-                t.due = args.due;
-              if (args.tags !== void 0)
-                t.tags = args.tags;
-              if (args.project !== void 0)
-                t.project = args.project;
-              if (args.assignee !== void 0)
-                t.assignee = args.assignee;
+              if (!t) return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
+              if (args.content !== void 0) t.content = args.content;
+              if (args.status !== void 0) t.status = args.status;
+              if (args.priority !== void 0) t.priority = args.priority;
+              if (args.due !== void 0) t.due = args.due;
+              if (args.tags !== void 0) t.tags = args.tags;
+              if (args.project !== void 0) t.project = args.project;
+              if (args.assignee !== void 0) t.assignee = args.assignee;
               t.updated = (/* @__PURE__ */ new Date()).toISOString();
               await save2(todos);
               return { content: [{ type: "text", text: `Updated #${args.id}` }] };
             }
             case "delete": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const i = todos.items.findIndex((t) => t.id === args.id);
-              if (i < 0)
-                return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
+              if (i < 0) return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
               const subtasks = todos.items.filter((t) => t.parent === args.id);
               todos.items = todos.items.filter((t) => t.id !== args.id && t.parent !== args.id);
               await save2(todos);
@@ -4175,8 +3924,7 @@ var init_tasks = __esm({
             }
             case "stats": {
               let items = todos.items;
-              if (args.project)
-                items = items.filter((t) => t.project === args.project);
+              if (args.project) items = items.filter((t) => t.project === args.project);
               const byS = {}, byP = {};
               let overdue = 0;
               const projects = [...new Set(todos.items.map((t) => t.project).filter(Boolean))];
@@ -4184,8 +3932,7 @@ var init_tasks = __esm({
               for (const t of items) {
                 byS[t.status] = (byS[t.status] || 0) + 1;
                 byP[t.priority] = (byP[t.priority] || 0) + 1;
-                if (t.due && t.status !== "completed" && t.status !== "cancelled" && new Date(t.due) < /* @__PURE__ */ new Date())
-                  overdue++;
+                if (t.due && t.status !== "completed" && t.status !== "cancelled" && new Date(t.due) < /* @__PURE__ */ new Date()) overdue++;
               }
               return { content: [{ type: "text", text: `${items.length} items${overdue ? `, ${overdue} overdue` : ""}
 Status: ${Object.entries(byS).map(([k, v]) => `${k}:${v}`).join(" ")}
@@ -4194,23 +3941,20 @@ Projects: ${projects.join(", ") || "(none)"}
 Assignees: ${assignees.join(", ") || "(none)"}` }] };
             }
             case "search": {
-              if (!args.query)
-                return { content: [{ type: "text", text: "query required" }], isError: true };
+              if (!args.query) return { content: [{ type: "text", text: "query required" }], isError: true };
               const q = args.query.toLowerCase();
               let results = todos.items.filter((t) => {
                 const text = `${t.content} ${t.tags?.join(" ") || ""} ${t.project || ""} ${t.assignee || ""}`.toLowerCase();
                 return text.includes(q);
               });
               results = results.slice(0, args.limit || 20);
-              if (!results.length)
-                return { content: [{ type: "text", text: `No results for: ${args.query}` }] };
+              if (!results.length) return { content: [{ type: "text", text: `No results for: ${args.query}` }] };
               const out = results.map((t) => `#${t.id} [${t.priority}] [${t.status}] ${t.content}`);
               return { content: [{ type: "text", text: `Found ${results.length}:
 ${out.join("\n")}` }] };
             }
             case "batch": {
-              if (!args.ids?.length || !args.status)
-                return { content: [{ type: "text", text: "ids and status required" }], isError: true };
+              if (!args.ids?.length || !args.status) return { content: [{ type: "text", text: "ids and status required" }], isError: true };
               let count = 0;
               for (const id of args.ids) {
                 const t = todos.items.find((i) => i.id === id);
@@ -4225,8 +3969,7 @@ ${out.join("\n")}` }] };
             }
             case "archive": {
               const completed = todos.items.filter((t) => t.status === "completed" || t.status === "cancelled");
-              if (!completed.length)
-                return { content: [{ type: "text", text: "Nothing to archive" }] };
+              if (!completed.length) return { content: [{ type: "text", text: "Nothing to archive" }] };
               const archivePath = path7.join(path7.dirname(todoPath()), "todos-archive.json");
               let archive = { items: [], lastId: 0 };
               try {
@@ -4240,56 +3983,45 @@ ${out.join("\n")}` }] };
               return { content: [{ type: "text", text: `Archived ${completed.length} items` }] };
             }
             case "move": {
-              if (!args.id || !args.project)
-                return { content: [{ type: "text", text: "id and project required" }], isError: true };
+              if (!args.id || !args.project) return { content: [{ type: "text", text: "id and project required" }], isError: true };
               const t = todos.items.find((i) => i.id === args.id);
-              if (!t)
-                return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
+              if (!t) return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
               t.project = args.project;
               t.updated = (/* @__PURE__ */ new Date()).toISOString();
               await save2(todos);
               return { content: [{ type: "text", text: `Moved #${args.id} to project: ${args.project}` }] };
             }
             case "prioritize": {
-              if (!args.id || !args.priority)
-                return { content: [{ type: "text", text: "id and priority required" }], isError: true };
+              if (!args.id || !args.priority) return { content: [{ type: "text", text: "id and priority required" }], isError: true };
               const t = todos.items.find((i) => i.id === args.id);
-              if (!t)
-                return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
+              if (!t) return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
               t.priority = args.priority;
               t.updated = (/* @__PURE__ */ new Date()).toISOString();
               await save2(todos);
               return { content: [{ type: "text", text: `#${args.id} priority \u2192 ${args.priority}` }] };
             }
             case "assign": {
-              if (!args.id || !args.assignee)
-                return { content: [{ type: "text", text: "id and assignee required" }], isError: true };
+              if (!args.id || !args.assignee) return { content: [{ type: "text", text: "id and assignee required" }], isError: true };
               const t = todos.items.find((i) => i.id === args.id);
-              if (!t)
-                return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
+              if (!t) return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
               t.assignee = args.assignee;
               t.updated = (/* @__PURE__ */ new Date()).toISOString();
               await save2(todos);
               return { content: [{ type: "text", text: `#${args.id} assigned to @${args.assignee}` }] };
             }
             case "subtasks": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "parent id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "parent id required" }], isError: true };
               const parent = todos.items.find((i) => i.id === args.id);
-              if (!parent)
-                return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
+              if (!parent) return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
               const children = todos.items.filter((t) => t.parent === args.id);
               const out = [`#${args.id}: ${parent.content}`, `Subtasks (${children.length}):`];
-              for (const c of children)
-                out.push(`  #${c.id} [${c.priority}] [${c.status}] ${c.content}`);
+              for (const c of children) out.push(`  #${c.id} [${c.priority}] [${c.status}] ${c.content}`);
               return { content: [{ type: "text", text: out.join("\n") }] };
             }
             case "notes": {
-              if (!args.id)
-                return { content: [{ type: "text", text: "id required" }], isError: true };
+              if (!args.id) return { content: [{ type: "text", text: "id required" }], isError: true };
               const t = todos.items.find((i) => i.id === args.id);
-              if (!t)
-                return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
+              if (!t) return { content: [{ type: "text", text: `#${args.id} not found` }], isError: true };
               if (args.text) {
                 t.notes = (t.notes || "") + "\n" + args.text;
                 t.updated = (/* @__PURE__ */ new Date()).toISOString();
@@ -4306,8 +4038,7 @@ ${t.notes || "(none)"}` }] };
               return { content: [{ type: "text", text: `Exported ${todos.items.length} items to ${filePath}` }] };
             }
             case "import": {
-              if (!args.file)
-                return { content: [{ type: "text", text: "file required" }], isError: true };
+              if (!args.file) return { content: [{ type: "text", text: "file required" }], isError: true };
               const imported = JSON.parse(await fs7.readFile(args.file, "utf-8"));
               for (const item of imported) {
                 todos.lastId++;
@@ -4371,11 +4102,9 @@ var init_mode_preset = __esm({
       handler: async (args) => {
         switch (args.action) {
           case "switch": {
-            if (!args.name)
-              return { content: [{ type: "text", text: "name required" }], isError: true };
+            if (!args.name) return { content: [{ type: "text", text: "name required" }], isError: true };
             const m = modes.find((x) => x.name === args.name);
-            if (!m)
-              return { content: [{ type: "text", text: `Mode '${args.name}' not found. Available: ${modes.map((x) => x.name).join(", ")}` }], isError: true };
+            if (!m) return { content: [{ type: "text", text: `Mode '${args.name}' not found. Available: ${modes.map((x) => x.name).join(", ")}` }], isError: true };
             currentMode = m;
             const tools = toolsForMode(m);
             return { content: [{ type: "text", text: `Switched to ${m.name}: ${m.description} (${tools.length} tools)` }] };
@@ -4383,15 +4112,12 @@ var init_mode_preset = __esm({
           case "list":
             return { content: [{ type: "text", text: modes.map((m) => `${m.name}${m === currentMode ? " *" : ""}: ${m.description}${args.verbose ? ` [${toolsForMode(m).length} tools]` : ""}`).join("\n") }] };
           case "select_preset": {
-            if (!args.name)
-              return { content: [{ type: "text", text: "name required" }], isError: true };
+            if (!args.name) return { content: [{ type: "text", text: "name required" }], isError: true };
             const p = presets.find((x) => x.name === args.name);
-            if (!p)
-              return { content: [{ type: "text", text: `Preset '${args.name}' not found. Available: ${presets.map((x) => x.name).join(", ")}` }], isError: true };
+            if (!p) return { content: [{ type: "text", text: `Preset '${args.name}' not found. Available: ${presets.map((x) => x.name).join(", ")}` }], isError: true };
             currentPreset = p;
             const m = modes.find((x) => x.name === p.modes[0]);
-            if (m)
-              currentMode = m;
+            if (m) currentMode = m;
             return { content: [{ type: "text", text: `Selected ${p.name}: ${p.description} (modes: ${p.modes.join(", ")})` }] };
           }
           case "list_presets":
@@ -4421,8 +4147,7 @@ function token() {
 }
 async function api(base, path19, opts = {}) {
   const t = token();
-  if (!t)
-    throw new Error("HANZO_API_KEY required");
+  if (!t) throw new Error("HANZO_API_KEY required");
   const r = await fetch(`${base}${path19}`, { ...opts, headers: { "Content-Type": "application/json", "Authorization": `Bearer ${t}`, ...opts.headers || {} } });
   if (!r.ok) {
     const b = await r.text().catch(() => "");
@@ -4445,11 +4170,8 @@ function fail6(m) {
   return { content: [{ type: "text", text: `Error: ${m}` }], isError: true };
 }
 function arr(d, ...keys) {
-  if (Array.isArray(d))
-    return d;
-  for (const k of keys)
-    if (Array.isArray(d?.[k]))
-      return d[k];
+  if (Array.isArray(d)) return d;
+  for (const k of keys) if (Array.isArray(d?.[k])) return d[k];
   return d?.data || [];
 }
 var API_URL, IAM_URL, KMS_URL, PAAS_URL, iamTool, kmsTool, paasTool, COMMERCE_RESOURCES, commerceTool, storageTool, authTool, apiTool, iamTools, kmsTools, paasTools, commerceTools, storageTools, authTools, apiTools, billingTool, billingTools, hanzoCloudTools;
@@ -4522,35 +4244,27 @@ var init_hanzo_cloud = __esm({
 ${u.map((x) => `${x.name} <${x.email || ""}> [${x.type || "normal-user"}]`).join("\n")}`);
             }
             case "get_user": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               return ok(j(await api(IAM_URL, `/api/get-user?id=${args.id.includes("/") ? args.id : `admin/${args.id}`}`)));
             }
             case "create_user": {
-              if (!args.name || !args.email || !args.password)
-                return fail6("name, email, password required");
+              if (!args.name || !args.email || !args.password) return fail6("name, email, password required");
               await api(IAM_URL, "/api/add-user", { method: "POST", body: JSON.stringify({ owner: o, name: args.name, email: args.email, password: args.password, organization: args.organization || "hanzo", type: "normal-user" }) });
               return ok(`Created: ${args.name} <${args.email}>`);
             }
             case "update_user": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               const id = args.id.includes("/") ? args.id : `admin/${args.id}`;
               const u = await api(IAM_URL, `/api/get-user?id=${id}`);
-              if (args.email)
-                u.email = args.email;
-              if (args.displayName)
-                u.displayName = args.displayName;
-              if (args.phone)
-                u.phone = args.phone;
-              if (args.data)
-                Object.assign(u, args.data);
+              if (args.email) u.email = args.email;
+              if (args.displayName) u.displayName = args.displayName;
+              if (args.phone) u.phone = args.phone;
+              if (args.data) Object.assign(u, args.data);
               await api(IAM_URL, "/api/update-user", { method: "POST", body: JSON.stringify(u) });
               return ok(`Updated: ${id}`);
             }
             case "delete_user": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               const id = args.id.includes("/") ? args.id : `admin/${args.id}`;
               const [ow, nm] = id.split("/");
               await api(IAM_URL, "/api/delete-user", { method: "POST", body: JSON.stringify({ owner: ow, name: nm }) });
@@ -4562,31 +4276,25 @@ ${u.map((x) => `${x.name} <${x.email || ""}> [${x.type || "normal-user"}]`).join
 ${orgs.map((x) => `${x.name}: ${x.displayName || ""} [${(x.users || []).length} members]`).join("\n")}`);
             }
             case "get_org": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               return ok(j(await api(IAM_URL, `/api/get-organization?id=${args.id.includes("/") ? args.id : `admin/${args.id}`}`)));
             }
             case "create_org": {
-              if (!args.name)
-                return fail6("name required");
+              if (!args.name) return fail6("name required");
               await api(IAM_URL, "/api/add-organization", { method: "POST", body: JSON.stringify({ owner: o, name: args.name, displayName: args.displayName || args.name, ...args.data || {} }) });
               return ok(`Created org: ${args.name}`);
             }
             case "update_org": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               const id = args.id.includes("/") ? args.id : `admin/${args.id}`;
               const org = await api(IAM_URL, `/api/get-organization?id=${id}`);
-              if (args.displayName)
-                org.displayName = args.displayName;
-              if (args.data)
-                Object.assign(org, args.data);
+              if (args.displayName) org.displayName = args.displayName;
+              if (args.data) Object.assign(org, args.data);
               await api(IAM_URL, "/api/update-organization", { method: "POST", body: JSON.stringify(org) });
               return ok(`Updated org: ${id}`);
             }
             case "delete_org": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               const id = args.id.includes("/") ? args.id : `admin/${args.id}`;
               const [ow, nm] = id.split("/");
               await api(IAM_URL, "/api/delete-organization", { method: "POST", body: JSON.stringify({ owner: ow, name: nm }) });
@@ -4598,29 +4306,24 @@ ${orgs.map((x) => `${x.name}: ${x.displayName || ""} [${(x.users || []).length} 
 ${roles.map((x) => `${x.name}: ${(x.users || []).length} users, ${(x.roles || []).length} sub-roles`).join("\n")}`);
             }
             case "get_role": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               return ok(j(await api(IAM_URL, `/api/get-role?id=${args.id.includes("/") ? args.id : `admin/${args.id}`}`)));
             }
             case "create_role": {
-              if (!args.name)
-                return fail6("name required");
+              if (!args.name) return fail6("name required");
               await api(IAM_URL, "/api/add-role", { method: "POST", body: JSON.stringify({ owner: o, name: args.name, displayName: args.displayName || args.name, ...args.data || {} }) });
               return ok(`Created role: ${args.name}`);
             }
             case "update_role": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               const id = args.id.includes("/") ? args.id : `admin/${args.id}`;
               const role = await api(IAM_URL, `/api/get-role?id=${id}`);
-              if (args.data)
-                Object.assign(role, args.data);
+              if (args.data) Object.assign(role, args.data);
               await api(IAM_URL, "/api/update-role", { method: "POST", body: JSON.stringify(role) });
               return ok(`Updated role: ${id}`);
             }
             case "delete_role": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               const id = args.id.includes("/") ? args.id : `admin/${args.id}`;
               const [ow, nm] = id.split("/");
               await api(IAM_URL, "/api/delete-role", { method: "POST", body: JSON.stringify({ owner: ow, name: nm }) });
@@ -4632,13 +4335,11 @@ ${roles.map((x) => `${x.name}: ${(x.users || []).length} users, ${(x.roles || []
 ${apps.map((x) => `${x.name}: ${x.displayName || ""} [${x.clientId || ""}]`).join("\n")}`);
             }
             case "get_app": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               return ok(j(await api(IAM_URL, `/api/get-application?id=${args.id.includes("/") ? args.id : `admin/${args.id}`}`)));
             }
             case "create_app": {
-              if (!args.name)
-                return fail6("name required");
+              if (!args.name) return fail6("name required");
               await api(IAM_URL, "/api/add-application", { method: "POST", body: JSON.stringify({ owner: o, name: args.name, displayName: args.displayName || args.name, organization: args.organization || "hanzo", ...args.data || {} }) });
               return ok(`Created app: ${args.name}`);
             }
@@ -4647,21 +4348,18 @@ ${apps.map((x) => `${x.name}: ${x.displayName || ""} [${x.clientId || ""}]`).joi
             case "list_tokens":
               return ok(j(await api(IAM_URL, `/api/get-tokens?owner=${o}&limit=${lim}`)));
             case "create_token": {
-              if (!args.name)
-                return fail6("name required");
+              if (!args.name) return fail6("name required");
               return ok(j(await api(IAM_URL, "/api/add-token", { method: "POST", body: JSON.stringify({ owner: o, name: args.name, ...args.data || {} }) })));
             }
             case "delete_token": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               await api(IAM_URL, "/api/delete-token", { method: "POST", body: JSON.stringify({ owner: o, name: args.id }) });
               return ok(`Deleted token: ${args.id}`);
             }
             case "list_permissions":
               return ok(j(await api(IAM_URL, `/api/get-permissions?owner=${o}`)));
             case "assign_role": {
-              if (!args.role || !args.user)
-                return fail6("role and user required");
+              if (!args.role || !args.user) return fail6("role and user required");
               const r = await api(IAM_URL, `/api/get-role?id=${args.role.includes("/") ? args.role : `admin/${args.role}`}`);
               r.users = r.users || [];
               r.users.push(args.user);
@@ -4669,8 +4367,7 @@ ${apps.map((x) => `${x.name}: ${x.displayName || ""} [${x.clientId || ""}]`).joi
               return ok(`Assigned role ${args.role} to ${args.user}`);
             }
             case "remove_role": {
-              if (!args.role || !args.user)
-                return fail6("role and user required");
+              if (!args.role || !args.user) return fail6("role and user required");
               const r = await api(IAM_URL, `/api/get-role?id=${args.role.includes("/") ? args.role : `admin/${args.role}`}`);
               r.users = (r.users || []).filter((u) => u !== args.user);
               await api(IAM_URL, "/api/update-role", { method: "POST", body: JSON.stringify(r) });
@@ -4679,8 +4376,7 @@ ${apps.map((x) => `${x.name}: ${x.displayName || ""} [${x.clientId || ""}]`).joi
             case "list_sessions":
               return ok(j(await api(IAM_URL, `/api/get-sessions?owner=${o}&limit=${lim}`)));
             case "delete_session": {
-              if (!args.id)
-                return fail6("id required");
+              if (!args.id) return fail6("id required");
               await api(IAM_URL, "/api/delete-session", { method: "POST", body: JSON.stringify({ owner: o, name: args.id }) });
               return ok(`Deleted session: ${args.id}`);
             }
@@ -4736,80 +4432,68 @@ ${apps.map((x) => `${x.name}: ${x.displayName || ""} [${x.clientId || ""}]`).joi
           const sp = encodeURIComponent(args.path || "/");
           switch (args.action) {
             case "list": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               const s = arr(await api(KMS_URL, `/api/v3/secrets?workspaceSlug=${args.project}&environment=${env}&secretPath=${sp}`), "secrets");
               return ok(`Secrets (${s.length}):
 ${s.map((x) => `${x.secretKey || x.key}: ${(x.secretValue || x.value || "").substring(0, 8)}...`).join("\n")}`);
             }
             case "get": {
-              if (!args.project || !args.key)
-                return fail6("project and key required");
+              if (!args.project || !args.key) return fail6("project and key required");
               return ok(j(await api(KMS_URL, `/api/v3/secrets/${encodeURIComponent(args.key)}?workspaceSlug=${args.project}&environment=${env}&secretPath=${sp}`)));
             }
             case "create": {
-              if (!args.project || !args.key || !args.value)
-                return fail6("project, key, value required");
+              if (!args.project || !args.key || !args.value) return fail6("project, key, value required");
               await api(KMS_URL, `/api/v3/secrets/${encodeURIComponent(args.key)}`, { method: "POST", body: JSON.stringify({ workspaceSlug: args.project, environment: env, secretPath: args.path || "/", secretValue: args.value, secretComment: args.comment || "" }) });
               return ok(`Created: ${args.key}`);
             }
             case "update": {
-              if (!args.project || !args.key || !args.value)
-                return fail6("project, key, value required");
+              if (!args.project || !args.key || !args.value) return fail6("project, key, value required");
               await api(KMS_URL, `/api/v3/secrets/${encodeURIComponent(args.key)}`, { method: "PATCH", body: JSON.stringify({ workspaceSlug: args.project, environment: env, secretPath: args.path || "/", secretValue: args.value }) });
               return ok(`Updated: ${args.key}`);
             }
             case "delete": {
-              if (!args.project || !args.key)
-                return fail6("project and key required");
+              if (!args.project || !args.key) return fail6("project and key required");
               await api(KMS_URL, `/api/v3/secrets/${encodeURIComponent(args.key)}`, { method: "DELETE", body: JSON.stringify({ workspaceSlug: args.project, environment: env, secretPath: args.path || "/" }) });
               return ok(`Deleted: ${args.key}`);
             }
             case "rotate": {
-              if (!args.project || !args.key || !args.value)
-                return fail6("project, key, new value required");
+              if (!args.project || !args.key || !args.value) return fail6("project, key, new value required");
               await api(KMS_URL, `/api/v3/secrets/${encodeURIComponent(args.key)}`, { method: "PATCH", body: JSON.stringify({ workspaceSlug: args.project, environment: env, secretPath: args.path || "/", secretValue: args.value }) });
               return ok(`Rotated: ${args.key} (new version created)`);
             }
             case "versions": {
-              if (!args.project || !args.key)
-                return fail6("project and key required");
+              if (!args.project || !args.key) return fail6("project and key required");
               const d = await api(KMS_URL, `/api/v1/secret/${encodeURIComponent(args.key)}/versions?workspaceSlug=${args.project}&environment=${env}&secretPath=${sp}`);
               const v = arr(d, "versions", "secretVersions");
               return ok(`Versions of ${args.key} (${v.length}):
 ${v.map((x, i) => `v${x.version || i + 1}: ${x.createdAt || ""} ${x.secretValue ? x.secretValue.substring(0, 8) + "..." : ""}`).join("\n")}`);
             }
             case "rollback": {
-              if (!args.project || !args.key || !args.version)
-                return fail6("project, key, version required");
+              if (!args.project || !args.key || !args.version) return fail6("project, key, version required");
               await api(KMS_URL, `/api/v1/secret/${encodeURIComponent(args.key)}/rollback`, { method: "POST", body: JSON.stringify({ workspaceSlug: args.project, environment: env, secretPath: args.path || "/", version: args.version }) });
               return ok(`Rolled back ${args.key} to v${args.version}`);
             }
             case "folders": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               const d = await api(KMS_URL, `/api/v1/folders?workspaceSlug=${args.project}&environment=${env}&parentPath=${sp}`);
               const f = arr(d, "folders");
               return ok(`Folders:
 ${f.map((x) => `${x.name || x.id}`).join("\n") || "(root only)"}`);
             }
             case "create_folder": {
-              if (!args.project || !args.folder)
-                return fail6("project and folder required");
+              if (!args.project || !args.folder) return fail6("project and folder required");
               await api(KMS_URL, "/api/v1/folders", { method: "POST", body: JSON.stringify({ workspaceSlug: args.project, environment: env, folderName: args.folder, parentPath: args.path || "/" }) });
               return ok(`Created folder: ${args.folder}`);
             }
             case "audit": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               const d = await api(KMS_URL, `/api/v1/audit-logs?workspaceSlug=${args.project}&limit=${args.limit || 50}`);
               const logs = arr(d, "auditLogs", "logs");
               return ok(`Audit (${logs.length}):
 ${logs.map((x) => `${x.createdAt || ""} ${x.actor || ""}: ${x.event || x.action || ""} ${x.secretKey || ""}`).join("\n")}`);
             }
             case "import": {
-              if (!args.project || !args.secrets)
-                return fail6("project and secrets (key-value map) required");
+              if (!args.project || !args.secrets) return fail6("project and secrets (key-value map) required");
               let count = 0;
               for (const [k, v] of Object.entries(args.secrets)) {
                 await api(KMS_URL, `/api/v3/secrets/${encodeURIComponent(k)}`, { method: "POST", body: JSON.stringify({ workspaceSlug: args.project, environment: env, secretPath: args.path || "/", secretValue: String(v) }) });
@@ -4818,19 +4502,16 @@ ${logs.map((x) => `${x.createdAt || ""} ${x.actor || ""}: ${x.event || x.action 
               return ok(`Imported ${count} secrets`);
             }
             case "export": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               const s = arr(await api(KMS_URL, `/api/v3/secrets?workspaceSlug=${args.project}&environment=${env}&secretPath=${sp}`), "secrets");
               const map = {};
-              for (const x of s)
-                map[x.secretKey || x.key] = x.secretValue || x.value || "";
+              for (const x of s) map[x.secretKey || x.key] = x.secretValue || x.value || "";
               return ok(j(map));
             }
             case "projects":
               return ok(j(await api(KMS_URL, "/api/v2/workspace")));
             case "environments": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               return ok(j(await api(KMS_URL, `/api/v2/workspace/${args.project}/environments`)));
             }
             default:
@@ -4899,115 +4580,90 @@ ${logs.map((x) => `${x.createdAt || ""} ${x.actor || ""}: ${x.event || x.action 
 ${p.map((x) => `${x.name || x.iid}: [${x.environments?.length || 0} envs]`).join("\n")}`);
             }
             case "get": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}`)));
             }
             case "deploy": {
-              if (!args.project || !args.environment || !args.container)
-                return fail6("project, environment, container required");
+              if (!args.project || !args.environment || !args.container) return fail6("project, environment, container required");
               const body = {};
-              if (args.image)
-                body.image = args.image;
-              if (args.env)
-                body.variables = args.env;
-              if (args.replicas)
-                body.replicas = args.replicas;
-              if (args.cpu)
-                body.cpuLimit = args.cpu;
-              if (args.memory)
-                body.memoryLimit = args.memory;
+              if (args.image) body.image = args.image;
+              if (args.env) body.variables = args.env;
+              if (args.replicas) body.replicas = args.replicas;
+              if (args.cpu) body.cpuLimit = args.cpu;
+              if (args.memory) body.memoryLimit = args.memory;
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container/${args.container}`, { method: "PUT", body: JSON.stringify(body) })));
             }
             case "delete": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               await api(PAAS_URL, `${base}/project/${args.project}`, { method: "DELETE" });
               return ok(`Deleted: ${args.project}`);
             }
             case "logs": {
-              if (!args.project || !args.environment || !args.container)
-                return fail6("project, environment, container required");
+              if (!args.project || !args.environment || !args.container) return fail6("project, environment, container required");
               const params = `lines=${args.lines || 100}${args.since ? `&since=${args.since}` : ""}`;
               const d = await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container/${args.container}/logs?${params}`);
               return ok(typeof d === "string" ? d : d?.logs || j(d));
             }
             case "scale": {
-              if (!args.project || !args.environment || !args.container)
-                return fail6("project, environment, container required");
-              if (!args.replicas)
-                return fail6("replicas required");
+              if (!args.project || !args.environment || !args.container) return fail6("project, environment, container required");
+              if (!args.replicas) return fail6("replicas required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container/${args.container}/scale`, { method: "POST", body: JSON.stringify({ replicas: args.replicas }) })));
             }
             case "restart": {
-              if (!args.project || !args.environment || !args.container)
-                return fail6("project, environment, container required");
+              if (!args.project || !args.environment || !args.container) return fail6("project, environment, container required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container/${args.container}/restart`, { method: "POST" })));
             }
             case "status": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/status`)));
             }
             case "domains": {
-              if (!args.project || !args.environment)
-                return fail6("project and environment required");
+              if (!args.project || !args.environment) return fail6("project and environment required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/domains`)));
             }
             case "add_domain": {
-              if (!args.project || !args.environment || !args.domain)
-                return fail6("project, environment, domain required");
+              if (!args.project || !args.environment || !args.domain) return fail6("project, environment, domain required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/domains`, { method: "POST", body: JSON.stringify({ domain: args.domain }) })));
             }
             case "remove_domain": {
-              if (!args.project || !args.environment || !args.domain)
-                return fail6("project, environment, domain required");
+              if (!args.project || !args.environment || !args.domain) return fail6("project, environment, domain required");
               await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/domains/${encodeURIComponent(args.domain)}`, { method: "DELETE" });
               return ok(`Removed domain: ${args.domain}`);
             }
             case "env_vars": {
-              if (!args.project || !args.environment || !args.container)
-                return fail6("project, environment, container required");
+              if (!args.project || !args.environment || !args.container) return fail6("project, environment, container required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container/${args.container}/variables`)));
             }
             case "set_env": {
-              if (!args.project || !args.environment || !args.container || !args.key || !args.value)
-                return fail6("project, environment, container, key, value required");
+              if (!args.project || !args.environment || !args.container || !args.key || !args.value) return fail6("project, environment, container, key, value required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container/${args.container}/variables`, { method: "POST", body: JSON.stringify({ [args.key]: args.value }) })));
             }
             case "unset_env": {
-              if (!args.project || !args.environment || !args.container || !args.key)
-                return fail6("project, environment, container, key required");
+              if (!args.project || !args.environment || !args.container || !args.key) return fail6("project, environment, container, key required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container/${args.container}/variables/${encodeURIComponent(args.key)}`, { method: "DELETE" })));
             }
             case "rollback": {
-              if (!args.project || !args.environment || !args.container || !args.version)
-                return fail6("project, environment, container, version required");
+              if (!args.project || !args.environment || !args.container || !args.version) return fail6("project, environment, container, version required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container/${args.container}/rollback`, { method: "POST", body: JSON.stringify({ version: args.version }) })));
             }
             case "builds": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/builds?limit=${args.lines || 20}`)));
             }
             case "metrics": {
-              if (!args.project || !args.environment || !args.container)
-                return fail6("project, environment, container required");
+              if (!args.project || !args.environment || !args.container) return fail6("project, environment, container required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container/${args.container}/metrics`)));
             }
             case "environments": {
-              if (!args.project)
-                return fail6("project required");
+              if (!args.project) return fail6("project required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env`)));
             }
             case "create_env": {
-              if (!args.project || !args.environment)
-                return fail6("project and environment required");
+              if (!args.project || !args.environment) return fail6("project and environment required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env`, { method: "POST", body: JSON.stringify({ name: args.environment }) })));
             }
             case "containers": {
-              if (!args.project || !args.environment)
-                return fail6("project and environment required");
+              if (!args.project || !args.environment) return fail6("project and environment required");
               return ok(j(await api(PAAS_URL, `${base}/project/${args.project}/env/${args.environment}/container`)));
             }
             default:
@@ -5080,8 +4736,7 @@ ${lines.join("\n")}
 Call with resource to see actions, or resource + action to execute.`);
           }
           const res = COMMERCE_RESOURCES[args.resource];
-          if (!res)
-            return fail6(`Unknown resource: ${args.resource}. Available: ${Object.keys(COMMERCE_RESOURCES).join(", ")}`);
+          if (!res) return fail6(`Unknown resource: ${args.resource}. Available: ${Object.keys(COMMERCE_RESOURCES).join(", ")}`);
           if (!args.action) {
             return ok(`${res.label} \u2014 available actions: ${res.hint}
 
@@ -5099,26 +4754,24 @@ Call with action to execute. Most actions support: id, data, query, limit, page,
 ${d.map((x) => `${x.id}: ${x.name || x.code || x.title || x.url || j(x).substring(0, 60)}`).join("\n")}`);
               }
               case "get": {
-                if (!args.id)
-                  return fail6("id required");
+                if (!args.id) return fail6("id required");
                 return ok(j(await api(API_URL, `${res.path}/${args.id}`)));
               }
               case "create":
                 return ok(j(await api(API_URL, res.path, { method: "POST", body: JSON.stringify(args.data || {}) })));
               case "update": {
-                if (!args.id)
-                  return fail6("id required");
+                if (!args.id) return fail6("id required");
                 return ok(j(await api(API_URL, `${res.path}/${args.id}`, { method: "PATCH", body: JSON.stringify(args.data || {}) })));
               }
               case "delete": {
-                if (!args.id)
-                  return fail6("id required");
+                if (!args.id) return fail6("id required");
                 await api(API_URL, `${res.path}/${args.id}`, { method: "DELETE" });
                 return ok(`Deleted ${args.resource}: ${args.id}`);
               }
             }
           }
           switch (args.resource) {
+            // ---- Products ----
             case "products": {
               switch (act) {
                 case "list": {
@@ -5128,32 +4781,29 @@ ${d.map((x) => `${x.id}: ${x.name || x.code || x.title || x.url || j(x).substrin
 ${d.map((x) => `${x.id}: ${x.name} $${((x.price || 0) / 100).toFixed(2)} [${x.sku || ""}]`).join("\n")}`);
                 }
                 case "get": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`)));
                 }
                 case "create":
                   return ok(j(await api(API_URL, res.path, { method: "POST", body: JSON.stringify(args.data || {}) })));
                 case "update": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`, { method: "PATCH", body: JSON.stringify(args.data || {}) })));
                 }
                 case "delete": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   await api(API_URL, `${res.path}/${args.id}`, { method: "DELETE" });
                   return ok(`Deleted product: ${args.id}`);
                 }
                 case "search": {
-                  if (!args.query)
-                    return fail6("query required");
+                  if (!args.query) return fail6("query required");
                   return ok(j(await api(API_URL, `/v1/search/product?q=${encodeURIComponent(args.query)}&limit=${lim}`)));
                 }
                 default:
                   return fail6(`Products: ${res.hint}`);
               }
             }
+            // ---- Orders ----
             case "orders": {
               switch (act) {
                 case "list": {
@@ -5163,89 +4813,77 @@ ${d.map((x) => `${x.id}: ${x.name} $${((x.price || 0) / 100).toFixed(2)} [${x.sk
 ${d.map((x) => `${x.id}: $${((x.total || 0) / 100).toFixed(2)} ${x.status || ""}`).join("\n")}`);
                 }
                 case "get": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`)));
                 }
                 case "create":
                   return ok(j(await api(API_URL, res.path, { method: "POST", body: JSON.stringify(args.data || { items: args.items || [] }) })));
                 case "update": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`, { method: "PATCH", body: JSON.stringify(args.data || {}) })));
                 }
                 case "authorize": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/authorize`, { method: "POST" })));
                 }
                 case "capture": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/capture`, { method: "POST" })));
                 }
                 case "charge": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/charge`, { method: "POST" })));
                 }
                 case "refund": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/refund`, { method: "POST", body: JSON.stringify(args.amount ? { amount: args.amount } : {}) })));
                 }
                 case "status": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/status`)));
                 }
                 case "payments": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/payments`)));
                 }
                 case "returns": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/returns`)));
                 }
                 case "confirm": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/confirm`, { method: "POST" })));
                 }
                 default:
                   return fail6(`Orders: ${res.hint}`);
               }
             }
+            // ---- Carts ----
             case "carts": {
               switch (act) {
                 case "get": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`)));
                 }
                 case "create":
                   return ok(j(await api(API_URL, res.path, { method: "POST", body: JSON.stringify(args.data || { items: args.items || [] }) })));
                 case "update": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`, { method: "PUT", body: JSON.stringify(args.data || {}) })));
                 }
                 case "set": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/set`, { method: "POST", body: JSON.stringify({ items: args.items || [] }) })));
                 }
                 case "discard": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/discard`, { method: "POST" })));
                 }
                 default:
                   return fail6(`Carts: ${res.hint}`);
               }
             }
+            // ---- Checkout ----
             case "checkout": {
               switch (act) {
                 case "authorize":
@@ -5253,18 +4891,15 @@ ${d.map((x) => `${x.id}: $${((x.total || 0) / 100).toFixed(2)} ${x.status || ""}
                 case "charge":
                   return ok(j(await api(API_URL, `${res.path}/charge`, { method: "POST", body: JSON.stringify(args.data || {}) })));
                 case "capture": {
-                  if (!args.id)
-                    return fail6("order id required");
+                  if (!args.id) return fail6("order id required");
                   return ok(j(await api(API_URL, `${res.path}/capture/${args.id}`, { method: "POST" })));
                 }
                 case "confirm": {
-                  if (!args.id)
-                    return fail6("order id required");
+                  if (!args.id) return fail6("order id required");
                   return ok(j(await api(API_URL, `${res.path}/confirm/${args.id}`, { method: "POST" })));
                 }
                 case "cancel": {
-                  if (!args.id)
-                    return fail6("order id required");
+                  if (!args.id) return fail6("order id required");
                   return ok(j(await api(API_URL, `${res.path}/cancel/${args.id}`, { method: "POST" })));
                 }
                 case "session":
@@ -5273,6 +4908,7 @@ ${d.map((x) => `${x.id}: $${((x.total || 0) / 100).toFixed(2)} ${x.status || ""}
                   return fail6(`Checkout: ${res.hint}`);
               }
             }
+            // ---- Subscriptions ----
             case "subscriptions": {
               switch (act) {
                 case "list": {
@@ -5281,31 +4917,28 @@ ${d.map((x) => `${x.id}: $${((x.total || 0) / 100).toFixed(2)} ${x.status || ""}
 ${d.map((x) => `${x.id}: ${x.planId || x.plan || ""} [${x.status}]`).join("\n")}`);
                 }
                 case "get": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`)));
                 }
                 case "create":
                   return ok(j(await api(API_URL, res.path, { method: "POST", body: JSON.stringify(args.data || {}) })));
                 case "update": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`, { method: "PATCH", body: JSON.stringify(args.data || {}) })));
                 }
                 case "cancel": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`, { method: "DELETE", body: JSON.stringify(args.data || {}) })));
                 }
                 case "apply_promotion": {
-                  if (!args.id || !args.code)
-                    return fail6("id and code required");
+                  if (!args.id || !args.code) return fail6("id and code required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/promotion`, { method: "POST", body: JSON.stringify({ code: args.code }) })));
                 }
                 default:
                   return fail6(`Subscriptions: ${res.hint}`);
               }
             }
+            // ---- Billing (was separate tool, now under commerce) ----
             case "billing": {
               switch (act) {
                 case "balance": {
@@ -5329,25 +4962,21 @@ ${d.map((i) => `${i.id}: $${((i.amount || 0) / 100).toFixed(2)} ${i.status || ""
 ${d.map((x) => `${x.id}: ${x.type} ${x.card?.last4 ? `****${x.card.last4}` : ""} ${x.status || ""}`).join("\n")}`);
                 }
                 case "deposit": {
-                  if (!args.amount)
-                    return fail6("amount (cents) required");
+                  if (!args.amount) return fail6("amount (cents) required");
                   return ok(j(await api(API_URL, `${res.path}/deposit`, { method: "POST", body: JSON.stringify({ amount: args.amount, currency: args.currency || "usd" }) })));
                 }
                 case "credit":
                   return ok(j(await api(API_URL, `${res.path}/credit`, { method: "POST", body: JSON.stringify(args.data || {}) })));
                 case "refund": {
-                  if (!args.id)
-                    return fail6("payment id required");
+                  if (!args.id) return fail6("payment id required");
                   return ok(j(await api(API_URL, `${res.path}/refund`, { method: "POST", body: JSON.stringify({ paymentId: args.id, amount: args.amount, ...args.data || {} }) })));
                 }
                 case "disputes": {
-                  if (args.id)
-                    return ok(j(await api(API_URL, `${res.path}/disputes/${args.id}`)));
+                  if (args.id) return ok(j(await api(API_URL, `${res.path}/disputes/${args.id}`)));
                   return ok(j(await api(API_URL, `${res.path}/disputes?limit=${lim}`)));
                 }
                 case "payouts": {
-                  if (args.id)
-                    return ok(j(await api(API_URL, `${res.path}/payouts/${args.id}`)));
+                  if (args.id) return ok(j(await api(API_URL, `${res.path}/payouts/${args.id}`)));
                   return ok(j(await api(API_URL, `${res.path}/payouts?limit=${lim}`)));
                 }
                 case "meters": {
@@ -5363,6 +4992,7 @@ ${d.map((x) => `${x.id}: ${x.name} (${x.unitName || "units"})`).join("\n")}`);
                   return fail6(`Billing: ${res.hint}`);
               }
             }
+            // ---- Customers (groups) ----
             case "customers": {
               switch (act) {
                 case "list": {
@@ -5371,36 +5001,30 @@ ${d.map((x) => `${x.id}: ${x.name} (${x.unitName || "units"})`).join("\n")}`);
 ${d.map((x) => `${x.id}: ${x.name}`).join("\n")}`);
                 }
                 case "get": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`)));
                 }
                 case "create":
                   return ok(j(await api(API_URL, res.path, { method: "POST", body: JSON.stringify(args.data || {}) })));
                 case "update": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`, { method: "PATCH", body: JSON.stringify(args.data || {}) })));
                 }
                 case "delete": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   await api(API_URL, `${res.path}/${args.id}`, { method: "DELETE" });
                   return ok(`Deleted: ${args.id}`);
                 }
                 case "members": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/members`)));
                 }
                 case "add_member": {
-                  if (!args.id || !args.member)
-                    return fail6("id and member required");
+                  if (!args.id || !args.member) return fail6("id and member required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/members`, { method: "POST", body: JSON.stringify({ userId: args.member }) })));
                 }
                 case "remove_member": {
-                  if (!args.id || !args.member)
-                    return fail6("id and member required");
+                  if (!args.id || !args.member) return fail6("id and member required");
                   await api(API_URL, `${res.path}/${args.id}/members/${args.member}`, { method: "DELETE" });
                   return ok(`Removed member: ${args.member}`);
                 }
@@ -5408,6 +5032,7 @@ ${d.map((x) => `${x.id}: ${x.name}`).join("\n")}`);
                   return fail6(`Customers: ${res.hint}`);
               }
             }
+            // ---- Inventory ----
             case "inventory": {
               switch (act) {
                 case "list": {
@@ -5416,32 +5041,29 @@ ${d.map((x) => `${x.id}: ${x.name}`).join("\n")}`);
 ${d.map((x) => `${x.id}: qty=${x.quantity || 0} product=${x.productId || ""}`).join("\n")}`);
                 }
                 case "get": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`)));
                 }
                 case "create":
                   return ok(j(await api(API_URL, res.path, { method: "POST", body: JSON.stringify(args.data || {}) })));
                 case "update": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`, { method: "PATCH", body: JSON.stringify(args.data || {}) })));
                 }
                 case "delete": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   await api(API_URL, `${res.path}/${args.id}`, { method: "DELETE" });
                   return ok(`Deleted: ${args.id}`);
                 }
                 case "adjust": {
-                  if (!args.id || args.adjustment === void 0)
-                    return fail6("id and adjustment required");
+                  if (!args.id || args.adjustment === void 0) return fail6("id and adjustment required");
                   return ok(j(await api(API_URL, `${res.path}/level/${args.id}/adjust`, { method: "POST", body: JSON.stringify({ adjustment: args.adjustment }) })));
                 }
                 default:
                   return fail6(`Inventory: ${res.hint}`);
               }
             }
+            // ---- Stores ----
             case "stores": {
               switch (act) {
                 case "list": {
@@ -5450,53 +5072,48 @@ ${d.map((x) => `${x.id}: qty=${x.quantity || 0} product=${x.productId || ""}`).j
 ${d.map((x) => `${x.id}: ${x.name || x.slug || ""}`).join("\n")}`);
                 }
                 case "get": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`)));
                 }
                 case "create":
                   return ok(j(await api(API_URL, res.path, { method: "POST", body: JSON.stringify(args.data || {}) })));
                 case "update": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`, { method: "PATCH", body: JSON.stringify(args.data || {}) })));
                 }
                 case "delete": {
-                  if (!args.id)
-                    return fail6("id required");
+                  if (!args.id) return fail6("id required");
                   await api(API_URL, `${res.path}/${args.id}`, { method: "DELETE" });
                   return ok(`Deleted store: ${args.id}`);
                 }
                 case "listings": {
-                  if (!args.id)
-                    return fail6("store id required");
+                  if (!args.id) return fail6("store id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/listing`)));
                 }
                 default:
                   return fail6(`Stores: ${res.hint}`);
               }
             }
+            // ---- Fulfillment ----
             case "fulfillment": {
               switch (act) {
                 case "ship": {
-                  if (!args.id)
-                    return fail6("fulfillment id required");
+                  if (!args.id) return fail6("fulfillment id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/ship`, { method: "POST", body: JSON.stringify(args.data || {}) })));
                 }
                 case "cancel": {
-                  if (!args.id)
-                    return fail6("fulfillment id required");
+                  if (!args.id) return fail6("fulfillment id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}/cancel`, { method: "POST" })));
                 }
                 case "track": {
-                  if (!args.id)
-                    return fail6("fulfillment id required");
+                  if (!args.id) return fail6("fulfillment id required");
                   return ok(j(await api(API_URL, `${res.path}/${args.id}`)));
                 }
                 default:
                   return fail6(`Fulfillment: ${res.hint}`);
               }
             }
+            // ---- Analytics ----
             case "analytics": {
               switch (act) {
                 case "dashboard":
@@ -5509,20 +5126,22 @@ ${d.map((x) => `${x.id}: ${x.name || x.slug || ""}`).join("\n")}`);
                   return fail6(`Analytics: ${res.hint}`);
               }
             }
+            // ---- Coupons (special actions) ----
             case "coupons": {
               if (act === "generate_codes") {
-                if (!args.id)
-                  return fail6("coupon id required");
+                if (!args.id) return fail6("coupon id required");
                 return ok(j(await api(API_URL, `${res.path}/${args.id}/codes`, { method: "POST", body: JSON.stringify({ count: args.count || 10 }) })));
               }
               return fail6(`Coupons: ${res.hint}`);
             }
+            // ---- Promotions (special actions) ----
             case "promotions": {
               if (act === "evaluate") {
                 return ok(j(await api(API_URL, `${res.path}/evaluate`, { method: "POST", body: JSON.stringify(args.data || {}) })));
               }
               return fail6(`Promotions: ${res.hint}`);
             }
+            // ---- Pricing ----
             case "pricing": {
               switch (act) {
                 case "calculate":
@@ -5532,13 +5151,11 @@ ${d.map((x) => `${x.id}: ${x.name || x.slug || ""}`).join("\n")}`);
                 case "create_rule":
                   return ok(j(await api(API_URL, "/v1/pricing-rules", { method: "POST", body: JSON.stringify(args.data || {}) })));
                 case "update_rule": {
-                  if (!args.id)
-                    return fail6("rule id required");
+                  if (!args.id) return fail6("rule id required");
                   return ok(j(await api(API_URL, `/v1/pricing-rules/${args.id}`, { method: "PATCH", body: JSON.stringify(args.data || {}) })));
                 }
                 case "delete_rule": {
-                  if (!args.id)
-                    return fail6("rule id required");
+                  if (!args.id) return fail6("rule id required");
                   await api(API_URL, `/v1/pricing-rules/${args.id}`, { method: "DELETE" });
                   return ok(`Deleted rule: ${args.id}`);
                 }
@@ -5546,6 +5163,7 @@ ${d.map((x) => `${x.id}: ${x.name || x.slug || ""}`).join("\n")}`);
                   return fail6(`Pricing: ${res.hint}`);
               }
             }
+            // ---- Tax ----
             case "tax": {
               switch (act) {
                 case "calculate":
@@ -5558,10 +5176,10 @@ ${d.map((x) => `${x.id}: ${x.name || x.slug || ""}`).join("\n")}`);
                   return fail6(`Tax: ${res.hint}`);
               }
             }
+            // ---- Affiliates (special) ----
             case "affiliates": {
               if (act === "connect") {
-                if (!args.id)
-                  return fail6("affiliate id required");
+                if (!args.id) return fail6("affiliate id required");
                 return ok(j(await api(API_URL, `${res.path}/${args.id}/connect`)));
               }
               return fail6(`Affiliates: ${res.hint}`);
@@ -5613,48 +5231,40 @@ ${d.map((x) => `${x.id}: ${x.name || x.slug || ""}`).join("\n")}`);
 ${d.map((x) => `${x.name || x.id}: ${x.region || ""} ${x.createdAt || ""}`).join("\n")}`);
             }
             case "create_bucket": {
-              if (!args.bucket)
-                return fail6("bucket name required");
+              if (!args.bucket) return fail6("bucket name required");
               return ok(j(await api(API_URL, "/v1/storage/buckets", { method: "POST", body: JSON.stringify({ name: args.bucket, region: args.region }) })));
             }
             case "delete_bucket": {
-              if (!args.bucket)
-                return fail6("bucket required");
+              if (!args.bucket) return fail6("bucket required");
               await api(API_URL, `/v1/storage/buckets/${args.bucket}`, { method: "DELETE" });
               return ok(`Deleted bucket: ${args.bucket}`);
             }
             case "list_objects": {
-              if (!args.bucket)
-                return fail6("bucket required");
+              if (!args.bucket) return fail6("bucket required");
               const d = arr(await api(API_URL, `/v1/storage/buckets/${args.bucket}/objects?prefix=${encodeURIComponent(args.prefix || "")}&limit=${args.limit || 100}`), "objects");
               return ok(`Objects (${d.length}):
 ${d.map((x) => `${x.key || x.name}: ${x.size || 0}b ${x.lastModified || ""}`).join("\n")}`);
             }
             case "get_object": {
-              if (!args.bucket || !args.key)
-                return fail6("bucket and key required");
+              if (!args.bucket || !args.key) return fail6("bucket and key required");
               const d = await api(API_URL, `/v1/storage/buckets/${args.bucket}/objects/${encodeURIComponent(args.key)}`);
               return ok(typeof d === "string" ? d : j(d));
             }
             case "delete_object": {
-              if (!args.bucket || !args.key)
-                return fail6("bucket and key required");
+              if (!args.bucket || !args.key) return fail6("bucket and key required");
               await api(API_URL, `/v1/storage/buckets/${args.bucket}/objects/${encodeURIComponent(args.key)}`, { method: "DELETE" });
               return ok(`Deleted: ${args.bucket}/${args.key}`);
             }
             case "presign": {
-              if (!args.bucket || !args.key)
-                return fail6("bucket and key required");
+              if (!args.bucket || !args.key) return fail6("bucket and key required");
               return ok(j(await api(API_URL, `/v1/storage/buckets/${args.bucket}/objects/${encodeURIComponent(args.key)}/presign`, { method: "POST", body: JSON.stringify({ expiry: args.expiry || 3600 }) })));
             }
             case "copy": {
-              if (!args.bucket || !args.key || !args.destination)
-                return fail6("bucket, key, destination required");
+              if (!args.bucket || !args.key || !args.destination) return fail6("bucket, key, destination required");
               return ok(j(await api(API_URL, `/v1/storage/buckets/${args.bucket}/objects/${encodeURIComponent(args.key)}/copy`, { method: "POST", body: JSON.stringify({ destination: args.destination, destBucket: args.destBucket || args.bucket }) })));
             }
             case "metadata": {
-              if (!args.bucket || !args.key)
-                return fail6("bucket and key required");
+              if (!args.bucket || !args.key) return fail6("bucket and key required");
               return ok(j(await api(API_URL, `/v1/storage/buckets/${args.bucket}/objects/${encodeURIComponent(args.key)}/metadata`)));
             }
             default:
@@ -5698,8 +5308,7 @@ ${d.map((x) => `${x.key || x.name}: ${x.size || 0}b ${x.lastModified || ""}`).jo
             case "logout":
               return ok(j(await api(IAM_URL, "/v1/iam/oauth/logout", { method: "POST" })));
             case "refresh": {
-              if (!args.refreshToken)
-                return fail6("refreshToken required");
+              if (!args.refreshToken) return fail6("refreshToken required");
               return ok(j(await api(IAM_URL, "/v1/iam/oauth/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: args.refreshToken }).toString() })));
             }
             case "sessions":
@@ -5768,19 +5377,15 @@ ${m.slice(0, 30).map((x) => `${x.id}: ${x.owned_by || ""}`).join("\n")}${m.lengt
 ... +${m.length - 30} more` : ""}`);
             }
             case "chat": {
-              if (!args.message && !args.messages)
-                return fail6("message or messages required");
+              if (!args.message && !args.messages) return fail6("message or messages required");
               const msgs = args.messages || [];
               if (!args.messages) {
-                if (args.system)
-                  msgs.push({ role: "system", content: args.system });
+                if (args.system) msgs.push({ role: "system", content: args.system });
                 msgs.push({ role: "user", content: args.message });
               }
               const body = { model: args.model || "auto", messages: msgs, max_tokens: args.maxTokens || 1e3 };
-              if (args.temperature !== void 0)
-                body.temperature = args.temperature;
-              if (args.topP !== void 0)
-                body.top_p = args.topP;
+              if (args.temperature !== void 0) body.temperature = args.temperature;
+              if (args.topP !== void 0) body.top_p = args.topP;
               const d = await api(API_URL, "/v1/chat/completions", { method: "POST", body: JSON.stringify(body) });
               const txt = d?.choices?.[0]?.message?.content || "(empty)";
               const u = d?.usage;
@@ -5789,34 +5394,29 @@ ${m.slice(0, 30).map((x) => `${x.id}: ${x.owned_by || ""}`).join("\n")}${m.lengt
 [${d?.model || args.model} | ${u.prompt_tokens}+${u.completion_tokens} tokens]` : ""));
             }
             case "embeddings": {
-              if (!args.input)
-                return fail6("input required");
+              if (!args.input) return fail6("input required");
               const d = await api(API_URL, "/v1/embeddings", { method: "POST", body: JSON.stringify({ model: args.model || "text-embedding-3-small", input: args.input }) });
               const emb = d?.data?.[0]?.embedding || [];
               return ok(`Embedding (${emb.length} dims): [${emb.slice(0, 5).map((x) => x.toFixed(4)).join(", ")}...]`);
             }
             case "images": {
-              if (!args.prompt)
-                return fail6("prompt required");
+              if (!args.prompt) return fail6("prompt required");
               return ok(j(await api(API_URL, "/v1/images/generations", { method: "POST", body: JSON.stringify({ model: args.model || "dall-e-3", prompt: args.prompt, size: args.size || "1024x1024", ...args.data || {} }) })));
             }
             case "audio": {
-              if (!args.input)
-                return fail6("input required");
+              if (!args.input) return fail6("input required");
               return ok(j(await api(API_URL, "/v1/audio/speech", { method: "POST", body: JSON.stringify({ model: args.model || "tts-1", input: args.input, ...args.data || {} }) })));
             }
             case "files":
               return ok(j(await api(API_URL, "/v1/files")));
             case "upload_file": {
-              if (!args.data)
-                return fail6("data required with file content");
+              if (!args.data) return fail6("data required with file content");
               return ok(j(await api(API_URL, "/v1/files", { method: "POST", body: JSON.stringify({ purpose: args.purpose || "fine-tune", ...args.data }) })));
             }
             case "fine_tunes":
               return ok(j(await api(API_URL, "/v1/fine_tuning/jobs")));
             case "create_fine_tune": {
-              if (!args.fileId)
-                return fail6("fileId required");
+              if (!args.fileId) return fail6("fileId required");
               return ok(j(await api(API_URL, "/v1/fine_tuning/jobs", { method: "POST", body: JSON.stringify({ model: args.model || "gpt-4o-mini-2024-07-18", training_file: args.fileId, ...args.data || {} }) })));
             }
             case "usage":
@@ -5898,8 +5498,7 @@ var init_hanzo = __esm({
             }, "list");
           }
           const tool = cloudToolMap.get(args.resource);
-          if (!tool)
-            return fail7("NOT_FOUND", `Unknown resource: ${args.resource}. Available: ${RESOURCES.join(", ")}`);
+          if (!tool) return fail7("NOT_FOUND", `Unknown resource: ${args.resource}. Available: ${RESOURCES.join(", ")}`);
           return await tool.handler(args);
         } catch (error) {
           return fail7("ERROR", error.message);
@@ -6184,8 +5783,7 @@ var init_file_ops = __esm({
       },
       handler: async (args) => {
         const buildTree = async (dir, prefix = "", depth = 0) => {
-          if (depth >= (args.maxDepth || 3))
-            return "";
+          if (depth >= (args.maxDepth || 3)) return "";
           try {
             const entries = await fs8.readdir(dir, { withFileTypes: true });
             const filtered = args.showHidden ? entries : entries.filter((e) => !e.name.startsWith("."));
@@ -6203,8 +5801,7 @@ var init_file_ops = __esm({
             }
             return tree;
           } catch (error) {
-            if (depth === 0)
-              throw error;
+            if (depth === 0) throw error;
             return prefix + "\u2514\u2500\u2500 [Error reading directory]\n";
           }
         };
@@ -6298,25 +5895,17 @@ var init_search = __esm({
           let command;
           if (useRipgrep) {
             command = "rg";
-            if (args.ignoreCase)
-              command += " -i";
-            if (args.showLineNumbers)
-              command += " -n";
-            if (args.contextLines > 0)
-              command += ` -C ${args.contextLines}`;
-            if (args.filePattern)
-              command += ` -g "${args.filePattern}"`;
+            if (args.ignoreCase) command += " -i";
+            if (args.showLineNumbers) command += " -n";
+            if (args.contextLines > 0) command += ` -C ${args.contextLines}`;
+            if (args.filePattern) command += ` -g "${args.filePattern}"`;
             command += ` "${args.pattern}" "${args.path || "."}"`;
           } else {
             command = "grep -r";
-            if (args.ignoreCase)
-              command += " -i";
-            if (args.showLineNumbers)
-              command += " -n";
-            if (args.contextLines > 0)
-              command += ` -C ${args.contextLines}`;
-            if (args.filePattern)
-              command += ` --include="${args.filePattern}"`;
+            if (args.ignoreCase) command += " -i";
+            if (args.showLineNumbers) command += " -n";
+            if (args.contextLines > 0) command += ` -C ${args.contextLines}`;
+            if (args.filePattern) command += ` --include="${args.filePattern}"`;
             command += ` "${args.pattern}" "${args.path || "."}"`;
           }
           const { stdout } = await execAsync8(command);
@@ -6375,8 +5964,7 @@ var init_search = __esm({
         try {
           const globPattern = path9.join(args.path || ".", "**", args.pattern);
           const opts = { maxDepth: args.maxDepth };
-          if (args.type === "file")
-            opts.nodir = true;
+          if (args.type === "file") opts.nodir = true;
           const files = await glob4(globPattern, opts);
           if (files.length === 0) {
             return {
@@ -6454,13 +6042,11 @@ var init_search = __esm({
             let command;
             if (useRipgrep) {
               command = `rg -n --max-count ${args.maxResults || 50}`;
-              if (args.filePattern)
-                command += ` -g "${args.filePattern}"`;
+              if (args.filePattern) command += ` -g "${args.filePattern}"`;
               command += ` "${args.query}" "${args.path || "."}"`;
             } else {
               command = `grep -r -n`;
-              if (args.filePattern)
-                command += ` --include="${args.filePattern}"`;
+              if (args.filePattern) command += ` --include="${args.filePattern}"`;
               command += ` "${args.query}" "${args.path || "."}" | head -${args.maxResults || 50}`;
             }
             try {
@@ -6554,10 +6140,8 @@ var init_shell = __esm({
           };
           const { stdout, stderr } = await execAsync9(args.command, options);
           let output = "";
-          if (stdout)
-            output += stdout;
-          if (stderr)
-            output += "\n[stderr]\n" + stderr;
+          if (stdout) output += stdout;
+          if (stderr) output += "\n[stderr]\n" + stderr;
           return {
             content: [{
               type: "text",
@@ -6712,12 +6296,9 @@ ${error.stderr || ""}`
         const output = procData.output.slice(-(args.tail || 50)).join("");
         const error = procData.error.slice(-(args.tail || 50)).join("");
         let result = "";
-        if (output)
-          result += "Output:\n" + output;
-        if (error)
-          result += "\nError:\n" + error;
-        if (!output && !error)
-          result = "No output yet";
+        if (output) result += "Output:\n" + output;
+        if (error) result += "\nError:\n" + error;
+        if (!output && !error) result = "No output yet";
         return {
           content: [{
             type: "text",
@@ -7093,8 +6674,7 @@ import * as path11 from "path";
 import { glob as glob5 } from "glob";
 async function getFiles(p, pattern) {
   const s = await fs10.stat(p).catch(() => null);
-  if (s?.isFile())
-    return [p];
+  if (s?.isFile()) return [p];
   const pats = pattern ? [pattern] : ["**/*.js", "**/*.ts", "**/*.tsx", "**/*.py", "**/*.rs", "**/*.go", "**/*.java", "**/*.rb", "**/*.php", "**/*.c", "**/*.cpp", "**/*.h"];
   const files = [];
   for (const pat of pats)
@@ -7151,33 +6731,28 @@ var init_ast_search = __esm({
           const results = [];
           switch (args.action) {
             case "search": {
-              if (!args.pattern)
-                return { content: [{ type: "text", text: "pattern required. Built-in: " + Object.keys(PATTERNS).join(", ") }], isError: true };
+              if (!args.pattern) return { content: [{ type: "text", text: "pattern required. Built-in: " + Object.keys(PATTERNS).join(", ") }], isError: true };
               const files = await getFiles(args.path || ".", args.filePattern);
               const pats = PATTERNS[args.pattern] || [new RegExp(args.pattern, "g")];
               let total = 0;
               for (const f of files) {
-                if (total >= (args.maxResults || 50))
-                  break;
+                if (total >= (args.maxResults || 50)) break;
                 const lines = (await fs10.readFile(f, "utf-8")).split("\n");
                 const matches = [];
                 lines.forEach((line, i) => {
-                  for (const re of pats)
-                    if (re.test(line)) {
-                      matches.push(`  ${i + 1}: ${line.trim()}`);
-                      total++;
-                      break;
-                    }
+                  for (const re of pats) if (re.test(line)) {
+                    matches.push(`  ${i + 1}: ${line.trim()}`);
+                    total++;
+                    break;
+                  }
                 });
-                if (matches.length)
-                  results.push(`${f}:
+                if (matches.length) results.push(`${f}:
 ${matches.join("\n")}`);
               }
               return { content: [{ type: "text", text: results.length ? results.join("\n\n") : "No matches" }] };
             }
             case "find_symbol": {
-              if (!args.symbol)
-                return { content: [{ type: "text", text: "symbol required" }], isError: true };
+              if (!args.symbol) return { content: [{ type: "text", text: "symbol required" }], isError: true };
               const files = await getFiles(args.path || ".", args.filePattern);
               const s = args.exact ? args.symbol : `\\w*${args.symbol}\\w*`;
               const typePats = {
@@ -7192,14 +6767,12 @@ ${matches.join("\n")}`);
                 const lines = (await fs10.readFile(f, "utf-8")).split("\n");
                 const matches = [];
                 lines.forEach((line, i) => {
-                  for (const p of pats)
-                    if (p.test(line)) {
-                      matches.push(`  ${i + 1}: ${line.trim()}`);
-                      break;
-                    }
+                  for (const p of pats) if (p.test(line)) {
+                    matches.push(`  ${i + 1}: ${line.trim()}`);
+                    break;
+                  }
                 });
-                if (matches.length)
-                  results.push(`${f}:
+                if (matches.length) results.push(`${f}:
 ${matches.join("\n")}`);
               }
               return { content: [{ type: "text", text: results.length ? results.join("\n\n") : `Symbol '${args.symbol}' not found` }] };
@@ -7218,14 +6791,11 @@ ${matches.join("\n")}`);
                     }
                   }
                 }
-                if (!deps.length)
-                  continue;
+                if (!deps.length) continue;
                 const ext = deps.filter((d) => !d.startsWith(".")), int = deps.filter((d) => d.startsWith("."));
                 const out = [f + ":"];
-                if (args.showExternal !== false && ext.length)
-                  out.push("  External: " + ext.join(", "));
-                if (args.showInternal !== false && int.length)
-                  out.push("  Internal: " + int.join(", "));
+                if (args.showExternal !== false && ext.length) out.push("  External: " + ext.join(", "));
+                if (args.showInternal !== false && int.length) out.push("  Internal: " + int.join(", "));
                 results.push(out.join("\n"));
               }
               return { content: [{ type: "text", text: results.length ? results.join("\n") : "No dependencies found" }] };
@@ -7243,17 +6813,12 @@ ${matches.join("\n")}`);
                   const fn = l.match(/(?:async\s+)?(?:function|def|fn|func)\s+(\w+)\s*\(/);
                   const cl = l.match(/(class|struct|interface|trait|enum)\s+(\w+)/);
                   const tp = l.match(/(?:export\s+)?type\s+(\w+)\s*[={]/);
-                  if (ex)
-                    items.push(`  ${i + 1}: export ${ex[3]} ${ex[4]}`);
-                  else if (cl)
-                    items.push(`  ${i + 1}: ${cl[1]} ${cl[2]}`);
-                  else if (fn && !im)
-                    items.push(`  ${i + 1}: fn ${fn[1]}`);
-                  else if (tp)
-                    items.push(`  ${i + 1}: type ${tp[1]}`);
+                  if (ex) items.push(`  ${i + 1}: export ${ex[3]} ${ex[4]}`);
+                  else if (cl) items.push(`  ${i + 1}: ${cl[1]} ${cl[2]}`);
+                  else if (fn && !im) items.push(`  ${i + 1}: fn ${fn[1]}`);
+                  else if (tp) items.push(`  ${i + 1}: type ${tp[1]}`);
                 }
-                if (items.length)
-                  results.push(`${f} (${lines.length} lines):
+                if (items.length) results.push(`${f} (${lines.length} lines):
 ${items.join("\n")}`);
               }
               return { content: [{ type: "text", text: results.length ? results.join("\n\n") : "No symbols found" }] };
@@ -7266,18 +6831,14 @@ ${items.join("\n")}`);
                 const content = await fs10.readFile(f, "utf-8");
                 const lines = content.split("\n");
                 const ext = path11.extname(f) || "other";
-                if (!byExt[ext])
-                  byExt[ext] = { files: 0, lines: 0 };
+                if (!byExt[ext]) byExt[ext] = { files: 0, lines: 0 };
                 byExt[ext].files++;
                 byExt[ext].lines += lines.length;
                 totalLines += lines.length;
                 for (const l of lines) {
-                  if (/(?:function|def|fn|func)\s+\w+\s*\(/.test(l))
-                    totalFuncs++;
-                  if (/(?:class|struct|interface)\s+\w+/.test(l))
-                    totalClasses++;
-                  if (/(?:import|require|use|from)\s/.test(l))
-                    totalImports++;
+                  if (/(?:function|def|fn|func)\s+\w+\s*\(/.test(l)) totalFuncs++;
+                  if (/(?:class|struct|interface)\s+\w+/.test(l)) totalClasses++;
+                  if (/(?:import|require|use|from)\s/.test(l)) totalImports++;
                 }
               }
               const extSummary = Object.entries(byExt).sort((a, b) => b[1].lines - a[1].lines).map(([ext, s]) => `  ${ext}: ${s.files} files, ${s.lines} lines`);
@@ -7298,14 +6859,11 @@ ${extSummary.join("\n")}` }] };
                 const exports = [];
                 for (let i = 0; i < lines.length; i++) {
                   const m = lines[i].match(/export\s+(default\s+)?(async\s+)?(function|class|const|let|var|type|interface|enum)\s+(\w+)/);
-                  if (m)
-                    exports.push(`  ${i + 1}: ${m[1] || ""}${m[3]} ${m[4]}`);
+                  if (m) exports.push(`  ${i + 1}: ${m[1] || ""}${m[3]} ${m[4]}`);
                   const re = lines[i].match(/module\.exports\s*=\s*(\{[\s\S]*?\}|\w+)/);
-                  if (re)
-                    exports.push(`  ${i + 1}: module.exports = ${re[1].substring(0, 60)}`);
+                  if (re) exports.push(`  ${i + 1}: module.exports = ${re[1].substring(0, 60)}`);
                 }
-                if (exports.length)
-                  results.push(`${f}:
+                if (exports.length) results.push(`${f}:
 ${exports.join("\n")}`);
               }
               return { content: [{ type: "text", text: results.length ? results.join("\n\n") : "No exports found" }] };
@@ -7319,39 +6877,32 @@ ${exports.join("\n")}`);
                   const l = lines[i];
                   const tm = l.match(/(?:export\s+)?(?:type|interface|enum)\s+(\w+)/);
                   const sm = l.match(/(?:pub\s+)?(?:struct|enum|trait)\s+(\w+)/);
-                  if (tm)
-                    types.push(`  ${i + 1}: ${l.trim().substring(0, 80)}`);
-                  else if (sm)
-                    types.push(`  ${i + 1}: ${l.trim().substring(0, 80)}`);
+                  if (tm) types.push(`  ${i + 1}: ${l.trim().substring(0, 80)}`);
+                  else if (sm) types.push(`  ${i + 1}: ${l.trim().substring(0, 80)}`);
                 }
-                if (types.length)
-                  results.push(`${f}:
+                if (types.length) results.push(`${f}:
 ${types.join("\n")}`);
               }
               return { content: [{ type: "text", text: results.length ? results.join("\n\n") : "No type definitions found" }] };
             }
             case "calls": {
-              if (!args.symbol)
-                return { content: [{ type: "text", text: "symbol required" }], isError: true };
+              if (!args.symbol) return { content: [{ type: "text", text: "symbol required" }], isError: true };
               const files = await getFiles(args.path || ".", args.filePattern);
               const callPat = new RegExp(`\\b${args.symbol}\\s*\\(`, "g");
               for (const f of files) {
                 const lines = (await fs10.readFile(f, "utf-8")).split("\n");
                 const matches = [];
                 lines.forEach((line, i) => {
-                  if (callPat.test(line))
-                    matches.push(`  ${i + 1}: ${line.trim()}`);
+                  if (callPat.test(line)) matches.push(`  ${i + 1}: ${line.trim()}`);
                 });
-                if (matches.length)
-                  results.push(`${f}:
+                if (matches.length) results.push(`${f}:
 ${matches.join("\n")}`);
               }
               return { content: [{ type: "text", text: results.length ? results.join("\n\n") : `No calls to '${args.symbol}' found` }] };
             }
             case "hierarchy": {
               let buildTree2 = function(name, depth) {
-                if (depth <= 0)
-                  return [];
+                if (depth <= 0) return [];
                 const out2 = [];
                 const children = classes.filter((c) => c.parent === name);
                 for (const c of children) {
@@ -7361,31 +6912,26 @@ ${matches.join("\n")}`);
                 return out2;
               };
               var buildTree = buildTree2;
-              if (!args.symbol)
-                return { content: [{ type: "text", text: "symbol (class name) required" }], isError: true };
+              if (!args.symbol) return { content: [{ type: "text", text: "symbol (class name) required" }], isError: true };
               const files = await getFiles(args.path || ".", args.filePattern);
               const classes = [];
               for (const f of files) {
                 const lines = (await fs10.readFile(f, "utf-8")).split("\n");
                 for (let i = 0; i < lines.length; i++) {
                   const m = lines[i].match(/class\s+(\w+)(?:\s+extends\s+(\w+))?/);
-                  if (m)
-                    classes.push({ name: m[1], parent: m[2], file: f, line: i + 1 });
+                  if (m) classes.push({ name: m[1], parent: m[2], file: f, line: i + 1 });
                   const sm = lines[i].match(/struct\s+(\w+)/);
-                  if (sm)
-                    classes.push({ name: sm[1], file: f, line: i + 1 });
+                  if (sm) classes.push({ name: sm[1], file: f, line: i + 1 });
                 }
               }
               const root = classes.find((c) => c.name === args.symbol);
               const out = [root ? `${args.symbol} (${root.file}:${root.line})` : args.symbol];
-              if (root?.parent)
-                out.push(`  extends: ${root.parent}`);
+              if (root?.parent) out.push(`  extends: ${root.parent}`);
               out.push(...buildTree2(args.symbol, args.depth || 3));
               const siblings = classes.filter((c) => c.parent === root?.parent && c.name !== args.symbol);
               if (siblings.length) {
                 out.push("\nSiblings:");
-                for (const s of siblings)
-                  out.push(`  ${s.name} (${s.file}:${s.line})`);
+                for (const s of siblings) out.push(`  ${s.name} (${s.file}:${s.line})`);
               }
               return { content: [{ type: "text", text: out.join("\n") }] };
             }
@@ -7488,8 +7034,7 @@ var init_vector_search = __esm({
                   for (let i = 0; i < args.content.length; i += chunkSize) {
                     chunks.push(args.content.substring(i, i + chunkSize));
                   }
-                  for (const chunk of chunks)
-                    items.push({ content: chunk, path: args.path, tags: args.tags });
+                  for (const chunk of chunks) items.push({ content: chunk, path: args.path, tags: args.tags });
                 } else {
                   items.push({ content: args.content, path: args.path, tags: args.tags });
                 }
@@ -7504,15 +7049,13 @@ var init_vector_search = __esm({
                   for (const fp of files) {
                     try {
                       const content = await fs11.readFile(fp, "utf-8");
-                      if (content.length > 0)
-                        items.push({ content, path: fp, tags: args.tags });
+                      if (content.length > 0) items.push({ content, path: fp, tags: args.tags });
                     } catch {
                     }
                   }
                 }
               }
-              if (!items.length)
-                return { content: [{ type: "text", text: "No content to index" }], isError: true };
+              if (!items.length) return { content: [{ type: "text", text: "No content to index" }], isError: true };
               let table;
               try {
                 table = await db.openTable(tableName);
@@ -7536,8 +7079,7 @@ var init_vector_search = __esm({
               return { content: [{ type: "text", text: `Indexed ${indexed} items into '${tableName}'` }] };
             }
             case "search": {
-              if (!args.query)
-                return { content: [{ type: "text", text: "query required" }], isError: true };
+              if (!args.query) return { content: [{ type: "text", text: "query required" }], isError: true };
               const db = await getDB(pp);
               const model = await getEmbedder();
               let table;
@@ -7548,8 +7090,7 @@ var init_vector_search = __esm({
               }
               const out = await model(args.query, { pooling: "mean", normalize: true });
               const matches = await (await table.search(Array.from(out.data)).limit(args.limit || 10)).toArray();
-              if (!matches.length)
-                return { content: [{ type: "text", text: "No matches" }] };
+              if (!matches.length) return { content: [{ type: "text", text: "No matches" }] };
               const fmt = matches.map((m, i) => {
                 const score = (1 - (m._distance || 0)).toFixed(3);
                 const tags = m.tags?.length ? ` [${m.tags.join(",")}]` : "";
@@ -7571,8 +7112,7 @@ Path: ${path12.join(pp, ".hanzo/lancedb")}` }] };
               }
             }
             case "delete": {
-              if (!args.id && !args.path)
-                return { content: [{ type: "text", text: "id or path required" }], isError: true };
+              if (!args.id && !args.path) return { content: [{ type: "text", text: "id or path required" }], isError: true };
               const db = await getDB(pp);
               const t = await db.openTable(tableName);
               if (args.id) {
@@ -7589,15 +7129,13 @@ Path: ${path12.join(pp, ".hanzo/lancedb")}` }] };
 ${tables.map((t) => `  ${t}`).join("\n") || "(none)"}` }] };
             }
             case "drop_table": {
-              if (!args.table)
-                return { content: [{ type: "text", text: "table required" }], isError: true };
+              if (!args.table) return { content: [{ type: "text", text: "table required" }], isError: true };
               const db = await getDB(pp);
               await db.dropTable(args.table);
               return { content: [{ type: "text", text: `Dropped table: ${args.table}` }] };
             }
             case "reindex": {
-              if (!args.path)
-                return { content: [{ type: "text", text: "path required" }], isError: true };
+              if (!args.path) return { content: [{ type: "text", text: "path required" }], isError: true };
               const db = await getDB(pp);
               try {
                 await db.dropTable(tableName);
@@ -7606,8 +7144,7 @@ ${tables.map((t) => `  ${t}`).join("\n") || "(none)"}` }] };
               return await vectorTool.handler({ ...args, action: "index" });
             }
             case "similar": {
-              if (!args.id && !args.content)
-                return { content: [{ type: "text", text: "id or content required" }], isError: true };
+              if (!args.id && !args.content) return { content: [{ type: "text", text: "id or content required" }], isError: true };
               const db = await getDB(pp);
               const model = await getEmbedder();
               const t = await db.openTable(tableName);
@@ -7615,20 +7152,17 @@ ${tables.map((t) => `  ${t}`).join("\n") || "(none)"}` }] };
               if (args.id) {
                 const docs = await (await t.search([])).limit(1e3).toArray();
                 const doc = docs.find((d) => String(d.id) === String(args.id));
-                if (!doc)
-                  return { content: [{ type: "text", text: `Document ${args.id} not found` }], isError: true };
+                if (!doc) return { content: [{ type: "text", text: `Document ${args.id} not found` }], isError: true };
                 queryContent = doc.content;
               }
               const out = await model(queryContent.substring(0, 512), { pooling: "mean", normalize: true });
               const matches = await (await t.search(Array.from(out.data)).limit((args.limit || 10) + 1)).toArray();
               const filtered = matches.filter((m) => {
-                if (args.id && String(m.id) === String(args.id))
-                  return false;
+                if (args.id && String(m.id) === String(args.id)) return false;
                 const sim = 1 - (m._distance || 0);
                 return sim >= (args.threshold || 0);
               }).slice(0, args.limit || 10);
-              if (!filtered.length)
-                return { content: [{ type: "text", text: "No similar documents found" }] };
+              if (!filtered.length) return { content: [{ type: "text", text: "No similar documents found" }] };
               const fmt = filtered.map((m, i) => `${i + 1}. [${(1 - (m._distance || 0)).toFixed(3)}] ${m.path || "content"}
    ${m.content.substring(0, 150).replace(/\n/g, " ")}...`);
               return { content: [{ type: "text", text: fmt.join("\n\n") }] };
@@ -7654,14 +7188,12 @@ async function findRefs(symbol, searchPath, fileGlob) {
   const refs = [];
   try {
     let cmd = `rg -n --no-heading "${symbol}"`;
-    if (fileGlob)
-      cmd += ` -g "${fileGlob}"`;
+    if (fileGlob) cmd += ` -g "${fileGlob}"`;
     cmd += ` "${searchPath}"`;
     const { stdout } = await execAsync10(cmd, { maxBuffer: 5 * 1024 * 1024 });
     for (const line of stdout.split("\n").filter(Boolean)) {
       const m = line.match(/^(.+?):(\d+):(.*)$/);
-      if (m)
-        refs.push({ file: m[1], line: parseInt(m[2]), text: m[3].trim() });
+      if (m) refs.push({ file: m[1], line: parseInt(m[2]), text: m[3].trim() });
     }
   } catch {
   }
@@ -7670,8 +7202,7 @@ async function findRefs(symbol, searchPath, fileGlob) {
 async function countLines(searchPath, fileGlob) {
   try {
     let cmd = `rg -c "" --include-zero`;
-    if (fileGlob)
-      cmd += ` -g "${fileGlob}"`;
+    if (fileGlob) cmd += ` -g "${fileGlob}"`;
     cmd += ` "${searchPath}"`;
     const { stdout } = await execAsync10(cmd, { maxBuffer: 5 * 1024 * 1024 });
     let files = 0, lines = 0;
@@ -7725,15 +7256,12 @@ var init_refactor = __esm({
         try {
           switch (args.action) {
             case "rename": {
-              if (!args.symbol || !args.newName)
-                return { content: [{ type: "text", text: "symbol and newName required" }], isError: true };
+              if (!args.symbol || !args.newName) return { content: [{ type: "text", text: "symbol and newName required" }], isError: true };
               const refs = await findRefs(`\\b${args.symbol}\\b`, args.path || ".", args.filePattern);
-              if (!refs.length)
-                return { content: [{ type: "text", text: `No references found for '${args.symbol}'` }] };
+              if (!refs.length) return { content: [{ type: "text", text: `No references found for '${args.symbol}'` }] };
               const groups = /* @__PURE__ */ new Map();
               for (const r of refs) {
-                if (!groups.has(r.file))
-                  groups.set(r.file, []);
+                if (!groups.has(r.file)) groups.set(r.file, []);
                 groups.get(r.file).push(r);
               }
               if (args.dryRun !== false) {
@@ -7741,10 +7269,8 @@ var init_refactor = __esm({
 `];
                 for (const [f, rs] of groups) {
                   out.push(`  ${f}: ${rs.length} refs`);
-                  for (const r of rs.slice(0, 3))
-                    out.push(`    L${r.line}: ${r.text}`);
-                  if (rs.length > 3)
-                    out.push(`    ... +${rs.length - 3} more`);
+                  for (const r of rs.slice(0, 3)) out.push(`    L${r.line}: ${r.text}`);
+                  if (rs.length > 3) out.push(`    ... +${rs.length - 3} more`);
                 }
                 out.push("\nSet dryRun=false to apply.");
                 return { content: [{ type: "text", text: out.join("\n") }] };
@@ -7786,28 +7312,22 @@ Replace lines ${args.startLine}-${args.endLine} with: ${indent}${args.name}()` }
             }
             case "inline":
             case "references": {
-              if (!args.symbol)
-                return { content: [{ type: "text", text: "symbol required" }], isError: true };
+              if (!args.symbol) return { content: [{ type: "text", text: "symbol required" }], isError: true };
               const defPatterns = [`function\\s+${args.symbol}\\s*\\(`, `(const|let|var)\\s+${args.symbol}\\s*=`, `def\\s+${args.symbol}\\s*\\(`, `fn\\s+${args.symbol}\\s*\\(`, `func\\s+${args.symbol}\\s*\\(`];
               const defs = [];
-              for (const p of defPatterns)
-                defs.push(...await findRefs(p, args.path || ".", args.filePattern));
+              for (const p of defPatterns) defs.push(...await findRefs(p, args.path || ".", args.filePattern));
               const allRefs = await findRefs(`\\b${args.symbol}\\b`, args.path || ".", args.filePattern);
               const calls = allRefs.filter((r) => !defs.some((d) => d.file === r.file && d.line === r.line));
               const out = [`Symbol: ${args.symbol}
 `, `Definitions (${defs.length}):`];
-              for (const d of defs)
-                out.push(`  ${d.file}:${d.line}: ${d.text}`);
+              for (const d of defs) out.push(`  ${d.file}:${d.line}: ${d.text}`);
               out.push("", `References (${calls.length}):`);
-              for (const r of calls.slice(0, args.limit || 50))
-                out.push(`  ${r.file}:${r.line}: ${r.text}`);
-              if (calls.length > (args.limit || 50))
-                out.push(`  ... +${calls.length - (args.limit || 50)} more`);
+              for (const r of calls.slice(0, args.limit || 50)) out.push(`  ${r.file}:${r.line}: ${r.text}`);
+              if (calls.length > (args.limit || 50)) out.push(`  ... +${calls.length - (args.limit || 50)} more`);
               return { content: [{ type: "text", text: out.join("\n") }] };
             }
             case "move": {
-              if (!args.symbol || !args.from || !args.to)
-                return { content: [{ type: "text", text: "symbol, from, to required" }], isError: true };
+              if (!args.symbol || !args.from || !args.to) return { content: [{ type: "text", text: "symbol, from, to required" }], isError: true };
               const refs = await findRefs(`\\b${args.symbol}\\b`, path13.dirname(args.from));
               const imports = refs.filter((r) => r.file !== args.from && (r.text.includes("import") || r.text.includes("require")));
               return { content: [{ type: "text", text: `Move '${args.symbol}' ${args.from} \u2192 ${args.to}
@@ -7831,15 +7351,13 @@ ${imports.map((r) => `  ${r.file}:${r.line}: ${r.text}`).join("\n")}` }] };
               const dead = symbols.filter((s) => s.refs === 0);
               const used = symbols.filter((s) => s.refs > 0);
               out.push(`Potentially unused exports (${dead.length}):`);
-              for (const s of dead.slice(0, args.limit || 50))
-                out.push(`  ${s.file}: ${s.name}`);
+              for (const s of dead.slice(0, args.limit || 50)) out.push(`  ${s.file}: ${s.name}`);
               out.push(`
 Used exports: ${used.length}`);
               return { content: [{ type: "text", text: out.join("\n") }] };
             }
             case "complexity": {
-              if (!args.file)
-                return { content: [{ type: "text", text: "file required" }], isError: true };
+              if (!args.file) return { content: [{ type: "text", text: "file required" }], isError: true };
               const content = await fs12.readFile(args.file, "utf-8");
               const lines = content.split("\n");
               const funcs = [];
@@ -7881,8 +7399,7 @@ Used exports: ${used.length}`);
                 for (const l of stdout.split("\n")) {
                   const m = l.match(/^(.+?):(\d+):(.*)$/);
                   if (m) {
-                    if (!fileLines.has(m[1]))
-                      fileLines.set(m[1], []);
+                    if (!fileLines.has(m[1])) fileLines.set(m[1], []);
                     fileLines.get(m[1]).push(m[3].trim());
                   }
                 }
@@ -7890,11 +7407,9 @@ Used exports: ${used.length}`);
                 for (const [file, lines] of fileLines) {
                   for (let i = 0; i <= lines.length - minLen; i++) {
                     const block = lines.slice(i, i + minLen).join("\n");
-                    if (block.length < 20)
-                      continue;
+                    if (block.length < 20) continue;
                     const fp = block.replace(/\s+/g, " ");
-                    if (!fingerprints.has(fp))
-                      fingerprints.set(fp, []);
+                    if (!fingerprints.has(fp)) fingerprints.set(fp, []);
                     fingerprints.get(fp).push({ file, startLine: i + 1 });
                   }
                 }
@@ -7903,8 +7418,7 @@ Used exports: ${used.length}`);
 `];
                 for (const [block, locs] of dupes.slice(0, args.limit || 20)) {
                   out.push(`  Duplicate in ${locs.length} locations:`);
-                  for (const l of locs)
-                    out.push(`    ${l.file}:${l.startLine}`);
+                  for (const l of locs) out.push(`    ${l.file}:${l.startLine}`);
                   out.push(`    Preview: ${block.substring(0, 80)}...`);
                 }
                 return { content: [{ type: "text", text: out.join("\n") }] };
@@ -7913,8 +7427,7 @@ Used exports: ${used.length}`);
               }
             }
             case "organize_imports": {
-              if (!args.file)
-                return { content: [{ type: "text", text: "file required" }], isError: true };
+              if (!args.file) return { content: [{ type: "text", text: "file required" }], isError: true };
               const content = await fs12.readFile(args.file, "utf-8");
               const lines = content.split("\n");
               const importLines = [];
@@ -7940,8 +7453,7 @@ ${organized}
 ${args.dryRun !== false ? "Set dryRun=false to apply." : "Applied."}` }] };
             }
             case "signatures": {
-              if (!args.file)
-                return { content: [{ type: "text", text: "file required" }], isError: true };
+              if (!args.file) return { content: [{ type: "text", text: "file required" }], isError: true };
               const content = await fs12.readFile(args.file, "utf-8");
               const sigs = [];
               const lines = content.split("\n");
@@ -7952,31 +7464,23 @@ ${args.dryRun !== false ? "Set dryRun=false to apply." : "Applied."}` }] };
                 const cm = l.match(/(export\s+)?class\s+(\w+)(\s+extends\s+\w+)?/);
                 const dm = l.match(/def\s+(\w+)\s*\(([^)]*)\)/);
                 const rm3 = l.match(/(pub\s+)?(async\s+)?fn\s+(\w+)\s*(\([^)]*\))/);
-                if (fm)
-                  sigs.push(`L${i + 1}: ${fm[1] || ""}${fm[2] || ""}function ${fm[3]}${fm[4]}`);
-                else if (am)
-                  sigs.push(`L${i + 1}: ${am[1] || ""}${am[3]} = ${am[4] || ""}(${am[5]})`);
-                else if (cm)
-                  sigs.push(`L${i + 1}: ${cm[1] || ""}class ${cm[2]}${cm[3] || ""}`);
-                else if (dm)
-                  sigs.push(`L${i + 1}: def ${dm[1]}(${dm[2]})`);
-                else if (rm3)
-                  sigs.push(`L${i + 1}: ${rm3[1] || ""}${rm3[2] || ""}fn ${rm3[3]}${rm3[4]}`);
+                if (fm) sigs.push(`L${i + 1}: ${fm[1] || ""}${fm[2] || ""}function ${fm[3]}${fm[4]}`);
+                else if (am) sigs.push(`L${i + 1}: ${am[1] || ""}${am[3]} = ${am[4] || ""}(${am[5]})`);
+                else if (cm) sigs.push(`L${i + 1}: ${cm[1] || ""}class ${cm[2]}${cm[3] || ""}`);
+                else if (dm) sigs.push(`L${i + 1}: def ${dm[1]}(${dm[2]})`);
+                else if (rm3) sigs.push(`L${i + 1}: ${rm3[1] || ""}${rm3[2] || ""}fn ${rm3[3]}${rm3[4]}`);
               }
               return { content: [{ type: "text", text: `Signatures in ${args.file} (${sigs.length}):
 
 ${sigs.join("\n")}` }] };
             }
             case "grep_replace": {
-              if (!args.pattern || !args.replacement)
-                return { content: [{ type: "text", text: "pattern and replacement required" }], isError: true };
+              if (!args.pattern || !args.replacement) return { content: [{ type: "text", text: "pattern and replacement required" }], isError: true };
               const refs = await findRefs(args.pattern, args.path || ".", args.filePattern);
-              if (!refs.length)
-                return { content: [{ type: "text", text: `No matches for pattern: ${args.pattern}` }] };
+              if (!refs.length) return { content: [{ type: "text", text: `No matches for pattern: ${args.pattern}` }] };
               const groups = /* @__PURE__ */ new Map();
               for (const r of refs) {
-                if (!groups.has(r.file))
-                  groups.set(r.file, []);
+                if (!groups.has(r.file)) groups.set(r.file, []);
                 groups.get(r.file).push(r);
               }
               if (args.dryRun !== false) {
@@ -7984,8 +7488,7 @@ ${sigs.join("\n")}` }] };
 `];
                 for (const [f, rs] of [...groups].slice(0, 10)) {
                   out.push(`  ${f}: ${rs.length} matches`);
-                  for (const r of rs.slice(0, 2))
-                    out.push(`    L${r.line}: ${r.text}`);
+                  for (const r of rs.slice(0, 2)) out.push(`    L${r.line}: ${r.text}`);
                 }
                 out.push("\nSet dryRun=false to apply.");
                 return { content: [{ type: "text", text: out.join("\n") }] };
@@ -8308,18 +7811,15 @@ Your project is ready for Hanzo UI components!`;
         }
         const grouped = components.reduce((acc, item) => {
           const category = item.category || "Uncategorized";
-          if (!acc[category])
-            acc[category] = [];
+          if (!acc[category]) acc[category] = [];
           acc[category].push(item);
           return acc;
         }, {});
         let content = "# Hanzo UI Components\\n\\n";
         if (components.length === 0) {
           content += "No components found";
-          if (typeFilter)
-            content += ` with type '${typeFilter}'`;
-          if (categoryFilter)
-            content += ` in category '${categoryFilter}'`;
+          if (typeFilter) content += ` with type '${typeFilter}'`;
+          if (categoryFilter) content += ` in category '${categoryFilter}'`;
           content += ".\\n";
         } else {
           for (const [category, items] of Object.entries(grouped)) {
@@ -8555,8 +8055,7 @@ The component will be ready to use in your project!`;
         } else {
           const byCategory = filtered.reduce((acc, block) => {
             const cat = block.category || "Uncategorized";
-            if (!acc[cat])
-              acc[cat] = [];
+            if (!acc[cat]) acc[cat] = [];
             acc[cat].push(block);
             return acc;
           }, {});
@@ -9461,8 +8960,7 @@ var init_base = __esm({
         }
       }
       static clampConfidence(confidence) {
-        if (confidence === void 0)
-          return 0.8;
+        if (confidence === void 0) return 0.8;
         return Math.max(0, Math.min(1, confidence));
       }
       static validateKey(key) {
@@ -10256,12 +9754,11 @@ var require_jsautogui = __commonJS({
       const spawn6 = async (name) => {
         const file = path19.join(__dirname, "main", name + "." + options.extension);
         query[file] = query[file] || [];
-        if (options.extension !== "exe")
-          fs18.writeFileSync(file, {
-            cmd: `@echo off
+        if (options.extension !== "exe") fs18.writeFileSync(file, {
+          cmd: `@echo off
 py main\\${name}.py`,
-            sh: `py main/${name}.py`
-          }[options.extension]);
+          sh: `py main/${name}.py`
+        }[options.extension]);
         spawned[file] = child_process.spawn(file);
         spawned[file].on("close", (code, signal) => {
           connected[file] = false;
@@ -10272,16 +9769,13 @@ py main\\${name}.py`,
           spawn6(name);
         });
         spawned[file].on("error", (err) => {
-          if (!_first[file])
-            throw err;
-          if (options.debug)
-            options.debug("error", err);
+          if (!_first[file]) throw err;
+          if (options.debug) options.debug("error", err);
         });
         spawned[file].on("spawn", () => {
           _first[file] = true;
           connected[file] = true;
-          if (options.debug)
-            options.debug("Spawned.");
+          if (options.debug) options.debug("Spawned.");
           query[file].forEach((i) => spawned[file].stdin.write(i));
         });
         spawned[file].stdout.on("data", (data) => {
@@ -10291,14 +9785,12 @@ py main\\${name}.py`,
         spawned[file].stdout.on("_actual_data", (response) => {
           const id = response.split(" ")[0];
           const message = response.split(" ").slice(1).join(" ");
-          if (options.debug)
-            console.log("-> " + message);
+          if (options.debug) console.log("-> " + message);
           if (_res[id]) {
             if (message === "success") {
               _res[id].r(_res[id].data);
               delete _res[id];
-            } else
-              _res[id].data.push(message);
+            } else _res[id].data.push(message);
           }
         });
       };
@@ -10310,8 +9802,7 @@ py main\\${name}.py`,
         const id = _id++;
         _res[id] = { r, data: [] };
         const pack = JSON.stringify({ ...obj, id, action }) + "\n";
-        if (!connected[file])
-          return query[file].push(pack);
+        if (!connected[file]) return query[file].push(pack);
         spawned[file].stdin.write(pack);
       });
       const convertObject = async (a, b) => {
@@ -10324,19 +9815,15 @@ py main\\${name}.py`,
       const autoSplit = async (a, b = ":") => (await a).map((i) => i.split(b));
       const check = (a, ...b) => {
         const typ = (x) => {
-          if (x === null)
-            return "null";
-          if (Array.isArray(x))
-            return "array";
+          if (x === null) return "null";
+          if (Array.isArray(x)) return "array";
           return typeof x;
         };
-        if (!b.some((b2) => typ(a) === typ(b2)))
-          throw new Error("Expected " + b.map(typ).join(" or ") + ", got " + typ(a));
+        if (!b.some((b2) => typ(a) === typ(b2))) throw new Error("Expected " + b.map(typ).join(" or ") + ", got " + typ(a));
       };
       const checkAll = (...a) => a.forEach((a2) => check(...a2));
       const checkArr = (a, arr2, t) => {
-        if (!arr2.includes(a))
-          throw new Error("Expected " + t + ", got " + a);
+        if (!arr2.includes(a)) throw new Error("Expected " + t + ", got " + a);
       };
       const checkSubArr = (a, arr2, t) => a.forEach((a2) => checkArr(a2, arr2, t));
       const pilImage = (str) => {
@@ -10380,8 +9867,7 @@ py main\\${name}.py`,
         },
         click: async (x = null, y = null, clicks = null, interval = null, button = null) => {
           checkAll([x, 0, null], [y, 0, null], [clicks, 0, null], [interval, 0, null], [button, "", null]);
-          if (button !== null)
-            checkArr(button, KeyboardKeys, "keyboard key");
+          if (button !== null) checkArr(button, KeyboardKeys, "keyboard key");
           await send("main", "click", { x, y, clicks, interval, button });
         },
         vScroll: async (value = null, x = null, y = null) => {
@@ -10432,8 +9918,7 @@ py main\\${name}.py`,
         },
         confirm: async (text = null, title = null, buttons = null) => {
           checkAll([text, "", null], [title, "", null], [buttons, [], null]);
-          if (buttons !== null)
-            buttons.forEach((i) => check(i, ""));
+          if (buttons !== null) buttons.forEach((i) => check(i, ""));
           return (await send("main", title || buttons ? "confirm" : "confirm-js", { text, title, buttons }))[0];
         },
         prompt: async (text = null, title = null, default_ = null) => {
@@ -10454,10 +9939,8 @@ py main\\${name}.py`,
           if (region !== null) {
             if (Array.isArray(region)) {
               region.forEach((i) => check(i, 0));
-              if (region.length !== 4)
-                throw new Error("Expected number[4], got number[" + region.length + "]");
-            } else
-              checkAll([region.left, 0], [region.top, 0], [region.width, 0], [region.height, 0]);
+              if (region.length !== 4) throw new Error("Expected number[4], got number[" + region.length + "]");
+            } else checkAll([region.left, 0], [region.top, 0], [region.width, 0], [region.height, 0]);
           }
           return pilImage((await send("main", "screenshot", { file, region }))[0]);
         },
@@ -11925,14 +11408,10 @@ var init_autogui_tools = __esm({
         handler: async (args) => {
           try {
             const config = {};
-            if (args.implementation)
-              config.implementation = args.implementation;
-            if (args.failsafe !== void 0)
-              config.failsafe = args.failsafe;
-            if (args.pause !== void 0)
-              config.pause = args.pause;
-            if (args.log !== void 0)
-              config.log = args.log;
+            if (args.implementation) config.implementation = args.implementation;
+            if (args.failsafe !== void 0) config.failsafe = args.failsafe;
+            if (args.pause !== void 0) config.pause = args.pause;
+            if (args.log !== void 0) config.log = args.log;
             if (args.implementation && autoguiAdapter?.getImplementationName() !== args.implementation) {
               autoguiAdapter = null;
             }
@@ -12682,14 +12161,10 @@ async function spawnAgent(args) {
     "--prompt",
     config.prompt
   ];
-  if (config.context)
-    agentArgs.push("--context", config.context);
-  if (config.outputGoal)
-    agentArgs.push("--output-goal", config.outputGoal);
-  if (config.files)
-    agentArgs.push("--files", config.files.join(","));
-  if (config.readOnly)
-    agentArgs.push("--read-only");
+  if (config.context) agentArgs.push("--context", config.context);
+  if (config.outputGoal) agentArgs.push("--output-goal", config.outputGoal);
+  if (config.files) agentArgs.push("--files", config.files.join(","));
+  if (config.readOnly) agentArgs.push("--read-only");
   const agentProcess = spawn5(hanzoCmd, agentArgs, {
     cwd: config.worktreePath || process.cwd(),
     stdio: "pipe"
@@ -12783,12 +12258,9 @@ async function manageHanzoNode(args) {
   switch (args.action) {
     case "start":
       const startArgs = ["node", "start"];
-      if (args.models)
-        startArgs.push("--models", args.models.join(","));
-      if (args.network)
-        startArgs.push("--network");
-      if (args.blockchain)
-        startArgs.push("--blockchain");
+      if (args.models) startArgs.push("--models", args.models.join(","));
+      if (args.network) startArgs.push("--network");
+      if (args.blockchain) startArgs.push("--blockchain");
       return executeCommand(`${hanzoCmd} ${startArgs.join(" ")}`);
     case "stop":
       return executeCommand(`${hanzoCmd} node stop`);
@@ -12808,16 +12280,11 @@ async function routeLLMRequest(args) {
     "--prompt",
     args.prompt
   ];
-  if (args.taskType)
-    routerArgs.push("--task-type", args.taskType);
-  if (args.requirements?.quality)
-    routerArgs.push("--quality", args.requirements.quality);
-  if (args.requirements?.maxCost)
-    routerArgs.push("--max-cost", args.requirements.maxCost.toString());
-  if (args.requirements?.maxLatency)
-    routerArgs.push("--max-latency", args.requirements.maxLatency.toString());
-  if (args.fallbackChain)
-    routerArgs.push("--fallback", args.fallbackChain.join(","));
+  if (args.taskType) routerArgs.push("--task-type", args.taskType);
+  if (args.requirements?.quality) routerArgs.push("--quality", args.requirements.quality);
+  if (args.requirements?.maxCost) routerArgs.push("--max-cost", args.requirements.maxCost.toString());
+  if (args.requirements?.maxLatency) routerArgs.push("--max-latency", args.requirements.maxLatency.toString());
+  if (args.fallbackChain) routerArgs.push("--fallback", args.fallbackChain.join(","));
   return executeCommand(`${hanzoCmd} ${routerArgs.join(" ")}`);
 }
 async function achieveConsensus(args) {
@@ -12827,8 +12294,7 @@ async function achieveConsensus(args) {
     const roundVotes = await Promise.all(
       agents.map(async (agentId) => {
         const agent = activeAgents.get(agentId);
-        if (!agent)
-          throw new Error(`Agent ${agentId} not found`);
+        if (!agent) throw new Error(`Agent ${agentId} not found`);
         const voteResult = await spawnAgent({
           model: agent.model,
           prompt: `${question}
@@ -14582,8 +14048,7 @@ ${stderr}
 `;
         }
         for (const comp of validComponents) {
-          if (comp === "card")
-            continue;
+          if (comp === "card") continue;
           const pascalCase = comp.split("-").map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join("");
           if (comp === "button") {
             code += `          <Button>Action</Button>
@@ -14790,8 +14255,7 @@ __export(tools_exports, {
 function dedupeByName(tools) {
   const seen = /* @__PURE__ */ new Set();
   return tools.filter((t) => {
-    if (seen.has(t.name))
-      return false;
+    if (seen.has(t.name)) return false;
     seen.add(t.name);
     return true;
   });
@@ -14831,59 +14295,37 @@ function getConfiguredTools(config = {}) {
     tools = [];
     if (enableCore) {
       if (enabledCategories.length > 0) {
-        if (enabledCategories.includes("files"))
-          tools.push(...fileTools);
-        if (enabledCategories.includes("search"))
-          tools.push(...searchTools);
-        if (enabledCategories.includes("shell"))
-          tools.push(...shellTools);
-        if (enabledCategories.includes("edit"))
-          tools.push(...editTools);
-        if (enabledCategories.includes("desktop"))
-          tools.push(...desktopTools);
+        if (enabledCategories.includes("files")) tools.push(...fileTools);
+        if (enabledCategories.includes("search")) tools.push(...searchTools);
+        if (enabledCategories.includes("shell")) tools.push(...shellTools);
+        if (enabledCategories.includes("edit")) tools.push(...editTools);
+        if (enabledCategories.includes("desktop")) tools.push(...desktopTools);
       } else {
         tools.push(...legacyCoreTools);
       }
     }
-    if (enableAI)
-      tools.push(...thinkTools);
-    if (enableAST)
-      tools.push(...astTools);
-    if (enableVector)
-      tools.push(...vectorTools);
-    if (enableTodo)
-      tools.push(...tasksTools);
-    if (enableModes)
-      tools.push(...modePresetTools);
-    if (enableCloud)
-      tools.push(...hanzoCloudTools);
-    if (enableVCS)
-      tools.push(...gitTools);
-    if (enableRefactor)
-      tools.push(...refactorTools);
-    if (enableMemory)
-      tools.push(...memoryTools);
-    if (enablePlan)
-      tools.push(...planTools);
+    if (enableAI) tools.push(...thinkTools);
+    if (enableAST) tools.push(...astTools);
+    if (enableVector) tools.push(...vectorTools);
+    if (enableTodo) tools.push(...tasksTools);
+    if (enableModes) tools.push(...modePresetTools);
+    if (enableCloud) tools.push(...hanzoCloudTools);
+    if (enableVCS) tools.push(...gitTools);
+    if (enableRefactor) tools.push(...refactorTools);
+    if (enableMemory) tools.push(...memoryTools);
+    if (enablePlan) tools.push(...planTools);
   }
   if (enableUI) {
     tools.push(...uiTools, ...multiFrameworkTools);
   }
-  if (enableAutoGUI)
-    tools.push(...autoguiTools);
-  if (enableOrchestration)
-    tools.push(...orchestrationTools);
-  if (enableUIRegistry)
-    tools.push(...uiRegistryTools);
-  if (enableGitHubUI)
-    tools.push(...githubUITools);
-  if (enableDesktop)
-    tools.push(...desktopTools);
+  if (enableAutoGUI) tools.push(...autoguiTools);
+  if (enableOrchestration) tools.push(...orchestrationTools);
+  if (enableUIRegistry) tools.push(...uiRegistryTools);
+  if (enableGitHubUI) tools.push(...githubUITools);
+  if (enableDesktop) tools.push(...desktopTools);
   tools.push(...customTools);
-  if (dedupeTools)
-    tools = dedupeByName(tools);
-  if (disabledTools.length > 0)
-    tools = tools.filter((t) => !disabledTools.includes(t.name));
+  if (dedupeTools) tools = dedupeByName(tools);
+  if (disabledTools.length > 0) tools = tools.filter((t) => !disabledTools.includes(t.name));
   return tools;
 }
 var desktopTools, legacyCoreTools, coreTools2, allTools, coreToolMap, toolMap;
@@ -15051,16 +14493,11 @@ async function getSystemPrompt(projectPath = process.cwd()) {
           await fs16.readFile(path17.join(projectPath, "package.json"), "utf-8")
         );
         parts.push(`- Node.js project: ${packageJson2.name || "unnamed"}`);
-        if (packageJson2.dependencies?.react)
-          parts.push("- Framework: React");
-        if (packageJson2.dependencies?.vue)
-          parts.push("- Framework: Vue");
-        if (packageJson2.dependencies?.angular)
-          parts.push("- Framework: Angular");
-        if (packageJson2.dependencies?.express)
-          parts.push("- Framework: Express");
-        if (packageJson2.dependencies?.next)
-          parts.push("- Framework: Next.js");
+        if (packageJson2.dependencies?.react) parts.push("- Framework: React");
+        if (packageJson2.dependencies?.vue) parts.push("- Framework: Vue");
+        if (packageJson2.dependencies?.angular) parts.push("- Framework: Angular");
+        if (packageJson2.dependencies?.express) parts.push("- Framework: Express");
+        if (packageJson2.dependencies?.next) parts.push("- Framework: Next.js");
       } catch {
       }
     }
@@ -15131,16 +14568,14 @@ function zapEncode(type, payload) {
   return frame;
 }
 function zapDecode(data) {
-  if (data.length < HEADER_SIZE)
-    return null;
+  if (data.length < HEADER_SIZE) return null;
   if (data[0] !== 90 || data[1] !== 65 || data[2] !== 80 || data[3] !== 1) {
     return null;
   }
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const type = view.getUint8(4);
   const length = view.getUint32(5, false);
-  if (data.length < HEADER_SIZE + length)
-    return null;
+  if (data.length < HEADER_SIZE + length) return null;
   const jsonBytes = data.subarray(HEADER_SIZE, HEADER_SIZE + length);
   const payload = length > 0 ? JSON.parse(textDecoder.decode(jsonBytes)) : null;
   return { type, payload };
@@ -15168,8 +14603,7 @@ async function startZapServer(options) {
     const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
     const data = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
     const msg = zapDecode(data);
-    if (!msg)
-      return;
+    if (!msg) return;
     switch (msg.type) {
       case MSG_HANDSHAKE: {
         const p = msg.payload || {};
@@ -15212,6 +14646,7 @@ async function startZapServer(options) {
           result = await callTool(toolName, args);
           break;
         }
+        // Client→server notifications (fire-and-forget)
         case "notifications/elementSelected":
         case "notifications/controlCancelled":
           result = { acknowledged: true };
@@ -15798,8 +15233,7 @@ async function startStdioServer(options, toolConfig) {
     }),
     "tools/call": async (params) => {
       const tool = toolMap2.get(params?.name);
-      if (!tool)
-        throw new Error(`Unknown tool: ${params?.name}`);
+      if (!tool) throw new Error(`Unknown tool: ${params?.name}`);
       return tool.handler(params?.arguments || {});
     },
     "resources/list": async () => ({
@@ -15824,14 +15258,12 @@ async function startStdioServer(options, toolConfig) {
       name: "hanzo-mcp",
       callTool: async (toolName, args) => {
         const tool = toolMap2.get(toolName);
-        if (!tool)
-          throw new Error(`Unknown tool: ${toolName}`);
+        if (!tool) throw new Error(`Unknown tool: ${toolName}`);
         return tool.handler(args);
       },
       handleMethod: async (method, params) => {
         const handler = methodHandlers2[method];
-        if (handler)
-          return handler(params || {});
+        if (handler) return handler(params || {});
         throw new Error(`Unsupported method: ${method}`);
       }
     });
