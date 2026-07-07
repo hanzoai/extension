@@ -38,6 +38,7 @@ import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './browser-dispatch';
 import * as auth from './auth';
+import { fetchAllUsage } from './shared/usage.js';
 import { listModels, chatCompletion, ChatMessage } from './chat-client';
 import { PageMonitor } from './page-monitor';
 import {
@@ -1780,6 +1781,19 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
           } catch { /* ollama unavailable */ }
 
           sendResponse({ success: true, ...results });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    // --- AI provider usage (Claude + Codex, via @hanzo/usage) ---
+    case 'usage.fetch': {
+      (async () => {
+        try {
+          const providers = await fetchAllUsage();
+          sendResponse({ success: true, providers });
         } catch (e: any) {
           sendResponse({ success: false, error: e.message });
         }

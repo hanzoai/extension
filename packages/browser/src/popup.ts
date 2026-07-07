@@ -693,6 +693,90 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // --- AI Usage (Claude + Codex) — data fetched by the background context
+  // where host permissions attach the live claude.ai / chatgpt.com cookies. ---
+  const usageList = document.getElementById('usage-list');
+  const usageRefresh = document.getElementById('usage-refresh');
+
+  interface UsageWindow { usedPercent: number; resetsAt?: string }
+  interface UsageSnapshotLite {
+    primary?: UsageWindow;
+    secondary?: UsageWindow;
+    identity?: { plan?: string };
+  }
+  interface ProviderUsageLite {
+    providerId: string;
+    displayName: string;
+    color?: string;
+    snapshot?: UsageSnapshotLite;
+    error?: string;
+  }
+
+  const esc = (s: string) =>
+    s.replace(/[&<>"]/g, (c) => (({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }) as Record<string, string>)[c]);
+
+  function resetLabel(iso?: string): string {
+    if (!iso) return '';
+    const ms = new Date(iso).getTime() - Date.now();
+    if (!Number.isFinite(ms)) return '';
+    if (ms <= 0) return 'resets now';
+    const m = Math.round(ms / 60000);
+    if (m < 60) return `resets in ${m}m`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `resets in ${h}h`;
+    return `resets in ${Math.round(h / 24)}d`;
+  }
+
+  function lane(label: string, w: UsageWindow | undefined, color?: string): string {
+    if (!w || typeof w.usedPercent !== 'number') return '';
+    const pct = Math.max(0, Math.min(100, Math.round(w.usedPercent)));
+    return `
+      <div class="usage-lane" style="display:flex;align-items:center;gap:8px;font-size:11px;margin-top:4px;">
+        <span style="width:52px;color:var(--text-muted,#888);">${label}</span>
+        <span style="flex:1;height:6px;border-radius:3px;background:var(--surface-2,#222);overflow:hidden;">
+          <span style="display:block;height:100%;width:${pct}%;background:${color || 'var(--accent,#d97757)'};"></span>
+        </span>
+        <span style="width:34px;text-align:right;">${pct}%</span>
+      </div>`;
+  }
+
+  function renderUsage(providers: ProviderUsageLite[]) {
+    if (!usageList) return;
+    usageList.innerHTML = providers
+      .map((p) => {
+        const body = p.error
+          ? `<div style="font-size:11px;color:var(--text-muted,#888);margin-top:4px;">${esc(p.error)}</div>`
+          : `${lane('Session', p.snapshot?.primary, p.color)}${lane('Weekly', p.snapshot?.secondary, p.color)}
+             <div style="font-size:10px;color:var(--text-muted,#888);margin-top:3px;">${esc(resetLabel(p.snapshot?.primary?.resetsAt))}</div>`;
+        const plan = p.snapshot?.identity?.plan;
+        return `
+          <div class="usage-row" style="padding:8px;border:1px solid var(--border,#2a2a2a);border-radius:8px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:${p.color || '#888'};"></span>
+              <strong style="font-size:12px;">${esc(p.displayName)}</strong>
+              ${plan ? `<span style="font-size:10px;color:var(--text-muted,#888);">${esc(plan)}</span>` : ''}
+            </div>
+            ${body}
+          </div>`;
+      })
+      .join('');
+  }
+
+  function loadUsage() {
+    if (!usageList) return;
+    usageList.innerHTML = '<div style="font-size:11px;color:var(--text-muted,#888);">Loading…</div>';
+    chrome.runtime.sendMessage({ action: 'usage.fetch' }, (resp) => {
+      if (chrome.runtime.lastError || !resp?.success) {
+        usageList.innerHTML = '<div style="font-size:11px;color:var(--text-muted,#888);">Usage unavailable</div>';
+        return;
+      }
+      renderUsage(resp.providers as ProviderUsageLite[]);
+    });
+  }
+
+  usageRefresh?.addEventListener('click', loadUsage);
+  loadUsage();
+
   // Init
   checkAuth();
 });
