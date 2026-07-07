@@ -27,6 +27,7 @@ import {
   type ZapManager,
 } from './shared/zap.js';
 import { connectNativeZap, type NativeZapState } from './shared/native-zap.js';
+import { fetchAllUsage } from './shared/usage.js';
 import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 import {
   getRagConfig,
@@ -2999,6 +3000,17 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
       case 'listTabFS':
         sendResponse({ success: false, error: 'Tab filesystem requires CDP bridge.' });
         break;
+
+      // AI provider usage (Claude + Codex, via @hanzo/usage)
+      case 'usage.fetch': {
+        try {
+          const providers = await fetchAllUsage();
+          sendResponse({ success: true, providers });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
 
       default:
         sendResponse({ success: false, error: `Unknown action: ${request.action}` });
