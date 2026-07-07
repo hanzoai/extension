@@ -96,6 +96,22 @@
 
       <div class="divider"></div>
 
+      <!-- AI Usage (Claude + Codex, from the current browser session) -->
+      <div class="usage-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <h3>AI Usage</h3>
+        <button id="usage-refresh" class="btn-icon" title="Refresh usage">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
+      </div>
+      <div id="usage-list" class="usage-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <a href="https://console.hanzo.ai/ai-accounts" target="_blank"
+         style="display:inline-block;margin-top:8px;font-size:11px;color:var(--text-muted,#888);">Manage AI accounts →</a>
+
+      <div class="divider"></div>
+
       <!-- Tools -->
       <h3>Tools</h3>
       <div class="tools-grid">

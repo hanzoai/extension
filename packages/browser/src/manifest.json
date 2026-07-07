@@ -19,6 +19,8 @@
   "host_permissions": [
     "http://localhost/*",
     "https://localhost/*",
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
     "<all_urls>"
   ],
   "content_security_policy": {

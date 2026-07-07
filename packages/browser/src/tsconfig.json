@@ -9,6 +9,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@hanzo/usage": ["../../../../usage/packages/core/dist/index.d.ts"]
+    },
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
