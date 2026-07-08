@@ -63,7 +63,11 @@ export interface NativeZapState {
 
 export type Dispatch = (method: string, params: any) => Promise<any> | any;
 
-const RECONNECT_MS = 3000;
+// Gentle safe poll: with no MCP client running there is no router to reach, so
+// the host connects-then-exits; probe every 30s instead of hammering (and
+// re-launching the native host) every 3s. A live consumer is picked up within
+// one interval.
+const RECONNECT_MS = 30_000;
 
 /** Connect to zapd via the native host, register as a browser provider, and
  *  dispatch inbound ROUTE commands to the browser. Self-heals on disconnect. */
