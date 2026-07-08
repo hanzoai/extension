@@ -110,7 +110,11 @@ class HanzoFirefoxExtension {
 
   constructor() {
     console.log('[Hanzo] Firefox extension initializing...');
-    this.connect();
+    // Legacy ws://:9223 CDP bridge is OPT-IN (globalThis.HANZO_LEGACY_CDP). The
+    // default (and only) transport is the ZAP native host — see
+    // discoverZapServers() at EOF — matching Chrome. Without a bridge server the
+    // WS just error-looped, so it no longer runs unless explicitly enabled.
+    if ((globalThis as { HANZO_LEGACY_CDP?: boolean }).HANZO_LEGACY_CDP) this.connect();
   }
 
   private connect(): void {
