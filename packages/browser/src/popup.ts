@@ -134,6 +134,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // --- Embedded search (feature: query → Hanzo answer engine) ---
+  const searchForm = document.getElementById('search-form') as HTMLFormElement | null;
+  const searchInput = document.getElementById('search-input') as HTMLInputElement | null;
+  searchForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = searchInput?.value.trim();
+    const target = q
+      ? chrome.runtime.getURL('newtab.html') + '?q=' + encodeURIComponent(q)
+      : chrome.runtime.getURL('newtab.html');
+    chrome.tabs.create({ url: target });
+    window.close();
+  });
+
   // --- Open chat ---
   // Default surface: in-page edge-pinned overlay (content-script). Honours
   // the user's `overlayEnabled`, `overlaySide`, and `overlayWidth` prefs.

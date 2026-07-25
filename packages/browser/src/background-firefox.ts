@@ -3088,4 +3088,32 @@ browser.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
+// ── Omnibox → Hanzo answer engine ────────────────────────────────────────
+// Firefox's address bar can't be silently hijacked (a security boundary), and
+// `chrome_settings_overrides.search_provider` default-engine takeover is policy
+// gated. The WebExtension mechanism that DOES work without opt-in is the
+// omnibox keyword: type `hanzo <query>` in the address bar → the query loads
+// the Hanzo answer engine (AI answer + sources + news) with ?q=. Same surface
+// as the new-tab landing.
+try {
+  const omnibox = (browser as any).omnibox;
+  if (omnibox) {
+    omnibox.setDefaultSuggestion({
+      description: 'Search Hanzo AI — AI answers with sources and realtime news',
+    });
+    omnibox.onInputEntered.addListener((text: string, disposition: string) => {
+      const url = browser.runtime.getURL('newtab.html') + '?q=' + encodeURIComponent(text);
+      if (disposition === 'newForegroundTab') {
+        void browser.tabs.create({ url });
+      } else if (disposition === 'newBackgroundTab') {
+        void browser.tabs.create({ url, active: false });
+      } else {
+        void browser.tabs.update({ url });
+      }
+    });
+  }
+} catch (e) {
+  console.warn('[Hanzo] omnibox unavailable:', e);
+}
+
 console.log('[Hanzo] Firefox background script loaded');

@@ -57,6 +57,18 @@
         <div class="divider"></div>
       </div>
 
+      <!-- Embedded search: run a query through the Hanzo answer engine. -->
+      <form id="search-form" style="display:flex;gap:6px;margin-bottom:10px;">
+        <input id="search-input" type="text" placeholder="Search Hanzo AI…" autocomplete="off"
+          style="flex:1;min-width:0;padding:9px 12px;background:var(--surface-light,#171717);border:1px solid var(--border,rgba(255,255,255,0.12));border-radius:8px;color:var(--text,#fafafa);font-size:13px;font-family:inherit;outline:none;">
+        <button id="search-btn" type="submit" title="Search" aria-label="Search"
+          style="width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--primary,#fafafa);border:none;border-radius:8px;color:#000;cursor:pointer;">
+          <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="7" cy="7" r="4.5"/><path d="M11 11l3.5 3.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </form>
+
       <!-- Actions: single Open Chat button + on-page surface settings. -->
       <button id="open-panel" class="btn btn-secondary" style="margin-bottom: 8px;">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
