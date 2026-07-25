@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Hanzo AI",
-  "version": "1.9.22",
-  "description": "AI-powered dev assistant — click-to-code navigation, source maps, WebGPU AI, and MCP integration for Claude Code.",
+  "version": "1.9.33",
+  "description": "AI answer engine, search, and dev assistant — Hanzo AI in a new tab, address-bar search, source-cited answers, realtime news, WebGPU AI, and MCP.",
   "permissions": [
     "activeTab",
     "identity",
@@ -48,6 +48,12 @@
       "48": "icon48.png",
       "128": "icon128.png"
     }
+  },
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "omnibox": {
+    "keyword": "hanzo"
   },
   "sidebar_action": {
     "default_title": "Hanzo AI",
