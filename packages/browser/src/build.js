@@ -24,6 +24,12 @@ async function build() {
   const backgroundAliases = { '@hanzo/usage': hanzoUsage };
   console.log('Using @hanzo/usage engine:', hanzoUsage);
 
+  // The answer engine (new-tab landing) consumes the @hanzo/ai SDK's `search`
+  // primitive — the ONE place the search/deep-research capability is defined.
+  // It's a published npm dependency (^0.2.3), so esbuild resolves it from
+  // node_modules like any other package — works identically locally and on CI
+  // (no sibling-repo path assumption).
+
   // Ensure dist directories exist
   fs.mkdirSync('dist/browser-extension', { recursive: true });
   fs.mkdirSync('dist/browser-extension/chrome', { recursive: true });
@@ -97,6 +103,19 @@ async function build() {
     platform: 'browser',
     target: ['chrome90', 'firefox91', 'safari14'],
     sourcemap: 'inline',
+  });
+
+  // Answer engine (new-tab landing + omnibox/address-bar search target).
+  // React 18 surface consuming the @hanzo/ai `search` primitive; monochrome.
+  await esbuild.build({
+    entryPoints: ['src/newtab.ts'],
+    bundle: true,
+    outfile: 'dist/browser-extension/newtab.js',
+    platform: 'browser',
+    target: ['chrome90', 'firefox91', 'safari14'],
+    // New-tab page loads on every tab — ship it lean (minified, no inline map).
+    minify: true,
+    sourcemap: false,
   });
 
   // Build browser control module
@@ -188,17 +207,18 @@ async function build() {
       );
     }
 
-    // Copy popup + sidebar HTML/CSS
-    for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'callback.html', 'ai-worker.js']) {
+    // Copy popup + sidebar + answer-engine HTML/CSS
+    for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'newtab.html', 'newtab.css', 'callback.html', 'ai-worker.js']) {
       const src = path.join('src', f);
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(dir, f));
       }
     }
 
-    // Copy compiled popup/sidebar scripts
+    // Copy compiled popup/sidebar/newtab scripts
     fs.copyFileSync('dist/browser-extension/popup.js', path.join(dir, 'popup.js'));
     fs.copyFileSync('dist/browser-extension/sidebar.js', path.join(dir, 'sidebar.js'));
+    fs.copyFileSync('dist/browser-extension/newtab.js', path.join(dir, 'newtab.js'));
 
     // Copy icons into each browser directory
     for (const icon of ['icon16.png', 'icon48.png', 'icon128.png']) {
