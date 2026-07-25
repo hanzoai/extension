@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Hanzo AI",
-  "version": "1.9.25",
-  "description": "AI-powered dev assistant — click-to-code navigation, source maps, WebGPU AI, and MCP integration for Claude Code.",
+  "version": "1.9.33",
+  "description": "AI answer engine, search, and dev assistant — Hanzo AI in a new tab, address-bar search, source-cited answers, realtime news, WebGPU AI, and MCP.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxfXGh0lPUT5m04GKfjUwrLsV6pLaK3VcZuFRPogqAir2tzyLYnQPRtHynue9yvDyguIVnlkwvcwfDOYZrvH76zbw4s6onPBG8HqTKO6LQ9K3kdO1qBBkMMjdOgULQ1MrWThEbpU7NSTiwLYpEta/jAvrKRCAeKIlQE8p6htZmPy9aRUZuae66JgLcAlzD2vviX9sVB1asFABJVswL1RgZ55/8IzZaUrFjzOo9OHK4hmEOtudzkML+5silsAYdC+1BZugph2x94ai17YmZTCL1XyUa5Ke4q80cj+i9rOTgzhZs+mruyhL/AvNVOXilsgqCdNqSz77naWzC3pVGbxOewIDAQAB",
   "permissions": [
     "activeTab",
@@ -53,6 +53,19 @@
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
+  },
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "chrome_settings_overrides": {
+    "search_provider": {
+      "name": "Hanzo",
+      "keyword": "hanzo",
+      "search_url": "https://hanzo.chat/c/new?q={searchTerms}&submit=true",
+      "favicon_url": "https://hanzo.ai/favicon.ico",
+      "encoding": "UTF-8",
+      "is_default": true
+    }
   },
   "web_accessible_resources": [
     {
