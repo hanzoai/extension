@@ -1,0 +1,102 @@
+# Native store-publish — Hanzo Git act_runner (label hanzo-build-linux-amd64).
+# This is the SYSTEM OF RECORD for publishing the browser extension to the
+# Chrome Web Store + Firefox AMO, and for the npm package. GitHub only mirrors.
+#
+# Secrets model — KMS ONLY. The single bootstrap credential is the KMS machine
+# identity (KMS_CLIENT_ID / KMS_CLIENT_SECRET, a git.hanzo.ai Actions secret).
+# Every store credential is pulled from KMS at publish time
+# (org `hanzo`, env `prod`, path `/extension-publish` — see
+# deploy/kms/extension-publish-kms-sync.yaml). No CWS/AMO/npm secret is ever
+# stored in GitHub or Gitea Actions secrets.
+#
+# amd64/Linux only. Safari (macOS) + Windows desktop stay on GitHub-hosted
+# runners until native macOS/Windows act_runners are green
+# (runners-act-migration.md Phase 2).
+name: publish
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: hanzo-build-linux-amd64
+    container: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tools (jq, pnpm)
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends jq curl
+          corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      # ── The ONE secret hop: KMS machine identity → store creds ──
+      # Login once, read each key from hanzo:/extension-publish, mask + export.
+      # A missing key exports empty; each publish step below gates on its creds,
+      # so partial provisioning publishes exactly what KMS has.
+      - name: Load publish secrets from KMS
+        env:
+          KMS_CLIENT_ID: ${{ secrets.KMS_CLIENT_ID }}
+          KMS_CLIENT_SECRET: ${{ secrets.KMS_CLIENT_SECRET }}
+        run: |
+          if [ -z "$KMS_CLIENT_ID" ] || [ -z "$KMS_CLIENT_SECRET" ]; then
+            echo "::warning::KMS machine identity absent — cannot pull publish creds. Seed KMS_CLIENT_ID/SECRET as git.hanzo.ai Actions secrets."
+            exit 0
+          fi
+          KMS=https://kms.hanzo.ai; ORG=hanzo; ENVN=prod; P=extension-publish
+          TOKEN=$(curl -sf "$KMS/v1/kms/auth/login" -H 'Content-Type: application/json' \
+            -d "{\"clientId\":\"$KMS_CLIENT_ID\",\"clientSecret\":\"$KMS_CLIENT_SECRET\"}" | jq -r .accessToken)
+          [ -n "$TOKEN" ] && [ "$TOKEN" != null ] || { echo "::error::KMS login failed"; exit 1; }
+          for KEY in CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN AMO_API_KEY AMO_API_SECRET NPM_TOKEN; do
+            VAL=$(curl -sf "$KMS/v1/kms/orgs/$ORG/secrets/$P/$KEY?env=$ENVN" \
+              -H "Authorization: Bearer $TOKEN" | jq -r '.secret.value // empty')
+            if [ -n "$VAL" ]; then echo "::add-mask::$VAL"; fi
+            echo "$KEY=$VAL" >> "$GITHUB_ENV"
+          done
+
+      - name: Build browser extension
+        working-directory: packages/browser
+        run: node src/build.js
+
+      - name: Package (web-ext — no zip binary on the runner)
+        working-directory: packages/browser
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          npx web-ext build --source-dir dist/browser-extension/chrome  --artifacts-dir dist --filename hanzo-ai-chrome-v${VERSION}.zip  --overwrite-dest
+          npx web-ext build --source-dir dist/browser-extension/firefox --artifacts-dir dist --filename hanzo-ai-firefox-v${VERSION}.zip --overwrite-dest
+
+      - name: Publish to Chrome Web Store
+        if: env.CHROME_EXTENSION_ID != ''
+        working-directory: packages/browser
+        run: |
+          ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+            -d "client_id=$CHROME_CLIENT_ID" -d "client_secret=$CHROME_CLIENT_SECRET" \
+            -d "refresh_token=$CHROME_REFRESH_TOKEN" -d "grant_type=refresh_token" | jq -r '.access_token')
+          VERSION=$(node -p "require('./package.json').version")
+          curl -sf -X PUT "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" -H "x-goog-api-version: 2" \
+            -T dist/hanzo-ai-chrome-v${VERSION}.zip
+          curl -sf -X POST "https://www.googleapis.com/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID/publish" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" -H "x-goog-api-version: 2" -H "Content-Length: 0"
+
+      - name: Publish to Firefox Add-ons
+        if: env.AMO_API_KEY != ''
+        working-directory: packages/browser
+        run: |
+          npx web-ext sign --source-dir dist/browser-extension/firefox \
+            --api-key "$AMO_API_KEY" --api-secret "$AMO_API_SECRET" \
+            --channel listed --id "hanzo-ai@hanzo.ai"
+
+      # npm — canonical home is here. The .github npm job stays live until this
+      # runs green (KMS NPM_TOKEN seeded), then it is deleted. pnpm publish skips
+      # versions already on npm, so any transition overlap is idempotent.
+      - name: Publish @hanzo/* to npm
+        if: env.NPM_TOKEN != ''
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
+          echo "@hanzo:registry=https://registry.npmjs.org/" >> .npmrc
+          pnpm --filter @hanzo/cards build
+          pnpm -r --if-present run build || true
+          pnpm -r publish --access public --no-git-checks --ignore-scripts --report-summary || true

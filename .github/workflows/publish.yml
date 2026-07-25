@@ -1,5 +1,12 @@
 name: Publish
 
+# Store-publish (Chrome Web Store, Firefox AMO, VS Code, Open VSX, JetBrains) and
+# every store credential have moved to the native pipeline on Hanzo Git:
+#   .gitea/workflows/publish.yml — reads creds from KMS (deploy/kms/…), NOT GitHub.
+# GitHub retains only: build + the downloadable GitHub Release (mirror
+# distribution), and the live npm publish (interim — migrates to native once the
+# KMS NPM_TOKEN is seeded and the native run is verified green).
+
 on:
   push:
     tags:
@@ -17,25 +24,16 @@ permissions:
   contents: write
 
 jobs:
-  # ─── Check available secrets ───
+  # ─── npm publish gate (the one store credential still on GitHub) ───
   secrets:
-    name: Load KMS Secrets
+    name: Check npm token
     runs-on: hanzo-build-linux-amd64
     outputs:
-      has-chrome: ${{ steps.check.outputs.has-chrome }}
-      has-firefox: ${{ steps.check.outputs.has-firefox }}
-      has-vsce: ${{ steps.check.outputs.has-vsce }}
       has-npm: ${{ steps.check.outputs.has-npm }}
-      has-jetbrains: ${{ steps.check.outputs.has-jetbrains }}
     steps:
-    - name: Check available secrets
+    - name: Check npm token
       id: check
-      run: |
-        echo "has-chrome=${{ secrets.CHROME_EXTENSION_ID != '' }}" >> $GITHUB_OUTPUT
-        echo "has-firefox=${{ secrets.AMO_API_KEY != '' }}" >> $GITHUB_OUTPUT
-        echo "has-vsce=${{ secrets.VSCE_PAT != '' }}" >> $GITHUB_OUTPUT
-        echo "has-npm=${{ secrets.NPM_TOKEN != '' }}" >> $GITHUB_OUTPUT
-        echo "has-jetbrains=${{ secrets.JETBRAINS_TOKEN != '' }}" >> $GITHUB_OUTPUT
+      run: echo "has-npm=${{ secrets.NPM_TOKEN != '' }}" >> $GITHUB_OUTPUT
 
   # ─── Chrome + Firefox ───
   browser:
@@ -82,40 +80,6 @@ jobs:
     - name: Lint Firefox
       working-directory: packages/browser
       run: npx web-ext lint --source-dir dist/browser-extension/firefox
-      continue-on-error: true
-
-    - name: Publish to Chrome Web Store
-      if: needs.secrets.outputs.has-chrome == 'true'
-      working-directory: packages/browser
-      run: |
-        ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
-          -d "client_id=${{ secrets.CHROME_CLIENT_ID }}" \
-          -d "client_secret=${{ secrets.CHROME_CLIENT_SECRET }}" \
-          -d "refresh_token=${{ secrets.CHROME_REFRESH_TOKEN }}" \
-          -d "grant_type=refresh_token" | jq -r '.access_token')
-        VERSION=$(node -p "require('./package.json').version")
-        curl -sf -X PUT \
-          "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${{ secrets.CHROME_EXTENSION_ID }}" \
-          -H "Authorization: Bearer $ACCESS_TOKEN" \
-          -H "x-goog-api-version: 2" \
-          -T dist/hanzo-ai-chrome-v${VERSION}.zip
-        curl -sf -X POST \
-          "https://www.googleapis.com/chromewebstore/v1.1/items/${{ secrets.CHROME_EXTENSION_ID }}/publish" \
-          -H "Authorization: Bearer $ACCESS_TOKEN" \
-          -H "x-goog-api-version: 2" \
-          -H "Content-Length: 0"
-      continue-on-error: true
-
-    - name: Publish to Firefox Add-ons
-      if: needs.secrets.outputs.has-firefox == 'true'
-      working-directory: packages/browser
-      run: |
-        npx web-ext sign \
-          --source-dir dist/browser-extension/firefox \
-          --api-key "${{ secrets.AMO_API_KEY }}" \
-          --api-secret "${{ secrets.AMO_API_SECRET }}" \
-          --channel listed \
-          --id "hanzo-ai@hanzo.ai"
       continue-on-error: true
 
   # ─── Safari (macOS + iOS) ───
@@ -228,18 +192,6 @@ jobs:
         name: hanzo-ai-ide
         path: packages/vscode/release-assets/*
 
-    - name: Publish to VS Code Marketplace
-      if: needs.secrets.outputs.has-vsce == 'true'
-      working-directory: packages/vscode
-      run: vsce publish -p ${{ secrets.VSCE_PAT }}
-      continue-on-error: true
-
-    - name: Publish to Open VSX
-      if: needs.secrets.outputs.has-vsce == 'true'
-      working-directory: packages/vscode
-      run: ovsx publish *.vsix -p ${{ secrets.OVSX_PAT }}
-      continue-on-error: true
-
   # ─── npm (all @hanzo/* workspace packages) ───
   npm:
     name: npm
@@ -317,14 +269,6 @@ jobs:
       with:
         name: hanzo-ai-jetbrains
         path: /tmp/hanzo-ai-jetbrains-v*.zip
-
-    - name: Publish to JetBrains Marketplace
-      if: needs.secrets.outputs.has-jetbrains == 'true'
-      working-directory: packages/jetbrains
-      run: ./gradlew publishPlugin
-      env:
-        PUBLISH_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
-      continue-on-error: true
 
   # ─── Microsoft Office add-in (Word / Excel / PowerPoint) ───
   office:

@@ -30,6 +30,19 @@ per-browser manifests come from `zapd install-host` (`zap-proto/zapd`).
 Patch only (X.Y.Z+1), never major. `package.json` is the source of truth; `build.js`
 stamps it into every manifest (chrome/firefox/safari).
 
+## CI/CD (native — Hanzo Git, KMS, act_runner)
+Git of record is `git.hanzo.ai/hanzoai/extension`; GitHub is a mirror.
+- `.gitea/workflows/*` — native pipeline on `hanzo-build-linux-amd64` act_runners:
+  `ci.yml` (amd64 test + build), `publish.yml` (Chrome Web Store + Firefox AMO + npm).
+- Secrets are **KMS only**. The pipeline logs in with the KMS machine identity
+  (`KMS_CLIENT_ID`/`KMS_CLIENT_SECRET`) and pulls store creds from `hanzo:/extension-publish`
+  (env `prod`). CR: `deploy/kms/extension-publish-kms-sync.yaml`. No store cred in
+  any Actions secret store.
+- `.github/workflows/` mirrors + degrades gracefully: `sync.yml` pushes main+tags to
+  Hanzo Git; `ci.yml`/`cross-platform-e2e.yml` keep the macOS(Safari)/Windows/matrix
+  lanes that still need GitHub-hosted runners; `publish.yml` keeps only the GitHub
+  Release + the interim npm publish (store-publish removed → native). See PUBLISHING.md.
+
 ## Cross-platform — WXT migration (canonical plan, not yet executed)
 
 One WebExtension codebase, every engine. **WXT** = build/SDK layer (build matrix,

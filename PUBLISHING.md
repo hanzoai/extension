@@ -1,32 +1,47 @@
 # Publishing Hanzo Extensions
 
-This document describes how to publish Hanzo extensions to various marketplaces.
+Publishing is NATIVE: it runs on Hanzo Git (`git.hanzo.ai`) act_runners, and
+every store credential lives in Hanzo KMS. GitHub only mirrors the repo.
 
-## Required Secrets
+## Topology (one way)
 
-Add these secrets to your GitHub repository settings:
+- **Git of record:** `git.hanzo.ai/hanzoai/extension`. GitHub is a public
+  mirror; `.github/workflows/sync.yml` pushes `main` + tags to Hanzo Git.
+- **CI/CD:** `.gitea/workflows/*` on `hanzo-build-linux-amd64` act_runners —
+  `ci.yml` (test + build) and `publish.yml` (Chrome Web Store + Firefox AMO + npm).
+- **Secrets — KMS ONLY.** The native pipeline logs in with the KMS machine
+  identity (`KMS_CLIENT_ID` / `KMS_CLIENT_SECRET`) and pulls store creds from
+  org `hanzo`, env `prod`, path `/extension-publish`
+  (see `deploy/kms/extension-publish-kms-sync.yaml`). No store credential is
+  ever a GitHub or Gitea Actions secret.
+- **amd64/Linux publishes natively.** Safari (macOS) + desktop (Windows) stay on
+  GitHub-hosted runners until native macOS/Windows act_runners are green
+  (`universe/docs/architecture/runners-act-migration.md`).
 
-| Secret | Description | How to Get |
-|--------|-------------|------------|
-| `VSCE_PAT` | VS Code Marketplace token | [Create PAT](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#get-a-personal-access-token) |
-| `OVSX_PAT` | Open VSX Registry token | [Create token](https://open-vsx.org/user-settings/tokens) |
-| `NPM_TOKEN` | npm publish token | `npm token create` or [npm.js tokens](https://www.npmjs.com/settings/~/tokens) |
-| `JETBRAINS_TOKEN` | JetBrains Marketplace token | [Generate token](https://plugins.jetbrains.com/author/me/tokens) |
-| `CERTIFICATE_CHAIN` | JetBrains plugin signing cert | [Plugin signing](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html) |
-| `PRIVATE_KEY` | JetBrains plugin signing key | See above |
-| `PRIVATE_KEY_PASSWORD` | JetBrains key password | See above |
+## KMS keys the operator seeds (path `hanzo:/extension-publish`, env `prod`)
+
+| Key(s) | Store |
+|--------|-------|
+| `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`, `CHROME_REFRESH_TOKEN` | Chrome Web Store |
+| `AMO_API_KEY`, `AMO_API_SECRET` | Firefox Add-ons |
+| `NPM_TOKEN` | npm (`@hanzo/*`) |
 
 ## Publishing Methods
 
-### Automatic (GitHub Actions)
+### Automatic (native)
 
-1. Create a GitHub release with a version tag (e.g., `v1.6.0`)
-2. The `publish.yml` workflow will automatically publish to all marketplaces
+Push a `vX.Y.Z` tag. GitHub mirrors it to Hanzo Git, which fires
+`.gitea/workflows/publish.yml`. Or run `workflow_dispatch` on Hanzo Git.
 
-Or manually trigger:
 ```bash
-gh workflow run publish.yml
+# version lives in packages/browser/package.json (patch only, never major)
+git tag v1.9.35 && git push origin v1.9.35
 ```
+
+> Interim: the live npm publish still also runs from `.github/workflows/publish.yml`
+> until the KMS `NPM_TOKEN` is seeded and one native `publish.yml` run is verified
+> green; then the GitHub npm job is deleted. `pnpm publish` skips versions already
+> on npm, so the overlap is idempotent.
 
 ### Manual Publishing
 
