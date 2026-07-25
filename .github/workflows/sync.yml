@@ -1,0 +1,35 @@
+# Mirror GitHub → Hanzo Git (git.hanzo.ai) — the ONLY thing GitHub does as a
+# system of record. Hanzo Git is the source forge; its act_runners fire the
+# native pipeline (.gitea/workflows/*). GitHub is a public mirror.
+#
+# Credential: HANZO_GIT_TOKEN — a low-privilege Hanzo-Git push token, the ONE
+# secret GitHub still holds. It is NOT a store/publish credential (those live in
+# KMS only). Absent the token this no-ops with a warning, so it never blocks a
+# push before the operator seeds it. Alternatively the operator enables Gitea's
+# native pull-mirror server-side and this workflow becomes unnecessary.
+name: sync
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: hanzo-build-linux-amd64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to git.hanzo.ai
+        env:
+          HANZO_GIT_TOKEN: ${{ secrets.HANZO_GIT_TOKEN }}
+        run: |
+          if [ -z "$HANZO_GIT_TOKEN" ]; then
+            echo "::warning::HANZO_GIT_TOKEN unset — mirror skipped. Seed it (or enable Gitea pull-mirror) to activate the native forge."
+            exit 0
+          fi
+          git push --prune "https://x-access-token:${HANZO_GIT_TOKEN}@git.hanzo.ai/hanzoai/extension.git" \
+            "+refs/remotes/origin/main:refs/heads/main" "+refs/tags/*:refs/tags/*"
