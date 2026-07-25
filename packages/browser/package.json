@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/browser-extension",
-  "version": "1.9.32",
+  "version": "1.9.33",
   "description": "Hanzo AI Browser Extension",
   "main": "dist/background.js",
   "scripts": {
@@ -12,6 +12,7 @@
     "check:bundle-budget": "node scripts/check-bundle-budgets.mjs"
   },
   "dependencies": {
+    "@hanzo/ai": "^0.2.3",
     "@supabase/supabase-js": "^2.50.3",
     "axios": "^1.10.0",
     "chalk": "^4.1.2",
