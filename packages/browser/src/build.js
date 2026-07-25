@@ -27,12 +27,9 @@ async function build() {
   console.log('Using @hanzo/gui local primitives shim:', hanzoGuiShim);
 
   // The Usage panel runs the headless @hanzo/usage engine in the background
-  // context. The package lives in the sibling repo (hanzoai/usage); alias its
-  // built ESM entry so esbuild bundles it into the background scripts. Same
-  // pattern as the @hanzo/gui shim above — one specifier, one source of truth.
-  const hanzoUsage = path.join(__dirname, '..', '..', '..', '..', 'usage', 'packages', 'core', 'dist', 'index.js');
-  const backgroundAliases = { '@hanzo/usage': hanzoUsage };
-  console.log('Using @hanzo/usage engine:', hanzoUsage);
+  // context. It's a published npm dependency (^0.1.6) — esbuild resolves it
+  // from node_modules like any package, so the build works identically locally
+  // and on CI (no sibling-repo path assumption).
 
   // The answer engine (new-tab landing) consumes the @hanzo/ai SDK's `search`
   // primitive — the ONE place the search/deep-research capability is defined.
@@ -64,7 +61,6 @@ async function build() {
     target: ['chrome90', 'safari14'],
     format: 'esm',
     external: ['chrome', 'browser'],
-    alias: backgroundAliases
   });
 
   // Build Firefox-specific background script (no ESM export, uses browser.* APIs)
@@ -76,7 +72,6 @@ async function build() {
     target: ['firefox91'],
     format: 'iife',  // Immediately-invoked function expression (no exports)
     external: ['browser'],
-    alias: backgroundAliases
   });
 
   // Build WebGPU AI module
