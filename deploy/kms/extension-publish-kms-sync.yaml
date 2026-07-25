@@ -1,0 +1,68 @@
+# Store-publish credentials for the Hanzo browser extension — KMS is the ONLY home.
+#
+# The native publish pipeline (.gitea/workflows/publish.yml, act_runner on
+# git.hanzo.ai) reads these at publish time. No store credential lives in a
+# GitHub or Gitea Actions secret — the ONLY bootstrap credential is the KMS
+# machine identity (KMS_CLIENT_ID / KMS_CLIENT_SECRET), already provisioned.
+#
+# ── Operator steps (the VALUES are the store-account owner's; not in git) ──
+#   1. KMS (kms.hanzo.ai) → org `hanzo`, env `prod`, project path `/extension-publish`.
+#      Add the keys below. These are the Chrome Web Store + Firefox AMO
+#      credentials — the store-account owner drops the real values here:
+#        CHROME_EXTENSION_ID     Chrome Web Store item id
+#        CHROME_CLIENT_ID        Google OAuth client id (CWS API)
+#        CHROME_CLIENT_SECRET    Google OAuth client secret
+#        CHROME_REFRESH_TOKEN    Google OAuth refresh token
+#        AMO_API_KEY             addons.mozilla.org JWT issuer
+#        AMO_API_SECRET          addons.mozilla.org JWT secret
+#      Optional (same path, if these stores are moved off GitHub too):
+#        VSCE_PAT  OVSX_PAT  JETBRAINS_TOKEN  NPM_TOKEN
+#         kms secret set --project hanzo --env prod --path /extension-publish \
+#           CHROME_EXTENSION_ID "<value>"     # …repeat per key
+#   2. Grant the extension repo's KMS machine identity (the KMS_CLIENT_ID it
+#      already uses) READ on project `hanzo`, path `/extension-publish`.
+#   3. Re-provision KMS_CLIENT_ID / KMS_CLIENT_SECRET as git.hanzo.ai Actions
+#      secrets so the native runner can log in (they exist on GitHub today —
+#      runners-act-migration.md Phase 1.2).
+#
+# Canonical GitOps home is universe/infra/k8s/kms-canonical-crs/hanzo/ (generated
+# by scripts/kms-canonical-v1alpha1-gen.py). This in-repo copy is the extension's
+# declared secret contract — reflect it into universe, do not diverge.
+---
+apiVersion: secrets.lux.network/v1alpha1
+kind: KMSSecret
+metadata:
+  name: extension-publish-kms-sync
+  namespace: hanzo
+  labels:
+    app.kubernetes.io/name: extension
+    app.kubernetes.io/component: kms-secret
+    app.kubernetes.io/part-of: hanzo-universe
+    kms.hanzo.ai/org: hanzo
+    kms.hanzo.ai/env: prod
+spec:
+  hostAPI: http://kms.hanzo.svc
+  resyncInterval: 60
+  authentication:
+    universalAuth:
+      # Shared platform machine identity (same as the other hanzo CRs). The
+      # operator scopes it to read /extension-publish.
+      credentialsRef:
+        secretName: hanzo-platform-iam-creds
+        secretNamespace: hanzo
+      secretsScope:
+        projectSlug: hanzo
+        envSlug: prod
+        secretsPath: /extension-publish
+        keys:
+          - CHROME_EXTENSION_ID
+          - CHROME_CLIENT_ID
+          - CHROME_CLIENT_SECRET
+          - CHROME_REFRESH_TOKEN
+          - AMO_API_KEY
+          - AMO_API_SECRET
+  managedSecretReference:
+    secretName: extension-publish-secrets
+    secretNamespace: hanzo
+    secretType: Opaque
+    creationPolicy: Orphan
