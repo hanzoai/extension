@@ -150,6 +150,9 @@ importers:
       '@hanzo/ai':
         specifier: ^0.2.3
         version: 0.2.3
+      '@hanzo/usage':
+        specifier: ^0.1.6
+        version: 0.1.6(react@18.3.1)
       '@supabase/supabase-js':
         specifier: ^2.50.3
         version: 2.50.3
@@ -2889,6 +2892,20 @@ packages:
     peerDependencies:
       react: '>=17'
     peerDependenciesMeta:
+      react:
+        optional: true
+
+  '@hanzo/usage@0.1.6':
+    resolution: {integrity: sha512-0gr4ZJ5qTH1hRt706uMciAevFPXG/08Xd5zbyZBlAi1o4k4EdKHTqLm/pRnbhv6jZbWTIOUtRQSysGyeJfOQMQ==}
+    peerDependencies:
+      '@hanzo/gui': '>=7.2.2'
+      '@hanzogui/lucide-icons-2': '>=7.2.2'
+      react: '>=18'
+    peerDependenciesMeta:
+      '@hanzo/gui':
+        optional: true
+      '@hanzogui/lucide-icons-2':
+        optional: true
       react:
         optional: true
 
@@ -13449,6 +13466,10 @@ snapshots:
       passport-oauth2: 1.8.0
     optionalDependencies:
       react: 19.2.7
+
+  '@hanzo/usage@0.1.6(react@18.3.1)':
+    optionalDependencies:
+      react: 18.3.1
 
   '@hono/node-server@1.19.14(hono@4.12.27)':
     dependencies:
