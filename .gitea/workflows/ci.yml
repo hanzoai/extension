@@ -1,0 +1,49 @@
+# Native CI — Hanzo Git act_runners (label hanzo-build-linux-amd64).
+# amd64 test + build gate; mirrors the amd64 lanes of .github/workflows/ci.yml.
+# The macOS (Safari) and cross-platform Playwright matrix stay on GitHub-hosted
+# runners until native macOS/Windows act_runners are green
+# (runners-act-migration.md Phase 2). act_runner reads this unmodified;
+# GitHub.com ignores .gitea/workflows, so the GitHub release lanes are untouched.
+name: ci
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: hanzo-build-linux-amd64
+    container: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      # Shared workspace lib first — consumers import its built dist/.
+      - run: pnpm --filter @hanzo/cards build
+      - run: pnpm --filter @hanzo/browser-extension test
+      - run: pnpm --filter @hanzo/aci test
+      - run: pnpm --filter @hanzo/auth test
+
+  build:
+    runs-on: hanzo-build-linux-amd64
+    container: node:22-bookworm
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build browser extension
+        working-directory: packages/browser
+        run: node src/build.js
+
+      - name: Check bundle budgets
+        working-directory: packages/browser
+        run: |
+          [ -f dist/browser-extension/background.js ] || node src/build.js
+          pnpm run check:bundle-budget
+        continue-on-error: true
