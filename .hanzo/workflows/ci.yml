@@ -3,7 +3,7 @@
 # The macOS (Safari) and cross-platform Playwright matrix stay on GitHub-hosted
 # runners until native macOS/Windows act_runners are green
 # (runners-act-migration.md Phase 2). act_runner reads this unmodified;
-# GitHub.com ignores .gitea/workflows, so the GitHub release lanes are untouched.
+# GitHub.com ignores .hanzo/workflows, so the GitHub release lanes are untouched.
 name: ci
 
 on:
