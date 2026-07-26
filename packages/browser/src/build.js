@@ -122,6 +122,17 @@ async function build() {
     sourcemap: false,
   });
 
+  // Onboarding (new-install consent ask: insights + opt-in training).
+  await esbuild.build({
+    entryPoints: ['src/onboarding.ts'],
+    bundle: true,
+    outfile: out('onboarding.js'),
+    platform: 'browser',
+    target: ['chrome90', 'firefox91', 'safari14'],
+    minify: true,
+    sourcemap: false,
+  });
+
   // Build browser control module
   await esbuild.build({
     entryPoints: ['src/browser-control.ts'],
@@ -196,7 +207,7 @@ async function build() {
     }
 
     // Copy popup + sidebar + answer-engine HTML/CSS
-    for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'newtab.html', 'newtab.css', 'callback.html', 'ai-worker.js']) {
+    for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'newtab.html', 'newtab.css', 'onboarding.html', 'onboarding.css', 'callback.html', 'ai-worker.js']) {
       const src = path.join('src', f);
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(dir, f));
@@ -207,6 +218,7 @@ async function build() {
     fs.copyFileSync(out('popup.js'), path.join(dir, 'popup.js'));
     fs.copyFileSync(out('sidebar.js'), path.join(dir, 'sidebar.js'));
     fs.copyFileSync(out('newtab.js'), path.join(dir, 'newtab.js'));
+    fs.copyFileSync(out('onboarding.js'), path.join(dir, 'onboarding.js'));
 
     // Copy icons into each browser directory
     for (const icon of ['icon16.png', 'icon48.png', 'icon128.png']) {
