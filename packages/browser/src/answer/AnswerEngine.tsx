@@ -447,10 +447,6 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
       <main className="ae-main">
         {phase === 'idle' ? (
           <div className="ae-hero">
-            <div className="ae-wordmark">
-              <HanzoMark size={44} />
-              <span>Hanzo</span>
-            </div>
             <div className="ae-hero-card">
               <InputCard
                 value={query}
