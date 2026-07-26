@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   kmsListSecrets,
   kmsGetSecret,
-  kmsCreateSecret,
-  kmsUpdateSecret,
+  kmsPutSecret,
   kmsDeleteSecret,
 } from '../src/shared/kms';
 
@@ -24,14 +23,54 @@ function mockResponse(data: any, ok = true, status = 200) {
 }
 
 const TOKEN = 'test-bearer-token';
-const PARAMS = {
-  workspaceId: 'ws-123',
-  environment: 'production',
-  secretPath: '/app',
-};
+const REF = { org: 'hanzo', env: 'production', path: 'app' };
+const SECRET = { ...REF, name: 'API_KEY' };
+
+function calledUrl(): string {
+  return mockFetch.mock.calls[0][0] as string;
+}
+
+function calledInit(): any {
+  return mockFetch.mock.calls[0][1];
+}
 
 beforeEach(() => {
   mockFetch.mockReset();
+});
+
+// ---------------------------------------------------------------------------
+// Path shape — the regression that actually happened
+// ---------------------------------------------------------------------------
+
+describe('KMS paths', () => {
+  it('never emits an /api/ prefix', async () => {
+    // This client used to speak /api/v3/secrets/raw, because the KMS binary
+    // embedded a console SPA under a root catch-all and answered every
+    // unmatched path with 200 text/html — so the wrong path looked alive and
+    // the right one looked broken. Nothing may drift back to it.
+    mockFetch.mockResolvedValue(mockResponse({ names: [] }));
+    await kmsListSecrets(TOKEN, REF);
+    mockFetch.mockResolvedValue(mockResponse({ secret: { value: 'v' } }));
+    await kmsGetSecret(TOKEN, SECRET);
+    mockFetch.mockResolvedValue(mockResponse({}));
+    await kmsPutSecret(TOKEN, SECRET, 'v');
+    mockFetch.mockResolvedValue(mockResponse({}));
+    await kmsDeleteSecret(TOKEN, SECRET);
+
+    expect(mockFetch.mock.calls).toHaveLength(4);
+    for (const [url] of mockFetch.mock.calls) {
+      expect(url).not.toContain('/api/');
+      expect(url).toContain('/v1/kms/');
+    }
+  });
+
+  it('escapes path segments individually so separators survive', async () => {
+    // The server splits {rest...} at its LAST slash into (path, name). Escaping
+    // the joined string would encode the separators into one long name.
+    mockFetch.mockResolvedValue(mockResponse({ secret: { value: 'v' } }));
+    await kmsGetSecret(TOKEN, { org: 'hanzo', env: 'main', path: 'a/b', name: 'C D' });
+    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets/a/b/C%20D');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -39,34 +78,40 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('kmsListSecrets', () => {
-  it('sends GET with correct URL and query params', async () => {
-    mockFetch.mockResolvedValue(mockResponse({ secrets: [{ secretKey: 'API_KEY' }] }));
-
-    const result = await kmsListSecrets(TOKEN, PARAMS);
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [url, opts] = mockFetch.mock.calls[0];
-    expect(url).toContain('kms.hanzo.ai/api/v3/secrets/raw?');
-    expect(url).toContain('workspaceId=ws-123');
-    expect(url).toContain('environment=production');
-    expect(url).toContain('secretPath=%2Fapp');
-    expect(opts.headers.Authorization).toBe(`Bearer ${TOKEN}`);
-    expect(result).toEqual([{ secretKey: 'API_KEY' }]);
+  it('returns the names array', async () => {
+    mockFetch.mockResolvedValue(mockResponse({ names: ['API_KEY', 'DB_URL'] }));
+    await expect(kmsListSecrets(TOKEN, REF)).resolves.toEqual(['API_KEY', 'DB_URL']);
   });
 
-  it('uses custom baseUrl when provided', async () => {
-    mockFetch.mockResolvedValue(mockResponse({ secrets: [] }));
-
-    await kmsListSecrets(TOKEN, PARAMS, 'https://custom-kms.example.com');
-
-    const [url] = mockFetch.mock.calls[0];
-    expect(url).toContain('custom-kms.example.com/api/v3/secrets/raw');
+  it('addresses the collection with path and env as query, and sends the bearer', async () => {
+    mockFetch.mockResolvedValue(mockResponse({ names: [] }));
+    await kmsListSecrets(TOKEN, REF);
+    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets?');
+    expect(calledUrl()).toContain('path=app');
+    expect(calledUrl()).toContain('env=production');
+    expect(calledInit().headers.Authorization).toBe(`Bearer ${TOKEN}`);
   });
 
-  it('throws on non-ok response', async () => {
+  it('defaults env when the ref omits it', async () => {
+    mockFetch.mockResolvedValue(mockResponse({ names: [] }));
+    await kmsListSecrets(TOKEN, { org: 'hanzo' });
+    expect(calledUrl()).toContain('env=default');
+  });
+
+  it('yields an empty array when the server omits names', async () => {
+    mockFetch.mockResolvedValue(mockResponse({}));
+    await expect(kmsListSecrets(TOKEN, REF)).resolves.toEqual([]);
+  });
+
+  it('uses a custom baseUrl when provided', async () => {
+    mockFetch.mockResolvedValue(mockResponse({ names: [] }));
+    await kmsListSecrets(TOKEN, REF, 'https://custom-kms.example.com');
+    expect(calledUrl()).toContain('custom-kms.example.com/v1/kms/orgs/hanzo/secrets');
+  });
+
+  it('throws with the status on failure', async () => {
     mockFetch.mockResolvedValue(mockResponse('Not found', false, 404));
-
-    await expect(kmsListSecrets(TOKEN, PARAMS)).rejects.toThrow('KMS list failed: 404');
+    await expect(kmsListSecrets(TOKEN, REF)).rejects.toThrow('KMS list failed: 404');
   });
 });
 
@@ -75,78 +120,47 @@ describe('kmsListSecrets', () => {
 // ---------------------------------------------------------------------------
 
 describe('kmsGetSecret', () => {
-  it('sends GET with encoded secret name', async () => {
-    mockFetch.mockResolvedValue(mockResponse({ secret: { secretKey: 'DB_URL', secretValue: 'postgres://...' } }));
-
-    const result = await kmsGetSecret(TOKEN, { ...PARAMS, secretName: 'DB_URL' });
-
-    const [url] = mockFetch.mock.calls[0];
-    expect(url).toContain('/api/v3/secrets/raw/DB_URL');
-    expect(result.secretKey).toBe('DB_URL');
+  it('unwraps secret.value', async () => {
+    mockFetch.mockResolvedValue(mockResponse({ secret: { value: 'postgres://...' } }));
+    await expect(kmsGetSecret(TOKEN, SECRET)).resolves.toBe('postgres://...');
   });
 
-  it('URL-encodes special characters in secret name', async () => {
-    mockFetch.mockResolvedValue(mockResponse({ secret: { secretKey: 'app/key' } }));
-
-    await kmsGetSecret(TOKEN, { ...PARAMS, secretName: 'app/key' });
-
-    const [url] = mockFetch.mock.calls[0];
-    expect(url).toContain('app%2Fkey');
+  it('addresses the secret and carries env', async () => {
+    mockFetch.mockResolvedValue(mockResponse({ secret: { value: 'v' } }));
+    await kmsGetSecret(TOKEN, SECRET);
+    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets/app/API_KEY');
+    expect(calledUrl()).toContain('env=production');
   });
 
-  it('throws on non-ok response', async () => {
+  it('throws with the status on failure', async () => {
+    mockFetch.mockResolvedValue(mockResponse('Not found', false, 404));
+    await expect(kmsGetSecret(TOKEN, SECRET)).rejects.toThrow('KMS get failed: 404');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// kmsPutSecret — create and replace are one call, because the server has one
+// ---------------------------------------------------------------------------
+
+describe('kmsPutSecret', () => {
+  it('POSTs to the collection with the flat body the server takes', async () => {
+    mockFetch.mockResolvedValue(mockResponse({}));
+    await kmsPutSecret(TOKEN, SECRET, 'sk-live-123');
+
+    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets');
+    expect(calledUrl()).not.toContain('API_KEY'); // name is in the body, not the URL
+    expect(calledInit().method).toBe('POST');
+    expect(JSON.parse(calledInit().body)).toEqual({
+      path: 'app',
+      name: 'API_KEY',
+      env: 'production',
+      value: 'sk-live-123',
+    });
+  });
+
+  it('throws with the status on failure', async () => {
     mockFetch.mockResolvedValue(mockResponse('Forbidden', false, 403));
-
-    await expect(kmsGetSecret(TOKEN, { ...PARAMS, secretName: 'X' })).rejects.toThrow('KMS get failed: 403');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// kmsCreateSecret
-// ---------------------------------------------------------------------------
-
-describe('kmsCreateSecret', () => {
-  it('sends POST with correct body', async () => {
-    mockFetch.mockResolvedValue(mockResponse({ secret: { secretKey: 'NEW_KEY' } }));
-
-    await kmsCreateSecret(TOKEN, { ...PARAMS, secretName: 'NEW_KEY' }, 'secret-value');
-
-    const [url, opts] = mockFetch.mock.calls[0];
-    expect(url).toContain('/api/v3/secrets/raw/NEW_KEY');
-    expect(opts.method).toBe('POST');
-    const body = JSON.parse(opts.body);
-    expect(body.secretValue).toBe('secret-value');
-    expect(body.workspaceId).toBe('ws-123');
-    expect(body.environment).toBe('production');
-    expect(body.type).toBe('shared');
-  });
-
-  it('includes Authorization header', async () => {
-    mockFetch.mockResolvedValue(mockResponse({ secret: {} }));
-
-    await kmsCreateSecret(TOKEN, { ...PARAMS, secretName: 'X' }, 'val');
-
-    const [, opts] = mockFetch.mock.calls[0];
-    expect(opts.headers.Authorization).toBe(`Bearer ${TOKEN}`);
-    expect(opts.headers['Content-Type']).toBe('application/json');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// kmsUpdateSecret
-// ---------------------------------------------------------------------------
-
-describe('kmsUpdateSecret', () => {
-  it('sends PATCH with correct body', async () => {
-    mockFetch.mockResolvedValue(mockResponse({ secret: { secretKey: 'KEY' } }));
-
-    await kmsUpdateSecret(TOKEN, { ...PARAMS, secretName: 'KEY' }, 'new-value');
-
-    const [url, opts] = mockFetch.mock.calls[0];
-    expect(url).toContain('/api/v3/secrets/raw/KEY');
-    expect(opts.method).toBe('PATCH');
-    const body = JSON.parse(opts.body);
-    expect(body.secretValue).toBe('new-value');
+    await expect(kmsPutSecret(TOKEN, SECRET, 'v')).rejects.toThrow('KMS put failed: 403');
   });
 });
 
@@ -155,21 +169,16 @@ describe('kmsUpdateSecret', () => {
 // ---------------------------------------------------------------------------
 
 describe('kmsDeleteSecret', () => {
-  it('sends DELETE with correct body', async () => {
+  it('DELETEs the secret URL', async () => {
     mockFetch.mockResolvedValue(mockResponse({}));
-
-    await kmsDeleteSecret(TOKEN, { ...PARAMS, secretName: 'OLD_KEY' });
-
-    const [url, opts] = mockFetch.mock.calls[0];
-    expect(url).toContain('/api/v3/secrets/raw/OLD_KEY');
-    expect(opts.method).toBe('DELETE');
-    const body = JSON.parse(opts.body);
-    expect(body.workspaceId).toBe('ws-123');
+    await kmsDeleteSecret(TOKEN, SECRET);
+    expect(calledInit().method).toBe('DELETE');
+    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets/app/API_KEY');
+    expect(calledUrl()).toContain('env=production');
   });
 
-  it('throws on non-ok response', async () => {
-    mockFetch.mockResolvedValue(mockResponse('Server Error', false, 500));
-
-    await expect(kmsDeleteSecret(TOKEN, { ...PARAMS, secretName: 'X' })).rejects.toThrow('KMS delete failed: 500');
+  it('throws with the status on failure', async () => {
+    mockFetch.mockResolvedValue(mockResponse('Forbidden', false, 403));
+    await expect(kmsDeleteSecret(TOKEN, SECRET)).rejects.toThrow('KMS delete failed: 403');
   });
 });

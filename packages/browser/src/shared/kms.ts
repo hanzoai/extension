@@ -1,47 +1,49 @@
 /**
  * KMS (Key Management / Secrets) client — shared across all browser targets.
  *
- * Lightweight fetch-based client for Hanzo KMS (kms.hanzo.ai).
- * Uses IAM bearer tokens for auth — no separate KMS credentials needed.
+ * Lightweight fetch-based client for Hanzo KMS. Uses IAM bearer tokens for
+ * auth — no separate KMS credentials needed.
  *
- * API path. Hanzo convention is `/v1/<service>/<endpoint>` — but the KMS
- * upstream publishes its v3 API under the root
- * `${KMS_PATH_PREFIX}/secrets/raw`. The kms.hanzo.ai gateway currently passes that
- * through unchanged (verified: `kms.hanzo.ai/api/v3/secrets/raw` → 401 JSON,
- * `/v1/kms/...` → SPA HTML). We centralise the path in `KMS_PATH_PREFIX`
- * so the day the gateway adds the rewrite we update one constant.
+ * Every path is `/v1/kms/...`, which is the Hanzo `/v1/<service>/<endpoint>`
+ * convention and, more importantly, what the server actually serves:
  *
- *   GET    {KMS_PATH_PREFIX}/secrets/raw         → list
- *   GET    {KMS_PATH_PREFIX}/secrets/raw/:name   → get
- *   POST   {KMS_PATH_PREFIX}/secrets/raw/:name   → create
- *   PATCH  {KMS_PATH_PREFIX}/secrets/raw/:name   → update
- *   DELETE {KMS_PATH_PREFIX}/secrets/raw/:name   → delete
+ *   GET    /v1/kms/orgs/{org}/secrets?path=&env=        → list names
+ *   GET    /v1/kms/orgs/{org}/secrets/{path}/{name}?env= → read one value
+ *   POST   /v1/kms/orgs/{org}/secrets                    → create or replace
+ *   DELETE /v1/kms/orgs/{org}/secrets/{path}/{name}?env= → delete
+ *
+ * This file used to speak Infisical's shape under an `/api/v3` prefix, with a
+ * header comment reporting that `/v1/kms/...` had been *verified* to return SPA
+ * HTML while `/api/v3/secrets/raw` returned JSON — so `/api/v3` was pinned as
+ * the working path and a rewrite was awaited. The observation was real and the
+ * conclusion was backwards: the KMS binary embedded a console SPA under a root
+ * catch-all, so it answered EVERY unmatched path with 200 text/html. The HTML
+ * was the 404. luxfi/kms 1.12.8 removed the catch-all, and the same probe now
+ * reads the other way round — `/v1/kms/...` answers JSON, `/api/v3/...` is a
+ * JSON 404. There is no gateway rewrite to wait for.
+ *
+ * Create and update are ONE call because the server has one upsert, not two
+ * endpoints. Listing arrived in luxfi/kms 1.12.9; before that the HTTP surface
+ * had no list at all, which is what made the Infisical prefix look necessary.
  */
 
 import { KMS_API_URL } from './config.js';
 
-/** Prefix for every KMS request. See file header. */
-const KMS_PATH_PREFIX = '/api/v3';
-
 // ── Types ───────────────────────────────────────────────────────────────
 
-export interface KmsSecret {
-  secretKey: string;
-  secretValue?: string;
-  version?: number;
-  type?: string;
-  environment?: string;
-  secretPath?: string;
+/** Where a secret lives. `path` groups secrets; `name` identifies one. */
+export interface KmsRef {
+  /** Org scope — also the scope of the bearer token that reads it. */
+  org: string;
+  /** Environment slug (`dev` / `test` / `main`). Defaults to `default`. */
+  env?: string;
+  /** Grouping path, e.g. `gateway`. Omit to address the org root. */
+  path?: string;
 }
 
-export interface KmsListParams {
-  workspaceId: string;
-  environment: string;
-  secretPath?: string;
-}
-
-export interface KmsSecretParams extends KmsListParams {
-  secretName: string;
+/** A ref plus the name of a single secret. */
+export interface KmsSecretRef extends KmsRef {
+  name: string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -57,121 +59,94 @@ function kmsUrl(path: string, baseUrl?: string): string {
   return `${baseUrl || KMS_API_URL}${path}`;
 }
 
-function buildQuery(params: Record<string, string | undefined>): string {
-  const entries = Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][];
-  if (!entries.length) return '';
-  return '?' + new URLSearchParams(entries).toString();
+/** The collection URL for an org, with `path`/`env` as query. */
+function collectionUrl(ref: KmsRef, baseUrl?: string): string {
+  const q = new URLSearchParams();
+  if (ref.path) q.set('path', ref.path);
+  q.set('env', ref.env || 'default');
+  return kmsUrl(`/v1/kms/orgs/${encodeURIComponent(ref.org)}/secrets?${q}`, baseUrl);
+}
+
+/**
+ * The URL of one secret. The server splits the trailing `{rest...}` at its LAST
+ * slash into (path, name), so each segment is escaped on its own — escaping the
+ * joined string would encode the separators and the server would read one long
+ * name.
+ */
+function secretUrl(ref: KmsSecretRef, baseUrl?: string): string {
+  const segs = [...(ref.path ? ref.path.split('/') : []), ref.name]
+    .filter((s) => s.length > 0)
+    .map(encodeURIComponent)
+    .join('/');
+  const q = new URLSearchParams({ env: ref.env || 'default' });
+  return kmsUrl(`/v1/kms/orgs/${encodeURIComponent(ref.org)}/secrets/${segs}?${q}`, baseUrl);
+}
+
+async function fail(op: string, resp: Response): Promise<never> {
+  throw new Error(`KMS ${op} failed: ${resp.status} ${await resp.text()}`);
 }
 
 // ── API Functions ───────────────────────────────────────────────────────
 
-/** List secrets in a workspace/environment */
+/** List the names of the secrets under a path. */
 export async function kmsListSecrets(
   token: string,
-  params: KmsListParams,
+  ref: KmsRef,
   baseUrl?: string,
-): Promise<KmsSecret[]> {
-  const query = buildQuery({
-    workspaceId: params.workspaceId,
-    environment: params.environment,
-    secretPath: params.secretPath,
-  });
-  const resp = await fetch(kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw${query}`, baseUrl), {
-    headers: kmsHeaders(token),
-  });
-  if (!resp.ok) throw new Error(`KMS list failed: ${resp.status} ${await resp.text()}`);
+): Promise<string[]> {
+  const resp = await fetch(collectionUrl(ref, baseUrl), { headers: kmsHeaders(token) });
+  if (!resp.ok) return fail('list', resp);
   const data = await resp.json();
-  return data.secrets || data;
+  return data.names ?? [];
 }
 
-/** Get a single secret by name */
+/** Read one secret's value. */
 export async function kmsGetSecret(
   token: string,
-  params: KmsSecretParams,
+  ref: KmsSecretRef,
   baseUrl?: string,
-): Promise<KmsSecret> {
-  const query = buildQuery({
-    workspaceId: params.workspaceId,
-    environment: params.environment,
-    secretPath: params.secretPath,
-  });
-  const resp = await fetch(
-    kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw/${encodeURIComponent(params.secretName)}${query}`, baseUrl),
-    { headers: kmsHeaders(token) },
-  );
-  if (!resp.ok) throw new Error(`KMS get failed: ${resp.status} ${await resp.text()}`);
+): Promise<string> {
+  const resp = await fetch(secretUrl(ref, baseUrl), { headers: kmsHeaders(token) });
+  if (!resp.ok) return fail('get', resp);
   const data = await resp.json();
-  return data.secret || data;
+  return data.secret?.value ?? '';
 }
 
-/** Create a new secret */
-export async function kmsCreateSecret(
+/**
+ * Create a secret, or replace it if the name already exists. One call, because
+ * the server has one upsert — there is no separate create and update.
+ */
+export async function kmsPutSecret(
   token: string,
-  params: KmsSecretParams,
+  ref: KmsSecretRef,
   value: string,
   baseUrl?: string,
-): Promise<KmsSecret> {
+): Promise<void> {
   const resp = await fetch(
-    kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw/${encodeURIComponent(params.secretName)}`, baseUrl),
+    kmsUrl(`/v1/kms/orgs/${encodeURIComponent(ref.org)}/secrets`, baseUrl),
     {
       method: 'POST',
       headers: kmsHeaders(token),
       body: JSON.stringify({
-        workspaceId: params.workspaceId,
-        environment: params.environment,
-        secretPath: params.secretPath,
-        secretValue: value,
-        type: 'shared',
+        path: ref.path ?? '',
+        name: ref.name,
+        env: ref.env || 'default',
+        value,
       }),
     },
   );
-  if (!resp.ok) throw new Error(`KMS create failed: ${resp.status} ${await resp.text()}`);
-  const data = await resp.json();
-  return data.secret || data;
+  if (!resp.ok) return fail('put', resp);
 }
 
-/** Update an existing secret */
-export async function kmsUpdateSecret(
-  token: string,
-  params: KmsSecretParams,
-  value: string,
-  baseUrl?: string,
-): Promise<KmsSecret> {
-  const resp = await fetch(
-    kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw/${encodeURIComponent(params.secretName)}`, baseUrl),
-    {
-      method: 'PATCH',
-      headers: kmsHeaders(token),
-      body: JSON.stringify({
-        workspaceId: params.workspaceId,
-        environment: params.environment,
-        secretPath: params.secretPath,
-        secretValue: value,
-      }),
-    },
-  );
-  if (!resp.ok) throw new Error(`KMS update failed: ${resp.status} ${await resp.text()}`);
-  const data = await resp.json();
-  return data.secret || data;
-}
-
-/** Delete a secret */
+/** Delete a secret. */
 export async function kmsDeleteSecret(
   token: string,
-  params: KmsSecretParams,
+  ref: KmsSecretRef,
   baseUrl?: string,
 ): Promise<void> {
-  const resp = await fetch(
-    kmsUrl(`${KMS_PATH_PREFIX}/secrets/raw/${encodeURIComponent(params.secretName)}`, baseUrl),
-    {
-      method: 'DELETE',
-      headers: kmsHeaders(token),
-      body: JSON.stringify({
-        workspaceId: params.workspaceId,
-        environment: params.environment,
-        secretPath: params.secretPath,
-      }),
-    },
-  );
-  if (!resp.ok) throw new Error(`KMS delete failed: ${resp.status} ${await resp.text()}`);
+  const resp = await fetch(secretUrl(ref, baseUrl), {
+    method: 'DELETE',
+    headers: kmsHeaders(token),
+  });
+  if (!resp.ok) return fail('delete', resp);
 }
