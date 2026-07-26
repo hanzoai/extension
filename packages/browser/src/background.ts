@@ -283,8 +283,17 @@ async function stopControlSession(): Promise<void> {
 void loadDebugFlagFromStorage();
 
 // Initialize WebGPU, Ollama, and CDP on install
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   debugLog('[Hanzo] Extension installed, initializing...');
+
+  // First install → open the consent onboarding once (insights + opt-in training).
+  if (details?.reason === 'install') {
+    try {
+      await chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html') });
+    } catch {
+      /* non-fatal — settings still reachable from the popup */
+    }
+  }
 
   // WebGPU init
   const gpuAvailable = await webgpuAI.initialize();
