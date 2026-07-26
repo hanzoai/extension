@@ -53,9 +53,9 @@ The Hanzo agent automatically detects and uses available LLM providers in this o
    - Access to all models with credits
    - Managed API keys in Hanzo Cloud
 
-## Complete Model Catalog (OpenRouter + LiteLLM Compatible)
+## Complete Model Catalog
 
-Hanzo AI provides access to every model available through OpenRouter and LiteLLM, including:
+Hanzo AI provides access to every major model through one API, including:
 
 - **OpenAI**: O3-Pro, O3, GPT-4o, GPT-4 Turbo, GPT-4, GPT-3.5 Turbo
 - **Anthropic**: Claude 4, Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Sonnet, Claude 3 Haiku
@@ -159,7 +159,7 @@ export OLLAMA_BASE_URL=http://localhost:11434
 ## Why AI Engineers Choose Hanzo AI
 
 ### 🎯 **The Complete Toolkit**
-- **Every Model**: OpenRouter + LiteLLM = access to every AI model
+- **Every Model**: one API across every major provider and our own Zen family
 - **Every Tool**: 4000+ MCP servers for specialized capabilities
 - **Every Provider**: OpenAI, Anthropic, Google, Meta, Mistral, and 50+ more
 
@@ -300,6 +300,6 @@ Error: Model xyz not available through Hanzo AI
 - **Dashboard**: [iam.hanzo.ai](https://iam.hanzo.ai)
 - **Support**: support@hanzo.ai
 
-**Hanzo AI is the unified platform for building AI-powered companies.** Access 200+ LLMs (OpenRouter/LiteLLM compatible), 4000+ MCP servers, legendary programmer modes, unlimited memory with vector/graph/relational search, browser automation, and everything you need to supercharge AI development. 
+**Hanzo AI is the unified platform for building AI-powered companies.** Access 200+ models through one API, 4000+ MCP servers, legendary programmer modes, unlimited memory with vector/graph/relational search, browser automation, and everything you need to supercharge AI development. 
 
 🚀 **[Get Started](https://iam.hanzo.ai)** | 📖 **[View Modes & Features](./HANZO_MODES.md)** | 💬 **[Join Discord](https://discord.gg/hanzoai)**
