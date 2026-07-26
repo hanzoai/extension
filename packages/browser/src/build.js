@@ -114,7 +114,7 @@ async function build() {
   await esbuild.build({
     entryPoints: ['src/newtab.ts'],
     bundle: true,
-    outfile: 'dist/browser-extension/newtab.js',
+    outfile: out('newtab.js'),
     platform: 'browser',
     target: ['chrome90', 'firefox91', 'safari14'],
     // New-tab page loads on every tab — ship it lean (minified, no inline map).
