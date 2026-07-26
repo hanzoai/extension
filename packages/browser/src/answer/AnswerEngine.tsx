@@ -3,6 +3,7 @@ import { createAiClient, type SearchEvent, type SearchMode, type SearchSource } 
 import { fetchNews, type NewsItem } from './news.js';
 import { AUTO_MODEL, fetchModelCatalog, type ChatModel, type ModelGroup } from './model-catalog.js';
 import { renderMarkdown } from './markdown.js';
+import { capture, contributeTrainingSample } from '../shared/consent.js';
 
 /**
  * Hanzo Answer Engine — the shared AI-answer surface (query → streamed answer +
@@ -321,6 +322,8 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
       setFollowUps([]);
       setError('');
       setNeedAuth(false);
+      void capture('answer_search', { mode, model: model.id });
+      let fullAnswer = '';
 
       const opts = {
         mode,
@@ -346,6 +349,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
               setAnswerSources(ev.sources);
               break;
             case 'text':
+              fullAnswer += ev.delta;
               setAnswer((a) => a + ev.delta);
               break;
             case 'follow_ups':
@@ -353,6 +357,10 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
               break;
             case 'done':
               setPhase('done');
+              void capture('answer_shown', { mode, model: model.id });
+              // Opt-in only: no-ops unless the user turned on training
+              // contribution (the consent module gates the send).
+              void contributeTrainingSample({ query: question, answer: fullAnswer, model: model.id });
               break;
             case 'error':
               if (ev.error.includes('__NO_TOKEN__') || /401|invalid api key/i.test(ev.error)) {
