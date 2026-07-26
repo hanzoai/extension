@@ -14,6 +14,7 @@ import {
   shortcutFromEvent,
   type Shortcut,
 } from './shared/shortcut.js';
+import { getConsent, setConsent, capture } from './shared/consent.js';
 
 declare const browser: typeof chrome & {
   sidebarAction?: {
@@ -228,6 +229,21 @@ document.addEventListener('DOMContentLoaded', () => {
       ? 'compact' : vals?.overlayWidth === 'wide' ? 'wide' : 'default';
     syncSettingsUi(enabled, side, width);
   });
+
+  // Privacy & data toggles — reflect stored consent, persist on change.
+  const insightsCheckbox = document.getElementById('insights-enabled') as HTMLInputElement | null;
+  const shareTrainingCheckbox = document.getElementById('share-training') as HTMLInputElement | null;
+  getConsent().then((c) => {
+    if (insightsCheckbox) insightsCheckbox.checked = c.insights;
+    if (shareTrainingCheckbox) shareTrainingCheckbox.checked = c.shareTraining;
+  });
+  insightsCheckbox?.addEventListener('change', (e) => {
+    void setConsent({ insights: (e.target as HTMLInputElement).checked });
+  });
+  shareTrainingCheckbox?.addEventListener('change', (e) => {
+    void setConsent({ shareTraining: (e.target as HTMLInputElement).checked });
+  });
+  void capture('popup_opened');
 
   function isInjectableTab(tab: chrome.tabs.Tab | undefined): boolean {
     if (!tab || !tab.id) return false;
