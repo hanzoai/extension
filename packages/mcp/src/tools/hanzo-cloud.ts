@@ -18,6 +18,8 @@ import { Tool } from '../types/index.js';
 
 const API_URL  = process.env.API_URL  || 'https://api.hanzo.ai';
 const IAM_URL  = process.env.IAM_URL  || 'https://iam.hanzo.ai';
+// The one IAM mount prefix. Mirrors IAM_API_PATH in packages/browser/src/shared/config.ts.
+const IAM_V1   = '/v1/iam';
 const KMS_URL  = process.env.KMS_URL  || 'https://kms.hanzo.ai';
 const PAAS_URL = process.env.PAAS_URL || 'https://platform.hanzo.ai';
 
@@ -79,140 +81,140 @@ export const iamTool: Tool = {
       const lim = args.limit || 50;
       switch (args.action) {
         case 'list_users': {
-          const u = arr(await api(IAM_URL, `/api/get-users?owner=${o}&limit=${lim}`));
+          const u = arr(await api(IAM_URL, `${IAM_V1}/get-users?owner=${o}&limit=${lim}`));
           return ok(`Users (${u.length}):\n${u.map((x: any) => `${x.name} <${x.email || ''}> [${x.type || 'normal-user'}]`).join('\n')}`);
         }
         case 'get_user': {
           if (!args.id) return fail('id required');
-          return ok(j(await api(IAM_URL, `/api/get-user?id=${args.id.includes('/') ? args.id : `admin/${args.id}`}`)));
+          return ok(j(await api(IAM_URL, `${IAM_V1}/get-user?id=${args.id.includes('/') ? args.id : `admin/${args.id}`}`)));
         }
         case 'create_user': {
           if (!args.name || !args.email || !args.password) return fail('name, email, password required');
-          await api(IAM_URL, '/api/add-user', { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, email: args.email, password: args.password, organization: args.organization || 'hanzo', type: 'normal-user' }) });
+          await api(IAM_URL, `${IAM_V1}/add-user`, { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, email: args.email, password: args.password, organization: args.organization || 'hanzo', type: 'normal-user' }) });
           return ok(`Created: ${args.name} <${args.email}>`);
         }
         case 'update_user': {
           if (!args.id) return fail('id required');
           const id = args.id.includes('/') ? args.id : `admin/${args.id}`;
-          const u = await api(IAM_URL, `/api/get-user?id=${id}`);
+          const u = await api(IAM_URL, `${IAM_V1}/get-user?id=${id}`);
           if (args.email) u.email = args.email;
           if (args.displayName) u.displayName = args.displayName;
           if (args.phone) u.phone = args.phone;
           if (args.data) Object.assign(u, args.data);
-          await api(IAM_URL, '/api/update-user', { method: 'POST', body: JSON.stringify(u) });
+          await api(IAM_URL, `${IAM_V1}/update-user`, { method: 'POST', body: JSON.stringify(u) });
           return ok(`Updated: ${id}`);
         }
         case 'delete_user': {
           if (!args.id) return fail('id required');
           const id = args.id.includes('/') ? args.id : `admin/${args.id}`;
           const [ow, nm] = id.split('/');
-          await api(IAM_URL, '/api/delete-user', { method: 'POST', body: JSON.stringify({ owner: ow, name: nm }) });
+          await api(IAM_URL, `${IAM_V1}/delete-user`, { method: 'POST', body: JSON.stringify({ owner: ow, name: nm }) });
           return ok(`Deleted: ${id}`);
         }
         case 'list_orgs': {
-          const orgs = arr(await api(IAM_URL, `/api/get-organizations?owner=${o}`));
+          const orgs = arr(await api(IAM_URL, `${IAM_V1}/get-organizations?owner=${o}`));
           return ok(`Orgs (${orgs.length}):\n${orgs.map((x: any) => `${x.name}: ${x.displayName || ''} [${(x.users || []).length} members]`).join('\n')}`);
         }
         case 'get_org': {
           if (!args.id) return fail('id required');
-          return ok(j(await api(IAM_URL, `/api/get-organization?id=${args.id.includes('/') ? args.id : `admin/${args.id}`}`)));
+          return ok(j(await api(IAM_URL, `${IAM_V1}/get-organization?id=${args.id.includes('/') ? args.id : `admin/${args.id}`}`)));
         }
         case 'create_org': {
           if (!args.name) return fail('name required');
-          await api(IAM_URL, '/api/add-organization', { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, displayName: args.displayName || args.name, ...(args.data || {}) }) });
+          await api(IAM_URL, `${IAM_V1}/add-organization`, { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, displayName: args.displayName || args.name, ...(args.data || {}) }) });
           return ok(`Created org: ${args.name}`);
         }
         case 'update_org': {
           if (!args.id) return fail('id required');
           const id = args.id.includes('/') ? args.id : `admin/${args.id}`;
-          const org = await api(IAM_URL, `/api/get-organization?id=${id}`);
+          const org = await api(IAM_URL, `${IAM_V1}/get-organization?id=${id}`);
           if (args.displayName) org.displayName = args.displayName;
           if (args.data) Object.assign(org, args.data);
-          await api(IAM_URL, '/api/update-organization', { method: 'POST', body: JSON.stringify(org) });
+          await api(IAM_URL, `${IAM_V1}/update-organization`, { method: 'POST', body: JSON.stringify(org) });
           return ok(`Updated org: ${id}`);
         }
         case 'delete_org': {
           if (!args.id) return fail('id required');
           const id = args.id.includes('/') ? args.id : `admin/${args.id}`;
           const [ow, nm] = id.split('/');
-          await api(IAM_URL, '/api/delete-organization', { method: 'POST', body: JSON.stringify({ owner: ow, name: nm }) });
+          await api(IAM_URL, `${IAM_V1}/delete-organization`, { method: 'POST', body: JSON.stringify({ owner: ow, name: nm }) });
           return ok(`Deleted org: ${id}`);
         }
         case 'list_roles': {
-          const roles = arr(await api(IAM_URL, `/api/get-roles?owner=${o}`));
+          const roles = arr(await api(IAM_URL, `${IAM_V1}/get-roles?owner=${o}`));
           return ok(`Roles (${roles.length}):\n${roles.map((x: any) => `${x.name}: ${(x.users || []).length} users, ${(x.roles || []).length} sub-roles`).join('\n')}`);
         }
         case 'get_role': {
           if (!args.id) return fail('id required');
-          return ok(j(await api(IAM_URL, `/api/get-role?id=${args.id.includes('/') ? args.id : `admin/${args.id}`}`)));
+          return ok(j(await api(IAM_URL, `${IAM_V1}/get-role?id=${args.id.includes('/') ? args.id : `admin/${args.id}`}`)));
         }
         case 'create_role': {
           if (!args.name) return fail('name required');
-          await api(IAM_URL, '/api/add-role', { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, displayName: args.displayName || args.name, ...(args.data || {}) }) });
+          await api(IAM_URL, `${IAM_V1}/add-role`, { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, displayName: args.displayName || args.name, ...(args.data || {}) }) });
           return ok(`Created role: ${args.name}`);
         }
         case 'update_role': {
           if (!args.id) return fail('id required');
           const id = args.id.includes('/') ? args.id : `admin/${args.id}`;
-          const role = await api(IAM_URL, `/api/get-role?id=${id}`);
+          const role = await api(IAM_URL, `${IAM_V1}/get-role?id=${id}`);
           if (args.data) Object.assign(role, args.data);
-          await api(IAM_URL, '/api/update-role', { method: 'POST', body: JSON.stringify(role) });
+          await api(IAM_URL, `${IAM_V1}/update-role`, { method: 'POST', body: JSON.stringify(role) });
           return ok(`Updated role: ${id}`);
         }
         case 'delete_role': {
           if (!args.id) return fail('id required');
           const id = args.id.includes('/') ? args.id : `admin/${args.id}`;
           const [ow, nm] = id.split('/');
-          await api(IAM_URL, '/api/delete-role', { method: 'POST', body: JSON.stringify({ owner: ow, name: nm }) });
+          await api(IAM_URL, `${IAM_V1}/delete-role`, { method: 'POST', body: JSON.stringify({ owner: ow, name: nm }) });
           return ok(`Deleted role: ${id}`);
         }
         case 'list_apps': {
-          const apps = arr(await api(IAM_URL, `/api/get-applications?owner=${o}`));
+          const apps = arr(await api(IAM_URL, `${IAM_V1}/get-applications?owner=${o}`));
           return ok(`Apps (${apps.length}):\n${apps.map((x: any) => `${x.name}: ${x.displayName || ''} [${x.clientId || ''}]`).join('\n')}`);
         }
         case 'get_app': {
           if (!args.id) return fail('id required');
-          return ok(j(await api(IAM_URL, `/api/get-application?id=${args.id.includes('/') ? args.id : `admin/${args.id}`}`)));
+          return ok(j(await api(IAM_URL, `${IAM_V1}/get-application?id=${args.id.includes('/') ? args.id : `admin/${args.id}`}`)));
         }
         case 'create_app': {
           if (!args.name) return fail('name required');
-          await api(IAM_URL, '/api/add-application', { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, displayName: args.displayName || args.name, organization: args.organization || 'hanzo', ...(args.data || {}) }) });
+          await api(IAM_URL, `${IAM_V1}/add-application`, { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, displayName: args.displayName || args.name, organization: args.organization || 'hanzo', ...(args.data || {}) }) });
           return ok(`Created app: ${args.name}`);
         }
-        case 'list_providers': return ok(j(await api(IAM_URL, `/api/get-providers?owner=${o}`)));
-        case 'list_tokens': return ok(j(await api(IAM_URL, `/api/get-tokens?owner=${o}&limit=${lim}`)));
+        case 'list_providers': return ok(j(await api(IAM_URL, `${IAM_V1}/get-providers?owner=${o}`)));
+        case 'list_tokens': return ok(j(await api(IAM_URL, `${IAM_V1}/get-tokens?owner=${o}&limit=${lim}`)));
         case 'create_token': {
           if (!args.name) return fail('name required');
-          return ok(j(await api(IAM_URL, '/api/add-token', { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, ...(args.data || {}) }) })));
+          return ok(j(await api(IAM_URL, `${IAM_V1}/add-token`, { method: 'POST', body: JSON.stringify({ owner: o, name: args.name, ...(args.data || {}) }) })));
         }
         case 'delete_token': {
           if (!args.id) return fail('id required');
-          await api(IAM_URL, '/api/delete-token', { method: 'POST', body: JSON.stringify({ owner: o, name: args.id }) });
+          await api(IAM_URL, `${IAM_V1}/delete-token`, { method: 'POST', body: JSON.stringify({ owner: o, name: args.id }) });
           return ok(`Deleted token: ${args.id}`);
         }
-        case 'list_permissions': return ok(j(await api(IAM_URL, `/api/get-permissions?owner=${o}`)));
+        case 'list_permissions': return ok(j(await api(IAM_URL, `${IAM_V1}/get-permissions?owner=${o}`)));
         case 'assign_role': {
           if (!args.role || !args.user) return fail('role and user required');
-          const r = await api(IAM_URL, `/api/get-role?id=${args.role.includes('/') ? args.role : `admin/${args.role}`}`);
+          const r = await api(IAM_URL, `${IAM_V1}/get-role?id=${args.role.includes('/') ? args.role : `admin/${args.role}`}`);
           r.users = r.users || [];
           r.users.push(args.user);
-          await api(IAM_URL, '/api/update-role', { method: 'POST', body: JSON.stringify(r) });
+          await api(IAM_URL, `${IAM_V1}/update-role`, { method: 'POST', body: JSON.stringify(r) });
           return ok(`Assigned role ${args.role} to ${args.user}`);
         }
         case 'remove_role': {
           if (!args.role || !args.user) return fail('role and user required');
-          const r = await api(IAM_URL, `/api/get-role?id=${args.role.includes('/') ? args.role : `admin/${args.role}`}`);
+          const r = await api(IAM_URL, `${IAM_V1}/get-role?id=${args.role.includes('/') ? args.role : `admin/${args.role}`}`);
           r.users = (r.users || []).filter((u: string) => u !== args.user);
-          await api(IAM_URL, '/api/update-role', { method: 'POST', body: JSON.stringify(r) });
+          await api(IAM_URL, `${IAM_V1}/update-role`, { method: 'POST', body: JSON.stringify(r) });
           return ok(`Removed role ${args.role} from ${args.user}`);
         }
-        case 'list_sessions': return ok(j(await api(IAM_URL, `/api/get-sessions?owner=${o}&limit=${lim}`)));
+        case 'list_sessions': return ok(j(await api(IAM_URL, `${IAM_V1}/get-sessions?owner=${o}&limit=${lim}`)));
         case 'delete_session': {
           if (!args.id) return fail('id required');
-          await api(IAM_URL, '/api/delete-session', { method: 'POST', body: JSON.stringify({ owner: o, name: args.id }) });
+          await api(IAM_URL, `${IAM_V1}/delete-session`, { method: 'POST', body: JSON.stringify({ owner: o, name: args.id }) });
           return ok(`Deleted session: ${args.id}`);
         }
-        case 'health': return ok(j(await api(IAM_URL, '/api/health')));
+        case 'health': return ok(j(await api(IAM_URL, `${IAM_V1}/health`)));
         default: return fail(`Unknown action: ${args.action}`);
       }
     } catch (e: any) { return fail(e.message); }
