@@ -1,11 +1,16 @@
-# Mirror GitHub → Hanzo Git (git.hanzo.ai) — the ONLY thing GitHub does as a
-# system of record. Hanzo Git is the source forge; its act_runners fire the
-# native pipeline (.gitea/workflows/*). GitHub is a public mirror.
+# Carry new refs from the GitHub mirror to git.hanzo.ai, the canonical forge,
+# whose act_runners fire the native pipeline (.hanzo/workflows/*). This is the
+# ONLY thing GitHub does as a system of record.
 #
-# Credential: HANZO_GIT_TOKEN — a low-privilege Hanzo-Git push token, the ONE
-# secret GitHub still holds. It is NOT a store/publish credential (those live in
-# KMS only). Absent the token this no-ops with a warning, so it never blocks a
-# push before the operator seeds it. Alternatively the operator enables Gitea's
+# ADDITIVE ONLY — no --prune, no --force, no --mirror, no "+" refspec. The sync
+# adds refs the forge does not have and fast-forwards the ones it does. A ref
+# that diverged is rejected and fails the run; the canonical side is never
+# deleted or rewritten from the mirror.
+#
+# Credential: GIT_TOKEN — a low-privilege forge push token, the ONE secret
+# GitHub still holds. It is NOT a store/publish credential (those live in KMS
+# only). Absent the token this no-ops with a warning, so it never blocks a push
+# before the operator seeds it. Alternatively the operator enables the forge's
 # native pull-mirror server-side and this workflow becomes unnecessary.
 name: sync
 
@@ -25,11 +30,11 @@ jobs:
 
       - name: Push to git.hanzo.ai
         env:
-          HANZO_GIT_TOKEN: ${{ secrets.HANZO_GIT_TOKEN }}
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
         run: |
-          if [ -z "$HANZO_GIT_TOKEN" ]; then
-            echo "::warning::HANZO_GIT_TOKEN unset — mirror skipped. Seed it (or enable Gitea pull-mirror) to activate the native forge."
+          if [ -z "$GIT_TOKEN" ]; then
+            echo "::warning::GIT_TOKEN unset — sync skipped. Seed it (or enable the forge pull-mirror) to activate the native forge."
             exit 0
           fi
-          git push --prune "https://x-access-token:${HANZO_GIT_TOKEN}@git.hanzo.ai/hanzoai/extension.git" \
-            "+refs/remotes/origin/main:refs/heads/main" "+refs/tags/*:refs/tags/*"
+          git push "https://x-access-token:${GIT_TOKEN}@git.hanzo.ai/hanzoai/extension.git" \
+            "refs/remotes/origin/main:refs/heads/main" "refs/tags/*:refs/tags/*"
