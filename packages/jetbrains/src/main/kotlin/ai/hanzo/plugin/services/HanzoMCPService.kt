@@ -70,7 +70,7 @@ class HanzoMCPService {
             val token = authService.getAuthToken() ?: return false
             
             val request = Request.Builder()
-                .url("${HanzoPlugin.API_BASE_URL}/api/v1/mcp/servers/$serverId/connect")
+                .url("${HanzoPlugin.API_BASE_URL}/v1/mcp/servers/$serverId/connect")
                 .header("Authorization", "Bearer $token")
                 .post("{}".toRequestBody("application/json".toMediaType()))
                 .build()
@@ -101,7 +101,7 @@ class HanzoMCPService {
             val token = authService.getAuthToken() ?: return false
             
             val request = Request.Builder()
-                .url("${HanzoPlugin.API_BASE_URL}/api/v1/mcp/servers/$serverId/disconnect")
+                .url("${HanzoPlugin.API_BASE_URL}/v1/mcp/servers/$serverId/disconnect")
                 .header("Authorization", "Bearer $token")
                 .post("{}".toRequestBody("application/json".toMediaType()))
                 .build()
@@ -132,7 +132,7 @@ class HanzoMCPService {
             val token = authService.getAuthToken() ?: return emptyList()
             
             val request = Request.Builder()
-                .url("${HanzoPlugin.API_BASE_URL}/api/v1/mcp/servers/$serverId/tools")
+                .url("${HanzoPlugin.API_BASE_URL}/v1/mcp/servers/$serverId/tools")
                 .header("Authorization", "Bearer $token")
                 .get()
                 .build()
@@ -176,7 +176,7 @@ class HanzoMCPService {
             }
             
             val request = Request.Builder()
-                .url("${HanzoPlugin.API_BASE_URL}/api/v1/mcp/servers/$serverId/execute")
+                .url("${HanzoPlugin.API_BASE_URL}/v1/mcp/servers/$serverId/execute")
                 .header("Authorization", "Bearer $token")
                 .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
                 .build()
@@ -214,7 +214,7 @@ class HanzoMCPService {
             val token = authService.getAuthToken() ?: return
             
             val request = Request.Builder()
-                .url("${HanzoPlugin.API_BASE_URL}/api/v1/mcp/servers")
+                .url("${HanzoPlugin.API_BASE_URL}/v1/mcp/servers")
                 .header("Authorization", "Bearer $token")
                 .get()
                 .build()
