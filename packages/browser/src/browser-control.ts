@@ -1171,6 +1171,20 @@ export class BrowserControl {
     });
   }
 
+  /**
+   * Direct in-process dispatch of a `browser.*` action.
+   *
+   * chrome.runtime.sendMessage never delivers to an onMessage listener in the
+   * *same* service worker, so sibling modules in the background worker (the CDP
+   * bridge) cannot reach `handleBrowserAction` over the message bus. They call
+   * this instead — same contract, resolves the response object. Safe against
+   * hangs: handleBrowserAction's switch has a `default` and a `catch`, so
+   * sendResponse (here, `resolve`) is always invoked exactly once.
+   */
+  dispatchAction(request: any): Promise<any> {
+    return new Promise((resolve) => this.handleBrowserAction(request, resolve));
+  }
+
   private async handleBrowserAction(request: any, sendResponse: (response: any) => void) {
     const tabId = request.tabId;
     try {

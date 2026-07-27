@@ -4,6 +4,26 @@ import { ActionRateLimiter, debugLog, loadDebugFlagFromStorage } from './runtime
 import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
 import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 
+/**
+ * Coerce the named params from string → number in place.
+ *
+ * native-zap decodes every command param as a UTF-8 string (see
+ * shared/native-zap.ts `decodeCmd`), but CDP methods like
+ * `Input.dispatchMouseEvent` type their coordinates as doubles and reject a
+ * string ("double value expected"). Callers that hand params to CDP run them
+ * through this first. Absent / already-numeric / non-numeric values are left
+ * untouched.
+ */
+function coerceNumericParams(params: any, keys: string[]): void {
+  if (!params) return;
+  for (const k of keys) {
+    const v = params[k];
+    if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) {
+      params[k] = Number(v);
+    }
+  }
+}
+
 interface CDPSession {
   tabId: number;
   debuggee: chrome.debugger.Debuggee;
@@ -31,10 +51,24 @@ export class CDPBridge {
   private wsClients: Set<WebSocket> = new Set();
   private overlayLimiter = new ActionRateLimiter();
   private overlaySignatures = new Map<string, string>();
-  
+  // BrowserControl lives in the SAME service worker. chrome.runtime.sendMessage
+  // never delivers to an onMessage listener in the sender's own worker, so DOM
+  // verbs (getText, type, hover, …) are dispatched to it directly through this
+  // hook — wired by background.ts. Null on Firefox/Safari (their own path).
+  private domDispatch: ((request: any) => Promise<any>) | null = null;
+
   constructor() {
     void loadDebugFlagFromStorage();
     this.setupDebuggerListener();
+  }
+
+  /**
+   * Wire the in-worker BrowserControl so DOM verbs dispatch directly instead of
+   * via chrome.runtime.sendMessage (which cannot reach an onMessage listener in
+   * the same service worker). Called once by background.ts at startup.
+   */
+  setDomDispatch(fn: (request: any) => Promise<any>): void {
+    this.domDispatch = fn;
   }
   
   private setupDebuggerListener() {
@@ -377,6 +411,7 @@ export class CDPBridge {
           break;
 
         case 'Input.dispatchMouseEvent':
+          coerceNumericParams(params, ['x', 'y', 'clickCount', 'buttons', 'deltaX', 'deltaY']);
           if (params?.x !== undefined && params?.y !== undefined) {
             this.notifyControlOverlay(tabId, 'ai.control.cursor', { x: params.x, y: params.y });
           }
@@ -401,9 +436,13 @@ export class CDPBridge {
           // instead of tripping SpiderMonkey/V8 expression parsing — the
           // same rule background-firefox.ts applies, so both browsers
           // accept identical caller JS.
+          // Do NOT spread ...params into Runtime.evaluate: native-zap delivers
+          // every value as a string, so a string `timeout` (or stray `code`/
+          // `tabId`) trips CDP's typed deserialization ("double value
+          // expected"). The only field we need is the expression — pickEvaluable
+          // derives it from every code-param alias.
           await this.send(tabId, 'Runtime.enable');
           result = await this.send(tabId, 'Runtime.evaluate', {
-            ...params,
             expression: wrapEvaluable(pickEvaluable(params)),
             returnByValue: true,
             awaitPromise: true,
@@ -420,12 +459,23 @@ export class CDPBridge {
           break;
 
         // High-level commands for hanzo-mcp
-        case 'hanzo.click':
+        case 'hanzo.click': {
+          // Coordinate click: the MCP sends {x, y} (strings) and no selector.
+          // Dispatch a real CDP mouse event at the point. Selector click keeps
+          // the DOM/box-model path below.
+          if (!params?.selector && params?.x != null && params?.y != null) {
+            coerceNumericParams(params, ['x', 'y']);
+            this.notifyControlOverlay(tabId, 'ai.control.cursor', { x: params.x, y: params.y });
+            await this.click(tabId, params.x, params.y);
+            result = { success: true };
+            break;
+          }
           this.notifyControlOverlay(tabId, 'ai.control.highlight', { selector: params.selector });
           this.notifyControlOverlay(tabId, 'ai.control.status', { text: `Clicking ${params.selector}` });
           const clicked = await this.clickSelector(tabId, params.selector);
           result = { success: clicked };
           break;
+        }
 
         case 'hanzo.fill':
           this.notifyControlOverlay(tabId, 'ai.control.highlight', { selector: params.selector });
@@ -529,11 +579,21 @@ export class CDPBridge {
             'url': 'getURL', 'title': 'getTitle', 'tabInfo': 'getTabInfo',
           };
           const action = 'browser.' + (actionMap[cmd] || cmd);
-          result = await new Promise((resolve) => {
-            chrome.runtime.sendMessage({ action, tabId, ...params }, (response) => {
-              resolve(response || { error: chrome.runtime.lastError?.message });
-            });
-          });
+          // tabId LAST so the resolved numeric id wins over any string tabId in
+          // params (native-zap decodes every value as a string). BrowserControl
+          // runs the verb via chrome.scripting.executeScript (MAIN world) — no
+          // content script, no message bus. domDispatch calls it directly
+          // because chrome.runtime.sendMessage cannot reach a listener in this
+          // same service worker; the sendMessage branch is the Firefox/legacy
+          // fallback only.
+          const request = { ...params, action, tabId };
+          result = this.domDispatch
+            ? await this.domDispatch(request)
+            : await new Promise((resolve) => {
+                chrome.runtime.sendMessage(request, (response) => {
+                  resolve(response || { error: chrome.runtime.lastError?.message });
+                });
+              });
           break;
         }
 
