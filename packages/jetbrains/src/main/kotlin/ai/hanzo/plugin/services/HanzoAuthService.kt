@@ -57,7 +57,7 @@ class HanzoAuthService {
         
         val requestBody = gson.toJson(json).toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
-            .url("${HanzoPlugin.AUTH_URL}/api/v1/login")
+            .url("${HanzoPlugin.AUTH_URL}/v1/iam/login")
             .post(requestBody)
             .build()
         
@@ -114,7 +114,7 @@ class HanzoAuthService {
         
         // Verify the API key by making a test request
         val request = Request.Builder()
-            .url("${HanzoPlugin.API_BASE_URL}/api/v1/user/profile")
+            .url("${HanzoPlugin.API_BASE_URL}/v1/user/profile")
             .header("Authorization", "Bearer $apiKey")
             .get()
             .build()
