@@ -124,7 +124,15 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--border-2);
   border-radius: var(--radius);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.02);
-  overflow: hidden;
+  /* NOT overflow:hidden. The model picker menu is position:absolute inside this
+     card and opens UPWARD, so a clip here truncates it to the card's box: the
+     "Search models…" filter, the Auto row and the whole Enso group get cut off
+     and only the last row plus the plan banner survive — which reads as "the
+     picker is broken / Enso is missing" rather than as a clipping bug. Nothing
+     here needs clipping: .ae-input is transparent, .ae-card-row has no
+     background, and the chips/modes/send button carry their own radii and sit
+     inside the padding, so none of them paint into the rounded corners. */
+  overflow: visible;
 }
 .ae-input {
   display: block; width: 100%; resize: none;
