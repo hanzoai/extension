@@ -8,7 +8,7 @@
 // inch — and the host re-frames 1:1 to binary on the UDS. The opaque command/
 // result payload uses a compact binary codec below (no JSON in the contract).
 
-const HELLO = 1, WELCOME = 2, ERROR = 7, ROUTE = 16, RESPONSE = 17;
+const HELLO = 1, WELCOME = 2, PROVIDERS_LIST = 3, PROVIDERS = 4, ERROR = 7, ROUTE = 16, RESPONSE = 17;
 const ROLE_PROVIDER = 1;
 
 function b64encode(bytes: Uint8Array): string {
@@ -55,23 +55,59 @@ function decodeCmd(p: Uint8Array): { method: string; params: Record<string, stri
   return { method, params };
 }
 
+// PROVIDERS body: count(u16) + per entry id(str) + role(u8) + brand(str) +
+// caps(u16 + str…). We only need the ids — that is the registry's answer to
+// "am I reachable?".
+export function decodeProviderIds(p: Uint8Array): string[] {
+  const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
+  const dec = new TextDecoder();
+  let o = 0;
+  const n = dv.getUint16(o, true); o += 2;
+  const ids: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const il = dv.getUint16(o, true); o += 2;
+    ids.push(dec.decode(p.subarray(o, o + il))); o += il;
+    o += 1; // role
+    const bl = dv.getUint16(o, true); o += 2;
+    o += bl; // brand
+    const nc = dv.getUint16(o, true); o += 2;
+    for (let c = 0; c < nc; c++) {
+      const cl = dv.getUint16(o, true); o += 2;
+      o += cl;
+    }
+  }
+  return ids;
+}
+
 export interface NativeZapState {
+  /** The router lists us as a provider — not merely "a port is open". */
   connected: boolean;
   port: chrome.runtime.Port | null;
+  /** Our id: proposed as `browser:<engine>/default`, refined to the router's
+   *  device-stamped id once WELCOME names it. Re-stamping is idempotent, so
+   *  reconnecting with the refined id yields the same id. */
   providerId: string;
+  /** A liveness probe is outstanding. Two ticks with no PROVIDERS reply means
+   *  the port is open but deaf — the wedge this state exists to catch. */
+  probing?: boolean;
 }
 
 export type Dispatch = (method: string, params: any) => Promise<any> | any;
 
-// Gentle safe poll: with no MCP client running there is no router to reach, so
-// the host connects-then-exits; probe every 30s instead of hammering (and
-// re-launching the native host) every 3s. A live consumer is picked up within
-// one interval.
-const RECONNECT_MS = 30_000;
+/** Post one router frame on a native port. `payload` empty ⇒ no body. */
+function send(port: chrome.runtime.Port, t: number, from: string, payload?: Uint8Array) {
+  port.postMessage({ t, flags: 0, from, to: '', payload: payload ? b64encode(payload) : '' });
+}
+
+const helloBody = (brand: string, caps: string[]) => encodeHello(ROLE_PROVIDER, brand, caps);
 
 /** Connect to zapd via the native host, register as a browser provider, and
- *  dispatch inbound ROUTE commands to the browser. Self-heals on disconnect. */
-export function connectNativeZap(
+ *  dispatch inbound ROUTE commands to the browser.
+ *
+ *  Reconnection is NOT scheduled here — `ensureNativeZap` is the one
+ *  reconciler. A second, self-scheduling retry inside this function is what
+ *  raced two native hosts onto the same provider id (see ensureNativeZap). */
+function connectNativeZap(
   state: NativeZapState,
   brand: string,
   caps: string[],
@@ -81,10 +117,10 @@ export function connectNativeZap(
   // Cross-browser: Firefox exposes `browser.runtime`, Chrome `chrome.runtime`;
   // both implement connectNative. One transport, both browsers.
   const rt: any = (typeof browser !== 'undefined' ? (browser as any) : chrome).runtime;
-  // Singleton: never run two native ports. Tear down any prior port first — its
-  // onDisconnect below is guarded so a replaced port never schedules a reconnect.
-  // Without this, repeated connectNativeZap() calls (startup + events + the 3s
-  // reconnect) accumulate ports, each spawning a native host → a host-spawn storm.
+  // Singleton: never run two native ports. Tear down any prior port first — two
+  // live hosts race to register the SAME provider id, and when the loser is
+  // closed it can take the winner's registry entry with it, leaving the router
+  // with 0 providers while the extension still holds an open port.
   const prior = state.port;
   state.port = null;
   if (prior) { try { prior.disconnect(); } catch {} }
@@ -97,21 +133,33 @@ export function connectNativeZap(
     return;
   }
   state.port = port;
-  const id = state.providerId;
-
-  const post = (t: number, to: string, payload: Uint8Array) =>
-    port.postMessage({ t, flags: 0, from: id, to, payload: b64encode(payload) });
+  state.connected = false;
+  state.probing = false;
 
   // Register as a provider.
-  post(HELLO, '', encodeHello(ROLE_PROVIDER, brand, caps));
+  send(port, HELLO, state.providerId, helloBody(brand, caps));
 
   port.onMessage.addListener(async (msg: any) => {
     const payload = msg.payload ? b64decode(msg.payload) : new Uint8Array(0);
     switch (msg.t) {
       case WELCOME:
-        state.connected = true;
-        log(`[Hanzo/ZAP] native host connected; registered ${id}`);
+        // WELCOME is addressed to the id the router VERIFIED — the native host
+        // stamps the device into it, so this is the only way we learn our real
+        // id. A WELCOME alone does not mean we are registered: another host for
+        // this same id may evict us a moment later. Ask the registry.
+        if (typeof msg.to === 'string' && msg.to) state.providerId = msg.to;
+        state.probing = true;
+        send(port, PROVIDERS_LIST, state.providerId);
         break;
+      case PROVIDERS: {
+        state.probing = false;
+        const listed = decodeProviderIds(payload).includes(state.providerId);
+        if (listed !== state.connected) {
+          log(`[Hanzo/ZAP] ${listed ? 'registered' : 'dropped by router'}: ${state.providerId}`);
+        }
+        state.connected = listed;
+        break;
+      }
       case ERROR:
         log('[Hanzo/ZAP] ' + new TextDecoder().decode(payload));
         break;
@@ -127,20 +175,70 @@ export function connectNativeZap(
         } catch (e: any) {
           out = new TextEncoder().encode('ERR:' + (e?.message || String(e)));
         }
-        port.postMessage({ t: RESPONSE, flags: 0, from: id, to: msg.from, payload: b64encode(out) });
+        port.postMessage({ t: RESPONSE, flags: 0, from: state.providerId, to: msg.from, payload: b64encode(out) });
         break;
       }
       default:
-        break; // PROVIDERS / PEER_* — a provider ignores these
+        break; // PEER_* — a provider ignores presence chatter
     }
   });
 
   port.onDisconnect.addListener(() => {
-    if (state.port !== port) return; // replaced by a newer port — do not reconnect
+    if (state.port !== port) return; // replaced by a newer port — nothing to do
     state.connected = false;
+    state.probing = false;
     state.port = null;
     const err = rt.lastError?.message;
     log('[Hanzo/ZAP] native host disconnected' + (err ? ': ' + err : ''));
-    setTimeout(() => connectNativeZap(state, brand, caps, dispatch, log), RECONNECT_MS);
   });
+}
+
+/** The ONE reconciler: drive this on a timer. It brings the extension's
+ *  registration in line with the router's registry, and is the only thing that
+ *  opens a native port after the first.
+ *
+ *  It exists because `onDisconnect` is not a sufficient health signal. A native
+ *  port stays "open" while its host process is wedged (the host blocks reading a
+ *  pipe the browser never closes), so a port can be open, deaf, and unregistered
+ *  forever — the observed failure: router reports 0 providers while a native host
+ *  has been up for hours and the extension believes it is connected.
+ *
+ *  Each tick:
+ *    no port                  → connect
+ *    probe unanswered         → the port is deaf; drop it and reconnect
+ *    port fine but unlisted   → re-send HELLO on it (the router does
+ *                               evict-and-replace, so this is idempotent)
+ *    always                   → probe the registry, which both refreshes
+ *                               `connected` and proves the pipe round-trips
+ */
+export function ensureNativeZap(
+  state: NativeZapState,
+  brand: string,
+  caps: string[],
+  dispatch: Dispatch,
+  log: (m: string) => void = console.log,
+): void {
+  const port = state.port;
+  if (!port) {
+    connectNativeZap(state, brand, caps, dispatch, log);
+    return;
+  }
+  if (state.probing) {
+    log('[Hanzo/ZAP] native host is not answering — reconnecting');
+    state.connected = false;
+    connectNativeZap(state, brand, caps, dispatch, log); // tears the deaf port down
+    return;
+  }
+  try {
+    // The port round-trips but the router does not list us — re-register
+    // rather than churn a new native host.
+    if (!state.connected) send(port, HELLO, state.providerId, helloBody(brand, caps));
+    state.probing = true;
+    send(port, PROVIDERS_LIST, state.providerId);
+  } catch {
+    // postMessage throws on an already-dead port: reconnect on the next tick.
+    state.probing = false;
+    state.connected = false;
+    state.port = null;
+  }
 }
