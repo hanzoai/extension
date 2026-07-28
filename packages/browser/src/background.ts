@@ -15,7 +15,7 @@ import {
   MSG_REQUEST,
   type ZapManager,
 } from './shared/zap.js';
-import { connectNativeZap, type NativeZapState } from './shared/native-zap.js';
+import { ensureNativeZap, type NativeZapState } from './shared/native-zap.js';
 import {
   getRagConfig as getSharedRagConfig,
   normalizeRagSnippets,
@@ -1843,7 +1843,7 @@ const nativeZap: NativeZapState = {
   providerId: `browser:${BROWSER_NAME}/default`,
 };
 const browserDispatch = (method: string, params: any) => cdpBridge.dispatchMethod(method, params);
-connectNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, debugLog);
+ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, debugLog);
 
 // Keep-alive — Layer 1: Port. Content scripts in every loaded http(s) tab
 // hold a `zap-keepalive` port. As long as ANY tab has one, Chrome keeps
@@ -1853,17 +1853,16 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener(() => { /* receipt is the keep-alive */ });
 });
 
-// Keep-alive — Layer 2: Alarms. Wake the worker periodically; if the native
-// host link dropped (or the worker was idled out), reconnect.
+// Keep-alive — Layer 2: Alarms. Wake the worker periodically and reconcile the
+// registration against the router. This runs unconditionally: `connected` is
+// what the reconciler *computes*, so gating the tick on it would leave a stale
+// `true` permanently unchallenged — the wedge we are fixing.
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
 try {
   chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.25 });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
-    if (!nativeZap.connected) {
-      debugLog('[Hanzo/ZAP] keep-alive: reconnecting native host');
-      connectNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, debugLog);
-    }
+    ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, debugLog);
   });
 } catch (e) {
   console.warn('[Hanzo] alarms unavailable:', e);

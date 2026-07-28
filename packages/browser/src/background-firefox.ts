@@ -26,7 +26,7 @@ import {
   handleZapMessage,
   type ZapManager,
 } from './shared/zap.js';
-import { connectNativeZap, type NativeZapState } from './shared/native-zap.js';
+import { ensureNativeZap, type NativeZapState } from './shared/native-zap.js';
 import { fetchAllUsage } from './shared/usage.js';
 import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 import {
@@ -3041,7 +3041,7 @@ const nativeZap: NativeZapState = {
 };
 const browserDispatch = (method: string, params: any) =>
   hanzoExtension.dispatchMethod(method, (params || {}) as Record<string, unknown>);
-connectNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
+ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
 
 // =============================================================================
 // Keep-alive — two-layer:
@@ -3072,10 +3072,9 @@ try {
   browser.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.25 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
-    if (!nativeZap.connected) {
-      console.log('[Hanzo/ZAP] keep-alive: reconnecting native host');
-      connectNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
-    }
+    // Unconditional: `connected` is what the reconciler computes, so gating the
+    // tick on it would leave a stale `true` permanently unchallenged.
+    ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
   });
 } catch (e) {
   console.warn('[Hanzo] alarms unavailable:', e);
