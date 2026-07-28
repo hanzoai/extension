@@ -9,10 +9,21 @@ tests: vitest.
 
     extension ─connectNative("ai.hanzo.zap")─► native host ─UDS─► zapd ◄─ hanzo-mcp
 
-- `shared/native-zap.ts` — the ONE transport: `connectNativeZap()` opens the native
-  port (**singleton** — one port; the router does evict-and-replace), registers as
-  provider `browser:<engine>/<host>/default`, dispatches inbound ROUTE commands.
+- `shared/native-zap.ts` — the ONE transport. `ensureNativeZap()` is the ONE entry
+  point: drive it from the keep-alive alarm and it reconciles the extension's
+  registration against the router (opens the native port — **singleton**, one port;
+  the router does evict-and-replace — registers as provider
+  `browser:<engine>/<host>/default`, dispatches inbound ROUTE commands).
   Cross-browser (`browser ∥ chrome`).
+  **`connected` means "zapd lists me as a provider"**, established by a
+  `PROVIDERS_LIST` probe — never merely "a port is open". A WELCOME is not proof:
+  a native port stays open while its host is wedged, so a port can be open, deaf
+  and unregistered indefinitely (the failure this replaced: zapd reporting 0
+  providers for hours while a host process was up and the extension believed it was
+  connected). The tick also re-sends HELLO on a healthy-but-unlisted port, and
+  replaces a port whose probe went unanswered. Do NOT add a second reconnect path —
+  two live hosts race for one provider id and the loser's close deregisters the
+  winner. Covered by `tests/native-zap.test.ts`.
 - `background.ts` (Chrome) — dispatch via `chrome.debugger` (CDP→tab; shows the
   "debugging this browser" banner; WebKit-incompatible). **To be removed** — see WXT plan.
 - `background-firefox.ts` — native `browser.*` dispatch (no banner). The correct model.
