@@ -274,6 +274,13 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
   const [modelGroups, setModelGroups] = useState<ModelGroup[]>([]);
   const [model, setModel] = useState<ChatModel>(AUTO_MODEL);
   const [news, setNews] = useState<NewsItem[]>([]);
+  // True once the user picks a model themselves, so the catalog's default-to-Enso
+  // never overwrites a deliberate choice made while the fetch was still in flight.
+  const picked = useRef(false);
+  const chooseModel = useCallback((m: ChatModel) => {
+    picked.current = true;
+    setModel(m);
+  }, []);
 
   const [phase, setPhase] = useState<'idle' | 'running' | 'done'>('idle');
   const [status, setStatus] = useState('');
@@ -285,10 +292,22 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
   const abortRef = useRef<AbortController | null>(null);
 
   // Load real model catalog + live news (both public — work signed out).
-  // Default stays on Auto ("routes to the best model"); the picker changes it.
+  //
+  // Enso is the default, selected once the catalog lands. It cannot be the
+  // useState seed: the catalog is fetched at runtime, so naming a model before
+  // it arrives would hardcode an id the server may not serve — the whole point
+  // of model-catalog.ts is that the list is never fabricated. AUTO_MODEL is the
+  // seed and the fallback, so a failed/slow fetch degrades to "routes to the
+  // best model" instead of a dead selection. Only the initial pick is
+  // overridden: `picked` guards a user's choice against a late catalog resolve.
   useEffect(() => {
     fetchModelCatalog(apiBase)
-      .then(({ groups }) => setModelGroups(groups))
+      .then(({ groups }) => {
+        setModelGroups(groups);
+        if (picked.current) return;
+        const enso = groups.find((g) => g.family === 'enso')?.models[0];
+        if (enso) setModel(enso);
+      })
       .catch(() => {});
     fetchNews().then(setNews).catch(() => {});
   }, [apiBase]);
@@ -458,7 +477,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
                 toggleSource={toggleSource}
                 models={modelGroups}
                 model={model}
-                setModel={setModel}
+                setModel={chooseModel}
                 busy={false}
               />
             </div>
@@ -545,7 +564,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
                 toggleSource={toggleSource}
                 models={modelGroups}
                 model={model}
-                setModel={setModel}
+                setModel={chooseModel}
                 busy={phase === 'running'}
               />
             </div>
