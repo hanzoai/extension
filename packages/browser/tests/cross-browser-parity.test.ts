@@ -38,7 +38,7 @@ describe('IAM URL conventions', () => {
   });
 
   it('shared auth uses the HIP-0111 canonical ${IAM_API_PATH}/oauth/token endpoint', () => {
-    // Pre-HIP-0111 shapes are both dead: the Casdoor
+    // Pre-HIP-0111 shapes are both dead: the legacy
     // /login/oauth/access_token path and a bare (un-prefixed) /oauth/token
     // that 404'd before 1.8.7. Strip comments before scanning — the
     // doc-comments intentionally reference the old paths to explain the bug.
