@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 import path from 'path';
 
-const extensionPath = path.resolve(__dirname, '../dist/browser-extension/chrome');
+const extensionPath = path.resolve(__dirname, '../../../dist/chrome');
 
 export default defineConfig({
   testDir: '.',

@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 import path from 'path'
 
-const chromeExtPath = path.resolve(__dirname, '../dist/browser-extension/chrome')
+const chromeExtPath = path.resolve(__dirname, '../../../dist/chrome')
 
 /**
  * Cross-platform E2E test config.
