@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createAiClient, type SearchEvent, type SearchMode, type SearchSource } from '@hanzo/ai';
+import { createAiClient, type AiClient, type SearchEvent, type SearchSource } from '@hanzo/ai';
 import { fetchNews, type NewsItem } from './news.js';
 import { AUTO_MODEL, fetchModelCatalog, type ChatModel, type ModelGroup } from './model-catalog.js';
 import { renderMarkdown } from './markdown.js';
 import { capture, contributeTrainingSample } from '../shared/consent.js';
-import { Composer } from './Composer.js';
+import { Composer, type Mode } from './Composer.js';
 import { Rail } from './Rail.js';
 import { Source } from './Source.js';
 import { Stories } from './Stories.js';
@@ -12,8 +12,9 @@ import { Stories } from './Stories.js';
 /**
  * Hanzo Answer Engine — the shared AI-answer surface (query → streamed answer +
  * inline citations + sources + live news). Backend = api.hanzo.ai ONLY, reached
- * through the @hanzo/ai `search`/`deepResearch` primitive (the one place the
- * capability is defined). Strict monochrome per the Hanzo brand.
+ * through @hanzo/ai: `search` for the grounded modes, `chat.completions` for
+ * Chat (each capability defined in exactly one place). Strict monochrome per
+ * the Hanzo brand.
  *
  * This file holds the state and the wire. Everything it draws with is a
  * presentational sibling — Rail, Composer (Models), Source, Stories — each one
@@ -21,6 +22,31 @@ import { Stories } from './Stories.js';
  * lifted into @hanzo/ui and mounted by chat and app without dragging the
  * extension's transport along.
  */
+
+/**
+ * Chat mode — the same question, ungrounded, straight to the model. It yields
+ * `SearchEvent`s so the surface keeps ONE stream to consume and ONE way to
+ * render an answer; a mode is a value the wire takes, never a second UI.
+ */
+async function* converse(
+  client: AiClient,
+  question: string,
+  model: string,
+  signal: AbortSignal,
+): AsyncGenerator<SearchEvent> {
+  const stream = await client.chat.completions.create(
+    { model, messages: [{ role: 'user', content: question }], stream: true },
+    { signal },
+  );
+  let answer = '';
+  for await (const chunk of stream) {
+    const delta = chunk.choices?.[0]?.delta?.content;
+    if (!delta) continue;
+    answer += delta;
+    yield { type: 'text', delta };
+  }
+  yield { type: 'done', answer, sources: [] };
+}
 
 export interface AnswerEngineProps {
   apiBase: string;
@@ -36,7 +62,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
   const [collapsed, setCollapsed] = useState(false);
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
-  const [mode, setMode] = useState<SearchMode>('search');
+  const [mode, setMode] = useState<Mode>('search');
   const [sources, setSources] = useState<Set<string>>(new Set());
   const [modelGroups, setModelGroups] = useState<ModelGroup[]>([]);
   const [model, setModel] = useState<ChatModel>(AUTO_MODEL);
@@ -102,7 +128,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
 
       setSubmitted(question);
       setPhase('running');
-      setStatus('Searching the web');
+      setStatus(mode === 'chat' ? 'Thinking' : 'Searching the web');
       setAnswer('');
       setAnswerSources([]);
       setFollowUps([]);
@@ -111,14 +137,17 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
       void capture('answer_search', { mode, model: model.id });
       let fullAnswer = '';
 
-      const opts = {
-        mode,
-        model: model.id,
-        sources: [...sources],
-        signal: ctrl.signal,
-      };
+      const stream =
+        mode === 'chat'
+          ? converse(client, question, model.id, ctrl.signal)
+          : (client.search(question, {
+              mode,
+              model: model.id,
+              sources: [...sources],
+              signal: ctrl.signal,
+            }) as AsyncGenerator<SearchEvent>);
       try {
-        for await (const ev of client.search(question, opts) as AsyncGenerator<SearchEvent>) {
+        for await (const ev of stream) {
           switch (ev.type) {
             case 'status':
               setStatus(
