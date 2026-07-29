@@ -401,9 +401,18 @@ export class CDPBridge {
           // instead of tripping SpiderMonkey/V8 expression parsing — the
           // same rule background-firefox.ts applies, so both browsers
           // accept identical caller JS.
+          //
+          // The caller's bag is NOT spread in. CDP validates Runtime.evaluate
+          // strictly, and `timeout` is a field it owns (a double). A client
+          // sending its own transport-level `timeout` — null by default in the
+          // MCP tool schema — reached CDP as `params.timeout: null` and every
+          // evaluate died on "Failed to deserialize params.timeout - double
+          // value expected", while the same call succeeded on Firefox, which
+          // consumes timeout as its own wait budget and forwards nothing. The
+          // three fields below are the whole contract, identical to the
+          // evaluate() method above: one rule, both Chrome call sites.
           await this.send(tabId, 'Runtime.enable');
           result = await this.send(tabId, 'Runtime.evaluate', {
-            ...params,
             expression: wrapEvaluable(pickEvaluable(params)),
             returnByValue: true,
             awaitPromise: true,
