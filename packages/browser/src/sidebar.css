@@ -333,46 +333,6 @@ html {
   color: var(--text-primary);
 }
 
-/* Glass login card */
-.chat-modern-login-card {
-  width: min(320px, 100%);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--glass-strong);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.05);
-  padding: 28px 24px;
-  animation: fadeIn 0.5s ease;
-}
-
-.chat-modern-login-card .chat-modern-auth-btn {
-  width: 100%;
-  margin-bottom: 14px;
-}
-
-.chat-modern-login-card #signup-btn {
-  width: 100%;
-  margin-bottom: 14px;
-}
-
-.chat-modern-login-card .auth-note {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  margin: 0;
-}
-
-.chat-modern-login-card .auth-note a {
-  color: var(--text-secondary);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.chat-modern-login-card .auth-note a:hover {
-  color: var(--text-primary);
-}
-
 /* ==================== Tab Bar ==================== */
 
 .tab-bar {
