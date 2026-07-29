@@ -15,8 +15,15 @@ import type { ChatModel, ModelGroup } from './model-catalog.js';
  */
 
 /** What the composer sends. `chat` goes straight to the model; the rest ground
- *  the question on the live web (`SearchMode` is the wire's own vocabulary). */
-export type Mode = SearchMode | 'chat';
+ *  the question on the live web (`SearchMode` is the wire's own vocabulary).
+ *
+ *  `deep` is EXCLUDED rather than absent. The wire still names it — dropping it
+ *  from `MODES` only stopped it being offered, it stayed a legal `Mode`, so any
+ *  call site could still hold one and put the retired name back on the surface.
+ *  Excluding it makes the collapse structural. Derived from `SearchMode` and not
+ *  restated, so a mode this surface invents is still a type error, and the day
+ *  the wire drops `deep` this narrows to nothing on its own. */
+export type Mode = Exclude<SearchMode, 'deep'> | 'chat';
 
 /** The modes, in the order they read as escalating effort. */
 export const MODES: { id: Mode; label: string; hint: string }[] = [
