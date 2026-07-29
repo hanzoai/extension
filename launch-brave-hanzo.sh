@@ -3,14 +3,14 @@
 # hanzo-mcp bridge and Claude can drive THIS real browser (not a headless one).
 #
 # The extension is already built at:
-#   ~/work/hanzo/extension/packages/browser/dist/browser-extension/chrome
+#   ~/work/hanzo/extension/dist/chrome
 # (rebuild with: cd ~/work/hanzo/extension/packages/browser && node src/build.js)
 #
 # Usage:  ~/work/hanzo/extension/launch-brave-hanzo.sh [url]
 # A dedicated profile keeps this separate from your normal Brave windows.
 set -e
 
-EXT="${HANZO_EXT_DIR:-$HOME/work/hanzo/extension/packages/browser/dist/browser-extension/chrome}"
+EXT="${HANZO_EXT_DIR:-$HOME/work/hanzo/extension/dist/chrome}"
 PROFILE="${HANZO_BRAVE_PROFILE:-$HOME/.config/hanzo-brave}"
 BRAVE="$(command -v brave-browser || command -v brave-browser-stable || echo /opt/brave.com/brave/brave)"
 
