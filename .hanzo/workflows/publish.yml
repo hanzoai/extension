@@ -64,8 +64,8 @@ jobs:
         working-directory: packages/browser
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          npx web-ext build --source-dir dist/browser-extension/chrome  --artifacts-dir dist --filename hanzo-ai-chrome-v${VERSION}.zip  --overwrite-dest
-          npx web-ext build --source-dir dist/browser-extension/firefox --artifacts-dir dist --filename hanzo-ai-firefox-v${VERSION}.zip --overwrite-dest
+          npx web-ext build --source-dir ../../dist/chrome  --artifacts-dir ../../dist --filename hanzo-ai-chrome-v${VERSION}.zip  --overwrite-dest
+          npx web-ext build --source-dir ../../dist/firefox --artifacts-dir ../../dist --filename hanzo-ai-firefox-v${VERSION}.zip --overwrite-dest
 
       - name: Publish to Chrome Web Store
         if: env.CHROME_EXTENSION_ID != ''
@@ -77,7 +77,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           curl -sf -X PUT "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID" \
             -H "Authorization: Bearer $ACCESS_TOKEN" -H "x-goog-api-version: 2" \
-            -T dist/hanzo-ai-chrome-v${VERSION}.zip
+            -T ../../dist/hanzo-ai-chrome-v${VERSION}.zip
           curl -sf -X POST "https://www.googleapis.com/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID/publish" \
             -H "Authorization: Bearer $ACCESS_TOKEN" -H "x-goog-api-version: 2" -H "Content-Length: 0"
 
@@ -85,7 +85,7 @@ jobs:
         if: env.AMO_API_KEY != ''
         working-directory: packages/browser
         run: |
-          npx web-ext sign --source-dir dist/browser-extension/firefox \
+          npx web-ext sign --source-dir ../../dist/firefox \
             --api-key "$AMO_API_KEY" --api-secret "$AMO_API_SECRET" \
             --channel listed --id "hanzo-ai@hanzo.ai"
 

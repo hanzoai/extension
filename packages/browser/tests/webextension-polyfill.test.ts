@@ -18,6 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execFileSync } from 'child_process';
 
 const pkg = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'),
@@ -65,30 +66,32 @@ describe('shared/auth.ts unified adapter', () => {
 });
 
 describe('build pipeline ships the polyfill', () => {
-  it('chrome bundle includes webextension-polyfill code', () => {
-    const distChrome = path.join(
-      __dirname,
-      '..',
-      'dist/browser-extension/chrome/background.js',
-    );
-    if (!fs.existsSync(distChrome)) {
-      // Build hasn't run yet — skip. CI runs build before tests.
-      return;
+  // src/build.js writes to the extension repo root's dist/<engine>/. These two
+  // used to read the old output root under packages/browser and `return` when
+  // it was absent — so once the root moved they asserted nothing, quietly, on
+  // every run. Build on demand instead: an assertion about the bundle has to
+  // have a bundle.
+  const BROWSER = path.join(__dirname, '..');
+  const DIST = path.resolve(BROWSER, '..', '..', 'dist');
+  const bundle = (engine: string) => {
+    const file = path.join(DIST, engine, 'background.js');
+    if (!fs.existsSync(file)) {
+      execFileSync('node', ['src/build.js'], { cwd: BROWSER, stdio: 'ignore' });
     }
-    const bg = fs.readFileSync(distChrome, 'utf8');
+    expect(fs.existsSync(file), `${engine}/background.js`).toBe(true);
+    return fs.readFileSync(file, 'utf8');
+  };
+
+  it('chrome bundle includes webextension-polyfill code', () => {
     // The polyfill module sets `globalThis.browser`. We grep for its
     // distinctive marker so we know it actually ended up in the bundle.
-    expect(bg).toMatch(/webextension-polyfill|browserPolyfill|chromeApiAvailable|globalThis\.browser/);
+    expect(bundle('chrome')).toMatch(
+      /webextension-polyfill|browserPolyfill|chromeApiAvailable|globalThis\.browser/,
+    );
   });
 
   it('firefox bundle does not break if the polyfill is a no-op', () => {
-    const distFirefox = path.join(
-      __dirname,
-      '..',
-      'dist/browser-extension/firefox/background.js',
-    );
-    if (!fs.existsSync(distFirefox)) return;
-    const bg = fs.readFileSync(distFirefox, 'utf8');
+    const bg = bundle('firefox');
     // The Firefox bundle should still be valid JS regardless of whether
     // the polyfill no-ops or wraps. Probe for any obvious syntax failure.
     expect(bg.length).toBeGreaterThan(1000);

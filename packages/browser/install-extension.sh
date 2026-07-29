@@ -2,7 +2,7 @@
 # Hanzo Browser Extension Installer
 # Provides instructions and opens browser extension pages
 
-EXTENSION_DIR="$(dirname "$0")/dist/browser-extension"
+EXTENSION_DIR="$(cd "$(dirname "$0")/../../dist" && pwd)"
 
 echo "=== Hanzo Browser Extension Installer ==="
 echo ""
@@ -17,7 +17,7 @@ if lsof -i :3001 > /dev/null 2>&1; then
     echo "✓ Browser Extension Server running on port 3001"
 else
     echo "✗ Browser Extension Server NOT running"
-    echo "  Start with: node dist/browser-extension/cli.js start"
+    echo "  Start with: node ../../dist/cli.js start"
 fi
 
 if lsof -i :9223 > /dev/null 2>&1; then

@@ -310,7 +310,7 @@ export class MCPServer {
         
         // Show instructions
         vscode.window.showInformationMessage(
-            'Browser extension built. Load it via chrome://extensions/ → Developer mode → Load unpacked → Select dist/browser-extension/',
+            'Browser extension built. Load it via chrome://extensions/ → Developer mode → Load unpacked → Select dist/chrome/',
             'Open Chrome Extensions'
         ).then(action => {
             if (action === 'Open Chrome Extensions') {
