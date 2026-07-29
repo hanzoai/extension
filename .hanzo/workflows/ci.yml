@@ -41,9 +41,9 @@ jobs:
         working-directory: packages/browser
         run: node src/build.js
 
+      # Armed: over budget fails the build. The previous form pointed at a path
+      # the build stopped writing and carried continue-on-error, so it measured
+      # nothing and reported nothing.
       - name: Check bundle budgets
         working-directory: packages/browser
-        run: |
-          [ -f dist/browser-extension/background.js ] || node src/build.js
-          pnpm run check:bundle-budget
-        continue-on-error: true
+        run: pnpm run check:bundle-budget
