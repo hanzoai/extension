@@ -59,12 +59,11 @@
             <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:0;overflow:hidden;">
               <select id="model-select"
                 style="padding:3px 18px 3px 6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.10);border-radius:6px;color:#a3a3a3;font-size:10px;font-family:inherit;cursor:pointer;-moz-appearance:none;appearance:none;white-space:nowrap;max-width:110px;text-overflow:ellipsis;overflow:hidden;height:22px;line-height:16px;flex-shrink:0;">
+                <!-- Auto is the only hand-written entry: it is the router, always
+                     valid. Every other option is appended by loadModels() from
+                     chat.listModels, so the picker can never advertise a model the
+                     account cannot reach. -->
                 <option value="auto">Auto</option>
-                <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-                <option value="claude-opus-4-20250514">Claude Opus 4</option>
-                <option value="gpt-4o">GPT-4o</option>
-                <option value="zen-coder-flash">Zen Coder Flash</option>
-                <option value="zen-max">Zen Max</option>
               </select>
               <label title="RAG context" style="display:inline-flex;align-items:center;gap:2px;font-size:10px;color:#666;cursor:pointer;white-space:nowrap;padding:2px 4px;flex-shrink:0;">
                 <input type="checkbox" id="rag-enabled" checked style="width:11px;height:11px;accent-color:#fafafa;cursor:pointer;margin:0;">
@@ -350,11 +349,6 @@
             <span>Default Model</span>
             <select id="default-model">
               <option value="auto">Auto (cost-aware)</option>
-              <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-              <option value="claude-opus-4-20250514">Claude Opus 4</option>
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="zen-coder-flash">Zen Coder Flash</option>
-              <option value="zen-max">Zen Max</option>
             </select>
           </label>
           <label class="setting-item">
