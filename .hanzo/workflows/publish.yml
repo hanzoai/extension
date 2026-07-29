@@ -41,9 +41,17 @@ jobs:
           KMS_CLIENT_ID: ${{ secrets.KMS_CLIENT_ID }}
           KMS_CLIENT_SECRET: ${{ secrets.KMS_CLIENT_SECRET }}
         run: |
+          # FAIL, do not exit 0. This used to warn and succeed, and the result was
+          # a publish pipeline that could not be told apart from a working one:
+          # every step below gates on `env.<CRED> != ''`, so an absent machine
+          # identity skipped all of them and the job went GREEN having shipped
+          # nothing. v1.9.37 was tagged, the tag reached git.hanzo.ai, a runner
+          # picked the job up, it finished in ~20s, and npm stayed on 1.9.36 with
+          # no error anywhere. A release that silently no-ops is worse than one
+          # that breaks loudly.
           if [ -z "$KMS_CLIENT_ID" ] || [ -z "$KMS_CLIENT_SECRET" ]; then
-            echo "::warning::KMS machine identity absent — cannot pull publish creds. Seed KMS_CLIENT_ID/SECRET as git.hanzo.ai Actions secrets."
-            exit 0
+            echo "::error::KMS machine identity absent — cannot pull publish creds. Seed KMS_CLIENT_ID/KMS_CLIENT_SECRET as git.hanzo.ai Actions secrets (org or repo scope)."
+            exit 1
           fi
           KMS=https://kms.hanzo.ai; ORG=hanzo; ENVN=prod; P=extension-publish
           TOKEN=$(curl -sf "$KMS/v1/kms/auth/login" -H 'Content-Type: application/json' \
@@ -89,9 +97,11 @@ jobs:
             --api-key "$AMO_API_KEY" --api-secret "$AMO_API_SECRET" \
             --channel listed --id "hanzo-ai@hanzo.ai"
 
-      # npm — canonical home is here. The .github npm job stays live until this
-      # runs green (KMS NPM_TOKEN seeded), then it is deleted. pnpm publish skips
-      # versions already on npm, so any transition overlap is idempotent.
+      # npm — canonical home is here, and now the ONLY home: the .github npm job
+      # this once ran beside was deleted with the rest of GitHub CI (6977db0),
+      # BEFORE this path had ever published anything. That is how 1.9.37 shipped
+      # nowhere. pnpm publish skips versions already on npm, so re-running is
+      # idempotent.
       - name: Publish @hanzo/* to npm
         if: env.NPM_TOKEN != ''
         run: |
@@ -100,3 +110,28 @@ jobs:
           pnpm --filter @hanzo/cards build
           pnpm -r --if-present run build || true
           pnpm -r publish --access public --no-git-checks --ignore-scripts --report-summary || true
+
+      # Say what actually shipped. Each publish step above is deliberately gated on
+      # its own credential so partial provisioning ships exactly what KMS has — but
+      # that makes a skipped store indistinguishable from a published one in a green
+      # run, which is the failure this whole file just got fixed for. This step
+      # cannot change what happened; it makes what happened READABLE, and fails the
+      # job if a tag published nowhere at all.
+      - name: Publish summary
+        if: always()
+        run: |
+          shipped=0
+          for pair in "CHROME_EXTENSION_ID:Chrome Web Store" "AMO_API_KEY:Firefox Add-ons" "NPM_TOKEN:npm"; do
+            key=${pair%%:*}; label=${pair#*:}
+            eval "val=\$$key"
+            if [ -n "$val" ]; then
+              echo "published -> $label"
+              shipped=$((shipped + 1))
+            else
+              echo "SKIPPED   -> $label (no credential in KMS at hanzo:/extension-publish)"
+            fi
+          done
+          if [ "$shipped" -eq 0 ]; then
+            echo "::error::this tag published NOWHERE — every target lacked a credential"
+            exit 1
+          fi

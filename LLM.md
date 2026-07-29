@@ -43,16 +43,30 @@ stamps it into every manifest (chrome/firefox/safari).
 
 ## CI/CD (native — Hanzo Git, KMS, act_runner)
 Git of record is `git.hanzo.ai/hanzoai/extension`; GitHub is a mirror.
-- `.gitea/workflows/*` — native pipeline on `hanzo-build-linux-amd64` act_runners:
-  `ci.yml` (amd64 test + build), `publish.yml` (Chrome Web Store + Firefox AMO + npm).
+- **`.hanzo/workflows/*`** — the ONLY pipeline, on `hanzo-build-linux-amd64`
+  act_runners: `ci.yml` (amd64 test + build), `publish.yml` (Chrome Web Store +
+  Firefox AMO + npm). Renamed from `.gitea/workflows` in `cc622bc`. The forge
+  reads this path natively and FIRST — `hanzoai/git modules/setting/actions.go`
+  `WorkflowDirs: [".hanzo/workflows", ".gitea/workflows", ".github/workflows"]`
+  (since `61ceddeb`, shipped in v1.26.26+).
+- **`.github/workflows/` is EMPTY** — GitHub CI was deleted in `6977db0`. Nothing
+  builds, publishes or syncs there. Do not "restore" it: GitHub is a mirror, and a
+  second plane is exactly what the migration removed.
 - Secrets are **KMS only**. The pipeline logs in with the KMS machine identity
-  (`KMS_CLIENT_ID`/`KMS_CLIENT_SECRET`) and pulls store creds from `hanzo:/extension-publish`
-  (env `prod`). CR: `deploy/kms/extension-publish-kms-sync.yaml`. No store cred in
-  any Actions secret store.
-- `.github/workflows/` mirrors + degrades gracefully: `sync.yml` pushes main+tags to
-  Hanzo Git; `ci.yml`/`cross-platform-e2e.yml` keep the macOS(Safari)/Windows/matrix
-  lanes that still need GitHub-hosted runners; `publish.yml` keeps only the GitHub
-  Release + the interim npm publish (store-publish removed → native). See PUBLISHING.md.
+  (`KMS_CLIENT_ID`/`KMS_CLIENT_SECRET`, Actions secrets on git.hanzo.ai) and pulls
+  store creds from `hanzo:/extension-publish` (env `prod`). CR:
+  `deploy/kms/extension-publish-kms-sync.yaml`. No store cred in any Actions
+  secret store.
+
+⚠️ **A tag is not a release — verify against the REGISTRY.** `v1.9.37` was tagged,
+reached git.hanzo.ai, was picked up by a runner, finished in ~20s and shipped
+NOTHING: the KMS machine identity was absent, so the secrets step warned and
+`exit 0`'d, and every publish step gates on `env.<CRED> != ''` — so all of them
+skipped. Green run, empty release, no error anywhere. That is now a hard failure,
+plus a `Publish summary` step that fails the job when a tag published nowhere.
+If a release does not appear: check `KMS_CLIENT_ID`/`KMS_CLIENT_SECRET` are seeded
+as Actions secrets, then confirm with
+`npm view @hanzo/browser-extension version` — never by looking at the tag.
 
 ## Cross-platform — WXT migration (canonical plan, not yet executed)
 
