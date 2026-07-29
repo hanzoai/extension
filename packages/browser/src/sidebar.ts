@@ -26,8 +26,6 @@ class HanzoSidebar {
     this.streamController = null;
     this.authenticated = false;
     this.ragContext = null;
-    this.chatWidgetMounted = false;
-    this.chatWidgetMountPromise = null;
     this.toolsInitialized = false;
     this.monitoringStarted = false;
     this.lastRequestKey = null;
@@ -336,9 +334,6 @@ class HanzoSidebar {
 
   switchTab(name) {
     this.currentTab = name;
-    if (name === 'chat') {
-      void this.ensureChatWidgetMounted();
-    }
     if (name === 'tools') {
       this.ensureToolsInitialized();
       void this.refreshUsageMetrics();
@@ -353,28 +348,6 @@ class HanzoSidebar {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
     const target = document.getElementById(`tab-${name}`);
     if (target) target.classList.remove('hidden');
-  }
-
-  async ensureChatWidgetMounted() {
-    if (this.chatWidgetMounted) return;
-    if (this.chatWidgetMountPromise) {
-      await this.chatWidgetMountPromise;
-      return;
-    }
-
-    this.chatWidgetMountPromise = import('./chat-widget')
-      .then((mod) => {
-        mod.mountModernChatWidget();
-        this.chatWidgetMounted = true;
-      })
-      .catch((error) => {
-        debugLog('Failed to mount chat widget:', error);
-      })
-      .finally(() => {
-        this.chatWidgetMountPromise = null;
-      });
-
-    await this.chatWidgetMountPromise;
   }
 
   ensureToolsInitialized() {

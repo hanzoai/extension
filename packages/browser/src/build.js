@@ -18,13 +18,16 @@ async function build() {
   console.log('Building browser extension...');
   console.log('Output root:', OUT);
 
-  // The extension does NOT depend on `@hanzo/ui`. Primitives are served by
-  // a small local shim aliased as `@hanzo/gui` so call-sites read like the
-  // canonical hanzo design system. The full tamagui-based @hanzo/gui will
-  // land in a feature branch — when that ships, just point the alias below
-  // at the published `@hanzo/gui` package and remove gui-primitives.tsx.
-  const hanzoGuiShim = path.join(__dirname, 'gui-primitives.tsx');
-  console.log('Using @hanzo/gui local primitives shim:', hanzoGuiShim);
+  // The extension renders on plain DOM elements styled by the sibling CSS —
+  // it consumes neither `@hanzo/ui` nor `@hanzo/gui`. That is a bundle-budget
+  // decision, measured: under this same esbuild config a single `@hanzo/ui`
+  // Button costs +154,347 raw / +54,470 gzip (193,568/60,222 bare-React →
+  // 347,915/114,692), and only builds at all once the consumer adds
+  // react-native-web plus `.web.*` resolveExtensions, because @hanzo/gui
+  // reaches react-native through @hanzogui/lucide-icons-2 → react-native-svg.
+  // newtab.js ships on every new tab at 180,363 raw / 57,145 gzip today, so
+  // that one primitive would very nearly double it. scripts/check-bundle-budgets.mjs
+  // is the gate: adopt the package when the delta fits the budget, not before.
 
   // The Usage panel runs the headless @hanzo/usage engine in the background
   // context. It's a published npm dependency (^0.1.6) — esbuild resolves it
@@ -85,11 +88,6 @@ async function build() {
   });
 
   // Build sidebar + popup UI scripts (TypeScript-first, with JS fallback).
-  // Primitives are aliased to the local @hanzo/gui shim (see gui-primitives.tsx).
-  const sidebarAliases = {
-    '@hanzo/gui': hanzoGuiShim,
-  };
-
   await esbuild.build({
     entryPoints: [fs.existsSync('src/sidebar.ts') ? 'src/sidebar.ts' : 'src/sidebar.js'],
     bundle: true,
@@ -97,7 +95,6 @@ async function build() {
     platform: 'browser',
     target: ['chrome90', 'firefox91', 'safari14'],
     sourcemap: 'inline',
-    alias: sidebarAliases,
   });
 
   await esbuild.build({
