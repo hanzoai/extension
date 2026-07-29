@@ -25,7 +25,7 @@ async function build() {
   // 347,915/114,692), and only builds at all once the consumer adds
   // react-native-web plus `.web.*` resolveExtensions, because @hanzo/gui
   // reaches react-native through @hanzogui/lucide-icons-2 → react-native-svg.
-  // newtab.js ships on every new tab at 180,363 raw / 57,145 gzip today, so
+  // newtab.js ships on every new tab at 181,077 raw / 57,435 gzip today, so
   // that one primitive would very nearly double it. scripts/check-bundle-budgets.mjs
   // is the gate: adopt the package when the delta fits the budget, not before.
 
@@ -34,8 +34,9 @@ async function build() {
   // from node_modules like any package, so the build works identically locally
   // and on CI (no sibling-repo path assumption).
 
-  // The answer engine (new-tab landing) consumes the @hanzo/ai SDK's `search`
-  // primitive — the ONE place the search/deep-research capability is defined.
+  // The answer engine (new-tab landing) consumes the @hanzo/ai SDK: `search`
+  // for the grounded modes and `chat.completions` for Chat — the ONE place
+  // each capability is defined.
   // It's a published npm dependency (^0.2.3), so esbuild resolves it from
   // node_modules like any other package — works identically locally and on CI
   // (no sibling-repo path assumption).
