@@ -14,11 +14,22 @@ import type { ChatModel, ModelGroup } from './model-catalog.js';
  * state and never calls a backend — mount it wherever the answer surface lives.
  */
 
-export const MODES: { id: SearchMode; label: string; hint: string }[] = [
+/** What the composer sends. `chat` goes straight to the model; the rest ground
+ *  the question on the live web (`SearchMode` is the wire's own vocabulary). */
+export type Mode = SearchMode | 'chat';
+
+/** The modes, in the order they read as escalating effort. */
+export const MODES: { id: Mode; label: string; hint: string }[] = [
+  { id: 'chat', label: 'Chat', hint: 'Straight to the model' },
   { id: 'search', label: 'Search', hint: 'Fast grounded answer' },
   { id: 'news', label: 'News', hint: 'Recency-biased' },
-  { id: 'research', label: 'Research', hint: 'Multi-source synthesis' },
-  { id: 'deep', label: 'Deep', hint: 'Plan + wide research' },
+  // No 'deep'. It was research with the dials up — same system prompt, same
+  // models, same gate — so two names offered a choice that was really an
+  // intensity, and hid a 2x price behind an adjective. Cloud folded them into
+  // one research mode (apps/answer/mode.go) that always does the deeper pass;
+  // 'deep' still RESOLVES there, so a client that has not shipped this does not
+  // 400 — which is why dropping the tab is safe on its own.
+  { id: 'research', label: 'Research', hint: 'Plans, reads sources, synthesizes' },
 ];
 
 export const SOURCES = ['web', 'news', 'academic', 'github', 'reddit', 'x'];
@@ -27,8 +38,8 @@ export interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
-  mode: SearchMode;
-  setMode: (mode: SearchMode) => void;
+  mode: Mode;
+  setMode: (mode: Mode) => void;
   sources: Set<string>;
   toggleSource: (source: string) => void;
   models: ModelGroup[];
@@ -63,7 +74,7 @@ export function Composer({
       <textarea
         ref={field}
         className="ae-input"
-        placeholder="Type @ for sources or / for modes"
+        placeholder={mode === 'chat' ? 'Ask anything' : 'Type @ for sources or / for modes'}
         value={value}
         rows={1}
         onChange={(e) => onChange(e.target.value)}
@@ -75,17 +86,21 @@ export function Composer({
         }}
       />
       <div className="ae-card-row">
+        {/* The container stays in the row whatever the mode: it is the left half
+            of a space-between, so dropping it would slide the toolbar left.
+            Chat is ungrounded, so it offers no sources to pick. */}
         <div className="ae-chips">
-          {SOURCES.map((s) => (
-            <button
-              key={s}
-              className={'ae-chip' + (sources.has(s) ? ' on' : '')}
-              onClick={() => toggleSource(s)}
-              title={`@${s}`}
-            >
-              @{s}
-            </button>
-          ))}
+          {mode !== 'chat' &&
+            SOURCES.map((s) => (
+              <button
+                key={s}
+                className={'ae-chip' + (sources.has(s) ? ' on' : '')}
+                onClick={() => toggleSource(s)}
+                title={`@${s}`}
+              >
+                @{s}
+              </button>
+            ))}
         </div>
         <div className="ae-card-right">
           <div className="ae-modes">
