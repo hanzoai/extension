@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loginBtn.textContent = 'Signing in...';
     chrome.runtime.sendMessage({ action: 'auth.login' }, (response) => {
       (loginBtn as HTMLButtonElement).disabled = false;
-      loginBtn.textContent = 'Sign In';
+      loginBtn.textContent = 'Sign in';
       if (response?.success) {
         checkAuth();
       }

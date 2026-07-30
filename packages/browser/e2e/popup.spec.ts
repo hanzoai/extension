@@ -12,7 +12,7 @@ test.describe('Popup', () => {
     // Login button should be present
     const loginBtn = page.locator('#login-btn');
     await expect(loginBtn).toBeVisible();
-    await expect(loginBtn).toContainText('Sign In');
+    await expect(loginBtn).toContainText('Sign in');
     await expect(loginBtn).toBeEnabled();
   });
 

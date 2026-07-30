@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { GuiProvider } from '@hanzo/gui';
+import guiConfig from '@hanzo/ui/gui-config';
 import { Composer, MODES, SOURCES, type Mode } from '../src/answer/Composer.js';
 
 /**
@@ -30,7 +32,17 @@ const props = (mode: Mode) => ({
   busy: false,
 });
 
-const draw = (mode: Mode) => renderToStaticMarkup(React.createElement(Composer, props(mode)));
+// The composer now renders through REAL @hanzo/ui, so it mounts the way every
+// consumer must: under GuiProvider — outside it, a gui component throws on
+// first paint.
+const draw = (mode: Mode) =>
+  renderToStaticMarkup(
+    React.createElement(
+      GuiProvider,
+      { config: guiConfig, defaultTheme: 'dark' },
+      React.createElement(Composer, props(mode)),
+    ),
+  );
 const labels = (html: string) =>
   [...html.matchAll(/class="ae-mode[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]);
 
