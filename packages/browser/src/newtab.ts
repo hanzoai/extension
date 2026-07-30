@@ -5,6 +5,8 @@
 import 'webextension-polyfill';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { GuiProvider } from '@hanzo/gui';
+import guiConfig from '@hanzo/ui/gui-config';
 import { AnswerEngine } from './answer/AnswerEngine.js';
 import { API_BASE_URL } from './shared/config.js';
 
@@ -31,13 +33,19 @@ function boot() {
 
   const el = document.getElementById('root');
   if (!el) return;
+  // Every @hanzo/ui component must sit under GuiProvider — a gui component
+  // mounted outside it throws on first paint and takes the whole page with it.
   createRoot(el).render(
-    React.createElement(AnswerEngine, {
-      apiBase: API_BASE_URL,
-      getToken,
-      signIn,
-      ...(initialQuery ? { initialQuery } : {}),
-    }),
+    React.createElement(
+      GuiProvider,
+      { config: guiConfig, defaultTheme: 'dark' },
+      React.createElement(AnswerEngine, {
+        apiBase: API_BASE_URL,
+        getToken,
+        signIn,
+        ...(initialQuery ? { initialQuery } : {}),
+      }),
+    ),
   );
 }
 

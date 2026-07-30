@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import type { SearchMode } from '@hanzo/ai';
+import { Button, Textarea } from '@hanzo/ui';
 import { Models } from './Models.js';
 import type { ChatModel, ModelGroup } from './model-catalog.js';
 
@@ -68,23 +69,21 @@ export function Composer({
   setModel,
   busy,
 }: ComposerProps) {
-  const field = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    const ta = field.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
-  }, [value]);
-
   return (
     <div className="ae-card">
-      <textarea
-        ref={field}
-        className="ae-input"
+      {/* @hanzo/ui field — auto-grows by line count (rows is the floor), so the
+          DOM-measured resize effect the raw <textarea> needed is gone. Blends
+          into .ae-card with transparent bg / no border, matching .ae-input. */}
+      <Textarea
         placeholder={mode === 'chat' ? 'Ask anything' : 'Type @ for sources or / for modes'}
         value={value}
         rows={1}
-        onChange={(e) => onChange(e.target.value)}
+        maxH={200}
+        bg="transparent"
+        borderWidth={0}
+        px={18}
+        fontSize={15}
+        onChangeText={onChange}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -123,15 +122,24 @@ export function Composer({
             ))}
           </div>
           <Models groups={models} current={model} onPick={setModel} />
-          <button className="ae-send" onClick={onSubmit} disabled={busy || !value.trim()} title="Search (Enter)">
-            {busy ? (
-              <span className="ae-spinner" />
-            ) : (
+          {/* @hanzo/ui send control — `isLoading` is the built-in busy signal,
+              so the hand-rolled .ae-spinner is gone with the raw <button>. */}
+          <Button
+            size="icon"
+            rounded={999}
+            width={34}
+            height={34}
+            onPress={onSubmit}
+            disabled={busy || !value.trim()}
+            isLoading={busy}
+            aria-label="Search (Enter)"
+          >
+            {busy ? null : (
               <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
                 <path d="M3 13V3l10 5-10 5z" fill="currentColor" />
               </svg>
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

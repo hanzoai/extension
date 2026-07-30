@@ -18,10 +18,15 @@ test.describe('answer surface', () => {
 
     await page.goto(`chrome-extension://${extensionId}/newtab.html`);
 
-    // The composer.
-    const field = page.locator('textarea.ae-input');
+    // The composer — now REAL @hanzo/ui components (the shared substrate), so
+    // the assertions anchor on the design system's own slot markers, exactly
+    // the contract @hanzo/ui's render suites assert.
+    const field = page.locator('textarea[data-slot="textarea"]');
     await expect(field).toBeVisible();
-    await expect(page.locator('button.ae-send')).toBeVisible();
+    // @hanzo/ui's Button renders role="button" with aria-disabled (the RNW
+    // pressable contract), so the assertions speak ARIA, not tag names.
+    const send = page.locator('[data-slot="button"]');
+    await expect(send).toBeVisible();
 
     // Source pills — the six the surface offers.
     const pills = page.locator('button.ae-chip');
@@ -40,9 +45,9 @@ test.describe('answer surface', () => {
     await expect(page.locator('aside.ae-sidebar button.ae-signin')).toBeVisible();
 
     // Send is inert until there is something to send.
-    await expect(page.locator('button.ae-send')).toBeDisabled();
+    await expect(send).toHaveAttribute('aria-disabled', 'true');
     await field.fill('what does the composer weigh');
-    await expect(page.locator('button.ae-send')).toBeEnabled();
+    await expect(send).not.toHaveAttribute('aria-disabled', 'true');
 
     // A pill toggles on and back off.
     await pills.first().click();

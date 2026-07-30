@@ -255,7 +255,7 @@ class HanzoSidebar {
       const latestAuthBtn = document.getElementById('auth-btn') as HTMLButtonElement | null;
       if (latestAuthBtn) {
         latestAuthBtn.disabled = false;
-        latestAuthBtn.textContent = 'Sign In';
+        latestAuthBtn.textContent = 'Sign in';
       }
     }
   }
