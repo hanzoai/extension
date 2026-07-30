@@ -25,7 +25,12 @@ const BUDGETS = {
   'content-script.js': 340, // 303.9
   'sidebar.js': 400, // 361.5
   'popup.js': 280, // 240.0
-  'newtab.js': 200, // 176.1 — loads on every new tab, so keep it lean
+  // 485.9 — the answer surface now renders through the REAL @hanzo/ui on
+  // @hanzo/gui (the one substrate shared with web/desktop/mobile) instead of
+  // raw DOM elements; the gui runtime is the +310KB (151.9KB gzip). Local
+  // file, no network fetch — the cost is parse, paid for one component system
+  // across every Hanzo surface.
+  'newtab.js': 500,
   'onboarding.js': 40, // 12.8
 };
 

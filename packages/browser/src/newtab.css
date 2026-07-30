@@ -137,6 +137,10 @@ a { color: inherit; text-decoration: none; }
   color: var(--text); font-family: inherit; font-size: 15px; line-height: 1.5;
 }
 .ae-input::placeholder { color: var(--text-3); }
+/* The composer field is @hanzo/ui's Textarea (data-slot is the design system's
+   own marker). It auto-grows by line count, so the browser's manual resize
+   grip is noise inside the card. */
+.ae-card textarea[data-slot="textarea"] { resize: none; }
 .ae-card-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; padding: 8px 10px 10px; flex-wrap: wrap;

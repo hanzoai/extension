@@ -108,7 +108,13 @@ async function build() {
   });
 
   // Answer engine (new-tab landing + omnibox/address-bar search target).
-  // React 18 surface consuming the @hanzo/ai `search` primitive; monochrome.
+  // React surface consuming the @hanzo/ai `search` primitive; monochrome.
+  // Renders through the REAL @hanzo/ui (on @hanzo/gui) — the one substrate the
+  // web app / desktop / mobile share — so the gui runtime needs web resolution:
+  // `.web.*` first (react-native-svg et al ship native fabric files at their
+  // plain specifiers), `react-native` → `react-native-web`, and a defined
+  // process.env (the gui runtime reads NODE_ENV / TAMAGUI_TARGET; an extension
+  // page has no `process`).
   await esbuild.build({
     entryPoints: ['src/newtab.ts'],
     bundle: true,
@@ -118,6 +124,13 @@ async function build() {
     // New-tab page loads on every tab — ship it lean (minified, no inline map).
     minify: true,
     sourcemap: false,
+    alias: { 'react-native': 'react-native-web' },
+    resolveExtensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js', '.json'],
+    define: {
+      'process.env.NODE_ENV': '"production"',
+      'process.env.TAMAGUI_TARGET': '"web"',
+    },
+    banner: { js: 'var process=globalThis.process??{env:{NODE_ENV:"production"}};' },
   });
 
   // Onboarding (new-install consent ask: insights + opt-in training).
