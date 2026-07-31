@@ -1877,3 +1877,34 @@ try {
 
 // Export for testing
 export { browserControl, webgpuAI, zapMgr, zapState };
+
+// omnibox keyword: type `hanzo <query>` in the address bar -> the Hanzo answer
+// engine. This is the ONE search entry that actually works in this browser:
+// chrome_settings_overrides.search_provider is declared beside it, but Brave
+// ignores extension search-provider overrides outright and Chrome honours them
+// only for Web Store installs — so an unpacked build has always had a dead
+// search box. The omnibox is the extension handling its own keyword, which needs
+// no browser cooperation and works unpacked, in Brave and in Chrome alike.
+//
+// Target is hanzo.chat/?q= — the plain query form, same as any search engine, and
+// the same URL the search_provider names, so there is one link shape to remember.
+try {
+  const omnibox = (chrome as any).omnibox;
+  if (omnibox) {
+    omnibox.setDefaultSuggestion({
+      description: 'Search Hanzo AI — AI answers with sources and realtime news',
+    });
+    omnibox.onInputEntered.addListener((text: string, disposition: string) => {
+      const url = 'https://hanzo.chat/?q=' + encodeURIComponent(text);
+      if (disposition === 'newForegroundTab') {
+        void chrome.tabs.create({ url });
+      } else if (disposition === 'newBackgroundTab') {
+        void chrome.tabs.create({ url, active: false });
+      } else {
+        void chrome.tabs.update({ url });
+      }
+    });
+  }
+} catch (e) {
+  console.warn('[Hanzo] omnibox unavailable:', e);
+}

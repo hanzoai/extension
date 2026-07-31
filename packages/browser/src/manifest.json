@@ -54,6 +54,9 @@
     "48": "icon48.png",
     "128": "icon128.png"
   },
+  "omnibox": {
+    "keyword": "hanzo"
+  },
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
@@ -61,7 +64,7 @@
     "search_provider": {
       "name": "Hanzo",
       "keyword": "hanzo",
-      "search_url": "https://hanzo.chat/c/new?q={searchTerms}&submit=true",
+      "search_url": "https://hanzo.chat/?q={searchTerms}",
       "favicon_url": "https://hanzo.ai/favicon.ico",
       "encoding": "UTF-8",
       "is_default": true
