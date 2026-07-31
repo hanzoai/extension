@@ -88,6 +88,12 @@ const pageMonitor = new PageMonitor();
 // Initialize CDP bridge for hanzo-mcp integration
 const cdpBridge: CDPBridge = getCDPBridge();
 
+// DOM verbs (getText, type, hover, …) forward from the CDP bridge to
+// BrowserControl, which runs them via chrome.scripting.executeScript. Both live
+// in this one service worker, so the bridge must call BrowserControl directly —
+// chrome.runtime.sendMessage never delivers to a same-worker listener.
+cdpBridge.setDomDispatch((request) => browserControl.dispatchAction(request));
+
 // Route CDP events to PageMonitor
 chrome.debugger.onEvent.addListener((source, method, params) => {
   if (source.tabId) {
