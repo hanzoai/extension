@@ -63,6 +63,13 @@ export const STORAGE_KEYS = {
 /** Cloud API base — override via storage key 'hanzo_config_api_base' */
 export const API_BASE_URL = 'https://api.hanzo.ai';
 
+/**
+ * Public catalog base — models, pricing and plans, read-only, edge-cached, no
+ * token. A different host because it is a different thing: API_BASE_URL is the
+ * authenticated API and every path on it needs a bearer.
+ */
+export const CATALOG_BASE_URL = 'https://catalog.hanzo.ai';
+
 // ── KMS (Secrets Management) ──────────────────────────────────────────
 
 /** KMS API base — override via storage key 'hanzo_config_kms_url' */
