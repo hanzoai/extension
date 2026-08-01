@@ -94,7 +94,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
   // best model" instead of a dead selection. Only the initial pick is
   // overridden: `picked` guards a user's choice against a late catalog resolve.
   useEffect(() => {
-    fetchModelCatalog(apiBase)
+    fetchModelCatalog()
       .then(({ groups }) => {
         setModelGroups(groups);
         if (picked.current) return;
