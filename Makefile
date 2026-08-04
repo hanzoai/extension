@@ -13,6 +13,7 @@ help:
 	@echo "${GREEN}Hanzo Dev - Local Development${RESET}"
 	@echo ""
 	@echo "${YELLOW}Available commands:${RESET}"
+	@echo "  ${CYAN}make help${RESET}          - Show this help"
 	@echo "  ${CYAN}make install${RESET}       - Install all dependencies"
 	@echo "  ${CYAN}make setup${RESET}         - Set up for local development"
 	@echo "  ${CYAN}make dev${RESET}           - Start development mode"
