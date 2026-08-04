@@ -1,4 +1,4 @@
-.PHONY: help install setup dev build test clean link login publish release release-minor release-major tag push version-patch version-minor version-major changelog lint format verify update outdated audit new-package run-claude run-aider run-openhands run-gemini run-codex run-grok compare
+.PHONY: help install setup dev build test clean distclean link login publish release release-minor release-major tag push version-patch version-minor version-major changelog lint format verify update outdated audit new-package run-claude run-aider run-openhands run-gemini run-codex run-grok compare
 
 # Colors
 GREEN := $(shell tput -Txterm setaf 2)
@@ -23,6 +23,7 @@ help:
 	@echo "  ${CYAN}make lint${RESET}          - Lint code"
 	@echo "  ${CYAN}make format${RESET}        - Format code"
 	@echo "  ${CYAN}make clean${RESET}         - Clean build artifacts"
+	@echo "  ${CYAN}make distclean${RESET}     - Clean build artifacts and node_modules"
 	@echo ""
 	@echo "${YELLOW}Release commands:${RESET}"
 	@echo "  ${CYAN}make release${RESET}       - Create a patch release (test, build, version, tag, push, publish)"
@@ -34,7 +35,7 @@ help:
 	@echo "  ${CYAN}make changelog${RESET}     - Generate changelog from commits"
 	@echo ""
 	@echo "${YELLOW}Maintenance commands:${RESET}"
-	@echo "  ${CYAN}make verify${RESET}        - Run all checks (clean, install, build, test, lint)"
+	@echo "  ${CYAN}make verify${RESET}        - Run all checks (distclean, install, build, test, lint)"
 	@echo "  ${CYAN}make update${RESET}        - Update dependencies interactively"
 	@echo "  ${CYAN}make outdated${RESET}      - Check for outdated packages"
 	@echo "  ${CYAN}make audit${RESET}         - Run security audit"
@@ -108,10 +109,17 @@ clean:
 	@echo "${YELLOW}Cleaning build artifacts...${RESET}"
 	@rm -rf out dist
 	@rm -rf packages/*/dist
+	@echo "${GREEN}✓ Clean complete!${RESET}"
+
+# The dependency trees, on top of the build output. Separate from clean because
+# removing node_modules is a re-install and not a rebuild — `make clean` should
+# cost a build, never a download.
+distclean: clean
+	@echo "${YELLOW}Removing node_modules...${RESET}"
 	@rm -rf node_modules
 	@rm -rf packages/*/node_modules
 	@rm -rf apps/*/node_modules
-	@echo "${GREEN}✓ Clean complete!${RESET}"
+	@echo "${GREEN}✓ Distclean complete!${RESET}"
 
 # Quick commands for development
 run-claude:
@@ -205,8 +213,9 @@ changelog:
 	@git log --pretty=format:"* %s (%h)" $$(git describe --tags --abbrev=0)..HEAD > CHANGELOG.md
 	@echo "${GREEN}✓ Changelog generated!${RESET}"
 
-# Verify everything is working
-verify: clean install build test lint
+# Verify everything is working. distclean, not clean, so this keeps doing exactly
+# what it did before the split: a cold tree, reinstalled from the lockfile.
+verify: distclean install build test lint
 	@echo "${GREEN}✓ All checks passed!${RESET}"
 
 # Update dependencies
