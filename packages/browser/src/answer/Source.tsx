@@ -16,9 +16,9 @@ export function Source({ source, index }: { source: SearchSource; index: number 
   return (
     <a className="ae-source" href={source.url} target="_blank" rel="noreferrer" title={source.title}>
       <span className="ae-source-head">
+        <span className="ae-source-idx">{index + 1}</span>
         {source.favicon ? <img src={source.favicon} alt="" width="14" height="14" /> : <span className="ae-dot" />}
         <span className="ae-source-host">{host}</span>
-        <span className="ae-source-idx">{index + 1}</span>
       </span>
       <span className="ae-source-title">{source.title}</span>
     </a>
