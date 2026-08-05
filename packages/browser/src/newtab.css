@@ -350,3 +350,12 @@ a { color: inherit; text-decoration: none; }
   .ae-modes { flex: 1; justify-content: space-between; }
   .ae-source { flex-basis: 150px; }
 }
+
+/* The fallback escape hatch on the expired-session card. Quiet: it is the
+   second choice, offered so the surface is never a dead end. */
+.ae-fallback-link {
+  display: inline-block; margin-top: 12px;
+  color: var(--text-3); font-size: 13px; text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ae-fallback-link:hover { color: var(--text); }
