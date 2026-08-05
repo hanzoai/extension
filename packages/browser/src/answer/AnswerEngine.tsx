@@ -59,7 +59,9 @@ export interface AnswerEngineProps {
 }
 
 export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: AnswerEngineProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Sidebar hidden by default — the answer surface should read like hanzo.chat:
+  // a single centered column. A fixed toggle (below) brings the rail back.
+  const [collapsed, setCollapsed] = useState(true);
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
   const [mode, setMode] = useState<Mode>('search');
@@ -245,6 +247,16 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
 
   return (
     <div className={'ae-root' + (collapsed ? ' collapsed' : '')}>
+      <button
+        className="ae-reveal"
+        onClick={() => setCollapsed((v) => !v)}
+        title="Toggle sidebar"
+        aria-label="Toggle sidebar"
+      >
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <path d="M2 4h12M2 8h12M2 12h12" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        </svg>
+      </button>
       <Rail
         collapsed={collapsed}
         toggle={() => setCollapsed((v) => !v)}

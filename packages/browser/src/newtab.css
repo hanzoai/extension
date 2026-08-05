@@ -1,17 +1,20 @@
 /* Hanzo Answer Engine — strict monochrome (brand primaryColor #FFFFFF).
    Shared tokens mirror popup.css / sidebar.css. */
 :root {
-  --bg: #0a0a0a;
-  --surface: #0f0f0f;
-  --surface-2: #171717;
-  --surface-3: #1e1e1e;
-  --text: #fafafa;
-  --text-2: #a3a3a3;
-  --text-3: #666666;
-  --border: rgba(255, 255, 255, 0.10);
-  --border-2: rgba(255, 255, 255, 0.16);
-  --glass: rgba(255, 255, 255, 0.04);
-  --glass-2: rgba(255, 255, 255, 0.07);
+  /* hanzo.chat dark palette — the exact gray scale from chat/client/src/style.css
+     (.dark). One brand, one set of tokens; the extension is no longer its own look. */
+  --bg: #000000;            /* surface-primary  / gray-975 */
+  --surface: #050505;       /* surface-secondary / gray-950 — source & hero cards */
+  --surface-2: #0d0d0d;     /* surface-primary-contrast / gray-900 — hover fills */
+  --surface-3: #171717;     /* surface-tertiary / gray-850 — number pills, selected mode */
+  --surface-active: #2f2f2f;/* surface-active / gray-700 — selected chip (NOT a white lozenge) */
+  --text: #ececec;          /* text-primary / gray-100 */
+  --text-2: #cdcdcd;        /* text-secondary / gray-300 */
+  --text-3: #999696;        /* text-secondary-alt / gray-400 */
+  --border: #171717;        /* border-light / gray-850 */
+  --border-2: #212121;      /* border-medium / gray-800 */
+  --glass: rgba(255, 255, 255, 0.03);
+  --glass-2: rgba(255, 255, 255, 0.06);
   --radius: 12px;
   --radius-sm: 8px;
   --radius-xs: 6px;
@@ -37,7 +40,20 @@ a { color: inherit; text-decoration: none; }
   height: 100vh;
   transition: grid-template-columns 0.18s ease;
 }
-.ae-root.collapsed { grid-template-columns: 60px 1fr; }
+/* Hidden by default: the rail collapses to nothing and the main column centers,
+   so the surface reads like hanzo.chat. The fixed .ae-reveal toggles it back. */
+.ae-root.collapsed { grid-template-columns: 0 1fr; }
+.ae-root.collapsed .ae-sidebar { display: none; }
+
+/* Fixed sidebar reveal — shown only when the rail is hidden. */
+.ae-reveal {
+  position: fixed; top: 14px; left: 14px; z-index: 50;
+  width: 34px; height: 34px; display: none; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xs);
+  color: var(--text-3); cursor: pointer;
+}
+.ae-root.collapsed .ae-reveal { display: flex; }
+.ae-reveal:hover { color: var(--text); background: var(--surface-2); }
 
 /* ── Sidebar ─────────────────────────────────────────────── */
 .ae-sidebar {
@@ -68,11 +84,11 @@ a { color: inherit; text-decoration: none; }
 .ae-new {
   display: flex; align-items: center; gap: 8px;
   margin-top: 8px; padding: 9px 12px;
-  background: var(--text); color: #000; border: none;
-  border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  background: var(--surface-3); color: var(--text); border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm); font-size: 13px; font-weight: 500;
   white-space: nowrap; overflow: hidden;
 }
-.ae-new:hover { background: #fff; }
+.ae-new:hover { background: var(--surface-hover, #212121); border-color: var(--border-2); }
 .ae-nav { display: flex; flex-direction: column; margin-top: 12px; gap: 1px; }
 .ae-nav a {
   padding: 8px 10px; border-radius: var(--radius-xs);
@@ -151,8 +167,9 @@ a { color: inherit; text-decoration: none; }
   background: var(--glass); border: 1px solid var(--border);
   color: var(--text-3); font-size: 11px; font-family: inherit;
 }
-.ae-chip:hover { color: var(--text-2); }
-.ae-chip.on { background: var(--text); color: #000; border-color: var(--text); }
+.ae-chip:hover { color: var(--text-2); background: var(--surface-2); }
+/* Selected is a step UP the surface ladder, not a white lozenge (chat ModeChips). */
+.ae-chip.on { background: var(--surface-active); color: var(--text); border-color: transparent; font-weight: 500; }
 .ae-card-right { display: flex; align-items: center; gap: 6px; }
 .ae-modes { display: flex; gap: 2px; background: var(--glass); border-radius: var(--radius-xs); padding: 2px; }
 .ae-mode {
@@ -160,7 +177,7 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-3); font-size: 11.5px; font-family: inherit; border-radius: 5px;
 }
 .ae-mode:hover { color: var(--text-2); }
-.ae-mode.on { background: var(--surface-3); color: var(--text); }
+.ae-mode.on { background: var(--surface-active); color: var(--text); font-weight: 500; }
 .ae-send {
   width: 34px; height: 34px; flex-shrink: 0; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -217,17 +234,23 @@ a { color: inherit; text-decoration: none; }
 .ae-answer-scroll > * { max-width: 760px; margin-left: auto; margin-right: auto; }
 .ae-question { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 20px; }
 .ae-sources { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 16px; margin-bottom: 8px; }
+/* Source card — chat AnswerView: 160px, number pill first, favicon, host, 3-line title. */
 .ae-source {
-  flex: 0 0 190px; display: flex; flex-direction: column; gap: 6px;
-  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--surface);
+  flex: 0 0 168px; display: flex; flex-direction: column; gap: 6px;
+  padding: 10px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); transition: background 0.12s ease;
 }
-.ae-source:hover { border-color: var(--border-2); background: var(--surface-2); }
+.ae-source:hover { background: var(--surface-2); }
 .ae-source-head { display: flex; align-items: center; gap: 6px; }
-.ae-source-head img { border-radius: 3px; }
-.ae-source-host { font-size: 11px; color: var(--text-3); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ae-source-idx { font-size: 10px; color: var(--text-3); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
-.ae-source-title { font-size: 12.5px; line-height: 1.35; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ae-source-head img { border-radius: 3px; flex-shrink: 0; }
+.ae-source-host { font-size: 11px; color: var(--text-2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ae-source-idx {
+  flex: 0 0 auto; width: 16px; height: 16px; padding: 0; border: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 500; color: var(--text-2);
+  background: var(--surface-3); border-radius: 50%;
+}
+.ae-source-title { font-size: 12px; line-height: 1.35; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 .ae-status { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 14px; padding: 8px 0; }
 
