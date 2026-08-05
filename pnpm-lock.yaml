@@ -148,8 +148,8 @@ importers:
   packages/browser:
     dependencies:
       '@hanzo/ai':
-        specifier: ^0.2.3
-        version: 0.2.3
+        specifier: ^0.3.1
+        version: 0.3.1
       '@hanzo/data':
         specifier: ^1.2.1
         version: 1.2.2(@hanzo/gui@7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0))(react@19.2.8)
@@ -158,7 +158,7 @@ importers:
         version: 7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0)
       '@hanzo/ui':
         specifier: ^8.0.34
-        version: 8.0.34(4hrbsawrnxupfapmowftxyw5ae)
+        version: 8.0.34(a1cf373604b662df4a10beb88893cb95)
       '@hanzo/usage':
         specifier: ^0.1.6
         version: 0.1.6(@hanzo/gui@7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0))(@hanzogui/lucide-icons-2@7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native-svg@15.15.5(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0))(react@19.2.8)
@@ -612,22 +612,6 @@ importers:
       zod-to-json-schema:
         specifier: ^3.22.4
         version: 3.25.2(zod@3.25.76)
-    optionalDependencies:
-      '@lancedb/lancedb':
-        specifier: ^0.13.0
-        version: 0.13.0(apache-arrow@18.1.0)
-      '@xenova/transformers':
-        specifier: ^2.17.2
-        version: 2.17.2
-      jsautogui:
-        specifier: ^1.0.0
-        version: 1.0.6
-      playwright:
-        specifier: 1.55.1
-        version: 1.55.1
-      playwright-core:
-        specifier: ^1.47.0
-        version: 1.55.1
     devDependencies:
       '@jest/globals':
         specifier: ^30.1.2
@@ -659,6 +643,22 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.8.3
+    optionalDependencies:
+      '@lancedb/lancedb':
+        specifier: ^0.13.0
+        version: 0.13.0(apache-arrow@18.1.0)
+      '@xenova/transformers':
+        specifier: ^2.17.2
+        version: 2.17.2
+      jsautogui:
+        specifier: ^1.0.0
+        version: 1.0.6
+      playwright:
+        specifier: 1.55.1
+        version: 1.55.1
+      playwright-core:
+        specifier: ^1.47.0
+        version: 1.55.1
 
   packages/meetings:
     dependencies:
@@ -3073,6 +3073,10 @@ packages:
 
   '@hanzo/ai@0.2.3':
     resolution: {integrity: sha512-vL042sYaVzmWUTrjcCrx3Gay/a+oa9Mgv1cVetapeyikSS4wKOw9lMdSbxw2OD8puJK/Ozew7cglL43MYI9L3Q==}
+    engines: {node: '>=18'}
+
+  '@hanzo/ai@0.3.1':
+    resolution: {integrity: sha512-c6dOPc8z3tONUjh8VSurwu9+1qRFH6sMXkbUX/NEfqerSaLawr0MGo8J6CAFn7p6ZDv0xB/uxICb1t+mmnLVKg==}
     engines: {node: '>=18'}
 
   '@hanzo/data@1.2.2':
@@ -15533,6 +15537,8 @@ snapshots:
 
   '@hanzo/ai@0.2.3': {}
 
+  '@hanzo/ai@0.3.1': {}
+
   '@hanzo/data@1.2.2(@hanzo/gui@7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0))(react@19.2.8)':
     dependencies:
       '@hanzo/gui': 7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0)
@@ -15660,7 +15666,7 @@ snapshots:
 
   '@hanzo/tokens@1.0.0': {}
 
-  '@hanzo/ui@8.0.34(4hrbsawrnxupfapmowftxyw5ae)':
+  '@hanzo/ui@8.0.34(a1cf373604b662df4a10beb88893cb95)':
     dependencies:
       '@hanzo/data': 1.2.2(@hanzo/gui@7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0))(react@19.2.8)
       '@hanzo/gui': 7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0)
