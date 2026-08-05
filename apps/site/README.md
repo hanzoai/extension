@@ -104,4 +104,4 @@ pnpm build
 - [Hanzo AI](https://hanzo.ai)
 - [Documentation](https://docs.hanzo.ai)
 - [GitHub](https://github.com/hanzoai)
-- [Discord](https://discord.gg/hanzoai)
+- [Discord](https://discord.gg/CJCyAsm9Vr)

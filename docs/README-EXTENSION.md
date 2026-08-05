@@ -103,7 +103,7 @@ The extension works out of the box after login. For advanced configuration:
 
 - 🌐 [Hanzo AI](https://hanzo.ai)
 - 📖 [Documentation](https://docs.hanzo.ai)
-- 💬 [Discord Community](https://discord.gg/hanzoai)
+- 💬 [Discord Community](https://discord.gg/CJCyAsm9Vr)
 - 📧 [Support](mailto:support@hanzo.ai)
 
 ---
