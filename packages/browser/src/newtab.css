@@ -19,6 +19,10 @@
   --radius-sm: 8px;
   --radius-xs: 6px;
   --sidebar-w: 232px;
+  /* The icon-rail width is @hanzo/ui primitives/sidebar's SIDEBAR_WIDTH_ICON
+     (3rem). Kept as that value, not a local guess, so the rail here and the
+     shared primitive collapse to the same size on every surface. */
+  --rail-w: 3rem;
 }
 
 * { box-sizing: border-box; }
@@ -40,20 +44,31 @@ a { color: inherit; text-decoration: none; }
   height: 100vh;
   transition: grid-template-columns 0.18s ease;
 }
-/* Hidden by default: the rail collapses to nothing and the main column centers,
-   so the surface reads like hanzo.chat. The fixed .ae-reveal toggles it back. */
-.ae-root.collapsed { grid-template-columns: 0 1fr; }
-.ae-root.collapsed .ae-sidebar { display: none; }
+/* COLLAPSED IS AN ICON RAIL, NEVER NOTHING.
+   `grid-template-columns: 0` + `display:none` erased the sidebar outright, so the
+   surface had no brand, no way back, and read as a blank page. This is the
+   `collapsible="icon"` behaviour of @hanzo/ui primitives/sidebar, and the width is
+   ITS token (SIDEBAR_WIDTH_ICON = 3rem) rather than a number picked here — so
+   swapping this rail for the shared primitive is a substitution, not a redesign. */
+.ae-root.collapsed { grid-template-columns: var(--rail-w) 1fr; }
 
-/* Fixed sidebar reveal — shown only when the rail is hidden. */
-.ae-reveal {
-  position: fixed; top: 14px; left: 14px; z-index: 50;
-  width: 34px; height: 34px; display: none; align-items: center; justify-content: center;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xs);
-  color: var(--text-3); cursor: pointer;
+/* Hovering THE RAIL opens it — matched with :has() on the sidebar, never on
+   .ae-root. .ae-root is the full-viewport grid container, so `.ae-root:hover`
+   is true anywhere on the page: the sidebar would spring open while the pointer
+   sat in the answer column. Measured, not guessed.
+   Pointer-only, so a touch device is not stuck half-open; :focus-within is the
+   keyboard equivalent. */
+@media (hover: hover) and (pointer: fine) {
+  .ae-root.collapsed:has(.ae-sidebar:hover),
+  .ae-root.collapsed:has(.ae-sidebar:focus-within) {
+    grid-template-columns: var(--sidebar-w) 1fr;
+  }
 }
-.ae-root.collapsed .ae-reveal { display: flex; }
-.ae-reveal:hover { color: var(--text); background: var(--surface-2); }
+/* Labels follow the SIDEBAR's own state, for the same reason. */
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) .ae-brand span,
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) .ae-new span,
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) .ae-nav,
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) .ae-signin-label { display: none; }
 
 /* ── Sidebar ─────────────────────────────────────────────── */
 .ae-sidebar {
@@ -104,7 +119,16 @@ a { color: inherit; text-decoration: none; }
 }
 .ae-signin:hover { border-color: var(--border-2); background: var(--surface-2); }
 .ae-signin.big { width: auto; padding: 10px 18px; font-size: 14px; }
-.collapsed .ae-brand span, .collapsed .ae-new span, .collapsed .ae-nav { display: none; }
+/* Icon-rail geometry. Centre the glyphs and drop the label gaps so a 3rem rail
+   holds them without clipping; the :not(:hover) rules above own visibility. */
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) { padding: 14px 6px; align-items: center; overflow: hidden; }
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) .ae-side-top { justify-content: center; }
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) .ae-collapse { display: none; }
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) .ae-brand,
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) .ae-new,
+.ae-root.collapsed .ae-sidebar:not(:hover):not(:focus-within) .ae-signin {
+  gap: 0; padding: 8px; justify-content: center; width: auto;
+}
 
 /* ── Main ────────────────────────────────────────────────── */
 .ae-main { min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
@@ -291,8 +315,29 @@ a { color: inherit; text-decoration: none; }
 @keyframes ae-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 720px) {
-  .ae-root, .ae-root.collapsed { grid-template-columns: 1fr; }
-  .ae-sidebar { display: none; }
+  /* The rail SURVIVES on mobile as icons. `display:none` here used to be safe only
+     because a fixed reveal button floated above it; that button is gone (the rail
+     carries its own control now), so hiding the sidebar would leave a phone with no
+     brand, no new-thread and no sign-in at all. 3rem is 48px — it costs almost
+     nothing and keeps one layout from phone to desktop.
+     Hover-open does not apply here: the rule above is gated on (hover: hover), so a
+     touch device toggles with the button rather than sticking half-open. */
+  .ae-root, .ae-root.collapsed { grid-template-columns: var(--rail-w) 1fr; }
+  /* Hover must NOT widen the rail here. 232px out of a 390px viewport leaves the
+     answer column unreadable, and a desktop browser at a small window still
+     reports a fine pointer — so the (hover: hover) guard alone does not cover it.
+     This block is later in the file at equal specificity, so it wins. */
+  .ae-root.collapsed:has(.ae-sidebar:hover),
+  .ae-root.collapsed:has(.ae-sidebar:focus-within) {
+    grid-template-columns: var(--rail-w) 1fr;
+  }
+  /* Explicitly opened, the sidebar OVERLAYS rather than pushing: the grid keeps
+     the rail's width so the content column never shrinks. */
+  .ae-root:not(.collapsed) { grid-template-columns: var(--rail-w) 1fr; }
+  .ae-root:not(.collapsed) .ae-sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0; width: var(--sidebar-w);
+    z-index: 60; box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+  }
   .ae-news-grid { grid-template-columns: 1fr; }
   .ae-hero { gap: 20px; padding: 20px 16px; justify-content: flex-start; padding-top: 48px; }
   .ae-answer-scroll { padding: 20px 16px 16px; }
