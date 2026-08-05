@@ -70,6 +70,29 @@ export const API_BASE_URL = 'https://api.hanzo.ai';
  */
 export const CATALOG_BASE_URL = 'https://catalog.hanzo.ai';
 
+// ── Telemetry ──────────────────────────────────────────────────────────
+
+/**
+ * Publishable event-ingest key (`pk-…`) for `POST {API_BASE_URL}/v1/event`,
+ * inlined at build time from the `EVENT_INGEST_KEY` env by `src/build.js`.
+ *
+ * Write-only and safe to ship in the bundle: it attributes a write to our org
+ * and mints no reading principal. WITHOUT it cloud files the extension's events
+ * under the reserved `$public` tenant, which stores only pageview/error and
+ * which our own org cannot read — so telemetry appears to work and records
+ * nothing an operator can ever see. That failure is invisible from the client,
+ * which is why the key belongs in the build env.
+ *
+ * Mint one per org: `POST /v1/keys {"type":"publishable"}`.
+ *
+ * Read through `typeof`, not a bare reference: when the define is absent (unit
+ * tests run the TypeScript directly, with no esbuild pass) the identifier is
+ * undeclared, and `typeof` is the only safe operator on an undeclared name.
+ */
+declare const __EVENT_INGEST_KEY__: string | undefined
+export const EVENT_INGEST_KEY: string | undefined =
+  typeof __EVENT_INGEST_KEY__ === 'string' && __EVENT_INGEST_KEY__ ? __EVENT_INGEST_KEY__ : undefined
+
 // ── KMS (Secrets Management) ──────────────────────────────────────────
 
 /** KMS API base — override via storage key 'hanzo_config_kms_url' */
