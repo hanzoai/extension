@@ -17,13 +17,21 @@
 //
 // Everything is fail-soft: a network error NEVER breaks a user action, and
 // nothing is sent for a switch that is off.
-import { API_BASE_URL } from './config.js';
+//
+// The SEND is `@hanzo/event` — the ONE Hanzo telemetry client, posting to
+// `POST /v1/event`. This module used to hand-roll its own wire
+// (`POST /v1/insights` with `{event, props, anon_id, ts, source}`) and its own
+// anonymous id, which made the extension a second telemetry protocol behind a
+// second door: the events landed in a store none of the cloud lenses
+// (analytics/insights/sentry) read, so the surface was dark in every dashboard
+// while looking instrumented from here. One wire, one door, one client.
+import { createAnalytics, type Analytics } from '@hanzo/event';
+import { API_BASE_URL, EVENT_INGEST_KEY } from './config.js';
 
 const KEYS = {
   insights: 'hanzo_insights_enabled',
   training: 'hanzo_share_training',
   onboarded: 'hanzo_onboarded',
-  anonId: 'hanzo_anon_id',
 } as const;
 
 export interface Consent {
@@ -128,29 +136,68 @@ export async function markOnboarded(): Promise<void> {
   await setLocal({ [KEYS.onboarded]: true });
 }
 
-async function anonId(): Promise<string> {
-  const v = await getLocal([KEYS.anonId]);
-  if (typeof v[KEYS.anonId] === 'string') return v[KEYS.anonId];
-  const id =
-    globalThis.crypto?.randomUUID?.() ??
-    `a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  await setLocal({ [KEYS.anonId]: id });
-  return id;
+/**
+ * Browser-level opt-out. Do Not Track and Global Privacy Control sit ABOVE the
+ * account switch: a user who set either has already answered, and the SDK reads
+ * neither, so every surface applies them itself.
+ *
+ * Guarded on `navigator` because this module is also reachable from the
+ * background service worker, whose WorkerNavigator carries none of these.
+ */
+function privacySignalsAllow(): boolean {
+  // `typeof`, not a bare read: the identifier may be undeclared entirely, and
+  // typeof is the only safe operator on an undeclared name.
+  if (typeof navigator === 'undefined') return true;
+  const n = navigator as Navigator & { msDoNotTrack?: string; globalPrivacyControl?: boolean };
+  const dnt = n.doNotTrack ?? n.msDoNotTrack;
+  if (dnt === '1' || dnt === 'yes') return false;
+  if (n.globalPrivacyControl) return false;
+  return true;
+}
+
+/**
+ * The ONE telemetry client, built lazily so it is never constructed for a user
+ * who has not consented — construction is what would install the SDK's global
+ * hooks, and a disabled client that exists is a claim waiting to be forgotten.
+ *
+ * No `getToken`. The SDK's is synchronous and this extension's bearer is only
+ * reachable by an async round-trip to the background broker, so these events ride
+ * the anonymous lane on the publishable `pk-` key — which is exactly what the
+ * previous hand-rolled send did, and what the `insights` consent describes.
+ *
+ * `captureErrors: false` on purpose. The consent the user actually gave covers
+ * "anonymous product events … only which surface fired". Stack traces are not
+ * that, and quietly widening what is collected under an unchanged consent string
+ * is a privacy regression, not a feature. Turning it on means changing the ask.
+ */
+let client: Analytics | null = null;
+function events(): Analytics {
+  if (!client) {
+    client = createAnalytics({
+      product: 'extension',
+      host: API_BASE_URL,
+      ingestKey: EVENT_INGEST_KEY,
+      captureErrors: false,
+    });
+  }
+  return client;
 }
 
 /** Anonymous product-usage event. No query/answer text, no PII. No-op when
- *  insights is off. Never throws. */
+ *  insights is off or the browser signals opt-out. Never throws. */
 export async function capture(event: string, props?: Record<string, unknown>): Promise<void> {
   try {
+    if (!privacySignalsAllow()) return;
     const c = await getConsent();
     if (!c.insights) return;
-    const anon_id = await anonId();
-    await fetch(`${API_BASE_URL}/v1/insights`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ event, props: props ?? {}, anon_id, ts: Date.now(), source: 'extension' }),
-      keepalive: true,
-    }).catch(() => {});
+    const a = events();
+    a.capture(event, props);
+    // Flush NOW, on a beacon. Every call site here fires as its surface is going
+    // away — `popup_opened` races the popup closing, `onboarding_complete` closes
+    // its own tab on the next line — and a batched event on a torn-down page is
+    // an event that never shipped. This is what the previous `keepalive: true`
+    // bought, kept.
+    a.flush(true);
   } catch {
     /* fail-soft */
   }

@@ -153,6 +153,9 @@ importers:
       '@hanzo/data':
         specifier: ^1.2.1
         version: 1.2.2(@hanzo/gui@7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0))(react@19.2.8)
+      '@hanzo/event':
+        specifier: ^0.3.11
+        version: 0.3.11(react@19.2.8)
       '@hanzo/gui':
         specifier: ^7.3.0
         version: 7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0)
@@ -3085,8 +3088,8 @@ packages:
       '@hanzo/gui': '>=7.2.2'
       react: '>=19'
 
-  '@hanzo/event@0.3.4':
-    resolution: {integrity: sha512-dRq2Nkzd+uMBOyJEuWTCLk5b1K15Hvk0VFFyvepldc/bgBuygxEoFCaJw4vawCfaKF5GRPnCmu1FCbron0mveA==}
+  '@hanzo/event@0.3.11':
+    resolution: {integrity: sha512-HLdDWZPPonel3HPgmDOQ+LqXPV8hPEMZFGnXlFT2gPQq+MxcHgAY482Y9jHCCKwLFo8v805FZ81ylTlBAl5RVQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
     peerDependenciesMeta:
@@ -15544,7 +15547,7 @@ snapshots:
       '@hanzo/gui': 7.3.1(encoding@0.1.13)(expo@57.0.9)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.6)(@react-native/metro-config@0.86.2(@babel/core@7.29.6))(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)(sf-symbols-typescript@2.2.0)
       react: 19.2.8
 
-  '@hanzo/event@0.3.4(react@19.2.8)':
+  '@hanzo/event@0.3.11(react@19.2.8)':
     optionalDependencies:
       react: 19.2.8
 
@@ -15655,7 +15658,7 @@ snapshots:
 
   '@hanzo/observe@0.1.1(react@19.2.8)':
     dependencies:
-      '@hanzo/event': 0.3.4(react@19.2.8)
+      '@hanzo/event': 0.3.11(react@19.2.8)
     optionalDependencies:
       react: 19.2.8
 
@@ -17579,7 +17582,7 @@ snapshots:
 
   '@hanzogui/telemetry@0.1.1(react@19.2.8)':
     dependencies:
-      '@hanzo/event': 0.3.4(react@19.2.8)
+      '@hanzo/event': 0.3.11(react@19.2.8)
       '@hanzo/observe': 0.1.1(react@19.2.8)
       react: 19.2.8
 
@@ -20194,7 +20197,9 @@ snapshots:
       metro-runtime: 0.84.4
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
 
   '@react-native/normalize-color@2.1.0': {}
 
