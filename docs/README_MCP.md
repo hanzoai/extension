@@ -305,7 +305,7 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) for deta
 
 - Documentation: [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md)
 - Issues: [GitHub Issues](https://github.com/hanzoai/extension/issues)
-- Discord: [Hanzo Community](https://discord.gg/hanzo)
+- Discord: [Hanzo Community](https://discord.gg/CJCyAsm9Vr)
 
 ## Acknowledgments
 

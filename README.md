@@ -295,7 +295,7 @@ npm run deploy:preview # Deploy preview
 
 ## 🔗 Links
 
-🚀 **[Login to Hanzo AI](https://iam.hanzo.ai)** | 🌐 **[Hanzo AI](https://hanzo.ai)** | 📖 **[Docs](https://docs.hanzo.ai)** | 💬 **[Discord](https://discord.gg/hanzoai)** | 📱 **[Download Apps](https://hanzo.app)**
+🚀 **[Login to Hanzo AI](https://iam.hanzo.ai)** | 🌐 **[Hanzo AI](https://hanzo.ai)** | 📖 **[Docs](https://docs.hanzo.ai)** | 💬 **[Discord](https://discord.gg/CJCyAsm9Vr)** | 📱 **[Download Apps](https://hanzo.app)**
 
 ---
 

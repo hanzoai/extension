@@ -302,4 +302,4 @@ Error: Model xyz not available through Hanzo AI
 
 **Hanzo AI is the unified platform for building AI-powered companies.** Access 200+ models through one API, 4000+ MCP servers, legendary programmer modes, unlimited memory with vector/graph/relational search, browser automation, and everything you need to supercharge AI development. 
 
-🚀 **[Get Started](https://iam.hanzo.ai)** | 📖 **[View Modes & Features](./HANZO_MODES.md)** | 💬 **[Join Discord](https://discord.gg/hanzoai)**
+🚀 **[Get Started](https://iam.hanzo.ai)** | 📖 **[View Modes & Features](./HANZO_MODES.md)** | 💬 **[Join Discord](https://discord.gg/CJCyAsm9Vr)**

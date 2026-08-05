@@ -249,7 +249,7 @@ Enable debug logging:
 
 - GitHub Issues: https://github.com/hanzoai/extension/issues
 - Documentation: https://github.com/hanzoai/extension
-- Discord: https://discord.gg/hanzo
+- Discord: https://discord.gg/CJCyAsm9Vr
 
 ## Security
 

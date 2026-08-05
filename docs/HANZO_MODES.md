@@ -313,6 +313,6 @@ team:
 
 🚀 [Sign up at iam.hanzo.ai](https://iam.hanzo.ai) to get started
 
-💬 Join our community: [discord.gg/hanzoai](https://discord.gg/hanzoai)
+💬 Join our community: [discord.gg/CJCyAsm9Vr](https://discord.gg/CJCyAsm9Vr)
 
 📚 Documentation: [docs.hanzo.ai](https://docs.hanzo.ai)
