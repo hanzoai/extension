@@ -8,6 +8,7 @@ import { Composer, type Mode } from './Composer.js';
 import { Rail } from './Rail.js';
 import { Source } from './Source.js';
 import { Stories } from './Stories.js';
+import { DEFAULT_PROVIDER_ID, fallbackUrl, loadProviderId, providerById } from './websearch.js';
 
 /**
  * Hanzo Answer Engine — the shared AI-answer surface (query → streamed answer +
@@ -84,6 +85,10 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [needAuth, setNeedAuth] = useState(false);
+  // The engine an unauthenticated query falls back to. Read once; the default
+  // stands until storage answers, so a query typed in the first moments after a
+  // new tab opens still has somewhere to go.
+  const [providerId, setProviderId] = useState<string>(DEFAULT_PROVIDER_ID);
   const abortRef = useRef<AbortController | null>(null);
 
   // Load real model catalog + live news (both public — work signed out).
@@ -105,6 +110,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
       })
       .catch(() => {});
     fetchNews().then(setNews).catch(() => {});
+    loadProviderId().then(setProviderId).catch(() => {});
   }, [apiBase]);
 
   const client = useMemo(
@@ -127,6 +133,30 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
+
+      // NO IDENTITY, NO DEAD END. /v1/ask is metered and answers 401 to a
+      // signed-out caller, but this surface IS the browser's search box: a query
+      // that returns a sign-in card has broken the address bar rather than shown a
+      // paywall. Hand it to the configured engine instead, before any spinner —
+      // checking first is what makes the handoff instant rather than a flash of
+      // "Searching the web" followed by a navigation.
+      //
+      // The fallback is not a Hanzo call: no token, no proxy, no telemetry. The
+      // query goes from this browser straight to the engine the user chose.
+      let identified = false;
+      try {
+        identified = Boolean(await getToken());
+      } catch {
+        identified = false;
+      }
+      if (!identified) {
+        const url = fallbackUrl(providerId, question);
+        if (url) {
+          void capture('answer_search_fallback', { provider: providerId, mode });
+          window.location.assign(url);
+          return;
+        }
+      }
 
       setSubmitted(question);
       setPhase('running');
@@ -196,7 +226,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
         setPhase('done');
       }
     },
-    [client, mode, model, sources],
+    [client, mode, model, sources, getToken, providerId],
   );
 
   // Fire the initial (address-bar) query once models are ready enough.
@@ -283,11 +313,23 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
               )}
 
               {needAuth ? (
+                /* Reached only when a token EXISTED and the call still came back
+                   401 — an expired or revoked session, since a signed-out query
+                   never gets here (run() hands it to the fallback engine first).
+                   Both doors are offered: renew the session for an AI answer, or
+                   take the same query to the configured engine. A dead end here
+                   would strand someone who simply needs to sign in again. */
                 <div className="ae-auth">
-                  <p>Sign in with Hanzo to get AI answers.</p>
+                  <p>Your Hanzo session expired. Sign in again for AI answers.</p>
                   <button className="ae-signin big" onClick={signIn}>
-                    Sign in — free to start
+                    Sign in
                   </button>
+                  <a
+                    className="ae-fallback-link"
+                    href={fallbackUrl(providerId, submitted) || undefined}
+                  >
+                    Search {providerById(providerId).label} instead
+                  </a>
                 </div>
               ) : error ? (
                 <div className="ae-error">{error}</div>
