@@ -359,3 +359,71 @@ a { color: inherit; text-decoration: none; }
   text-underline-offset: 3px;
 }
 .ae-fallback-link:hover { color: var(--text); }
+
+/* ── Generative result widgets ───────────────────────────── */
+/* margin-left/right stay AUTO: .ae-answer-scroll > * centres its children at
+   760px, and a `margin: 4px 0 18px` shorthand here silently resets those to 0 —
+   the widgets then hugged the left edge while the prose beside them stayed
+   centred. Set only the block margins. */
+.ae-widgets {
+  display: flex; flex-direction: column; gap: 14px;
+  margin-top: 4px; margin-bottom: 18px;
+}
+.ae-widget {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); padding: 16px 18px;
+}
+.ae-widget-title {
+  margin: 0 0 10px; font-size: 14px; font-weight: 600;
+  color: var(--text); letter-spacing: -0.01em;
+}
+.ae-widget-subtitle { margin: -6px 0 12px; font-size: 13px; color: var(--text-3); }
+
+/* A wide table scrolls INSIDE its own box; the page never scrolls sideways. */
+.ae-widget-scroll { overflow-x: auto; }
+.ae-widget-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.ae-widget-table th, .ae-widget-table td {
+  text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.ae-widget-table thead th { color: var(--text-3); font-weight: 500; white-space: nowrap; }
+.ae-widget-table tbody th { color: var(--text); font-weight: 500; }
+.ae-widget-table td { color: var(--text-2); }
+.ae-widget-table tr:last-child th, .ae-widget-table tr:last-child td { border-bottom: none; }
+
+.ae-widget-steplist { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+.ae-widget-steplist li { font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
+.ae-widget-steplist li::marker { color: var(--text-3); }
+
+.ae-widget-statgrid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px;
+}
+.ae-widget-stat { display: flex; flex-direction: column; gap: 2px; }
+.ae-widget-statvalue {
+  font-size: 20px; font-weight: 600; color: var(--text);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.ae-widget-statlabel { font-size: 12px; color: var(--text-3); }
+
+.ae-widget-events { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.ae-widget-events li { display: grid; grid-template-columns: minmax(72px, auto) 1fr; gap: 14px; }
+.ae-widget-when { font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.ae-widget-what { font-size: 13.5px; color: var(--text-2); line-height: 1.5; }
+
+.ae-widget-facts { margin: 0; display: grid; grid-template-columns: minmax(96px, auto) 1fr; gap: 8px 16px; }
+.ae-widget-facts dt { font-size: 12.5px; color: var(--text-3); }
+.ae-widget-facts dd { margin: 0; font-size: 13.5px; color: var(--text-2); }
+
+.ae-widget-meaning { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text-2); }
+.ae-widget-example {
+  margin: 12px 0 0; padding: 10px 12px; overflow-x: auto;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 12.5px; color: var(--text-2); white-space: pre-wrap;
+}
+
+@media (max-width: 720px) {
+  .ae-widget { padding: 14px; }
+  .ae-widget-events li { grid-template-columns: 1fr; gap: 2px; }
+  .ae-widget-facts { grid-template-columns: 1fr; gap: 2px 0; }
+  .ae-widget-facts dd { margin-bottom: 8px; }
+}
