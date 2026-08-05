@@ -152,11 +152,11 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
             case 'status':
               setStatus(
                 ev.stage === 'planning'
-                  ? 'Planning research'
+                  ? 'Planning research' + (ev.detail ? `: ${ev.detail}` : '')
                   : ev.stage === 'searching'
                     ? 'Searching the web' + (ev.detail ? `: ${ev.detail}` : '')
                     : ev.stage === 'reading'
-                      ? 'Reading sources'
+                      ? 'Reading sources' + (ev.detail ? `: ${ev.detail}` : '')
                       : 'Writing the answer',
               );
               break;
