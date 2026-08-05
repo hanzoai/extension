@@ -8,6 +8,8 @@ import { Composer, type Mode } from './Composer.js';
 import { Rail } from './Rail.js';
 import { Source } from './Source.js';
 import { Stories } from './Stories.js';
+import { Widgets } from './WidgetView.js';
+import { extractWidgets } from './widget.js';
 import { DEFAULT_PROVIDER_ID, fallbackUrl, loadProviderId, providerById } from './websearch.js';
 
 /**
@@ -334,10 +336,24 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
               ) : error ? (
                 <div className="ae-error">{error}</div>
               ) : (
-                <div
-                  className="ae-answer markdown"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(answer) }}
-                />
+                /* The answer picks its own presentation: any widget blocks it
+                   emitted render as real components, and the prose is what is
+                   left after they are removed — so a widget is never also shown
+                   as raw JSON. Extraction runs per frame against a STREAMING,
+                   half-written document, which is why an unterminated fence is
+                   left alone until it closes. */
+                (() => {
+                  const { prose, widgets } = extractWidgets(answer);
+                  return (
+                    <>
+                      <Widgets widgets={widgets} />
+                      <div
+                        className="ae-answer markdown"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(prose) }}
+                      />
+                    </>
+                  );
+                })()
               )}
 
               {followUps.length > 0 && (
