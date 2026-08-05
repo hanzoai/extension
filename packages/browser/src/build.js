@@ -46,6 +46,19 @@ async function build() {
     fs.mkdirSync(out(d), { recursive: true });
   }
 
+  // Publishable event-ingest key (pk-…) for POST api.hanzo.ai/v1/event, inlined
+  // into every bundle that can emit telemetry (the surfaces importing
+  // shared/consent.ts: popup, newtab, onboarding). Write-only — it attributes a
+  // write and mints no reading principal — so it is safe in a shipped bundle.
+  //
+  // Absent from a plain `node src/build.js`, and that is correct rather than
+  // broken: the client then sends unattributed, cloud files the events under the
+  // reserved `$public` tenant, and our org cannot read them. CI passes the value
+  // from KMS `deploy/EVENT_INGEST_KEY`, the same one name every Hanzo surface uses.
+  const TELEMETRY_DEFINE = {
+    __EVENT_INGEST_KEY__: JSON.stringify(process.env.EVENT_INGEST_KEY ?? ''),
+  };
+
   // Build content script
   await esbuild.build({
     entryPoints: ['src/content-script.ts'],
@@ -105,6 +118,7 @@ async function build() {
     platform: 'browser',
     target: ['chrome90', 'firefox91', 'safari14'],
     sourcemap: 'inline',
+    define: { ...TELEMETRY_DEFINE },
   });
 
   // Answer engine (new-tab landing + omnibox/address-bar search target).
@@ -129,6 +143,7 @@ async function build() {
     define: {
       'process.env.NODE_ENV': '"production"',
       'process.env.TAMAGUI_TARGET': '"web"',
+      ...TELEMETRY_DEFINE,
     },
     banner: { js: 'var process=globalThis.process??{env:{NODE_ENV:"production"}};' },
   });
@@ -142,6 +157,7 @@ async function build() {
     target: ['chrome90', 'firefox91', 'safari14'],
     minify: true,
     sourcemap: false,
+    define: { ...TELEMETRY_DEFINE },
   });
 
   // Build browser control module
