@@ -247,16 +247,9 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
 
   return (
     <div className={'ae-root' + (collapsed ? ' collapsed' : '')}>
-      <button
-        className="ae-reveal"
-        onClick={() => setCollapsed((v) => !v)}
-        title="Toggle sidebar"
-        aria-label="Toggle sidebar"
-      >
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-          <path d="M2 4h12M2 8h12M2 12h12" fill="none" stroke="currentColor" strokeWidth="1.4" />
-        </svg>
-      </button>
+      {/* No fixed reveal button: the rail itself is always present now, and it
+          carries its own expand control. A floating toggle only existed because
+          the collapsed rail rendered nothing to click. */}
       <Rail
         collapsed={collapsed}
         toggle={() => setCollapsed((v) => !v)}
