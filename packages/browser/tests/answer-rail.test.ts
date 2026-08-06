@@ -11,10 +11,9 @@ import { Rail } from '../src/answer/Rail.js';
  * the composer holding the width.
  *
  * Collapsed is an ICON RAIL, not an absence: the brand and the way back stay on
- * screen, and the labels are always in the markup and hidden in CSS. That is
- * load-bearing rather than stylistic — the rail opens on hover, which is a CSS
- * state, so markup branched on `collapsed` in JS could never be revealed by
- * hovering and the rail would widen to show nothing.
+ * screen, and the labels are always in the markup and hidden in CSS, so widening
+ * the rail needs no re-render. Collapse is EXPLICIT — the rail never springs open
+ * under the pointer — so the mark itself has to be the way back.
  */
 
 function markup(el: React.ReactElement): string {
@@ -42,8 +41,20 @@ describe('the answer rail', () => {
     // The way back is still clickable...
     expect(shut).toContain('ae-brand');
     expect(shut).toContain('ae-new');
-    // ...and the labels are present for CSS to reveal on hover.
+    // ...and the labels stay in the markup for CSS to reveal on expand,
+    // so widening the rail needs no re-render.
     expect(shut).toContain('New thread');
+  });
+
+  it('makes the mark the way back when collapsed, and the brand when open', () => {
+    // While the rail opened on hover the mark had no job and the collapse
+    // toggle was hidden, so hover was the only way back — an affordance you
+    // cannot see. Collapse is explicit now, so the mark has to carry it.
+    const shut = markup(React.createElement(Rail, { ...railProps, collapsed: true }));
+    const open = markup(React.createElement(Rail, { ...railProps, collapsed: false }));
+    expect(shut).toContain('aria-label="Expand sidebar"');
+    expect(open).not.toContain('aria-label="Expand sidebar"');
+    expect(open).toContain('aria-label="Hanzo"');
   });
 
   it('announces which state the toggle will leave', () => {
