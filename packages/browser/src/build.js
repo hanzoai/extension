@@ -66,7 +66,7 @@ async function build() {
     outfile: out('content-script.js'),
     platform: 'browser',
     target: ['chrome90', 'firefox91', 'safari14'],
-    sourcemap: 'inline'
+    minify: true
   });
 
   // Build background script for Chrome (with WebGPU support)
@@ -75,6 +75,7 @@ async function build() {
     bundle: true,
     outfile: out('background.js'),
     platform: 'browser',
+    minify: true,
     target: ['chrome90', 'safari14'],
     format: 'esm',
     external: ['chrome', 'browser'],
@@ -86,6 +87,7 @@ async function build() {
     bundle: true,
     outfile: out('background-firefox.js'),
     platform: 'browser',
+    minify: true,
     target: ['firefox91'],
     format: 'iife',  // Immediately-invoked function expression (no exports)
     external: ['browser'],
@@ -97,6 +99,7 @@ async function build() {
     bundle: true,
     outfile: out('webgpu-ai.js'),
     platform: 'browser',
+    minify: true,
     target: 'es2020',
     format: 'esm'
   });
@@ -108,7 +111,7 @@ async function build() {
     outfile: out('sidebar.js'),
     platform: 'browser',
     target: ['chrome90', 'firefox91', 'safari14'],
-    sourcemap: 'inline',
+    minify: true,
   });
 
   await esbuild.build({
@@ -117,7 +120,7 @@ async function build() {
     outfile: out('popup.js'),
     platform: 'browser',
     target: ['chrome90', 'firefox91', 'safari14'],
-    sourcemap: 'inline',
+    minify: true,
     define: { ...TELEMETRY_DEFINE },
   });
 
@@ -166,6 +169,7 @@ async function build() {
     bundle: true,
     outfile: out('browser-control.js'),
     platform: 'browser',
+    minify: true,
     target: 'es2020',
     format: 'esm'
   });
