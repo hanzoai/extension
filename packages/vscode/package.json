@@ -364,7 +364,8 @@
     "node-fetch": "^3.3.2",
     "sinon": "^21.0.0",
     "typescript": "^5.2.2",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "@hanzo/iam": "^0.13.2"
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.21.0",

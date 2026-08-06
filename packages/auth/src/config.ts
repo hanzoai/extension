@@ -1,16 +1,24 @@
-// The ONE definition of Hanzo IAM endpoints and the per-surface OAuth client
-// registry. Every Hanzo extension (browser, office, vscode, cli, mcp) resolves
-// its auth URLs HERE — so a path can never drift between five hand-rolled
-// copies again (the vscode add-in shipped `hanzo.id/oauth/authorize`, missing
-// the /v1/iam prefix, for exactly that reason).
+// The per-surface OAuth client registry, and the surface's view of Hanzo IAM.
 //
-// HIP-0111: the canonical OAuth2/OIDC surface is `${issuer}/v1/iam/oauth/*`.
-// The login UI (authorize) lives on hanzo.id; the token/userinfo API on
-// iam.hanzo.ai. Both carry the SAME /v1/iam prefix — that is the whole point.
+// The ENDPOINTS are not defined here. `@hanzo/iam` already declares them
+// (OIDC_PATHS, BRAND_SERVER_URLS) and it is the package the other twenty-odd
+// extension packages already depend on, so restating `/v1/iam/oauth/*` here
+// made a third copy of one fact — with the vscode add-in's hand-written
+// constant as a fourth, kept in step by a comment asking the next reader to
+// check. The add-in had already shipped `hanzo.id/oauth/authorize` (no
+// /v1/iam) once; a comment is not a mechanism.
+//
+// So this file now derives every URL from @hanzo/iam and keeps only what is
+// genuinely its own: which OAuth client each surface is, and the headless flow
+// that @hanzo/iam's browser SDK cannot serve (an Office add-in and a VS Code
+// extension have no popup to open).
 
+import { BRAND_SERVER_URLS, iamUrl } from '@hanzo/iam/paths';
+
+// The login UI, which is a different host from the API: a person authorizes at
+// hanzo.id and the surface then talks to iam.hanzo.ai. Both carry /v1/iam.
 export const IAM_LOGIN_URL = 'https://hanzo.id';
-export const IAM_API_URL = 'https://iam.hanzo.ai';
-export const IAM_API_PATH = '/v1/iam';
+export const IAM_API_URL = BRAND_SERVER_URLS.hanzo;
 export const DEFAULT_SCOPES = 'openid profile email offline_access';
 
 // SurfaceClient is one registered IAM OAuth client — one per product surface, so
@@ -34,20 +42,16 @@ export const CLIENTS = {
 
 export type SurfaceName = keyof typeof CLIENTS;
 
-// URL builders — the only place these paths are assembled. issuer defaults to
-// the login host for authorize and the API host for token/userinfo, but both
-// are overridable (self-hosted brands, tests) via the opts.
+// URL builders. The issuer differs per endpoint (login UI vs API) and is
+// overridable for self-hosted brands and tests; the PATH is never a choice this
+// package gets to make, so it comes from @hanzo/iam every time.
 
 export function authorizeURL(issuer: string = IAM_LOGIN_URL): string {
-  return `${trimEnd(issuer)}${IAM_API_PATH}/oauth/authorize`;
+  return iamUrl(issuer, 'authorize');
 }
 export function tokenURL(issuer: string = IAM_API_URL): string {
-  return `${trimEnd(issuer)}${IAM_API_PATH}/oauth/token`;
+  return iamUrl(issuer, 'token');
 }
 export function userinfoURL(issuer: string = IAM_API_URL): string {
-  return `${trimEnd(issuer)}${IAM_API_PATH}/oauth/userinfo`;
-}
-
-function trimEnd(s: string): string {
-  return s.replace(/\/+$/, '');
+  return iamUrl(issuer, 'userinfo');
 }
