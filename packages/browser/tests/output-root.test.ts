@@ -25,9 +25,11 @@ const DIST = path.join(REPO, 'dist');
 
 describe('the build output root is the one every consumer names', () => {
   it('is written by src/build.js, one directory per engine', () => {
-    if (!fs.existsSync(path.join(DIST, 'chrome'))) {
-      execFileSync('node', ['src/build.js'], { cwd: path.join(REPO, 'packages', 'browser'), stdio: 'ignore' });
-    }
+    // The build is a fixture (tests/built-dist.ts), not something this test
+    // runs. It used to run it here, gated on the DIRECTORY existing, while
+    // another suite ran the same build gated on a FILE — so this one saw the
+    // directory appear under the other's build and asserted against a tree
+    // still being written.
     for (const engine of ['chrome', 'firefox', 'safari']) {
       expect(fs.existsSync(path.join(DIST, engine, 'manifest.json')) ||
              fs.existsSync(path.join(DIST, engine, 'Info.plist')), engine).toBe(true);
