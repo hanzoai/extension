@@ -1745,6 +1745,64 @@ const elementPicker = (() => {
     document.body.appendChild(label);
   }
 
+  // Where does this pixel come from in SOURCE? That is the question an editing
+  // agent needs answered, and a CSS selector cannot answer it — selectors name a
+  // position in the rendered tree, which changes the moment anyone reorders a
+  // wrapper.
+  //
+  // Two ways to get a real answer, tried in order of trustworthiness:
+  //
+  //   1. The gui compiler's annotations. It writes data-at (file:line), data-is
+  //      (the component) and data-in (its call site) during the same AST pass
+  //      that flattens the tree, so the name refers to the component that
+  //      actually rendered. Present on any @hanzo/gui or @hanzo/ui surface.
+  //   2. React's own dev fiber. Any React app in development carries
+  //      _debugSource on the fiber node — fileName/lineNumber straight from the
+  //      JSX transform. This is how a site we did not build still resolves.
+  //
+  // Both are dev-only by construction: a production bundle has neither, and
+  // that is correct — there is no source on the other end to edit.
+  function sourceOf(el: Element | null): Record<string, string | number> | undefined {
+    if (!el) return undefined;
+
+    const tagged = el.closest?.('[data-at]');
+    if (tagged) {
+      return {
+        at: tagged.getAttribute('data-at') || '',
+        component: tagged.getAttribute('data-is') || '',
+        usedIn: tagged.getAttribute('data-in') || '',
+        via: 'gui',
+      };
+    }
+
+    // React stores the fiber under a per-render key, so it has to be found by
+    // prefix rather than by name.
+    const key = Object.keys(el).find(
+      (k) => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')
+    );
+    let fiber: any = key ? (el as any)[key] : null;
+    // The clicked leaf is usually a host element; the source lives on the
+    // nearest ancestor fiber that came from JSX.
+    while (fiber) {
+      const src = fiber._debugSource || fiber._debugInfo?.[0];
+      if (src?.fileName) {
+        return {
+          at: `${String(src.fileName).split('/').pop()}:${src.lineNumber ?? 0}`,
+          file: src.fileName,
+          line: src.lineNumber ?? 0,
+          component:
+            typeof fiber.type === 'function'
+              ? fiber.type.displayName || fiber.type.name || ''
+              : String(fiber.type || ''),
+          via: 'react',
+        };
+      }
+      fiber = fiber.return;
+    }
+
+    return undefined;
+  }
+
   function onMove(e: MouseEvent) {
     if (!active) return;
     const target = e.target as HTMLElement;
@@ -1794,7 +1852,7 @@ const elementPicker = (() => {
 
     navigator.clipboard.writeText(info).catch(() => {});
     // Also send to background for MCP tools
-    chrome.runtime.sendMessage({ action: 'elementSelected', data: { selector, fullPath, tag, text, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } } });
+    chrome.runtime.sendMessage({ action: 'elementSelected', data: { selector, fullPath, tag, text, source: sourceOf(el), rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } } });
     stop();
   }
 
