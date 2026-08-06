@@ -1834,7 +1834,21 @@ const elementPicker = (() => {
       ve = ve.parentElement;
     }
 
-    return undefined;
+    // Plain HTML: nothing compiled it, so there is nothing to resolve — and
+    // nothing to resolve TO. The document IS the source, so the served URL plus
+    // a selector is already an exact edit target, which is the same answer the
+    // frameworks above work so hard to reconstruct.
+    //
+    // Returned rather than left undefined so a caller can tell "this page has
+    // no build step" (editable, act on the selector) from "this is a production
+    // bundle" (not editable, there is no source on the other end). Those need
+    // different behaviour and an absent field conflates them.
+    return {
+      at: location.pathname,
+      file: location.href,
+      selector: getSelector(el),
+      via: 'dom',
+    };
   }
 
   function onMove(e: MouseEvent) {
