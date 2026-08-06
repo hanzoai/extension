@@ -754,14 +754,6 @@ a {
   .ae-root.collapsed {
     grid-template-columns: var(--rail-w) 1fr;
   }
-  /* Hover must NOT widen the rail here. 232px out of a 390px viewport leaves the
-     answer column unreadable, and a desktop browser at a small window still
-     reports a fine pointer — so the (hover: hover) guard alone does not cover it.
-     This block is later in the file at equal specificity, so it wins. */
-  .ae-root.collapsed:has(.ae-sidebar:hover),
-  .ae-root.collapsed:has(.ae-sidebar:focus-within) {
-    grid-template-columns: var(--rail-w) 1fr;
-  }
   /* Explicitly opened, the sidebar OVERLAYS rather than pushing: the grid keeps
      the rail's width so the content column never shrinks. */
   .ae-root:not(.collapsed) {
