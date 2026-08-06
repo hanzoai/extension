@@ -137,6 +137,10 @@ importers:
         version: 3.2.6(@types/node@20.19.9)(jsdom@26.1.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.43.1)(yaml@2.8.3)
 
   packages/auth:
+    dependencies:
+      '@hanzo/iam':
+        specifier: ^0.13.2
+        version: 0.13.2(react@19.2.8)
     devDependencies:
       typescript:
         specifier: ^5.8.3
@@ -1087,6 +1091,9 @@ importers:
         specifier: ^3.25.71
         version: 3.25.76
     devDependencies:
+      '@hanzo/iam':
+        specifier: ^0.13.2
+        version: 0.13.2(react@19.2.8)
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13

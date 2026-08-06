@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { authorizeURL, tokenURL, userinfoURL, CLIENTS, IAM_API_PATH } from '../src/config';
+import { authorizeURL, tokenURL, userinfoURL, CLIENTS } from '../src/config';
 import { authClientFor } from '../src/index';
 
 describe('canonical HIP-0111 endpoints — the drift guard', () => {
@@ -9,7 +9,10 @@ describe('canonical HIP-0111 endpoints — the drift guard', () => {
     expect(authorizeURL()).toBe('https://hanzo.id/v1/iam/oauth/authorize');
     expect(tokenURL()).toBe('https://iam.hanzo.ai/v1/iam/oauth/token');
     expect(userinfoURL()).toBe('https://iam.hanzo.ai/v1/iam/oauth/userinfo');
-    expect(IAM_API_PATH).toBe('/v1/iam');
+    // The prefix used to be asserted a second time as a bare IAM_API_PATH
+    // constant. That constant is gone — the paths come from @hanzo/iam now, so
+    // there is nothing local left to drift, and these three URLs already pin
+    // the prefix they are actually built from.
   });
 
   it('a custom issuer keeps the /v1/iam prefix', () => {
