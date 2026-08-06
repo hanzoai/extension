@@ -264,6 +264,17 @@ export async function getValidAccessToken(storage: BrowserStorage): Promise<stri
     }
   }
 
+  // Known-expired with nothing to refresh from: the session is over, so say so.
+  // Handing the dead token back left every caller believing it was signed in,
+  // and the surfaces discovered the 401 for themselves — the answer engine read
+  // that as a failed search rather than a signed-out one.
+  if (expiresAt) {
+    await logout(storage);
+    return null;
+  }
+
+  // No expiry was ever recorded (the direct-token login path stores none), so
+  // the token is not provably stale. Use it.
   return accessToken;
 }
 
