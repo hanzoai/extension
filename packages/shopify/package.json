@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/shopify",
   "version": "1.0.0",
-  "description": "Hanzo AI for Shopify — an embedded admin app: generate/rewrite product descriptions + SEO, summarize orders and draft customer replies, and ask about a product or order. A Polaris + App Bridge React panel over a Node backend that does Shopify OAuth, proxies the Admin GraphQL API, verifies every Shopify HMAC (OAuth callback + webhooks), and runs the model gateway through the published @hanzo/ai over api.hanzo.ai.",
+  "description": "Hanzo AI for Shopify \u2014 an embedded admin app: generate/rewrite product descriptions + SEO, summarize orders and draft customer replies, and ask about a product or order. A Polaris + App Bridge React panel over a Node backend that does Shopify OAuth, proxies the Admin GraphQL API, verifies every Shopify HMAC (OAuth callback + webhooks), and runs the model gateway through the published @hanzo/ai over api.hanzo.ai.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.2.0",
-    "@hanzo/iam": "^0.13.2",
+    "@hanzo/ai": "^0.3.1",
+    "@hanzo/iam": "^0.21.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
