@@ -19,19 +19,43 @@ const DIST = path.resolve(BROWSER, '..', '..', 'dist');
 const ENGINES = ['chrome', 'firefox', 'safari'];
 
 // KB ceilings keyed by bundle name. Raw bytes — what a store weighs and what
-// the engine parses. Comments are the measurement at 1.9.39.
+// the engine parses. Comments are the measurement these were re-ratcheted to.
+//
+// RE-RATCHETED at 1.9.49, because the numbers below had stopped measuring
+// anything. The 1.9.39 ceilings were set against UNMINIFIED output: nine of the
+// twelve esbuild calls in src/build.js did not minify, and three embedded a
+// base64 sourcemap in the shipped file. Minifying all of them cut popup 415.8 ->
+// 49.0 and content-script 391.8 -> 55.4, which left a 340KB ceiling sitting over
+// a 55KB bundle — a gate that could not fail. A budget five times the artifact
+// is not a lenient budget, it is an absent one.
+//
+// So each ceiling is back to just above its measured size, and the ratchet
+// works again.
 const BUDGETS = {
-  'background.js': 360, // 314.6
-  'content-script.js': 340, // 303.9
-  'sidebar.js': 400, // 361.5
-  'popup.js': 280, // 240.0
-  // 485.9 — the answer surface now renders through the REAL @hanzo/ui on
-  // @hanzo/gui (the one substrate shared with web/desktop/mobile) instead of
-  // raw DOM elements; the gui runtime is the +310KB (151.9KB gzip). Local
-  // file, no network fetch — the cost is parse, paid for one component system
-  // across every Hanzo surface.
-  'newtab.js': 500,
-  'onboarding.js': 40, // 12.8
+  'background.js': 200, // 180.5
+  'content-script.js': 62, // 55.4
+  'sidebar.js': 66, // 59.3
+  'popup.js': 55, // 49.0
+  // 549.2 — RAISED from 500, deliberately and with the reason, which is what
+  // this file asks of anyone adding weight.
+  //
+  // The answer surface renders through the REAL @hanzo/ui on @hanzo/gui — the
+  // one substrate shared with web/desktop/mobile — and the gui runtime is the
+  // bulk of it. 485.9 at 1.9.39, 503.7 before the dependency sweep, 549.2 after
+  // @hanzo/gui 7.3.0 -> 8.1.1 crossed a major.
+  //
+  // The weight is REAL and was measured rather than assumed: react-dom 177KB,
+  // @hanzogui/themes 82KB, @hanzogui/web 80KB, react-native-web 49KB. The
+  // obvious lever — 240 of the 390 themes are chromatic and this page renders
+  // none of them — does NOT work: @hanzogui/themes v5 is already a compressed
+  // encoding (one shared colour table plus index pairs expanded by a five-line
+  // function), so re-emitting a 150-theme subset as literals is LARGER than the
+  // 82KB it would replace. @hanzo/ui 8.0.64 exports a `monochrome` config that
+  // filters at runtime; it is correct, and it saves nothing here, because both
+  // configs still import the full table. A build-time subset would have to
+  // re-encode in the same compact form.
+  'newtab.js': 570,
+  'onboarding.js': 35, // 31.0
 };
 
 const kb = (bytes) => (bytes / 1024).toFixed(1);
