@@ -27,6 +27,12 @@ jobs:
       - run: pnpm --filter @hanzo/browser-extension test
       - run: pnpm --filter @hanzo/aci test
       - run: pnpm --filter @hanzo/auth test
+      # hanzo-ide's `test` script drives the VS Code integration harness, which
+      # needs a display; `test:vitest` is the plain-node suite. It is here for
+      # iam-paths.test.ts, which holds the extension's hand-copied IAM path
+      # prefix equal to @hanzo/iam's. That guard is the reason the copy is
+      # allowed to exist, so it has to actually run.
+      - run: pnpm --filter hanzo-ide test:vitest
 
   build:
     runs-on: hanzo-build-linux-amd64
