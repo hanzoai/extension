@@ -256,8 +256,16 @@ async function build() {
     }
   });
 
-  // Copy package.json for npm
+  // Copy package.json for npm — STAMPED with the same version as everything else.
+  //
+  // src/package.json is a TEMPLATE (name, bin, files, deps) and its own `version`
+  // field is inert; it sat at 1.0.0 while the real one climbed to 1.9.x. The
+  // browser manifests above already take `pkgVersion` from the root package.json,
+  // so leaving this one un-stamped meant the npm artifact was the ONE output that
+  // did not agree with the source of truth this file names three lines up — and a
+  // publish of it would have tried to republish 1.0.0.
   const pkg = JSON.parse(fs.readFileSync('src/package.json', 'utf8'));
+  pkg.version = pkgVersion;
   pkg.main = 'cli.js';
   fs.writeFileSync(out('package.json'), JSON.stringify(pkg, null, 2));
 
