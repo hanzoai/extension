@@ -18,6 +18,10 @@ export default defineConfig({
   test: {
     exclude: ['e2e/**', 'node_modules/**'],
     setupFiles: ['./tests/vitest.setup.ts'],
+    // The bundle suites need a built dist/. Once, here, before the files run in
+    // parallel — two of them used to build it themselves and raced. See
+    // tests/built-dist.ts.
+    globalSetup: ['./tests/built-dist.ts'],
     server: { deps: { inline: [/@hanzogui\//, /@hanzo\/gui/, /@hanzo\/ui/, /react-native/] } },
   },
 });
