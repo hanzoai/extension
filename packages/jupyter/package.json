@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/jupyter",
   "version": "1.0.0",
-  "description": "Hanzo AI for JupyterLab — an in-notebook AI assistant. A side-panel assistant with a model picker and streaming output, plus cell actions (explain, fix/debug from a traceback, document, optimize, generate a cell from a prompt). Model calls route through the api.hanzo.ai gateway via @hanzo/ai; the Hanzo `hk-` key is set in JupyterLab settings.",
+  "description": "Hanzo AI for JupyterLab \u2014 an in-notebook AI assistant. A side-panel assistant with a model picker and streaming output, plus cell actions (explain, fix/debug from a traceback, document, optimize, generate a cell from a prompt). Model calls route through the api.hanzo.ai gateway via @hanzo/ai; the Hanzo `hk-` key is set in JupyterLab settings.",
   "keywords": [
     "jupyter",
     "jupyterlab",
@@ -52,8 +52,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.2.0",
-    "@hanzo/iam": "^0.13.2",
+    "@hanzo/ai": "^0.3.1",
+    "@hanzo/iam": "^0.21.7",
     "@jupyterlab/application": "^4.0.0",
     "@jupyterlab/apputils": "^4.0.0",
     "@jupyterlab/cells": "^4.0.0",

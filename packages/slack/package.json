@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/slack",
   "version": "1.0.0",
-  "description": "Hanzo AI in Slack — slash command, App Home assistant panel, message shortcuts, and interactivity, built on @hanzo/ai, @hanzo/iam, and @hanzo/cards.",
+  "description": "Hanzo AI in Slack \u2014 slash command, App Home assistant panel, message shortcuts, and interactivity, built on @hanzo/ai, @hanzo/iam, and @hanzo/cards.",
   "type": "module",
   "main": "./dist/server.js",
   "types": "./dist/index.d.ts",
@@ -19,9 +19,9 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.2.0",
+    "@hanzo/ai": "^0.3.1",
     "@hanzo/cards": "workspace:*",
-    "@hanzo/iam": "^0.13.2",
+    "@hanzo/iam": "^0.21.7",
     "@slack/bolt": "^4.7.3"
   },
   "devDependencies": {
