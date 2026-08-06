@@ -18,7 +18,6 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execFileSync } from 'child_process';
 
 const pkg = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'),
@@ -69,15 +68,14 @@ describe('build pipeline ships the polyfill', () => {
   // src/build.js writes to the extension repo root's dist/<engine>/. These two
   // used to read the old output root under packages/browser and `return` when
   // it was absent — so once the root moved they asserted nothing, quietly, on
-  // every run. Build on demand instead: an assertion about the bundle has to
-  // have a bundle.
+  // every run. An assertion about the bundle has to have a bundle, so the
+  // build is a fixture the whole suite shares (tests/built-dist.ts) and these
+  // simply require it. Building it HERE, as this file briefly did, raced the
+  // identical build in output-root.test.ts.
   const BROWSER = path.join(__dirname, '..');
   const DIST = path.resolve(BROWSER, '..', '..', 'dist');
   const bundle = (engine: string) => {
     const file = path.join(DIST, engine, 'background.js');
-    if (!fs.existsSync(file)) {
-      execFileSync('node', ['src/build.js'], { cwd: BROWSER, stdio: 'ignore' });
-    }
     expect(fs.existsSync(file), `${engine}/background.js`).toBe(true);
     return fs.readFileSync(file, 'utf8');
   };
