@@ -1,0 +1,24 @@
+# Canonical CI/CD config for hanzoai/extension — the one file both the
+# hanzoai/ci reusable (.hanzo/workflows/cicd.yml) and platform.hanzo.ai read.
+#
+# No `images:`: nothing here is a container. This repo ships a pnpm workspace of
+# editor/browser/desktop extensions that are packaged and published from tags by
+# the existing lanes, so the only thing CI owes it is a gate that goes red when
+# the code breaks.
+#
+# The gate is the amd64 lane that has been green on this fleet already
+# (.hanzo/workflows/ci.yml): install frozen, build the shared @hanzo/cards lib
+# that the consumers import dist/ from, run the three suites that actually have
+# tests, then build the browser extension and hold it to its bundle budget.
+# The budget check is armed — over budget fails, which is the point of measuring.
+test:
+  - name: build
+    run: |
+      set -e
+      corepack enable
+      pnpm install --frozen-lockfile
+      pnpm --filter @hanzo/cards build
+      pnpm --filter @hanzo/browser-extension test
+      pnpm --filter @hanzo/aci test
+      pnpm --filter @hanzo/auth test
+      cd packages/browser && node src/build.js && pnpm run check:bundle-budget
