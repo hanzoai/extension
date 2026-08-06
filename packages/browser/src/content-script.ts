@@ -1800,6 +1800,40 @@ const elementPicker = (() => {
       fiber = fiber.return;
     }
 
+    // Svelte's dev compiler attaches __svelte_meta.loc = {file, line, column}
+    // to the DOM node itself — the most direct of the three, no walk needed
+    // beyond finding the nearest annotated ancestor.
+    let sv: any = el;
+    while (sv) {
+      const loc = sv.__svelte_meta?.loc;
+      if (loc?.file) {
+        return {
+          at: `${String(loc.file).split('/').pop()}:${loc.line ?? 0}`,
+          file: loc.file,
+          line: loc.line ?? 0,
+          via: 'svelte',
+        };
+      }
+      sv = sv.parentElement;
+    }
+
+    // Vue exposes the component instance on the element (v3: __vueParentComponent,
+    // v2: __vue__). In dev the component's own options carry __file.
+    let ve: any = el;
+    while (ve) {
+      const inst = ve.__vueParentComponent || ve.__vue__;
+      const file = inst?.type?.__file || inst?.$options?.__file;
+      if (file) {
+        return {
+          at: String(file).split('/').pop() || String(file),
+          file,
+          component: inst?.type?.name || inst?.$options?.name || '',
+          via: 'vue',
+        };
+      }
+      ve = ve.parentElement;
+    }
+
     return undefined;
   }
 
