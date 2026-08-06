@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/auth",
   "version": "1.0.0",
-  "description": "The one Hanzo IAM auth core — canonical HIP-0111 OAuth2 + PKCE, shared by every Hanzo extension (browser, office, vscode, cli, mcp).",
+  "description": "The one Hanzo IAM auth core \u2014 canonical HIP-0111 OAuth2 + PKCE, shared by every Hanzo extension (browser, office, vscode, cli, mcp).",
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -22,5 +22,8 @@
   },
   "files": [
     "src"
-  ]
+  ],
+  "dependencies": {
+    "@hanzo/iam": "^0.13.2"
+  }
 }

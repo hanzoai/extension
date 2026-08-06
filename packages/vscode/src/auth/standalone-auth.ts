@@ -7,10 +7,16 @@ import { execSync } from 'child_process';
 
 // The canonical HIP-0111 OAuth path prefix. Both the login UI (authorize) and
 // the API (token) carry it — this file previously omitted it (hitting
-// hanzo.id/oauth/authorize, which 404s), the exact drift @hanzo/auth exists to
-// prevent. Kept as a local const here because this MCP-standalone auth compiles
-// without the workspace bundler; the value MUST equal @hanzo/auth's IAM_API_PATH.
-const IAM_API_PATH = '/v1/iam';
+// hanzo.id/oauth/authorize, which 404s).
+//
+// @hanzo/iam declares this canonically (OIDC_PATHS), but importing it here
+// would put a 1.8 MB package with three transitive dependencies into a shipped
+// VS Code extension to obtain twelve characters. So the value is restated and
+// the AGREEMENT is enforced instead: `src/test/vitest/iam-paths.test.ts` fails
+// if this constant ever stops matching @hanzo/iam, which costs nothing at
+// runtime. The previous comment asked the next reader to keep it in step by
+// hand; a comment is not a mechanism.
+export const IAM_API_PATH = '/v1/iam';
 
 // form() encodes a token-endpoint body as application/x-www-form-urlencoded —
 // RFC 6749 requires it; posting a JSON object (axios's default) is rejected by
