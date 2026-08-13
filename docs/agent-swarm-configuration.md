@@ -1,6 +1,6 @@
 # Agent Swarm Configuration
 
-The Hanzo Dev CLI supports sophisticated multi-agent configurations through YAML files, enabling teams of specialized AI agents to work together on complex tasks. The system supports both traditional swarm orchestration and cost-optimized peer networks powered by Hanzo Zen.
+The Hanzo Dev CLI supports sophisticated multi-agent configurations through YAML files, enabling teams of specialized AI agents to work together on complex tasks. The system supports both traditional swarm orchestration and cost-optimized peer networks powered by Zen.
 
 ## Quick Start
 
@@ -273,13 +273,13 @@ I particularly like the consistent error response format - it will help us creat
 better user feedback.
 ```
 
-## Peer Networks with Hanzo Zen
+## Peer Networks with Zen
 
-Peer networks provide a cost-optimized architecture where all agents can communicate with each other through MCP, with Hanzo Zen handling the main orchestration loop locally.
+Peer networks provide a cost-optimized architecture where all agents can communicate with each other through MCP, with Zen handling the main orchestration loop locally. Zen is [Zoo Labs Foundation's](https://zoo.industries) model family; the CLI runs it locally and calls API models only when it needs them.
 
 ### Key Benefits
 
-1. **90% Cost Reduction**: Use local Hanzo Zen for orchestration, only calling API-based LLMs when needed
+1. **90% Cost Reduction**: Use local Zen for orchestration, only calling API-based LLMs when needed
 2. **Full Connectivity**: Every agent can call every other agent recursively
 3. **Flexible Deployment**: Run on laptop, mobile, or edge devices
 4. **Smart Routing**: Orchestrator decides when to use local vs API models
@@ -294,7 +294,7 @@ swarm:
     endpoint: "http://localhost:8080"
   instances:
     orchestrator:
-      model: "zen"  # Local Hanzo Zen
+      model: "zen"  # Local Zen
       connect_to_agents: ["architect", "developer", "reviewer"]
     architect:
       model: "opus"  # API-based for complex tasks
@@ -321,13 +321,13 @@ dev swarm run "analyze" --peer --local-llm http://localhost:8080
 
 The peer network architecture optimizes costs by:
 
-1. **Local Orchestration**: Main loop runs on free local Hanzo Zen
+1. **Local Orchestration**: Main loop runs on free local Zen
 2. **Selective API Calls**: Only use expensive models for complex tasks
 3. **Batching**: Group similar requests to minimize API calls
 4. **Caching**: Reuse results from previous agent interactions
 5. **Smart Routing**: Orchestrator decides optimal agent for each task
 
-### Hanzo Zen Features
+### Zen Features
 
 - **Model**: Mixture of Experts (MoE) architecture
 - **Deployment**: Edge to exascale (1B-1T parameters)

@@ -3,7 +3,7 @@ import { MCPTool } from '../server';
 import { BackendFactory, IBackend } from '../../core/backend-abstraction';
 
 /**
- * Zen tool - Uses Hanzo Zen1 AI model for local private AI inference
+ * Zen tool - Uses Zen1 AI model for local private AI inference
  * Supports both local and cloud deployment
  */
 export function createZenTool(context: vscode.ExtensionContext): MCPTool {
@@ -19,7 +19,7 @@ export function createZenTool(context: vscode.ExtensionContext): MCPTool {
     
     return {
         name: 'zen',
-        description: 'Hanzo Zen1 AI model for local private AI inference',
+        description: 'Zen1 AI model for local private AI inference',
         inputSchema: {
             type: 'object',
             properties: {

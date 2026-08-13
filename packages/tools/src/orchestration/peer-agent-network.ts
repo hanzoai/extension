@@ -215,7 +215,7 @@ export class PeerAgentNetwork extends EventEmitter {
   private async startMainLoop(): Promise<void> {
     console.log(`Starting main orchestration loop with ${this.networkConfig.mainLoopLLM.model}`);
     
-    // The main loop uses Hanzo Zen or other local LLM for coordination
+    // The main loop uses Zen or other local LLM for coordination
     // This saves costs by using local inference for orchestration
     this.emit('main-loop-started', this.networkConfig.mainLoopLLM);
   }
@@ -264,7 +264,7 @@ export class PeerAgentNetwork extends EventEmitter {
   }
 
   /**
-   * Plan execution using local LLM (Hanzo Zen)
+   * Plan execution using local LLM (Zen)
    */
   private async planExecution(task: string, startAgent: string): Promise<any> {
     // Use local LLM for planning to save costs
@@ -277,7 +277,7 @@ export class PeerAgentNetwork extends EventEmitter {
     Consider which agents need to collaborate and in what order.
     `;
     
-    // Call local Hanzo Zen model
+    // Call local Zen model
     const plan = await this.callLocalLLM(prompt);
     return plan;
   }
@@ -344,7 +344,7 @@ export class PeerAgentNetwork extends EventEmitter {
     const useLocalLLM = this.shouldUseLocalLLM(instance, task);
     
     if (useLocalLLM) {
-      // Use Hanzo Zen for this agent to save costs
+      // Use Zen for this agent to save costs
       return await this.executeWithLocalLLM(peer, task, plan);
     } else {
       // Use configured API-based LLM (Claude, OpenAI, etc.)
@@ -379,7 +379,7 @@ export class PeerAgentNetwork extends EventEmitter {
   }
 
   /**
-   * Execute with local Hanzo Zen LLM
+   * Execute with local Zen LLM
    */
   private async executeWithLocalLLM(peer: AgentPeer, task: string, plan: any): Promise<any> {
     const prompt = this.buildPeerPrompt(peer, task, plan);
@@ -486,12 +486,12 @@ export class PeerAgentNetwork extends EventEmitter {
   }
 
   /**
-   * Call local Hanzo Zen LLM
+   * Call local Zen LLM
    */
   private async callLocalLLM(prompt: string): Promise<any> {
     const { model, endpoint, maxTokens, temperature } = this.networkConfig.mainLoopLLM;
     
-    // Call local Hanzo Zen endpoint
+    // Call local Zen endpoint
     const response = await fetch(endpoint || 'http://localhost:8080/v1/completions', {
       method: 'POST',
       headers: {

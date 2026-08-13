@@ -398,7 +398,7 @@ export class PeerMCPServer {
     const useLocal = this.shouldUseLocalLLM(operation);
     
     if (useLocal && this.config.networkConfig.costOptimization) {
-      // Use local Hanzo Zen for simple operations
+      // Use local Zen for simple operations
       return await this.callLocalLLM(peerName, operation, params);
     } else {
       // Use peer's configured LLM

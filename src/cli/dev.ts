@@ -539,7 +539,7 @@ program
         new Command('init')
             .description('Initialize a new agent swarm configuration')
             .option('-p, --path <path>', 'Path for the configuration file', '.hanzo/agents.yaml')
-            .option('--peer-network', 'Initialize as peer network with Hanzo Zen main loop')
+            .option('--peer-network', 'Initialize as peer network with Zen main loop')
             .action(async (options) => {
                 const spinner = ora('Initializing agent swarm configuration...').start();
                 
@@ -549,8 +549,8 @@ program
                     if (options.peerNetwork) {
                         // Create peer network configuration
                         await AgentSwarmManager.initPeerNetworkConfig(options.path);
-                        spinner.succeed('Peer network configuration initialized with Hanzo Zen!');
-                        console.log(chalk.cyan('Using Hanzo Zen for cost-effective local orchestration'));
+                        spinner.succeed('Peer network configuration initialized with Zen!');
+                        console.log(chalk.cyan('Using Zen for cost-effective local orchestration'));
                     } else {
                         await AgentSwarmManager.initConfig(options.path);
                         spinner.succeed('Agent swarm configuration initialized!');
@@ -567,7 +567,7 @@ program
         new Command('run <task>')
             .description('Run a task with the configured agent swarm')
             .option('-c, --config <path>', 'Path to agent configuration file')
-            .option('--peer', 'Run as peer network with Hanzo Zen orchestration')
+            .option('--peer', 'Run as peer network with Zen orchestration')
             .option('--critic', 'Include critic analysis in results')
             .option('--local-llm <endpoint>', 'Local LLM endpoint', 'http://localhost:8080')
             .action(async (task, options) => {
@@ -575,7 +575,7 @@ program
                 
                 try {
                     if (options.peer) {
-                        // Use peer network with local Hanzo Zen
+                        // Use peer network with local Zen
                         const { PeerAgentNetwork } = await import('../cli-tools/orchestration/peer-agent-network');
                         
                         const network = new PeerAgentNetwork({
@@ -589,10 +589,10 @@ program
                         });
                         
                         await network.initialize();
-                        spinner.succeed('Peer network initialized with Hanzo Zen');
+                        spinner.succeed('Peer network initialized with Zen');
                         
                         console.log(chalk.cyan('\n🌐 Executing with peer network...'));
-                        console.log(chalk.gray('Using local Hanzo Zen for orchestration (cost-optimized)'));
+                        console.log(chalk.gray('Using local Zen for orchestration (cost-optimized)'));
                         
                         const results = await network.executeTask(task, {
                             requireCritic: options.critic
