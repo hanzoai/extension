@@ -159,7 +159,7 @@ export OLLAMA_BASE_URL=http://localhost:11434
 ## Why AI Engineers Choose Hanzo AI
 
 ### 🎯 **The Complete Toolkit**
-- **Every Model**: one API across every major provider and our own Zen family
+- **Every Model**: one API across every major provider, plus the Zen family
 - **Every Tool**: 4000+ MCP servers for specialized capabilities
 - **Every Provider**: OpenAI, Anthropic, Google, Meta, Mistral, and 50+ more
 

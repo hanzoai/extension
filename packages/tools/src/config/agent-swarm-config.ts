@@ -453,7 +453,7 @@ You handle infrastructure and deployment:
   }
 
   /**
-   * Initialize a peer network configuration with Hanzo Zen
+   * Initialize a peer network configuration with Zen
    */
   static async initPeerNetworkConfig(targetPath?: string): Promise<void> {
     const configPath = targetPath || path.join(process.cwd(), '.hanzo', 'agents-peer.yaml');
@@ -474,7 +474,7 @@ You handle infrastructure and deployment:
     fs.writeFileSync(configPath, peerConfig, 'utf8');
     
     console.log(`Created peer network configuration at: ${configPath}`);
-    console.log('This configuration uses Hanzo Zen for cost-effective local orchestration.');
+    console.log('This configuration uses Zen for cost-effective local orchestration.');
   }
 
   /**
@@ -490,20 +490,20 @@ You handle infrastructure and deployment:
         local_llm: {
           model: "hanzo-zen",
           endpoint: "http://localhost:8080",
-          description: "Local Hanzo Zen MoE for cost-effective orchestration"
+          description: "Local Zen MoE for cost-effective orchestration"
         },
         instances: {
           orchestrator: {
-            description: "Main orchestrator using Hanzo Zen for coordination",
+            description: "Main orchestrator using Zen for coordination",
             directory: ".",
             model: "zen",
             expose_as_mcp: true,
             mcp_port: 10000,
             connect_to_agents: ["architect", "developer", "reviewer", "tester", "critic"],
             vibe: true,
-            prompt: `# Orchestrator Agent (Hanzo Zen)
+            prompt: `# Orchestrator Agent (Zen)
             
-You are the main orchestrator running on local Hanzo Zen for cost efficiency.
+You are the main orchestrator running on local Zen for cost efficiency.
 Your role is to coordinate all other agents efficiently.
 
 ## Cost Optimization Strategy
