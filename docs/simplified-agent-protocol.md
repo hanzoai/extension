@@ -136,7 +136,7 @@ coordinator -> architect -> developer -> reviewer
 1. **Simplicity**: One tool per agent, clear mental model
 2. **Flexibility**: Any agent can call any other agent
 3. **Extensibility**: Easy to add new agents or MCP servers
-4. **Cost Efficiency**: Hanzo Zen orchestrates locally
+4. **Cost Efficiency**: Zen orchestrates locally
 5. **Tool Sharing**: All agents access the same MCP tools
 
 ## Example Flow
@@ -174,7 +174,7 @@ Each agent receives:
 3. Access to standard Hanzo tools
 4. Their own prompt and context
 
-The orchestrator (Hanzo Zen) manages:
+The orchestrator (Zen) manages:
 1. Tool routing between agents
 2. Recursion depth tracking
 3. Cost optimization (local vs API calls)

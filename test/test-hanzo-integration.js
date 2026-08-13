@@ -62,7 +62,7 @@ async function testHanzoIntegration() {
   console.log('\n4. Testing local-first MCP approach...');
   console.log('- Local MCP tools work without API key');
   console.log('- Cloud MCP provides access to 4000+ servers');
-  console.log('- Hanzo Zen enables 90% cost reduction for local AI');
+  console.log('- Zen enables 90% cost reduction for local AI');
   
   console.log('\n✅ Integration test complete!');
   console.log('\nTo use @hanzo/mcp with Hanzo App:');
