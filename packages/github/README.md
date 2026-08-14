@@ -85,7 +85,7 @@ Never commit secrets — env only (store in KMS, sync to k8s via `KMSSecret`).
 | `GITHUB_APP_ID` | yes | — | Numeric app id. |
 | `GITHUB_PRIVATE_KEY` | yes | — | PEM. `\n`-escaped one-liners are un-escaped automatically. |
 | `GITHUB_WEBHOOK_SECRET` | yes | — | Verifies `X-Hub-Signature-256`. |
-| `HANZO_API_KEY` | no | `''` | `hk-…` gateway bearer. Empty ⇒ anonymous/limited models. |
+| `HANZO_API_KEY` | no | `''` | `sk-…` gateway bearer. Empty ⇒ anonymous/limited models. |
 | `HANZO_API_BASE_URL` | no | `https://api.hanzo.ai` | Gateway. |
 | `HANZO_MODEL` | no | `zen5` | Review/triage model (Zen, qwen3+). |
 | `HANZO_MAX_DIFF_CHARS` | no | `120000` | Diff budget before windowing. |

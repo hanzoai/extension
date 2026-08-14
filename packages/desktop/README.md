@@ -28,7 +28,7 @@ window you summon from anywhere.
     **pasted back** over the frontmost app (the corrected text lands where the
     original was).
 - **Streaming** — every reply streams token-by-token into the panel.
-- **Your key, your machine** — paste your `hk-` key from
+- **Your key, your machine** — paste your `sk-` key from
   [hanzo.id](https://hanzo.id) into Settings. It is stored **only** in the app's
   local store (the webview's `localStorage`) and sent **only** to `api.hanzo.ai`
   as the bearer. No secret is bundled or committed.
@@ -41,11 +41,11 @@ the Rust is the native container.
 ```
 packages/desktop/
 ├── src/                      frontend (TypeScript, esbuild → dist/)
-│   ├── config.ts             gateway endpoints, default model, hk- key guard, store key
+│   ├── config.ts             gateway endpoints, default model, sk- key guard, store key
 │   ├── actions.ts            PURE: action catalog, prompt builders, clipboard-context
 │   │                         assembly/truncation, message shaping, reply parsing
 │   ├── hanzo.ts              THIN wrapper over @hanzo/ai (createAiClient): run / stream / list
-│   ├── store.ts              local settings (hk- key + model): parse / merge / serialize
+│   ├── store.ts              local settings (sk- key + model): parse / merge / serialize
 │   ├── clipboard.ts          Tauri I/O boundary: read clipboard, copy, paste-back
 │   ├── app.ts                DOM controller (glue only — one run path for every action)
 │   ├── index.html            the panel markup
@@ -142,7 +142,7 @@ Rust shell: toggle_window() → show + focus, emit "focus-prompt"
    │                                     tray quick action → emit "run-action" <id>
    ▼
 frontend app.ts (one run path):
-   gate on hk- key → captureSubject() reads the clipboard (Tauri plugin)
+   gate on sk- key → captureSubject() reads the clipboard (Tauri plugin)
    → buildActionMessages(id, inputs, ctx)  [pure]
    → streamChat(...) over @hanzo/ai → api.hanzo.ai /v1/chat/completions
    → parseResult(reply)  [pure]
@@ -156,8 +156,8 @@ frontend app.ts (one run path):
 - All model traffic goes to `api.hanzo.ai` over `/v1/...` (never an `/api/` prefix)
   through `@hanzo/ai` — the transport is never reimplemented here.
 - The window CSP allows connecting only to `https://api.hanzo.ai`.
-- The `hk-` key is validated (`isHanzoKey`) before it is ever used as a bearer, so
-  a wrong paste (an IAM JWT, an OpenAI `sk-` key) is rejected in the UI.
+- The `sk-` key is validated (`isHanzoKey`) before it is ever used as a bearer, so
+  a wrong paste (an IAM JWT, a half-copied key) is rejected in the UI.
 
 ## License
 

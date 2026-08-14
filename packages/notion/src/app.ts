@@ -10,7 +10,7 @@
 //    service). The app holds only an opaque SESSION id (sessionStorage) and
 //    proxies every Notion call through the service — the bot token and the
 //    client_secret are NEVER in the browser.
-//  - Hanzo: an `hk-` key pasted by the user (localStorage), or empty
+//  - Hanzo: an `sk-` key pasted by the user (localStorage), or empty
 //    (anonymous/limited). Same createAiClient contract as every Hanzo surface.
 
 /* global window, document, sessionStorage, localStorage, crypto */

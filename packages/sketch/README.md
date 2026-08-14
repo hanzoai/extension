@@ -54,7 +54,7 @@ is pure and fully unit-tested.
 ## Your Hanzo key
 
 The plugin never bundles or commits a key. Open the panel, expand **Hanzo key &
-model**, paste an `hk-…` Hanzo API key (or an IAM access token from
+model**, paste an `sk-…` Hanzo API key (or an IAM access token from
 [`@hanzo/iam`](https://www.npmjs.com/package/@hanzo/iam)), and **Save**. It is
 stored per-plugin with `sketch/settings`. Optionally set a model (default
 `zen5`).

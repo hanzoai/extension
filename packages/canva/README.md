@@ -12,7 +12,7 @@ without leaving the canvas:
 
 It reads the current selection and page via `@canva/design`, runs the model gateway
 through the **published `@hanzo/ai`** headless client over `api.hanzo.ai`, and adds or
-replaces text elements with the result. You paste your own Hanzo `hk-` key; the app
+replaces text elements with the result. You paste your own Hanzo `sk-` key; the app
 holds no secret and calls no `/api/` path — only `api.hanzo.ai/v1/...`.
 
 ## Architecture — one way to do everything
@@ -22,7 +22,7 @@ holds no secret and calls no `/api/` path — only `api.hanzo.ai/v1/...`.
 | `src/design-core.ts` | **PURE.** The action catalog, prompt builders, design-context assembly + truncation, and response parsing. No SDK, no DOM. Fully unit-tested. | — |
 | `src/hanzo.ts` | Thin wrapper over `@hanzo/ai` — the only place the model gateway is called. | `@hanzo/ai` |
 | `src/canva.ts` | Thin adapter over `@canva/design` — read the selection, replace it, insert a new text element. | `@canva/design` |
-| `src/config.ts` | Gateway base URL, default model, context budget, `hk-` key guard. | — |
+| `src/config.ts` | Gateway base URL, default model, context budget, `sk-` key guard. | — |
 | `src/app.tsx` | The App UI Kit panel — binds the three above to widgets; holds only UI state. | `@canva/app-ui-kit` |
 | `src/index.tsx` | Entry — mounts `App` under `AppUiProvider`. | `react-dom`, `@canva/app-ui-kit` |
 
@@ -77,13 +77,13 @@ pnpm --filter @hanzo/canva watch      # rebuilds dist/ on change
 npx @canva/cli@latest apps preview    # opens the app in the Canva editor, hot-reloading
 ```
 
-Open any design, launch **Hanzo AI** from the app side panel, paste your `hk-` key,
+Open any design, launch **Hanzo AI** from the app side panel, paste your `sk-` key,
 pick a model, and run an action. Select text on the canvas to enable **Rewrite** and
 **Translate**.
 
-### Getting a Hanzo `hk-` key
+### Getting a Hanzo `sk-` key
 
-Sign in at <https://hanzo.id> and mint an API key (prefixed `hk-`). The panel
+Sign in at <https://hanzo.id> and mint an API key (prefixed `sk-`). The panel
 validates the prefix before use and sends it as the bearer to `api.hanzo.ai`. The key
 lives only in the panel's session state — it is never persisted or bundled.
 
@@ -103,7 +103,7 @@ embedding and the count clamp), the `id → messages` path, and the response par
 (fence/quote stripping, idempotence, list-marker stripping). `test/hanzo.test.ts`
 asserts the `@hanzo/ai` request shaping against a mock client (model, `stream:false`,
 temperature, messages, abort signal, empty-content error, model listing).
-`test/config.test.ts` covers the `/v1` endpoint builders and the `hk-` key guard.
+`test/config.test.ts` covers the `/v1` endpoint builders and the `sk-` key guard.
 
 ```
 Test Files  3 passed (3)

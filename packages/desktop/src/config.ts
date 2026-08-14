@@ -1,5 +1,5 @@
 // Desktop app config — the api.hanzo.ai model gateway (default model + endpoints)
-// and the context character budget. Endpoints and the `hk-` key guard mirror
+// and the context character budget. Endpoints and the `sk-` key guard mirror
 // @hanzo/raycast / @hanzo/office so the productivity suite stays DRY: the action
 // catalog and prompt/parse logic live in actions.ts, the thin @hanzo/ai adapter
 // in hanzo.ts, the local key store in store.ts, and the Tauri clipboard I/O in
@@ -17,7 +17,7 @@ export const DEFAULT_MODEL = "zen5";
 
 // Public IAM origin that mints Hanzo user tokens, and the OAuth client id an
 // inbound Hanzo token is audienced to, under the shared <org>-<app> naming scheme.
-// The app itself uses a pasted `hk-` key held in the local store (store.ts); these
+// The app itself uses a pasted `sk-` key held in the local store (store.ts); these
 // exist so a Hanzo-hosted backend can validate one via @hanzo/iam.
 export const DEFAULT_IAM_SERVER_URL = "https://hanzo.id";
 export const DEFAULT_IAM_CLIENT_ID = "hanzo-desktop";
@@ -42,16 +42,17 @@ export const CONTEXT_CHAR_BUDGET = 24_000;
 // ---- Local store key ------------------------------------------------------
 //
 // The single localStorage key under which the app persists its settings (the
-// pasted `hk-` key + default model). One constant so store.ts and any test agree.
+// pasted `sk-` key + default model). One constant so store.ts and any test agree.
 export const STORE_KEY = "hanzo.desktop.settings";
 
 // ---- Key guard ------------------------------------------------------------
 //
-// A Hanzo API key is minted by hanzo.id and is always prefixed `hk-`. isHanzoKey
+// A Hanzo API key is minted by hanzo.id and is always prefixed `sk-`. isHanzoKey
 // is the boundary guard: the settings pane validates the pasted key against this
 // before it is ever handed to the client as a bearer, so an obviously-wrong paste
-// (an IAM JWT, an OpenAI `sk-` key) is rejected in the UI instead of failing
-// opaquely at the gateway. Trim first — users paste with whitespace.
+// (an IAM JWT, a half-copied key) is rejected in the UI instead of failing
+// opaquely at the gateway. Shape is all it proves — only a `/v1/models` call
+// says the key is ours. Trim first — users paste with whitespace.
 export function isHanzoKey(key: string | undefined | null): key is string {
-  return typeof key === "string" && /^hk-[A-Za-z0-9._-]{16,}$/.test(key.trim());
+  return typeof key === "string" && /^sk-[A-Za-z0-9._-]{16,}$/.test(key.trim());
 }

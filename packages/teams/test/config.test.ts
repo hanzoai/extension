@@ -4,7 +4,7 @@ import { loadConfig, DEFAULT_MODELS, type Env } from '../src/config';
 const base: Env = {
   MICROSOFT_APP_ID: 'app-id',
   MICROSOFT_APP_PASSWORD: 'app-secret',
-  HANZO_API_KEY: 'hk-test',
+  HANZO_API_KEY: 'sk-test',
 };
 
 describe('loadConfig', () => {
@@ -12,7 +12,7 @@ describe('loadConfig', () => {
     const c = loadConfig(base);
     expect(c.appId).toBe('app-id');
     expect(c.appPassword).toBe('app-secret');
-    expect(c.hanzoApiKey).toBe('hk-test');
+    expect(c.hanzoApiKey).toBe('sk-test');
     expect(c.appType).toBe('MultiTenant');
     expect(c.appTenantId).toBe('');
     expect(c.port).toBe(3978);

@@ -81,7 +81,7 @@ describe('runAction (through a mocked AiClient)', () => {
     const out = await runAction({
       id: 'summarize',
       context: { title: 'Doc', text: 'content' },
-      hanzoToken: 'hk-1',
+      hanzoToken: 'sk-1',
       model: 'zen5',
       client,
     });

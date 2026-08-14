@@ -1,15 +1,15 @@
-// The app's local settings store: the pasted `hk-` key and the default model,
+// The app's local settings store: the pasted `sk-` key and the default model,
 // persisted in the webview's localStorage. The pure serialization (parse / merge /
 // serialize) is factored out so it is unit-testable with no DOM; the DOM adapter
 // (loadSettings / saveSettings) is the thin boundary that touches localStorage.
 //
-// The `hk-` key never leaves this machine — it is written only to the webview's
+// The `sk-` key never leaves this machine — it is written only to the webview's
 // origin-scoped localStorage and sent only to api.hanzo.ai as the bearer via
 // @hanzo/ai. No secret is bundled, no secret is committed.
 
 import { DEFAULT_MODEL, STORE_KEY, isHanzoKey } from "./config.js";
 
-// Settings the app persists. `apiKey` is the Hanzo `hk-` key (empty until the user
+// Settings the app persists. `apiKey` is the Hanzo `sk-` key (empty until the user
 // pastes one); `model` is the default model id sent to the gateway.
 export interface Settings {
   apiKey: string;
@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS: Settings = { apiKey: "", model: DEFAULT_MODEL };
 // (nothing stored), invalid JSON, a non-object, or missing/wrong-typed fields all
 // collapse to DEFAULT_SETTINGS-filled values. Pure and total — the boundary guard
 // for what may be sitting in localStorage. A stored key that no longer matches the
-// `hk-` shape is dropped (treated as absent) so a corrupted key can't be sent.
+// `sk-` shape is dropped (treated as absent) so a corrupted key can't be sent.
 export function parseSettings(raw: string | null): Settings {
   if (!raw) return { ...DEFAULT_SETTINGS };
   let obj: unknown;
@@ -63,7 +63,7 @@ export function mergeSettings(
     } else {
       return {
         settings: current,
-        error: "Not a Hanzo key — expected an hk- key from hanzo.id.",
+        error: "Not a Hanzo key — expected an sk- key from hanzo.id.",
       };
     }
   }

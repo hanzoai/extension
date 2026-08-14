@@ -144,7 +144,7 @@ The canonical path, end to end (`qbo-analysis.analyzeReport`):
 
 In the **panel**, the user pastes the report JSON and the same pure
 `finance.ts` / `hanzo.ts` produce the answer directly against the gateway with
-their pasted `hk-…` key — zero backend. In the **service**, `/v1/analyze` runs
+their pasted `sk-…` key — zero backend. In the **service**, `/v1/analyze` runs
 the whole flow server-side so the Intuit token and the Hanzo key never leave the
 server.
 

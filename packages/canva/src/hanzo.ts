@@ -13,7 +13,7 @@ import type { ChatMessage } from './design-core.js';
 export interface AskOptions {
   model?: string;
   temperature?: number;
-  /** Hanzo `hk-` key pasted by the user; sent as the bearer. */
+  /** Hanzo `sk-` key pasted by the user; sent as the bearer. */
   token?: string;
   baseURL?: string;
   /** Injected client (tests). Defaults to a real createAiClient. */
@@ -31,7 +31,7 @@ function client(opts: AskOptions): AiClient {
 // runChat is the single path from a built message list to the model. Every Canva
 // surface (every action) funnels here. Non-streaming: the panel renders the
 // final text and inserts it. token may be empty (the gateway serves anonymous/
-// limited models), but the panel gates on a valid `hk-` key first.
+// limited models), but the panel gates on a valid `sk-` key first.
 export async function runChat(messages: ChatMessage[], opts: AskOptions = {}): Promise<string> {
   const res = await client(opts).chat.completions.create(
     {

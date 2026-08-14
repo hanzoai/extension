@@ -9,7 +9,7 @@
  *  - GitLab: the instance base URL, an access token with `api` scope (Personal,
  *    Project, or Group — or a GitLab App OAuth token), and the webhook secret
  *    token used to verify inbound `X-Gitlab-Token` headers in constant time.
- *  - Hanzo: an `hk-…` API key (or IAM bearer) used as the gateway bearer for
+ *  - Hanzo: an `sk-…` API key (or IAM bearer) used as the gateway bearer for
  *    `@hanzo/ai`, plus the IAM origin + client id used to validate an inbound
  *    Hanzo user token when a request is owner-scoped.
  */
@@ -57,7 +57,7 @@ export interface HanzoConfig {
   /** Gateway base URL. */
   baseURL: string;
   /**
-   * Default Hanzo API key / bearer used against the gateway. `hk-…` key or IAM
+   * Default Hanzo API key / bearer used against the gateway. `sk-…` key or IAM
    * bearer. May be empty: the gateway serves anonymous/limited models.
    */
   apiKey: string;

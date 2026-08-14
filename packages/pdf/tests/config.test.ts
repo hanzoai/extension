@@ -16,7 +16,7 @@ describe('model gateway endpoints', () => {
 
 describe('pickBearer', () => {
   it('API key wins over the OAuth token', () => {
-    expect(pickBearer('hk-abc', 'jwt-xyz')).toBe('hk-abc');
+    expect(pickBearer('sk-abc', 'jwt-xyz')).toBe('sk-abc');
   });
   it('falls back to the OAuth token when no key', () => {
     expect(pickBearer('', 'jwt-xyz')).toBe('jwt-xyz');

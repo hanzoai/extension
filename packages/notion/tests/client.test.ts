@@ -69,12 +69,12 @@ describe('createAiClient', () => {
 
   it('POSTs to /v1/chat/completions with the bearer + shaped body', async () => {
     const doFetch = vi.fn().mockResolvedValue(ok({ choices: [{ message: { content: 'ok' } }] }));
-    const ai = createAiClient({ token: 'hk-123', fetch: doFetch as any });
+    const ai = createAiClient({ token: 'sk-123', fetch: doFetch as any });
     const res = await ai.chat.completions.create({ model: 'zen5', messages: [{ role: 'user', content: 'q' }] });
     expect(res.choices[0].message!.content).toBe('ok');
     const [url, init] = doFetch.mock.calls[0];
     expect(url).toBe('https://api.hanzo.ai/v1/chat/completions');
-    expect(init.headers.Authorization).toBe('Bearer hk-123');
+    expect(init.headers.Authorization).toBe('Bearer sk-123');
     expect(JSON.parse(init.body).stream).toBe(false);
   });
 

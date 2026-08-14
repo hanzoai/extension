@@ -87,7 +87,7 @@ describe('ask', () => {
   it('POSTs to the gateway with the bearer and returns the content', async () => {
     const fetchMock = vi.fn(async (_url: string, init: any) => {
       const body = JSON.parse(init.body);
-      expect(init.headers.Authorization).toBe('Bearer hk-abc');
+      expect(init.headers.Authorization).toBe('Bearer sk-abc');
       expect(body.messages[0].content).toBe(LEGAL_SYSTEM_PROMPT);
       expect(body.messages[1].content).toContain('summarize');
       return {
@@ -97,7 +97,7 @@ describe('ask', () => {
       } as any;
     });
     vi.stubGlobal('fetch', fetchMock);
-    const out = await ask('summarize', 'Matter: 1', 'hk-abc');
+    const out = await ask('summarize', 'Matter: 1', 'sk-abc');
     expect(out).toBe('a summary');
     expect(fetchMock.mock.calls[0][0]).toBe('https://api.hanzo.ai/v1/chat/completions');
   });

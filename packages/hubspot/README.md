@@ -33,7 +33,7 @@ Two credentials, kept apart by design:
   serverless runtime as `process.env.PRIVATE_APP_ACCESS_TOKEN`. The React card
   never sees it — it reads/writes CRM data only by calling the serverless
   functions.
-- **Hanzo** — an `hk-…` API key stored as a HubSpot **secret**
+- **Hanzo** — an `sk-…` API key stored as a HubSpot **secret**
   (`HANZO_API_KEY`), read by the `hanzo-assistant` serverless function and passed
   to `@hanzo/ai`. The browser only ever receives the final generated text.
 
@@ -129,7 +129,7 @@ serverless functions.
 The model key never goes in source or in the browser — it is a HubSpot secret:
 
 ```bash
-hs secret add HANZO_API_KEY        # paste your hk-… key from hanzo.id
+hs secret add HANZO_API_KEY        # paste your sk-… key from hanzo.id
 ```
 
 `serverless.json` declares `HANZO_API_KEY` on the `hanzo-assistant` function, so

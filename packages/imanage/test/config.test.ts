@@ -33,7 +33,7 @@ describe('config: gateway constants', () => {
 
 describe('config: pickBearer', () => {
   it('prefers a pasted key over an oauth token', () => {
-    expect(pickBearer('hk-abc', 'oauth-xyz')).toBe('hk-abc');
+    expect(pickBearer('sk-abc', 'oauth-xyz')).toBe('sk-abc');
   });
   it('falls back to the oauth token, trimming whitespace', () => {
     expect(pickBearer('   ', '  tok  ')).toBe('tok');

@@ -47,6 +47,6 @@ export function bearer(): string {
 // round-trip; throws with the gateway's message on failure.
 export async function validateKey(key: string): Promise<string[]> {
   const k = key.trim();
-  if (!k) throw new Error('Enter a Hanzo API key (hk-…).');
+  if (!k) throw new Error('Enter a Hanzo API key (sk-…).');
   return listModels(k);
 }

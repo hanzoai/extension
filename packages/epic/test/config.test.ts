@@ -23,7 +23,7 @@ describe('config: Hanzo gateway', () => {
 
 describe('config: pickBearer', () => {
   it('prefers the pasted key over the IAM token', () => {
-    expect(pickBearer('hk-key', 'iam-token')).toBe('hk-key');
+    expect(pickBearer('sk-key', 'iam-token')).toBe('sk-key');
   });
   it('falls back to the IAM token when no key', () => {
     expect(pickBearer('', 'iam-token')).toBe('iam-token');

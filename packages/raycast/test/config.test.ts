@@ -22,14 +22,14 @@ describe('gateway endpoints', () => {
 });
 
 describe('isHanzoKey (boundary guard)', () => {
-  it('accepts a well-formed hk- key, trimming whitespace', () => {
-    expect(isHanzoKey('hk-abcdef0123456789xyz')).toBe(true);
-    expect(isHanzoKey('  hk-abcdef0123456789xyz  ')).toBe(true);
+  it('accepts a well-formed sk- key, trimming whitespace', () => {
+    expect(isHanzoKey('sk-abcdef0123456789xyz')).toBe(true);
+    expect(isHanzoKey('  sk-abcdef0123456789xyz  ')).toBe(true);
   });
 
   it('rejects the wrong prefix, too-short, empty, and null', () => {
-    expect(isHanzoKey('sk-abcdef0123456789xyz')).toBe(false); // OpenAI key
-    expect(isHanzoKey('hk-short')).toBe(false);
+    expect(isHanzoKey('hk-abcdef0123456789xyz')).toBe(false); // the retired prefix
+    expect(isHanzoKey('sk-short')).toBe(false);
     expect(isHanzoKey('eyJhbGciOi.jwt.token')).toBe(false); // an IAM JWT
     expect(isHanzoKey('')).toBe(false);
     expect(isHanzoKey(undefined)).toBe(false);

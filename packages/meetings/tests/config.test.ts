@@ -10,7 +10,7 @@ import { authorizeUrl, tokenExchange, parseTokenResponse } from '../src/zoom/oau
 
 describe('pickBearer', () => {
   it('prefers a pasted API key over an OAuth token', () => {
-    expect(pickBearer('hk-key', 'oauth-tok')).toBe('hk-key');
+    expect(pickBearer('sk-key', 'oauth-tok')).toBe('sk-key');
   });
   it('falls back to the OAuth token, then empty', () => {
     expect(pickBearer('', 'oauth-tok')).toBe('oauth-tok');
@@ -41,10 +41,10 @@ describe('readServerConfig', () => {
   };
 
   it('reads a complete config with the optional Hanzo key and a default port', () => {
-    const cfg = readServerConfig({ ...full, HANZO_API_KEY: 'hk-1' });
+    const cfg = readServerConfig({ ...full, HANZO_API_KEY: 'sk-1' });
     expect(cfg.zoomClientId).toBe('cid');
     expect(cfg.zoomWebhookSecret).toBe('whsec');
-    expect(cfg.hanzoApiKey).toBe('hk-1');
+    expect(cfg.hanzoApiKey).toBe('sk-1');
     expect(cfg.port).toBe(8788);
   });
 

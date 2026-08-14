@@ -210,7 +210,7 @@ export interface RunActionParams {
   /** rewrite instruction / target language / question. */
   detail?: string;
   selection: Selection;
-  /** An `hk-…` Hanzo API key or IAM access token. */
+  /** An `sk-…` Hanzo API key or IAM access token. */
   hanzoToken: string;
   model?: string;
   baseUrl?: string;

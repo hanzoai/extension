@@ -90,7 +90,7 @@ export function extractContent(data: any): string {
 
 // ask runs one non-streaming completion and returns the answer. token may be
 // empty (the gateway serves anonymous/limited models); when present it is the
-// bearer (an `hk-` key or an IAM access token).
+// bearer (an `sk-` key or an IAM access token).
 export async function ask(
   task: string,
   ctx: DocumentContext,

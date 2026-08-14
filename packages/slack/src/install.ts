@@ -18,7 +18,7 @@ import type { Installation, InstallationQuery, InstallationStore } from '@slack/
 
 /** The Hanzo credential bound to one workspace. */
 export interface HanzoWorkspaceToken {
-  /** `hk-…` API key or IAM bearer used as the gateway credential. */
+  /** `sk-…` API key or IAM bearer used as the gateway credential. */
   token: string;
   /** Org/owner the token belongs to, when known (from IAM validation). */
   owner?: string;

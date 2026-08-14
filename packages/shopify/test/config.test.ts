@@ -80,9 +80,9 @@ describe('readServerConfig', () => {
   });
 
   it('honors SHOPIFY_SCOPES, HANZO_API_KEY and PORT', () => {
-    const cfg = readServerConfig({ ...base, SHOPIFY_SCOPES: 'read_products', HANZO_API_KEY: 'hk-x', PORT: '9100' });
+    const cfg = readServerConfig({ ...base, SHOPIFY_SCOPES: 'read_products', HANZO_API_KEY: 'sk-x', PORT: '9100' });
     expect(cfg.scopes).toBe('read_products');
-    expect(cfg.hanzoApiKey).toBe('hk-x');
+    expect(cfg.hanzoApiKey).toBe('sk-x');
     expect(cfg.port).toBe(9100);
   });
 

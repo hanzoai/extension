@@ -74,7 +74,7 @@ entry points.
 
 - Node 18+ and `pnpm`.
 - An Azure Bot registration (app id + secret) — see below.
-- A Hanzo API key (`hk-…`) with model access on `api.hanzo.ai`.
+- A Hanzo API key (`sk-…`) with model access on `api.hanzo.ai`.
 
 ## Configuration
 

@@ -9,7 +9,7 @@ export const API_BASE_URL = 'https://api.hanzo.ai';
 // Default model. Overridable per-request via the picker; the gateway routes it.
 export const DEFAULT_MODEL = 'zen-1';
 
-// localStorage key for the pasted Hanzo API key (`hk-…`). A pasted key needs no
+// localStorage key for the pasted Hanzo API key (`sk-…`). A pasted key needs no
 // registered OAuth client, which is the zero-setup path a lawyer uses. (OAuth /
 // hanzo.id device login is the documented future upgrade — see README.)
 export const APIKEY_STORAGE_KEY = 'hanzo.pdf.apiKey';

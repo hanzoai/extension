@@ -3,7 +3,7 @@
 // (see src-tauri/tauri.conf.json). No framework — esbuild + Node stdlib only,
 // mirroring @hanzo/pdf's and @hanzo/canva's build. Every model call goes to
 // api.hanzo.ai via @hanzo/ai; the app holds no secret — the user pastes their own
-// hk- key into the settings pane, stored only in the webview's localStorage.
+// sk- key into the settings pane, stored only in the webview's localStorage.
 //
 //   node build.js          → production build  (dist/index.html, app.js, styles.css)
 //   node build.js --watch  → rebuild on change (Tauri dev serves dist/)

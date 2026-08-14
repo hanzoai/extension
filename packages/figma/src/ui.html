@@ -5,12 +5,12 @@
 <style>__HANZO_UI_CSS__</style>
 
 <main>
-  <!-- Key gate: the zero-setup path — paste an hk- key, validated by a real
+  <!-- Key gate: the zero-setup path — paste an sk- key, validated by a real
        /v1/models call before it's saved to figma.clientStorage. -->
   <section id="key-gate" class="gate" hidden>
     <h1>Hanzo AI for Figma</h1>
     <p class="muted">Paste your Hanzo API key to begin. It is stored only in this plugin (figma.clientStorage) and sent only to api.hanzo.ai.</p>
-    <input id="key-input" type="password" placeholder="hk-…" autocomplete="off" spellcheck="false" />
+    <input id="key-input" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false" />
     <button id="key-save" class="primary">Connect</button>
     <p id="key-status" class="status"></p>
     <p class="muted small">Get a key at <span class="mono">api.hanzo.ai</span>.</p>

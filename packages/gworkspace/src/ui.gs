@@ -216,7 +216,7 @@ function modelPicker_() {
 function apiKeyInput_(value) {
   return CardService.newTextInput()
     .setFieldName('apikey')
-    .setTitle('Hanzo API key (hk-…)')
+    .setTitle('Hanzo API key (sk-…)')
     .setHint('Stored per-user, never leaves your account.')
     .setValue(value || '');
 }

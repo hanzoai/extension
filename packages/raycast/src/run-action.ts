@@ -51,7 +51,7 @@ export async function runQuickAction(
     await showToast({
       style: Toast.Style.Failure,
       title: "Set your Hanzo API key",
-      message: "Add your hk- key in this extension’s preferences (⌘,).",
+      message: "Add your sk- key in this extension’s preferences (⌘,).",
     });
     return;
   }
