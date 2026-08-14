@@ -13,7 +13,7 @@ Built on the published Hanzo SDK:
   and `.models.list()`. All model calls go to `https://api.hanzo.ai` on `/v1/...`
   (never an `/api/` prefix). We import it; we do not reimplement the transport.
 - **[`@hanzo/iam`](https://www.npmjs.com/package/@hanzo/iam)** — Hanzo identity /
-  the `hk-…` API key the panel uses as its gateway bearer.
+  the `sk-…` API key the panel uses as its gateway bearer.
 
 Procore is the construction management system of record: documents, RFIs,
 submittals, observations, and daily logs. This app reads those records through
@@ -30,7 +30,7 @@ Browser panel (dist/index.html, app.js)          Server service (dist/server.js)
   same-origin proxy       (cookie)               forwards to api.procore.com with
   (never sees a Procore token)                   the Procore-Company-Id header
         │
-        └── calls api.hanzo.ai /v1 directly with the pasted hk-… Hanzo key
+        └── calls api.hanzo.ai /v1 directly with the pasted sk-… Hanzo key
             (@hanzo/ai headless client)
 ```
 

@@ -126,7 +126,7 @@ pnpm typecheck      # tsc --noEmit
 SHOPIFY_API_KEY=...          # public client id
 SHOPIFY_API_SECRET=...       # SERVER ONLY — OAuth + all HMAC
 SHOPIFY_REDIRECT_URI=https://shopify.hanzo.ai/oauth/callback
-HANZO_API_KEY=hk-...         # optional — lets the webhook run a model call
+HANZO_API_KEY=sk-...         # optional — lets the webhook run a model call
 PORT=8791
 node dist/server.js
 ```

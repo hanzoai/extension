@@ -9,7 +9,7 @@
  *  - GitHub App: numeric app id, PEM private key, and the webhook secret used to
  *    verify inbound `X-Hub-Signature-256` HMACs. Octokit mints a per-installation
  *    token from the app JWT for every repo it operates on.
- *  - Hanzo: an `hk-…` API key (or IAM bearer) used as the gateway bearer for
+ *  - Hanzo: an `sk-…` API key (or IAM bearer) used as the gateway bearer for
  *    `@hanzo/ai`, plus the IAM origin + client id used to validate an inbound
  *    Hanzo user token when a request is owner-scoped.
  */
@@ -59,7 +59,7 @@ export interface HanzoConfig {
   /** Gateway base URL. */
   baseURL: string;
   /**
-   * Default Hanzo API key / bearer used against the gateway. `hk-…` key or IAM
+   * Default Hanzo API key / bearer used against the gateway. `sk-…` key or IAM
    * bearer. May be empty: the gateway serves anonymous/limited models.
    */
   apiKey: string;

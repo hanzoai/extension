@@ -9,7 +9,7 @@
  *  - Slack: signing secret + (single-workspace bot token) OR (OAuth client
  *    id/secret + state secret) for multi-workspace install. Presence of
  *    SLACK_CLIENT_ID selects OAuth mode.
- *  - Hanzo: an `hk-…` API key (or IAM bearer) used as the gateway bearer, plus
+ *  - Hanzo: an `sk-…` API key (or IAM bearer) used as the gateway bearer, plus
  *    the IAM origin + OAuth client id used to VALIDATE an inbound Hanzo user
  *    token (owner-scoping).
  */
@@ -43,7 +43,7 @@ export interface HanzoConfig {
   baseURL: string;
   /**
    * Default Hanzo API key / bearer used against the gateway when a workspace
-   * has no stored token of its own. `hk-…` key or IAM bearer. May be empty:
+   * has no stored token of its own. `sk-…` key or IAM bearer. May be empty:
    * the gateway serves anonymous/limited models.
    */
   apiKey: string;

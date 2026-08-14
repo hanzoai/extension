@@ -39,7 +39,7 @@ Node), so the tests exercise the exact shipped code with zero duplication.
 
 ## Auth
 
-Paste a Hanzo **API key** (`hk-…`, created at
+Paste a Hanzo **API key** (`sk-…`, created at
 [console.hanzo.ai/api-keys](https://console.hanzo.ai/api-keys)) into the add-on
 **Settings** card. It is stored in `PropertiesService.getUserProperties()`
 (per-user, never leaves the account) and sent as `Authorization: Bearer <key>`.
@@ -117,7 +117,7 @@ In the [Apps Script editor](https://script.google.com) for the project:
 1. **Deploy → Test deployments**.
 2. Under **Application(s): Google Workspace Add-on**, click **Install**.
 3. Open Docs / Sheets / Slides / Gmail — the **Hanzo AI** add-on appears in the
-   right-hand add-on rail. Open it, go to **Settings**, paste your `hk-` key.
+   right-hand add-on rail. Open it, go to **Settings**, paste your `sk-` key.
 
 A test deployment installs the add-on **only for you**, from the current HEAD of
 what you pushed — the fast inner loop.

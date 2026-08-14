@@ -38,14 +38,14 @@ describe('loadConfig', () => {
       ...base,
       GITLAB_BASE_URL: 'https://gitlab.acme.internal',
       HANZO_API_BASE_URL: 'https://gw.example.com',
-      HANZO_API_KEY: 'hk-abc',
+      HANZO_API_KEY: 'sk-abc',
       HANZO_MODEL: 'zen5-coder',
       HANZO_MAX_DIFF_CHARS: '500',
       PORT: '8080',
     } as NodeJS.ProcessEnv);
     expect(c.gitlab.baseURL).toBe('https://gitlab.acme.internal');
     expect(c.hanzo.baseURL).toBe('https://gw.example.com');
-    expect(c.hanzo.apiKey).toBe('hk-abc');
+    expect(c.hanzo.apiKey).toBe('sk-abc');
     expect(c.model).toBe('zen5-coder');
     expect(c.maxDiffChars).toBe(500);
     expect(c.port).toBe(8080);

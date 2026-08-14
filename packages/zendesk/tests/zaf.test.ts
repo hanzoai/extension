@@ -108,7 +108,7 @@ describe('secureFetch (key stays server-side)', () => {
     expect(captured?.secure).toBe(true);
     // The Authorization header carries the PLACEHOLDER, not a real key.
     expect(captured?.headers?.Authorization).toBe(`Bearer {{setting.${APIKEY_SETTING}}}`);
-    expect(JSON.stringify(captured)).not.toMatch(/hk-/);
+    expect(JSON.stringify(captured)).not.toMatch(/(?:sk|hk)-/);
     // The Response is usable by @hanzo/ai.
     expect(res.ok).toBe(true);
     expect(res.status).toBe(200);

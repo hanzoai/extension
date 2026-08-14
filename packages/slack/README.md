@@ -68,7 +68,7 @@ src/
 | `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` | OAuth | Multi-workspace install. |
 | `SLACK_STATE_SECRET` | OAuth | Signs the OAuth `state`. |
 | `SLACK_APP_TOKEN` | Socket Mode | `xapp-…`, with `SLACK_SOCKET_MODE=true`. |
-| `HANZO_API_KEY` | no | App-default gateway bearer (`hk-…`). A workspace's own bound token overrides it. |
+| `HANZO_API_KEY` | no | App-default gateway bearer (`sk-…`). A workspace's own bound token overrides it. |
 | `HANZO_API_BASE_URL` | no | Gateway base. Default `https://api.hanzo.ai`. |
 | `HANZO_DEFAULT_MODEL` | no | Default model. Default `zen5`. |
 | `HANZO_IAM_SERVER_URL` | no | IAM origin for token validation. Default `https://hanzo.id`. |
@@ -85,7 +85,7 @@ server-side only (`install.ts`) and never logged.
 ```bash
 pnpm install
 pnpm build
-SLACK_SIGNING_SECRET=… SLACK_BOT_TOKEN=xoxb-… HANZO_API_KEY=hk-… pnpm start
+SLACK_SIGNING_SECRET=… SLACK_BOT_TOKEN=xoxb-… HANZO_API_KEY=sk-… pnpm start
 # → @hanzo/slack listening on :3000
 ```
 
@@ -120,7 +120,7 @@ The manifest declares:
   `SLACK_SIGNING_SECRET`.
 - **Multi-workspace (OAuth)**: set `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`,
   `SLACK_STATE_SECRET`, then send admins to `{BASE}/slack/install`. Each install
-  is stored per team; bind that workspace's Hanzo `hk-…` key with
+  is stored per team; bind that workspace's Hanzo `sk-…` key with
   `store.setHanzoToken(teamId, { token })`.
 
 ### 3. Point Slack at your URLs

@@ -104,7 +104,7 @@ describe('createAiClient (mocked fetch)', () => {
     const fetchMock = mockFetch(200, {
       choices: [{ message: { role: 'assistant', content: 'ok' } }],
     });
-    const ai = createAiClient({ token: 'hk-abc', baseURL: 'https://api.hanzo.ai', fetch: fetchMock });
+    const ai = createAiClient({ token: 'sk-abc', baseURL: 'https://api.hanzo.ai', fetch: fetchMock });
     const res = await ai.chat.completions.create({
       model: 'zen5',
       messages: [{ role: 'user', content: 'hi' }],
@@ -114,7 +114,7 @@ describe('createAiClient (mocked fetch)', () => {
     expect(call[0]).toBe('https://api.hanzo.ai/v1/chat/completions');
     const init = call[1] as RequestInit;
     expect(init.method).toBe('POST');
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer hk-abc');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-abc');
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
     expect(JSON.parse(init.body as string)).toMatchObject({ model: 'zen5', stream: false });
   });

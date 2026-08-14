@@ -16,7 +16,7 @@ import {
 
 describe('pickBearer', () => {
   it('prefers the pasted API key over the oauth token', () => {
-    expect(pickBearer('hk-123', 'oauth-tok')).toBe('hk-123');
+    expect(pickBearer('sk-123', 'oauth-tok')).toBe('sk-123');
   });
   it('falls back to the oauth token when no key', () => {
     expect(pickBearer('', 'oauth-tok')).toBe('oauth-tok');
@@ -79,9 +79,9 @@ describe('readServerConfig', () => {
   });
 
   it('honors QBO_ENV=production, HANZO_API_KEY, and PORT', () => {
-    const cfg = readServerConfig({ ...base, QBO_ENV: 'production', HANZO_API_KEY: 'hk-x', PORT: '9100' });
+    const cfg = readServerConfig({ ...base, QBO_ENV: 'production', HANZO_API_KEY: 'sk-x', PORT: '9100' });
     expect(cfg.qboEnv).toBe('production');
-    expect(cfg.hanzoApiKey).toBe('hk-x');
+    expect(cfg.hanzoApiKey).toBe('sk-x');
     expect(cfg.port).toBe(9100);
   });
 

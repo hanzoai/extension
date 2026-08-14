@@ -16,7 +16,7 @@ var API_BASE_URL = 'https://api.hanzo.ai';
 // Default model. Overridable per-request; the gateway routes it.
 var DEFAULT_MODEL = 'zen-1';
 
-// PropertiesService key for the pasted Hanzo `hk-` API key.
+// PropertiesService key for the pasted Hanzo `sk-` API key.
 var APIKEY_PROP = 'hanzo.apiKey';
 // PropertiesService key for the preferred model id.
 var MODEL_PROP = 'hanzo.model';
@@ -110,7 +110,7 @@ function parseModels(data) {
 /**
  * ask runs one non-streaming completion and returns the text to insert. token
  * may be empty (the gateway serves anonymous/limited models); when present it is
- * the Hanzo `hk-` key.
+ * the Hanzo `sk-` key.
  */
 function ask(task, selection, token, opts) {
   var headers = {};

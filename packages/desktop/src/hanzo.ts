@@ -14,7 +14,7 @@ import type { ChatMessage } from "./actions.js";
 export interface AskOptions {
   model?: string;
   temperature?: number;
-  /** Hanzo `hk-` key (from the local store); sent as the bearer. */
+  /** Hanzo `sk-` key (from the local store); sent as the bearer. */
   token?: string;
   baseURL?: string;
   /** Injected client (tests). Defaults to a real createAiClient. */
@@ -39,7 +39,7 @@ function client(opts: AskOptions): AiClient {
 // The quick-action commands (summarize, explain, rewrite, translate, fix-grammar)
 // funnel here when the app wants the whole result before it copies/pastes. token
 // may be empty (the gateway serves anonymous/limited models), but the app gates on
-// a valid `hk-` key first.
+// a valid `sk-` key first.
 export async function runChat(
   messages: ChatMessage[],
   opts: AskOptions = {},

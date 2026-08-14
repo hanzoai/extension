@@ -15,7 +15,7 @@ a frame and:
 
 The AI runs on the [api.hanzo.ai](https://api.hanzo.ai) gateway through the
 published [`@hanzo/ai`](https://www.npmjs.com/package/@hanzo/ai) headless client.
-Your Hanzo API key (`hk-…`) is pasted once, validated against `/v1/models`, and
+Your Hanzo API key (`sk-…`) is pasted once, validated against `/v1/models`, and
 stored only inside the plugin (`figma.clientStorage`). Nothing is sent anywhere
 but `api.hanzo.ai`.
 
@@ -68,7 +68,7 @@ Import into Figma:
 2. **Menu → Plugins → Development → Import plugin from manifest…**
 3. Select `packages/figma/dist/manifest.json`.
 4. Run it from **Plugins → Development → Hanzo AI** on any file (or a FigJam
-   board). Paste your `hk-` key on first run.
+   board). Paste your `sk-` key on first run.
 
 With `pnpm watch` running, re-run the plugin after a change to pick up the new
 build (Figma reloads the manifest's `code.js`/`ui.html` each launch).

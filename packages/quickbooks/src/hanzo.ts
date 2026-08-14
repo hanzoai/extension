@@ -76,7 +76,7 @@ export function extractContent(res: ChatCompletion): string {
 export interface AskOptions {
   model?: string;
   temperature?: number;
-  /** Bearer credential: an `hk-…` key or an IAM token. Empty → anonymous. */
+  /** Bearer credential: an `sk-…` key or an IAM token. Empty → anonymous. */
   token?: string;
   baseURL?: string;
   /** Injected client (tests). Defaults to a real createAiClient. */

@@ -144,7 +144,7 @@ export function extractContent(res: ChatCompletion): string {
 export interface AskOptions {
   model?: string;
   temperature?: number;
-  token?: string; // hk- key or IAM token; empty → anonymous/public models
+  token?: string; // sk- key or IAM token; empty → anonymous/public models
   baseUrl?: string;
   /** Injected @hanzo/ai client (tests). Defaults to a real createAiClient. */
   client?: AiClient;

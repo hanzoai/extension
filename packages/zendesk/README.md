@@ -46,7 +46,7 @@ The output isn't inserted automatically. The agent clicks:
 
 ## Security — the Hanzo key never reaches the browser
 
-The Hanzo API key (`hk-…`) is a **secure installation setting**
+The Hanzo API key (`sk-…`) is a **secure installation setting**
 (`manifest.json` → `parameters[hanzo_api_key]`, `"secure": true`, `"type":
 "password"`). Zendesk stores secure settings server-side and **does not expose
 them to the iframe** — so the panel can't (and doesn't) read the key.
@@ -119,7 +119,7 @@ npx zcli apps:update dist
 After install, in **Admin Center → Apps and integrations → Zendesk Support
 apps**, open the app's settings and:
 
-1. Paste your Hanzo API key (`hk-…`) into **Hanzo API key** (secure).
+1. Paste your Hanzo API key (`sk-…`) into **Hanzo API key** (secure).
 2. Optionally set a **Default model** (defaults to `zen5`).
 3. Save. The panel appears in the ticket sidebar.
 

@@ -37,7 +37,7 @@ hold, **the Notion bot token never leaves the server**:
   service, which attaches the real `Bearer` + `Notion-Version` server-side.
   (Notion public-integration tokens do not expire and there is no refresh flow —
   so there is nothing time-based to manage.)
-- **Hanzo** — an `hk-` API key pasted by the user (kept in the browser), or
+- **Hanzo** — an `sk-` API key pasted by the user (kept in the browser), or
   empty for anonymous/limited models. The `createAiClient` contract — the same
   headless client surface as `@hanzo/ai`.
 
@@ -48,7 +48,7 @@ browser SPA (app.ts) ──OAuth redirect──▶ api.notion.com/v1/oauth/autho
      │                              └──POST api.notion.com/v1/oauth/token (Basic auth)──▶ bot token
      │                              ◀── { session, workspace }        (opaque session id only)
      ├──/notion/* (x-hanzo-session)──▶ service ──Bearer bot token──▶ api.notion.com/v1/{search,pages,blocks,databases}
-     └──POST /v1/chat/completions (Bearer hk-)──▶ api.hanzo.ai
+     └──POST /v1/chat/completions (Bearer sk-)──▶ api.hanzo.ai
 ```
 
 The engine is small, pure, and unit-tested:

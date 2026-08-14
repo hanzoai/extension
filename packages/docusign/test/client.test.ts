@@ -57,11 +57,11 @@ describe('createAiClient (injected fetch — no network)', () => {
       return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'ok' } }] }), { status: 200 });
     }) as unknown as typeof fetch;
 
-    const ai = createAiClient({ token: 'hk-1', baseURL: 'https://api.hanzo.ai', fetch: fakeFetch });
+    const ai = createAiClient({ token: 'sk-1', baseURL: 'https://api.hanzo.ai', fetch: fakeFetch });
     const res = await ai.chat.completions.create({ model: 'zen5', messages: [{ role: 'user', content: 'hi' }] });
     expect(extractContent(res)).toBe('ok');
     expect(seen!.url).toBe('https://api.hanzo.ai/v1/chat/completions');
-    expect((seen!.init.headers as any).Authorization).toBe('Bearer hk-1');
+    expect((seen!.init.headers as any).Authorization).toBe('Bearer sk-1');
     const sent = JSON.parse(seen!.init.body as string);
     expect(sent).toMatchObject({ model: 'zen5', stream: false });
   });

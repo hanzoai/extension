@@ -56,7 +56,7 @@ describe('complete (injected client)', () => {
       prompt: QUICK_ACTIONS.summarize.prompt,
       context: 'U1: hello',
       model: 'zen5',
-      token: 'hk-x',
+      token: 'sk-x',
       baseURL: 'https://api.hanzo.ai',
       client,
     });

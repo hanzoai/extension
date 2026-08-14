@@ -9,7 +9,7 @@ export const DEFAULT_MODEL = 'zen-1';
 
 // Roaming-settings keys (Office.context.roamingSettings persists per-user across
 // the user's devices). Two auth paths: the IAM OAuth token set (managed by
-// @hanzo/auth) and a pasted Hanzo API key (`hk-…`) for zero-setup use — the key
+// @hanzo/auth) and a pasted Hanzo API key (`sk-…`) for zero-setup use — the key
 // needs no registered OAuth client, which is why the Windows test kit uses it.
 export const TOKEN_SETTING_KEY = 'hanzo.tokens';
 export const APIKEY_SETTING_KEY = 'hanzo.apiKey';

@@ -40,7 +40,7 @@ You need [Node.js](https://nodejs.org) installed.
    **Home → Add-ins → Shared Folder → Hanzo AI**.
 
 4. **Use it.** Click **Hanzo AI** on the Home tab to open the pane. Expand
-   **"Or use a Hanzo API key"**, paste your `hk-…` key (from
+   **"Or use a Hanzo API key"**, paste your `sk-…` key (from
    console.hanzo.ai → API keys), **Save**. Select text or a range, type an
    instruction, **Ask Hanzo**, then **Insert**.
 

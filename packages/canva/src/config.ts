@@ -17,7 +17,7 @@ export const DEFAULT_MODEL = 'zen5';
 
 // Public IAM origin that mints Hanzo user tokens, and the OAuth client id an
 // inbound Hanzo token is audienced to (owner-scoping validation via @hanzo/iam).
-// The Canva app itself pastes an `hk-` key; these exist so a Hanzo-hosted
+// The Canva app itself pastes an `sk-` key; these exist so a Hanzo-hosted
 // backend can validate one under the shared <org>-<app> naming scheme.
 export const DEFAULT_IAM_SERVER_URL = 'https://hanzo.id';
 export const DEFAULT_IAM_CLIENT_ID = 'hanzo-canva';
@@ -40,11 +40,12 @@ export function modelsURL(): string {
 // never silent drop (design-core marks `truncated`).
 export const DESIGN_CHAR_BUDGET = 12_000;
 
-// A Hanzo API key is minted by hanzo.id and is always prefixed `hk-`. isHanzoKey
+// A Hanzo API key is minted by hanzo.id and is always prefixed `sk-`. isHanzoKey
 // is the boundary guard: the panel validates a pasted key against this before it
 // is ever handed to the client as a bearer, so an obviously-wrong paste (an IAM
-// JWT, an OpenAI `sk-` key) is rejected in the UI instead of failing opaquely at
-// the gateway. Trim first — users paste with trailing whitespace.
+// JWT, a half-copied key) is rejected in the UI instead of failing opaquely at
+// the gateway. Shape is all it proves — only a `/v1/models` call says the key is
+// ours. Trim first — users paste with trailing whitespace.
 export function isHanzoKey(key: string | undefined | null): key is string {
-  return typeof key === 'string' && /^hk-[A-Za-z0-9._-]{16,}$/.test(key.trim());
+  return typeof key === 'string' && /^sk-[A-Za-z0-9._-]{16,}$/.test(key.trim());
 }

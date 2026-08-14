@@ -144,7 +144,7 @@ export function extractContent(res: { choices?: Array<{ message?: { content?: un
 export interface CompleteOptions {
   model?: string;
   temperature?: number;
-  /** Hanzo bearer: an `hk-…` API key or IAM token. Held server-side only. */
+  /** Hanzo bearer: an `sk-…` API key or IAM token. Held server-side only. */
   token?: string;
   baseURL?: string;
   /** Injected client (tests). Defaults to a real createAiClient. */

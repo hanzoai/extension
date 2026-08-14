@@ -20,7 +20,7 @@ Two credentials, kept apart by design:
   in the token-exchange service (`server.ts`), read from the environment. The
   browser SPA never sees it. The SPA holds a short-lived Clio **access token**
   in `sessionStorage` and calls Clio's REST API directly with it.
-- **Hanzo** — an `hk-` API key pasted by the user (kept in the browser), or
+- **Hanzo** — an `sk-` API key pasted by the user (kept in the browser), or
   empty for anonymous/limited models. Same contract as `@hanzo/office-addin`.
 
 ```
@@ -29,7 +29,7 @@ browser SPA (app.ts) ──OAuth redirect──▶ app.clio.com/oauth/authorize
      ├──POST /oauth/callback──▶ token service (server.ts, holds client_secret)
      │                              └──POST app.clio.com/oauth/token──▶ tokens
      ├──Clio REST v4 (Bearer access token)──▶ app.clio.com/api/v4/{matters,documents,notes,…}
-     └──POST /v1/chat/completions (Bearer hk-)──▶ api.hanzo.ai
+     └──POST /v1/chat/completions (Bearer sk-)──▶ api.hanzo.ai
 ```
 
 The engine is small, pure and unit-tested. `clio-oauth.ts` (authorize URL,

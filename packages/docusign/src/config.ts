@@ -20,7 +20,7 @@ export const DEFAULT_MODEL = 'zen5';
 export const DEFAULT_IAM_SERVER_URL = 'https://hanzo.id';
 export const DEFAULT_IAM_CLIENT_ID = 'hanzo-docusign';
 
-// localStorage key for the pasted Hanzo API key (`hk-…`) in the web panel. The
+// localStorage key for the pasted Hanzo API key (`sk-…`) in the web panel. The
 // Extension-App panel is a static web page (iframe), not an Office host with
 // roamingSettings, so the zero-setup credential lives in localStorage — same as
 // @hanzo/pdf and @hanzo/meetings.

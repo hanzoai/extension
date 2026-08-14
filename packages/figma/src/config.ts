@@ -13,7 +13,7 @@ export const API_BASE_URL = 'https://api.hanzo.ai';
 /** Default model when the picker has not been touched. A Zen model (qwen3+). */
 export const DEFAULT_MODEL = 'zen5';
 
-/** figma.clientStorage key for the pasted Hanzo API key (`hk-…`). clientStorage
+/** figma.clientStorage key for the pasted Hanzo API key (`sk-…`). clientStorage
  *  is the plugin-scoped persistent store; unlike a static web app's
  *  localStorage, only the main thread can reach it, so the iframe asks code.ts
  *  to load/save it over the messaging protocol. */
@@ -34,5 +34,5 @@ export const CONTEXT_CHAR_BUDGET = 24_000;
 /** True when a string looks like a Hanzo API key. Boundary guard only — the
  *  authoritative check is a real `/v1/models` call (see design-core.validateKey). */
 export function looksLikeApiKey(key: string): boolean {
-  return /^hk-/.test(key.trim());
+  return /^sk-/.test(key.trim());
 }

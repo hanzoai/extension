@@ -131,7 +131,7 @@ describe('stream (reply-draft assembly over a mocked client)', () => {
     const input: RunInput = {
       task: quickActionPrompt('draft_reply'),
       ctx: buildContext(ticketInput()),
-      token: 'hk-test',
+      token: 'sk-test',
       model: 'zen5',
       client,
     };
@@ -144,7 +144,7 @@ describe('stream (reply-draft assembly over a mocked client)', () => {
     let captured: ChatCompletionCreateParams | undefined;
     const client = fakeClient({ chunks: ['ok'], capture: (p) => (captured = p) });
     await stream(
-      { task: 'Summarize', ctx: buildContext(ticketInput()), token: 'hk-test', model: 'zen-custom', client },
+      { task: 'Summarize', ctx: buildContext(ticketInput()), token: 'sk-test', model: 'zen-custom', client },
       () => {},
     );
     expect(captured?.model).toBe('zen-custom');

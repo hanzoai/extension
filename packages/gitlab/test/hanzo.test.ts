@@ -58,7 +58,7 @@ describe('complete (request shaping via mock client)', () => {
       system: 'SYS',
       user: 'USER',
       model: 'zen5',
-      token: 'hk-abc',
+      token: 'sk-abc',
       baseURL: 'https://api.hanzo.ai',
       client: fake,
     });

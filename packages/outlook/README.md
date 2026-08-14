@@ -36,7 +36,7 @@ unit-tested here:
 - `config.ts` — the `api.hanzo.ai/v1` gateway endpoints + roaming-settings keys.
 - `chat.ts` — `ask` / `askStream` (SSE) / `listModels` and the request/response shaping.
 - `auth.ts` — the `@hanzo/auth` OAuth2+PKCE core wired to Office `roamingSettings`,
-  plus the pasted `hk-` API-key path.
+  plus the pasted `sk-` API-key path.
 
 The only Outlook-specific module is **`outlook-host.ts`**: the mailbox glue
 (`Office.context.mailbox.item`) and its pure shaping helpers — `stripHtml`,

@@ -261,7 +261,7 @@ export function extractContent(data: any): string {
 
 // ask runs one non-streaming completion and returns the answer. token may be
 // empty (the gateway serves anonymous/limited models); when present it is the
-// bearer (a pasted hk- key or an IAM token).
+// bearer (a pasted sk- key or an IAM token).
 export async function ask(
   task: string,
   ctx: TranscriptContext,

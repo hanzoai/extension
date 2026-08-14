@@ -20,7 +20,7 @@ export const HANZO_API_BASE_URL = 'https://api.hanzo.ai';
 // the gateway routes it.
 export const DEFAULT_MODEL = 'zen5';
 
-// localStorage key for the pasted Hanzo API key (`hk-…`) in the web panel. The
+// localStorage key for the pasted Hanzo API key (`sk-…`) in the web panel. The
 // SMART app launches as a static web page (iframe/browser), not an EHR host with
 // server-side storage, so the zero-setup Hanzo credential lives in localStorage —
 // same as @hanzo/pdf and @hanzo/docusign. NOTE: this is the HANZO gateway key,

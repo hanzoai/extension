@@ -14,7 +14,7 @@ import type { ChatMessage } from "./actions.js";
 export interface AskOptions {
   model?: string;
   temperature?: number;
-  /** Hanzo `hk-` key (Raycast preference); sent as the bearer. */
+  /** Hanzo `sk-` key (Raycast preference); sent as the bearer. */
   token?: string;
   baseURL?: string;
   /** Injected client (tests). Defaults to a real createAiClient. */
@@ -39,7 +39,7 @@ function client(opts: AskOptions): AiClient {
 // model. The quick-action commands (summarize, explain, rewrite, translate,
 // fix-grammar) funnel here: they need the whole result before they paste it.
 // token may be empty (the gateway serves anonymous/limited models), but a command
-// gates on a valid `hk-` key first.
+// gates on a valid `sk-` key first.
 export async function runChat(
   messages: ChatMessage[],
   opts: AskOptions = {},

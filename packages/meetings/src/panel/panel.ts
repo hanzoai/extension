@@ -137,7 +137,7 @@ export function mountPanel(host: PanelHost): void {
   // Reflect the current auth state and populate models.
   const refreshAuth = async (): Promise<void> => {
     const key = getApiKey();
-    els.authhint.textContent = key ? 'Using your saved Hanzo API key.' : 'Paste a Hanzo API key (hk-…) to use your models.';
+    els.authhint.textContent = key ? 'Using your saved Hanzo API key.' : 'Paste a Hanzo API key (sk-…) to use your models.';
     await populateModels(els.model, bearer());
   };
   void refreshAuth();

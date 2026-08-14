@@ -143,7 +143,7 @@ describe('runAction', () => {
     const out = await runAction({
       id: 'summarize',
       context: { displayNumber: '00123-Smith', documents: [] },
-      hanzoToken: 'hk-x',
+      hanzoToken: 'sk-x',
     });
     expect(out).toBe('SUMMARY');
   });

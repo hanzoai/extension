@@ -71,7 +71,7 @@ export function extractContent(data: any): string {
 }
 
 // ask runs one non-streaming completion and returns the text. token may be
-// empty (anonymous/limited); when present it is the Hanzo bearer (hk- key or
+// empty (anonymous/limited); when present it is the Hanzo bearer (sk- key or
 // IAM OAuth token).
 export async function ask(task: string, context: string, token: string, opts: ChatOptions = {}): Promise<string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };

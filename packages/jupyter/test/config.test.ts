@@ -15,12 +15,12 @@ describe('resolveSettings', () => {
 
   it('uses provided values', () => {
     const s = resolveSettings({
-      apiKey: 'hk-abc',
+      apiKey: 'sk-abc',
       model: 'zen5-coder',
       baseUrl: 'https://gw.example.com',
     });
     expect(s).toEqual({
-      apiKey: 'hk-abc',
+      apiKey: 'sk-abc',
       model: 'zen5-coder',
       baseUrl: 'https://gw.example.com',
     });
@@ -35,11 +35,11 @@ describe('resolveSettings', () => {
 
   it('trims values and strips trailing slashes from baseUrl', () => {
     const s = resolveSettings({
-      apiKey: '  hk-x  ',
+      apiKey: '  sk-x  ',
       model: '  zen5  ',
       baseUrl: 'https://api.hanzo.ai///',
     });
-    expect(s.apiKey).toBe('hk-x');
+    expect(s.apiKey).toBe('sk-x');
     expect(s.model).toBe('zen5');
     expect(s.baseUrl).toBe('https://api.hanzo.ai');
   });
