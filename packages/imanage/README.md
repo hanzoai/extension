@@ -19,7 +19,7 @@ Built on the published Hanzo SDK:
   and `.models.list()`. All model calls go to `https://api.hanzo.ai` on `/v1/...`
   (never an `/api/` prefix). We import it; we do not reimplement the transport.
 - **[`@hanzo/iam`](https://www.npmjs.com/package/@hanzo/iam)** — Hanzo identity /
-  the `hk-…` API key the panel uses as its gateway bearer.
+  the `sk-…` API key the panel uses as its gateway bearer.
 
 > **Note on `/api/`.** The `/api/` ban is a **Hanzo gateway** rule (`api.hanzo.ai`
 > IS the api host, so paths are `/v1/...`). iManage's **own** Work API path is
@@ -36,7 +36,7 @@ Browser panel (dist/index.html, app.js)          Server service (dist/server.js)
   same-origin proxy       (cookie)               (X-Auth-Token) + refresh, forwards
   (never sees an iManage token)                  to {host}/api/v2/customers/…
         │
-        └── calls api.hanzo.ai /v1 directly with the pasted hk-… Hanzo key
+        └── calls api.hanzo.ai /v1 directly with the pasted sk-… Hanzo key
             (@hanzo/ai headless client)
 ```
 

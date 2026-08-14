@@ -41,13 +41,13 @@ describe('loadConfig', () => {
     const cfg = loadConfig({
       ...BASE,
       SLACK_BOT_TOKEN: 'xoxb-1',
-      HANZO_API_KEY: 'hk-123',
+      HANZO_API_KEY: 'sk-123',
       HANZO_API_BASE_URL: 'https://api.hanzo.ai',
       HANZO_DEFAULT_MODEL: 'zen5-pro',
       HANZO_IAM_SERVER_URL: 'https://hanzo.id',
       PORT: '8080',
     });
-    expect(cfg.hanzo.apiKey).toBe('hk-123');
+    expect(cfg.hanzo.apiKey).toBe('sk-123');
     expect(cfg.defaultModel).toBe('zen5-pro');
     expect(cfg.hanzo.iamServerUrl).toBe('https://hanzo.id');
     expect(cfg.port).toBe(8080);

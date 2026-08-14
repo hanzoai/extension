@@ -21,14 +21,14 @@ describe('gateway config', () => {
 });
 
 describe('isHanzoKey', () => {
-  it('accepts a well-formed hk- key (trimming whitespace)', () => {
-    expect(isHanzoKey('hk-abcdef0123456789ABCDEF')).toBe(true);
-    expect(isHanzoKey('  hk-abcdef0123456789ABCDEF  ')).toBe(true);
+  it('accepts a well-formed sk- key (trimming whitespace)', () => {
+    expect(isHanzoKey('sk-abcdef0123456789ABCDEF')).toBe(true);
+    expect(isHanzoKey('  sk-abcdef0123456789ABCDEF  ')).toBe(true);
   });
 
   it('rejects the wrong prefix, too-short, or non-string', () => {
-    expect(isHanzoKey('sk-abcdef0123456789ABCDEF')).toBe(false);
-    expect(isHanzoKey('hk-short')).toBe(false);
+    expect(isHanzoKey('hk-abcdef0123456789ABCDEF')).toBe(false); // the retired prefix
+    expect(isHanzoKey('sk-short')).toBe(false);
     expect(isHanzoKey('')).toBe(false);
     expect(isHanzoKey(undefined)).toBe(false);
     expect(isHanzoKey(null)).toBe(false);

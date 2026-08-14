@@ -58,7 +58,7 @@ export interface CompleteInput {
   user: string;
   /** Model id to route to. */
   model: string;
-  /** Bearer credential for the gateway (`hk-…` key or IAM bearer). May be ''. */
+  /** Bearer credential for the gateway (`sk-…` key or IAM bearer). May be ''. */
   token: string;
   /** Gateway base URL. */
   baseURL: string;

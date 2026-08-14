@@ -412,7 +412,7 @@ function fakeClient(opts: {
 }
 
 function runInput(over: Partial<RunInput> = {}): RunInput {
-  return { actionId: 'rewrite', snapshot: snapshot(), note: '', token: 'hk-test', ...over };
+  return { actionId: 'rewrite', snapshot: snapshot(), note: '', token: 'sk-test', ...over };
 }
 
 describe('stream', () => {
@@ -479,7 +479,7 @@ describe('messageText', () => {
 describe('validateKey / listModels', () => {
   it('validateKey returns the model ids on success', async () => {
     const client = fakeClient({ models: ['zen5', 'zen-coder'] });
-    expect(await validateKey('hk-x', client)).toEqual(['zen5', 'zen-coder']);
+    expect(await validateKey('sk-x', client)).toEqual(['zen5', 'zen-coder']);
   });
 
   it('validateKey rejects an empty key before any call', async () => {
@@ -488,11 +488,11 @@ describe('validateKey / listModels', () => {
 
   it('listModels returns [] on failure instead of throwing', async () => {
     const client = fakeClient({ modelsThrows: true });
-    expect(await listModels('hk-x', client)).toEqual([]);
+    expect(await listModels('sk-x', client)).toEqual([]);
   });
 
   it('listModels returns the ids on success', async () => {
     const client = fakeClient({ models: ['zen5'] });
-    expect(await listModels('hk-x', client)).toEqual(['zen5']);
+    expect(await listModels('sk-x', client)).toEqual(['zen5']);
   });
 });

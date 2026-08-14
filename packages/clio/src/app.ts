@@ -8,7 +8,7 @@
 //  - Clio: the OAuth token is obtained server-side (token service) and returned
 //    to the app; kept in sessionStorage for the tab's lifetime, refreshed via
 //    the service. The client_secret is NEVER here.
-//  - Hanzo: an `hk-` key pasted by the user (kept in localStorage), or empty
+//  - Hanzo: an `sk-` key pasted by the user (kept in localStorage), or empty
 //    (anonymous/limited). Same contract as @hanzo/office-addin.
 
 /* global window, document, sessionStorage, localStorage, crypto */

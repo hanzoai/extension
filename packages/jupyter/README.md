@@ -18,7 +18,7 @@ scientists live.
 
 Model calls route through the **Hanzo AI gateway** (`api.hanzo.ai`, `/v1/...`)
 via the published headless client [`@hanzo/ai`](https://www.npmjs.com/package/@hanzo/ai) —
-no bespoke HTTP. Your Hanzo `hk-` key is set in JupyterLab settings, never in
+no bespoke HTTP. Your Hanzo `sk-` key is set in JupyterLab settings, never in
 source.
 
 ## Architecture
@@ -39,7 +39,7 @@ unit-tested.
 
 - JupyterLab **>= 4.0**
 - Node **>= 18** and `jlpm` (the JupyterLab-pinned Yarn, shipped with JupyterLab)
-- A Hanzo `hk-` API key (from <https://hanzo.ai>) for authenticated models; the
+- A Hanzo `sk-` API key (from <https://hanzo.ai>) for authenticated models; the
   gateway also serves public/limited models anonymously.
 
 ## Build
@@ -85,13 +85,13 @@ Open **Settings → Settings Editor → Hanzo AI** (or edit Advanced Settings JS
 
 ```json
 {
-  "apiKey": "hk-…",
+  "apiKey": "sk-…",
   "model": "zen5",
   "baseUrl": "https://api.hanzo.ai"
 }
 ```
 
-- **`apiKey`** — your Hanzo `hk-` key. Sent as a Bearer token to `api.hanzo.ai`.
+- **`apiKey`** — your Hanzo `sk-` key. Sent as a Bearer token to `api.hanzo.ai`.
   Leave blank to use the gateway's public models. Stored by the JupyterLab
   settings registry, never committed to source.
 - **`model`** — the default model id for cell actions and the panel. Any id from

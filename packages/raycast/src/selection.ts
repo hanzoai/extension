@@ -1,5 +1,5 @@
 // The Raycast I/O layer: read the frontmost app's selected text (falling back to
-// the clipboard), read the extension preferences (the `hk-` key + default model),
+// the clipboard), read the extension preferences (the `sk-` key + default model),
 // and paste/copy a result back. This is the ONLY module that imports @raycast/api,
 // so actions.ts (prompts/parsing) and hanzo.ts (@hanzo/ai) stay pure and
 // unit-testable. The `chooseSubject` decision — which capture becomes the model's
@@ -9,7 +9,7 @@ import { getPreferenceValues, getSelectedText, Clipboard } from "@raycast/api";
 import { chooseSubject, type ActionContext } from "./actions.js";
 import { DEFAULT_MODEL } from "./config.js";
 
-// Preferences declared in package.json. `apiKey` is the Hanzo `hk-` key (a
+// Preferences declared in package.json. `apiKey` is the Hanzo `sk-` key (a
 // secure/password preference); `model` is the default model id sent to the
 // gateway (a dropdown seeded from /v1/models, overridable). getPreferenceValues
 // is typed against this shape.

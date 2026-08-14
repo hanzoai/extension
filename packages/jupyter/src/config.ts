@@ -1,7 +1,7 @@
 // Hanzo-for-JupyterLab config — the one backend this extension talks to and the
 // tunables the settings registry exposes. The model gateway is api.hanzo.ai/v1
 // (no `/api/` prefix — it is api.hanzo.ai already). Secrets never live here:
-// the Hanzo `hk-` key is read from the JupyterLab settings registry at runtime,
+// the Hanzo `sk-` key is read from the JupyterLab settings registry at runtime,
 // never bundled into source.
 
 /** Where the Hanzo model gateway lives. `@hanzo/ai` defaults here too. */
@@ -33,7 +33,7 @@ export const CommandIds = {
 
 /**
  * Resolved runtime settings the extension reads from the settings registry.
- * `apiKey` is the Hanzo `hk-` credential; empty means anonymous (the gateway
+ * `apiKey` is the Hanzo `sk-` credential; empty means anonymous (the gateway
  * serves its public/limited models). `baseUrl` is overridable for self-hosted
  * gateways but defaults to api.hanzo.ai.
  */

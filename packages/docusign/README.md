@@ -131,7 +131,7 @@ env file.
 | `DOCUSIGN_REDIRECT_URI` | yes | Registered OAuth callback URL |
 | `DOCUSIGN_CONNECT_HMAC_KEY` | yes | Connect HMAC secret (server only) |
 | `DOCUSIGN_ENV` | no | `demo` (default) or `production` |
-| `HANZO_API_KEY` | no | `hk-…` gateway bearer the webhook summarizes with; without it the webhook verifies + routes but skips summarization |
+| `HANZO_API_KEY` | no | `sk-…` gateway bearer the webhook summarizes with; without it the webhook verifies + routes but skips summarization |
 | `PORT` | no | Listen port (default `8789`) |
 
 The service fails fast (throws) at startup if any required secret is missing.

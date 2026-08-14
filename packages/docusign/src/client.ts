@@ -65,7 +65,7 @@ export interface ModelInfo {
 /** Options for {@link createAiClient}. */
 export interface AiClientOptions {
   /**
-   * Bearer credential: an `hk-…` Hanzo API key or an IAM access token. Empty
+   * Bearer credential: an `sk-…` Hanzo API key or an IAM access token. Empty
    * means anonymous — the gateway serves its public/limited models.
    */
   token?: string;

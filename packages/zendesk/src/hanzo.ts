@@ -92,7 +92,7 @@ export interface RunInput {
   ctx: TicketContext;
   /** Model id to route to. */
   model?: string;
-  /** Bearer credential for the gateway: the pasted `hk-…` key. Empty is allowed
+  /** Bearer credential for the gateway: the pasted `sk-…` key. Empty is allowed
    *  (the gateway serves anonymous/limited models). */
   token: string;
   /** Injected client (tests). Defaults to a real `createAiClient`. */
@@ -158,7 +158,7 @@ export async function complete(input: RunInput): Promise<string> {
  *  caller can populate the picker in one round-trip. */
 export async function validateKey(token: string): Promise<string[]> {
   const t = token.trim();
-  if (!t) throw new Error('Enter a Hanzo API key (hk-…).');
+  if (!t) throw new Error('Enter a Hanzo API key (sk-…).');
   const client = createAiClient({ baseUrl: API_BASE_URL, token: t });
   const models = await client.models.list();
   return models.map((m) => m.id).filter((id) => typeof id === 'string' && id.length > 0);

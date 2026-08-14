@@ -166,7 +166,7 @@ describe('runAction (through a mocked AiClient)', () => {
 
   it('assembles context, forms the task, and returns the model text', async () => {
     const { client, create } = mockClient(completion('CRITIQUE'));
-    const out = await runAction({ id: 'critique', selection: one, hanzoToken: 'hk-x', client });
+    const out = await runAction({ id: 'critique', selection: one, hanzoToken: 'sk-x', client });
     expect(out).toBe('CRITIQUE');
     expect(create).toHaveBeenCalledOnce();
     const [params, opts] = create.mock.calls[0];
@@ -179,7 +179,7 @@ describe('runAction (through a mocked AiClient)', () => {
 
   it('honors an explicit model and passes the detail into the task', async () => {
     const { client, create } = mockClient(completion('["Bienvenido"]'));
-    await runAction({ id: 'translate', detail: 'Spanish', selection: one, hanzoToken: 'hk-x', model: 'zen5-pro', client });
+    await runAction({ id: 'translate', detail: 'Spanish', selection: one, hanzoToken: 'sk-x', model: 'zen5-pro', client });
     const [params] = create.mock.calls[0];
     expect(params.model).toBe('zen5-pro');
     expect(params.messages[1].content).toContain('Spanish');
@@ -188,7 +188,7 @@ describe('runAction (through a mocked AiClient)', () => {
   it('forwards the abort signal', async () => {
     const { client, create } = mockClient(completion('ok'));
     const controller = new AbortController();
-    await runAction({ id: 'ask', selection: one, hanzoToken: 'hk-x', client, signal: controller.signal });
+    await runAction({ id: 'ask', selection: one, hanzoToken: 'sk-x', client, signal: controller.signal });
     const [, opts] = create.mock.calls[0];
     expect(opts).toEqual({ signal: controller.signal });
   });

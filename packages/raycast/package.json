@@ -91,7 +91,7 @@
     {
       "name": "apiKey",
       "title": "Hanzo API Key",
-      "description": "Your Hanzo hk- key from hanzo.id. Stored securely by Raycast; sent only to api.hanzo.ai.",
+      "description": "Your Hanzo sk- key from hanzo.id. Stored securely by Raycast; sent only to api.hanzo.ai.",
       "type": "password",
       "required": true
     },

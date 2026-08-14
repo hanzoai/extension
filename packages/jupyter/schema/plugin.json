@@ -8,7 +8,7 @@
     "apiKey": {
       "type": "string",
       "title": "Hanzo API key",
-      "description": "Your Hanzo `hk-` API key (from https://hanzo.ai). Leave blank to use the gateway's public/limited models. Sent as a Bearer token to api.hanzo.ai; never stored in source.",
+      "description": "Your Hanzo `sk-` API key (from https://hanzo.ai). Leave blank to use the gateway's public/limited models. Sent as a Bearer token to api.hanzo.ai; never stored in source.",
       "default": ""
     },
     "model": {

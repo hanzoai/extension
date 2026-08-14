@@ -4,7 +4,7 @@
 // Canva CLI (`canva apps preview`) serves this dist/ (or points at its own dev
 // server); either way the app is a static bundle Canva loads in the app iframe.
 // Every model call goes to api.hanzo.ai via @hanzo/ai; the app holds no secret —
-// the user pastes their own hk- key.
+// the user pastes their own sk- key.
 //
 //   node build.js            → production build  (dist/index.html, dist/app.js, dist/app.css)
 //   node build.js --watch    → rebuild on change

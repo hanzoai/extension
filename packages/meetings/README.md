@@ -104,7 +104,7 @@ never in the repo.
 | `HANZO_API_KEY` | no | Bearer the webhook uses to summarize (no user in the loop). Without it, the webhook verifies + routes but skips summarization. |
 | `PORT` | no | Listen port (default `8788`). |
 
-The Meet add-on and the in-panel Zoom app use a **pasted Hanzo API key** (`hk-…`,
+The Meet add-on and the in-panel Zoom app use a **pasted Hanzo API key** (`sk-…`,
 held in `localStorage`, validated by a real `/v1/models` call) — no OAuth client
 needed for the panel itself. hanzo.id device login is the documented upgrade; the
 bearer plumbing already tolerates any token.

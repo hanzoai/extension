@@ -32,7 +32,7 @@ export type ChatMessage = ChatCompletionMessage;
 
 /**
  * createHanzoClient builds the @hanzo/ai client from resolved settings. The
- * `hk-` key (or empty for anonymous) becomes the bearer token; the base URL
+ * `sk-` key (or empty for anonymous) becomes the bearer token; the base URL
  * defaults to api.hanzo.ai. This is the SINGLE place the SDK client is
  * constructed. `fetchImpl` is injectable for tests.
  */

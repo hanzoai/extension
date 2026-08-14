@@ -101,7 +101,7 @@ describe('ask', () => {
   it('POSTs to the gateway with the bearer, context, and selection', async () => {
     const fetchMock = vi.fn(async (_url: string, init: any) => {
       const body = JSON.parse(init.body);
-      expect(init.headers.Authorization).toBe('Bearer hk-tok');
+      expect(init.headers.Authorization).toBe('Bearer sk-tok');
       expect(body.messages[1].content).toContain('the arbitration clause'); // selection
       expect(body.messages[1].content).toContain('DOC BODY'); // context
       return {
@@ -110,7 +110,7 @@ describe('ask', () => {
       } as any;
     });
     vi.stubGlobal('fetch', fetchMock);
-    const out = await ask('Explain', ctxOf('DOC BODY'), 'hk-tok', 'the arbitration clause');
+    const out = await ask('Explain', ctxOf('DOC BODY'), 'sk-tok', 'the arbitration clause');
     expect(out).toBe('grounded answer (p. 1)');
     expect(fetchMock.mock.calls[0][0]).toBe('https://api.hanzo.ai/v1/chat/completions');
   });
@@ -151,7 +151,7 @@ describe('askStream', () => {
     });
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, body: stream } as any)));
     const chunks: string[] = [];
-    const full = await askStream('Summarize', ctxOf('d'), 'hk-1', (c) => chunks.push(c));
+    const full = await askStream('Summarize', ctxOf('d'), 'sk-1', (c) => chunks.push(c));
     expect(full).toBe('Hello world');
     expect(chunks).toEqual(['Hello', ' world']);
   });

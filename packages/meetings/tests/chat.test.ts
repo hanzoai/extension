@@ -122,7 +122,7 @@ describe('ask (request shaping over mock fetch)', () => {
   it('POSTs to the gateway /v1 with the bearer, transcript and task', async () => {
     const fetchMock = vi.fn(async (_url: string, init: any) => {
       const body = JSON.parse(init.body);
-      expect(init.headers.Authorization).toBe('Bearer hk-tok');
+      expect(init.headers.Authorization).toBe('Bearer sk-tok');
       expect(body.messages[1].content).toContain('DECISION: ship friday'); // transcript
       expect(body.messages[1].content).toContain('What did we decide?'); // task
       return {
@@ -132,7 +132,7 @@ describe('ask (request shaping over mock fetch)', () => {
       } as any;
     });
     vi.stubGlobal('fetch', fetchMock);
-    const out = await ask('What did we decide?', ctxOf('DECISION: ship friday'), 'hk-tok');
+    const out = await ask('What did we decide?', ctxOf('DECISION: ship friday'), 'sk-tok');
     expect(out).toBe('We decided to ship Friday.');
     expect(fetchMock.mock.calls[0][0]).toBe('https://api.hanzo.ai/v1/chat/completions');
   });
@@ -176,7 +176,7 @@ describe('askStream', () => {
       return { ok: true, body: stream } as any;
     }));
     const chunks: string[] = [];
-    const full = await askStream('Summarize', ctxOf('d'), 'hk-1', (c) => chunks.push(c));
+    const full = await askStream('Summarize', ctxOf('d'), 'sk-1', (c) => chunks.push(c));
     expect(full).toBe('Hello world');
     expect(chunks).toEqual(['Hello', ' world']);
   });
@@ -193,7 +193,7 @@ describe('summarizeTranscript (server one-shot)', () => {
   it('windows the segments and sends the Summarize action with the bearer', async () => {
     const fetchMock = vi.fn(async (_url: string, init: any) => {
       const body = JSON.parse(init.body);
-      expect(init.headers.Authorization).toBe('Bearer hk-srv');
+      expect(init.headers.Authorization).toBe('Bearer sk-srv');
       expect(body.messages[1].content).toContain(QUICK_ACTIONS.summary);
       expect(body.messages[1].content).toContain('Ana: kickoff'); // rendered segment
       expect(body.messages[1].content).toContain('Meeting: Sprint Review'); // meta header
@@ -206,7 +206,7 @@ describe('summarizeTranscript (server one-shot)', () => {
     vi.stubGlobal('fetch', fetchMock);
     const out = await summarizeTranscript(
       [{ speaker: 'Ana', text: 'kickoff' }, { speaker: 'Bob', text: 'agenda' }],
-      'hk-srv',
+      'sk-srv',
       { topic: 'Sprint Review' },
     );
     expect(out).toBe('Summary text.');

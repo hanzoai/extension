@@ -14,7 +14,7 @@ Built on the published Hanzo SDK:
   and `.models.list()`. All model calls go to `https://api.hanzo.ai` on `/v1/...`
   (never an `/api/` prefix). We import it; we do not reimplement the transport.
 - **[`@hanzo/iam`](https://www.npmjs.com/package/@hanzo/iam)** — Hanzo identity /
-  the `hk-…` API key the panel uses as its gateway bearer.
+  the `sk-…` API key the panel uses as its gateway bearer.
 
 Canvas is the dominant higher-ed / K12 LMS: courses, syllabi, modules, assignments,
 pages, discussions, and student submissions. This app reads those records through
@@ -36,7 +36,7 @@ Browser panel (dist/index.html, app.js)          Server service (dist/server.js)
   same-origin proxy      (cookie)                forwards to {canvas-host}/api/v1
   (never sees a Canvas token)                    with the user's access token
         │
-        └── calls api.hanzo.ai /v1 directly with the pasted hk-… Hanzo key
+        └── calls api.hanzo.ai /v1 directly with the pasted sk-… Hanzo key
             (@hanzo/ai headless client)
 ```
 

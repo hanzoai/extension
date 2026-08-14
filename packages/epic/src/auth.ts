@@ -1,5 +1,5 @@
 // The HANZO-gateway credential for the web panel — the zero-setup pasted-key
-// path. This is ONLY the Hanzo model-gateway bearer (an `hk-…` key or an IAM
+// path. This is ONLY the Hanzo model-gateway bearer (an `sk-…` key or an IAM
 // token); it is emphatically NOT the FHIR/PHI token. The FHIR access token lives
 // server-side (server.ts) and is never handled here — the panel holds only the
 // opaque server session cookie for FHIR reads. So a leaked localStorage key
@@ -46,6 +46,6 @@ export function bearer(): string {
 // throws with the gateway's message on failure. Empty key → clear message.
 export async function validateKey(key: string): Promise<string[]> {
   const k = key.trim();
-  if (!k) throw new Error('Enter a Hanzo API key (hk-…).');
+  if (!k) throw new Error('Enter a Hanzo API key (sk-…).');
   return listModels({ token: k });
 }

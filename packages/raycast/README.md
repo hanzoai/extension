@@ -39,7 +39,7 @@ The quick-action commands share one path (`src/run-action.ts`):
 
 Set these in Raycast → Extensions → Hanzo AI (⌘,):
 
-- **Hanzo API Key** (required) — your `hk-…` key from
+- **Hanzo API Key** (required) — your `sk-…` key from
   [hanzo.id](https://hanzo.id). Stored securely by Raycast (a `password`
   preference); sent only to `api.hanzo.ai` as a bearer. Never committed.
 - **Model** (optional) — default model id routed by the gateway (default
@@ -93,7 +93,7 @@ One and only one way through the stack — pure core, thin adapters:
 
 ```
 src/
-  config.ts       gateway URLs, default model, hk- key guard      (pure)
+  config.ts       gateway URLs, default model, sk- key guard      (pure)
   actions.ts      action catalog, prompts, context assembly,      (pure)
                   capture policy (chooseSubject), response parsing
   hanzo.ts        the ONLY caller of @hanzo/ai: runChat /          (thin adapter)

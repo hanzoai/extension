@@ -12,12 +12,12 @@ import type { Installation } from '@slack/bolt';
 
 describe('resolveBearer', () => {
   it('prefers the workspace token over the app default', () => {
-    expect(resolveBearer({ token: 'hk-ws' }, 'hk-default')).toBe('hk-ws');
+    expect(resolveBearer({ token: 'sk-ws' }, 'sk-default')).toBe('sk-ws');
   });
 
   it('falls back to the app default when no workspace token', () => {
-    expect(resolveBearer(undefined, 'hk-default')).toBe('hk-default');
-    expect(resolveBearer({ token: '   ' }, 'hk-default')).toBe('hk-default');
+    expect(resolveBearer(undefined, 'sk-default')).toBe('sk-default');
+    expect(resolveBearer({ token: '   ' }, 'sk-default')).toBe('sk-default');
   });
 
   it('returns empty (anonymous) when neither is set', () => {
@@ -73,15 +73,15 @@ describe('HanzoFileInstallationStore', () => {
 
   it('binds and reads a per-workspace Hanzo token', async () => {
     const store = newStore();
-    await store.setHanzoToken('T1', { token: 'hk-ws', owner: 'acme' });
-    expect(await store.getHanzoToken('T1')).toEqual({ token: 'hk-ws', owner: 'acme' });
+    await store.setHanzoToken('T1', { token: 'sk-ws', owner: 'acme' });
+    expect(await store.getHanzoToken('T1')).toEqual({ token: 'sk-ws', owner: 'acme' });
     expect(await store.getHanzoToken('T2')).toBeUndefined();
   });
 
   it('deletes an installation and its Hanzo token', async () => {
     const store = newStore();
     await store.storeInstallation({ team: { id: 'T1' } } as unknown as Installation);
-    await store.setHanzoToken('T1', { token: 'hk-ws' });
+    await store.setHanzoToken('T1', { token: 'sk-ws' });
     await store.deleteInstallation({ isEnterpriseInstall: false, teamId: 'T1' } as never);
     expect(await store.getHanzoToken('T1')).toBeUndefined();
   });

@@ -25,10 +25,10 @@ describe('auth: pasted Hanzo key (NOT the FHIR/PHI token)', () => {
     const { getApiKey, setApiKey, hasApiKey, bearer } = await import('../src/auth.js');
     expect(getApiKey()).toBe('');
     expect(hasApiKey()).toBe(false);
-    setApiKey('  hk-abc  ');
-    expect(getApiKey()).toBe('hk-abc'); // trimmed
+    setApiKey('  sk-abc  ');
+    expect(getApiKey()).toBe('sk-abc'); // trimmed
     expect(hasApiKey()).toBe(true);
-    expect(bearer()).toBe('hk-abc');
+    expect(bearer()).toBe('sk-abc');
     setApiKey('');
     expect(getApiKey()).toBe('');
     expect(hasApiKey()).toBe(false);
@@ -42,8 +42,8 @@ describe('auth: pasted Hanzo key (NOT the FHIR/PHI token)', () => {
   it('does not touch the FHIR/PHI storage — only the Hanzo gateway key', async () => {
     const { setApiKey } = await import('../src/auth.js');
     const { APIKEY_STORAGE_KEY } = await import('../src/config.js');
-    setApiKey('hk-x');
+    setApiKey('sk-x');
     // The one and only key it writes is the Hanzo gateway key.
-    expect(localStorage.getItem(APIKEY_STORAGE_KEY)).toBe('hk-x');
+    expect(localStorage.getItem(APIKEY_STORAGE_KEY)).toBe('sk-x');
   });
 });

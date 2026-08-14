@@ -9,7 +9,7 @@ export const API_BASE_URL = 'https://api.hanzo.ai';
 // Default model. Overridable per-request via the picker; the gateway routes it.
 export const DEFAULT_MODEL = 'zen-1';
 
-// localStorage key for the pasted Hanzo API key (`hk-…`). The Zoom App and the
+// localStorage key for the pasted Hanzo API key (`sk-…`). The Zoom App and the
 // Meet add-on are static web panels (iframe/webview), not an Office host with
 // roamingSettings, so the zero-setup credential lives in localStorage — same as
 // @hanzo/pdf. OAuth via hanzo.id (device login) is the documented upgrade; the

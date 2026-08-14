@@ -4,7 +4,7 @@
 //   2. an @AuraEnabled Apex method the LWC imports that the class doesn't define.
 //   3. an incomplete hanzoAssistant LWC bundle (js / html / meta missing).
 //   4. any gateway endpoint that isn't api.hanzo.ai/v1 (no /api/, no /v2/).
-//   5. a hardcoded Hanzo `hk-` key or Bearer literal anywhere in source.
+//   5. a hardcoded Hanzo API key or Bearer literal anywhere in source.
 //   6. the Named/External Credential pair or its principal grant missing.
 // It is intentionally simple — a byte-level sanity gate, not a compiler. The Apex
 // compiler + the test run (`npm run apex:test`) are the authoritative checks.
@@ -93,9 +93,10 @@ for (const f of sourceFiles) {
     fail(`${f} builds an /api/ endpoint — use /v1/ only`);
   if (/(?:hanzo\.ai|callout:Hanzo_API)\/v2\//.test(src))
     fail(`${f} builds a v2 endpoint`);
-  // A real Hanzo key: hk- followed by key-ish chars. The docs use hk-… (ellipsis)
-  // as a placeholder, which must never match.
-  if (/\bhk-[A-Za-z0-9]{8,}/.test(src)) fail(`${f} appears to contain a hardcoded hk- API key`);
+  // A real Hanzo key: sk- followed by key-ish chars. Retired hk- keys still exist
+  // in the wild and leak just as badly, so both shapes are caught. The docs use
+  // sk-… (ellipsis) as a placeholder, which must never match.
+  if (/\b(?:sk|hk)-[A-Za-z0-9]{8,}/.test(src)) fail(`${f} appears to contain a hardcoded API key`);
   // A literal Bearer token (not the merge field {!$Credential…}) is a leak.
   if (/Bearer\s+[A-Za-z0-9._-]{16,}/.test(src)) fail(`${f} contains a literal Bearer token`);
 }

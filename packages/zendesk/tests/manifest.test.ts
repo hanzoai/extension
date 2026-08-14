@@ -58,7 +58,7 @@ describe('manifest.json (ZAF v2 validity)', () => {
 
   it('never embeds a secret value in the manifest', () => {
     const raw = readFileSync(join(pkgRoot, 'manifest.json'), 'utf8');
-    expect(raw).not.toMatch(/hk-[A-Za-z0-9]/); // no literal key
+    expect(raw).not.toMatch(/(?:sk|hk)-[A-Za-z0-9]/); // no literal key, retired shape included
     const key = manifest.parameters.find((p: any) => p.name === APIKEY_SETTING);
     expect(key.default ?? '').toBe(''); // no default secret
   });

@@ -190,7 +190,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function reflectAuth() {
     authHint.textContent = hasApiKey()
       ? 'Ready — using your Hanzo API key.'
-      : 'Paste a Hanzo API key (hk-…) to use your models. Anonymous public models may also work.';
+      : 'Paste a Hanzo API key (sk-…) to use your models. Anonymous public models may also work.';
   }
 
   async function populateModels() {

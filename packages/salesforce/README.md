@@ -69,7 +69,7 @@ never surface or write data the user couldn't themselves.
   (`sf`) on your PATH.
 - A Salesforce org (a scratch org, a Developer Edition, or a sandbox) with
   **My Domain** enabled (required for Named Credentials and LWC).
-- A **Hanzo API key** (`hk-…`) for your org — mint one at
+- A **Hanzo API key** (`sk-…`) for your org — mint one at
   [hanzo.ai](https://hanzo.ai) / your Hanzo IAM console.
 
 ## Deploy
@@ -106,7 +106,7 @@ never ship in source). Add it once:
    - Parameter Name: `HanzoApiPrincipal`
    - Sequence Number: `1`
    - Under **Authentication Parameters**, add one named **`ApiKey`** with your
-     `hk-…` key as the value.
+     `sk-…` key as the value.
 3. Save.
 
 The Named Credential's header `Bearer {!$Credential.Hanzo_API.ApiKey}` now
@@ -189,7 +189,7 @@ sf package version promote --package "Hanzo AI for Salesforce@0.1.0-1"
 
 The install link produced by `version create` installs the LWC, Apex, Named/
 External Credential, permission set, and the config metadata into a subscriber
-org; the subscriber then does step 2 (enter their own `hk-…` key) and step 4 (add
+org; the subscriber then does step 2 (enter their own `sk-…` key) and step 4 (add
 the LWC to their page layouts). Managed-package Apex requires **≥75% coverage** —
 `HanzoClientTest` + `HanzoControllerTest` cover the callout, parsing, context
 assembly, and all three write-backs.

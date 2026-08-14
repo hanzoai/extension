@@ -44,7 +44,7 @@ than silently overflowing.
 
 ## Auth
 
-Paste a Hanzo API key (`hk-…`); it is **validated by a real `/v1/models` call**
+Paste a Hanzo API key (`sk-…`); it is **validated by a real `/v1/models` call**
 before it is saved to `localStorage`, so a dead key is rejected at paste time,
 not at first question. An empty key still reaches the gateway's public models.
 OAuth via `hanzo.id` (device login) is the documented future upgrade — the bearer

@@ -100,7 +100,7 @@ export function App(): JSX.Element {
   // selection-actions and an instruction for instruction-actions.
   const missing =
     !keyValid
-      ? 'Paste your Hanzo hk- key to begin.'
+      ? 'Paste your Hanzo sk- key to begin.'
       : spec.needsSelection && selection.count === 0
         ? 'Select text on your design to run this action.'
         : spec.needsInstruction && instruction.trim() === ''
@@ -161,9 +161,9 @@ export function App(): JSX.Element {
 
         <FormField
           label="Hanzo API key"
-          description={keyValid ? 'Key looks valid.' : 'Paste your hk- key from hanzo.id'}
+          description={keyValid ? 'Key looks valid.' : 'Paste your sk- key from hanzo.id'}
           control={(props) => (
-            <TextInput {...props} placeholder="hk-..." value={key} onChange={setKey} />
+            <TextInput {...props} placeholder="sk-..." value={key} onChange={setKey} />
           )}
         />
 

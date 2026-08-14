@@ -347,7 +347,7 @@ window.addEventListener('DOMContentLoaded', () => {
   function reflectAuth(): void {
     authHint.textContent = hasApiKey()
       ? 'Using your saved Hanzo key.'
-      : 'No key saved — using public models. Paste an hk-… key for your org models.';
+      : 'No key saved — using public models. Paste an sk-… key for your org models.';
   }
 
   function setBusy(b: boolean): void {

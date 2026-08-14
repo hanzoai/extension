@@ -118,7 +118,7 @@ async function run(
   outcome: "copy" | "paste",
 ): Promise<void> {
   if (!isHanzoKey(settings.apiKey)) {
-    openSettings("Paste your hk- key from hanzo.id to start.");
+    openSettings("Paste your sk- key from hanzo.id to start.");
     return;
   }
 
@@ -302,7 +302,7 @@ function boot(): void {
   wireEvents();
   void refreshModels();
   void wireTauri();
-  if (!isHanzoKey(settings.apiKey)) openSettings("Paste your hk- key from hanzo.id to start.");
+  if (!isHanzoKey(settings.apiKey)) openSettings("Paste your sk- key from hanzo.id to start.");
 }
 
 boot();

@@ -7,8 +7,8 @@ import {
   type Settings,
 } from "../src/store";
 
-const KEY = "hk-" + "a".repeat(20);
-const KEY2 = "hk-" + "b".repeat(20);
+const KEY = "sk-" + "a".repeat(20);
+const KEY2 = "sk-" + "b".repeat(20);
 
 describe("parseSettings", () => {
   it("returns defaults for null / empty", () => {
@@ -31,8 +31,8 @@ describe("parseSettings", () => {
     expect(parseSettings(raw)).toEqual({ apiKey: KEY, model: "zen5-coder" });
   });
 
-  it("drops a stored key that no longer matches the hk- shape", () => {
-    const raw = JSON.stringify({ apiKey: "sk-bad", model: "zen5" });
+  it("drops a stored key that no longer matches the sk- shape", () => {
+    const raw = JSON.stringify({ apiKey: "hk-" + "a".repeat(20), model: "zen5" });
     expect(parseSettings(raw)).toEqual({ apiKey: "", model: "zen5" });
   });
 
@@ -69,7 +69,7 @@ describe("mergeSettings", () => {
   });
 
   it("rejects a malformed key WITHOUT mutating current settings", () => {
-    const { settings, error } = mergeSettings(base, { apiKey: "sk-openai-style" });
+    const { settings, error } = mergeSettings(base, { apiKey: "hk-" + "a".repeat(20) });
     expect(error).toMatch(/Not a Hanzo key/);
     expect(settings).toBe(base); // returns the untouched original
   });

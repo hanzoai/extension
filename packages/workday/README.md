@@ -14,7 +14,7 @@ Built on the published Hanzo SDK:
   and `.models.list()`. All model calls go to `https://api.hanzo.ai` on `/v1/...`
   (never an `/api/` prefix). We import it; we do not reimplement the transport.
 - **[`@hanzo/iam`](https://www.npmjs.com/package/@hanzo/iam)** — Hanzo identity /
-  the `hk-…` API key the panel uses as its gateway bearer.
+  the `sk-…` API key the panel uses as its gateway bearer.
 
 Workday is the enterprise system of record for people data: workers, supervisory
 organizations, time off, and recruiting. This app reads those records through the
@@ -36,7 +36,7 @@ Browser panel (dist/index.html, app.js)          Server service (dist/server.js)
   same-origin proxy       (cookie)               resolves the resource route to a
   (never sees a token or the tenant)             REST / RaaS URL on the tenant host
         │
-        └── calls api.hanzo.ai /v1 directly with the pasted hk-… Hanzo key
+        └── calls api.hanzo.ai /v1 directly with the pasted sk-… Hanzo key
             (@hanzo/ai headless client)
 ```
 

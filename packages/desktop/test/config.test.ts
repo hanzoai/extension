@@ -26,18 +26,18 @@ describe("gateway constants", () => {
 });
 
 describe("isHanzoKey", () => {
-  it("accepts a well-formed hk- key", () => {
-    expect(isHanzoKey("hk-" + "a".repeat(16))).toBe(true);
-    expect(isHanzoKey("hk-Abc123._-Abc123._-")).toBe(true);
+  it("accepts a well-formed sk- key", () => {
+    expect(isHanzoKey("sk-" + "a".repeat(16))).toBe(true);
+    expect(isHanzoKey("sk-Abc123._-Abc123._-")).toBe(true);
   });
 
   it("trims surrounding whitespace before matching", () => {
-    expect(isHanzoKey("  hk-" + "b".repeat(20) + "  ")).toBe(true);
+    expect(isHanzoKey("  sk-" + "b".repeat(20) + "  ")).toBe(true);
   });
 
   it("rejects the wrong prefix, too-short, or non-string", () => {
-    expect(isHanzoKey("sk-" + "a".repeat(20))).toBe(false); // OpenAI key
-    expect(isHanzoKey("hk-short")).toBe(false); // < 16 body chars
+    expect(isHanzoKey("hk-" + "a".repeat(20))).toBe(false); // the retired prefix
+    expect(isHanzoKey("sk-short")).toBe(false); // < 16 body chars
     expect(isHanzoKey("eyJhbGciOiJI.jwt.token")).toBe(false); // an IAM JWT
     expect(isHanzoKey("")).toBe(false);
     expect(isHanzoKey(undefined)).toBe(false);
