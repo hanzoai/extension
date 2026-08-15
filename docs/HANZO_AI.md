@@ -176,7 +176,7 @@ export OLLAMA_BASE_URL=http://localhost:11434
 - **Team Budgets**: Set limits and track spending
 
 ### 🔒 **Enterprise Ready**
-- **SOC2 Compliant**: Enterprise-grade security
+- **SOC 2 Type II controls**: Encryption in transit and at rest, role-based access control, and audit logging
 - **API Key Vault**: Encrypted storage for provider keys
 - **Audit Logs**: Complete usage history
 - **Team Management**: Role-based access control
