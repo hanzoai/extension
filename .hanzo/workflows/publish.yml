@@ -16,8 +16,15 @@ name: publish
 
 on:
   push:
-    tags: ['v*']
+    branches: [main]
   workflow_dispatch:
+
+# Serialized, newest wins. Two builds in flight both ask npm before either
+# uploads, so both read the same version as unpublished and the slower one
+# submits a stale zip under a version the store will not let it replace.
+concurrency:
+  group: publish
+  cancel-in-progress: true
 
 jobs:
   publish:
@@ -36,7 +43,28 @@ jobs:
       # Login once, read each key from hanzo:/extension-publish, mask + export.
       # A missing key exports empty; each publish step below gates on its creds,
       # so partial provisioning publishes exactly what KMS has.
+      - name: Is this version already published
+        id: ahead
+        # Before the credential read, so an ordinary push costs nothing and
+        # asks KMS for nothing. The stores are the reason this gate exists at
+        # all: npm skips a version it already has, but a store upload of one
+        # it already has is a rejection, so without this every push that did
+        # not bump the version would fail on a duplicate.
+        run: |
+          NEW=$(node -p "require('./packages/browser/package.json').version")
+          OLD=$(curl -sf "https://registry.npmjs.org/@hanzo%2fbrowser-extension" \
+                  | jq -r '."dist-tags".latest // "0.0.0"' 2>/dev/null || echo "0.0.0")
+          NEWEST=$(printf '%s\n%s\n' "$OLD" "$NEW" | sort -V | tail -1)
+          if [ "$OLD" = "$NEW" ] || [ "$NEWEST" != "$NEW" ]; then
+            echo "npm serves $OLD; tree is $NEW — nothing to ship."
+            echo "yes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm serves $OLD; tree is $NEW — shipping."
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Load publish secrets from KMS
+        if: steps.ahead.outputs.yes == 'true'
         env:
           KMS_CLIENT_ID: ${{ secrets.KMS_CLIENT_ID }}
           KMS_CLIENT_SECRET: ${{ secrets.KMS_CLIENT_SECRET }}
@@ -65,10 +93,12 @@ jobs:
           done
 
       - name: Build browser extension
+        if: steps.ahead.outputs.yes == 'true'
         working-directory: packages/browser
         run: node src/build.js
 
       - name: Package (web-ext — no zip binary on the runner)
+        if: steps.ahead.outputs.yes == 'true'
         working-directory: packages/browser
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -76,7 +106,7 @@ jobs:
           npx web-ext build --source-dir ../../dist/firefox --artifacts-dir ../../dist --filename hanzo-ai-firefox-v${VERSION}.zip --overwrite-dest
 
       - name: Publish to Chrome Web Store
-        if: env.CHROME_EXTENSION_ID != ''
+        if: steps.ahead.outputs.yes == 'true' && env.CHROME_EXTENSION_ID != ''
         working-directory: packages/browser
         run: |
           ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
@@ -90,7 +120,7 @@ jobs:
             -H "Authorization: Bearer $ACCESS_TOKEN" -H "x-goog-api-version: 2" -H "Content-Length: 0"
 
       - name: Publish to Firefox Add-ons
-        if: env.AMO_API_KEY != ''
+        if: steps.ahead.outputs.yes == 'true' && env.AMO_API_KEY != ''
         working-directory: packages/browser
         run: |
           npx web-ext sign --source-dir ../../dist/firefox \
@@ -103,7 +133,7 @@ jobs:
       # nowhere. pnpm publish skips versions already on npm, so re-running is
       # idempotent.
       - name: Publish @hanzo/* to npm
-        if: env.NPM_TOKEN != ''
+        if: steps.ahead.outputs.yes == 'true' && env.NPM_TOKEN != ''
         run: |
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
           echo "@hanzo:registry=https://registry.npmjs.org/" >> .npmrc
@@ -118,7 +148,7 @@ jobs:
       # cannot change what happened; it makes what happened READABLE, and fails the
       # job if a tag published nowhere at all.
       - name: Publish summary
-        if: always()
+        if: always() && steps.ahead.outputs.yes == 'true'
         run: |
           shipped=0
           for pair in "CHROME_EXTENSION_ID:Chrome Web Store" "AMO_API_KEY:Firefox Add-ons" "NPM_TOKEN:npm"; do
