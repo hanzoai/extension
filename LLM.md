@@ -58,19 +58,32 @@ Git of record is `git.hanzo.ai/hanzoai/extension`; GitHub is a mirror.
   builds, publishes or syncs there. Do not "restore" it: GitHub is a mirror, and a
   second plane is exactly what the migration removed.
 - Secrets are **KMS only**. The pipeline logs in with the KMS machine identity
-  (`KMS_CLIENT_ID`/`KMS_CLIENT_SECRET`, Actions secrets on git.hanzo.ai) and pulls
-  store creds from `hanzo:/extension-publish` (env `prod`). CR:
-  `deploy/kms/extension-publish-kms-sync.yaml`. No store cred in any Actions
-  secret store.
+  (`KMS_CLIENT_ID`/`KMS_CLIENT_SECRET`, org-level Actions secrets on
+  git.hanzo.ai, inherited by every `hanzoai` repo) and reads each credential at
+  run time. No store cred in any Actions secret store.
 
-⚠️ **A tag is not a release — verify against the REGISTRY.** `v1.9.37` was tagged,
-reached git.hanzo.ai, was picked up by a runner, finished in ~20s and shipped
-NOTHING: the KMS machine identity was absent, so the secrets step warned and
-`exit 0`'d, and every publish step gates on `env.<CRED> != ''` — so all of them
-skipped. Green run, empty release, no error anywhere. That is now a hard failure,
-plus a `Publish summary` step that fails the job when a tag published nowhere.
-If a release does not appear: check `KMS_CLIENT_ID`/`KMS_CLIENT_SECRET` are seeded
-as Actions secrets, then confirm with
+**The KMS read contract.** Cloud's embedded KMS serves the FLAT form and answers
+`{name, env, value}`:
+
+    GET https://kms.hanzo.ai/v1/kms/secrets/[<path>/]<KEY>?env=prod   -> .value
+
+The org is not a path segment — the read is scoped by the token's owner claim.
+The older `/v1/kms/orgs/<org>/secrets/<path>/<KEY>` form with `.secret.value`
+404s, and because a 404 body is not a value, every key it reads comes back
+empty. `@hanzo/ui` and `@hanzo/logo` read the flat form too; it is the one way.
+
+Where each credential lives:
+- `NPM_TOKEN` — org `hanzo`, env `prod`, **root path** (`KMS_NPM_PATH` empty).
+- Chrome Web Store + Firefox AMO — `hanzo:/extension-publish`, env `prod`
+  (`KMS_STORE_PATH`). CR: `deploy/kms/extension-publish-kms-sync.yaml`.
+  **Not seeded yet**, so those two steps skip and `Publish summary` says so.
+
+⚠️ **A tag is not a release — verify against the REGISTRY.** Every publish step
+gates on `env.<CRED> != ''`, so a credential that reads back empty skips its
+step rather than failing it. Two steps exist to stop that reading as success:
+`npm serves what the tree declares` asks the registry for the version the tree
+declares, and `Publish summary` names every target that shipped and fails the
+job if none did. If a release does not appear, confirm with
 `npm view @hanzo/browser-extension version` — never by looking at the tag.
 
 ## Cross-platform — WXT migration (canonical plan, not yet executed)
