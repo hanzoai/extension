@@ -189,7 +189,7 @@ Hanzo AI provides the complete toolkit for AI-driven development:
 
 ### Enterprise Features
 - **SSO Integration**: SAML, OAuth, LDAP
-- **Compliance**: SOC 2 Type II controls; certification scoped per engagement
+- **Compliance**: Controls built to SOC 2 Type II; continual internal audits, report on request
 - **White-labeling**: Custom branding
 - **Private deployment**: On-premise options
 
