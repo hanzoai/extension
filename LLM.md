@@ -24,6 +24,11 @@ tests: vitest.
   replaces a port whose probe went unanswered. Do NOT add a second reconnect path —
   two live hosts race for one provider id and the loser's close deregisters the
   winner. Covered by `tests/native-zap.test.ts`.
+- The same `PROVIDERS` reply carries our entry's caps, so `decodeProviders` keeps
+  the whole entry and `state.caps` is what the router says this browser serves.
+  `shared/zap.ts` answers `zap.status` from that state — registration, provider id,
+  caps — and the sidebar's tool count is that list's length. There is no MCP-tool
+  manifest to report: the extension is a provider on zapd, not a consumer of one.
 - `background.ts` (Chrome) — dispatch via `chrome.debugger` (CDP→tab; shows the
   "debugging this browser" banner; WebKit-incompatible). **To be removed** — see WXT plan.
 - `background-firefox.ts` — native `browser.*` dispatch (no banner). The correct model.
