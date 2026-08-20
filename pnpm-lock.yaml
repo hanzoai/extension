@@ -610,9 +610,6 @@ importers:
       minimatch:
         specifier: 9.0.7
         version: 9.0.7
-      ws:
-        specifier: 8.21.0
-        version: 8.21.0
       zod:
         specifier: ^3.22.4
         version: 3.25.76
@@ -635,9 +632,6 @@ importers:
       '@types/node':
         specifier: ^20.10.5
         version: 20.19.9
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
       esbuild:
         specifier: ^0.25.8
         version: 0.25.8
@@ -2917,6 +2911,7 @@ packages:
 
   '@hanzo/event@0.3.18':
     resolution: {integrity: sha512-y0JvSAphXqfUtijUN3NvDVnl/rBCWvbALAduf9F2twxQ2Wjt6cuyKKJ5/G0PoN7bRKqhzhB3b0iIs3cFoopuBQ==}
+    deprecated: Contains a hardcoded, revoked publishable ingest key used as a fallback credential; telemetry silently 403s. Upgrade to >=0.3.21.
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
     peerDependenciesMeta:
@@ -5167,6 +5162,7 @@ packages:
   '@shopify/polaris@13.9.5':
     resolution: {integrity: sha512-UN+rT2q1r/uF0Xia8MaCl2nDxatuzbjunS5WYcv4qw8VBvThTxDVURgpwOuvutSrvu138pwScOAah933vqlYkg==}
     engines: {node: '>=20.10.0'}
+    deprecated: 'Polaris React is deprecated and no longer maintained. For building Shopify admin experiences, use Polaris web components: https://shopify.dev/docs/api/polaris — archived docs for this package: https://shopify.github.io/polaris-react-archive/'
     peerDependencies:
       react: ^18.0.0
       react-dom: ^18.0.0
@@ -18064,7 +18060,9 @@ snapshots:
       metro-runtime: 0.84.4
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
 
   '@react-native/normalize-color@2.1.0': {}
 
