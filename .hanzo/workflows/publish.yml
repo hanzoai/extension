@@ -63,31 +63,45 @@ jobs:
             echo "yes=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Load publish secrets from KMS
+      - name: Load publish credentials from KMS
         if: steps.ahead.outputs.yes == 'true'
         env:
           KMS_CLIENT_ID: ${{ secrets.KMS_CLIENT_ID }}
           KMS_CLIENT_SECRET: ${{ secrets.KMS_CLIENT_SECRET }}
+          KMS_ENDPOINT: ${{ vars.KMS_ENDPOINT || 'https://kms.hanzo.ai' }}
+          KMS_SECRET_ENV: ${{ vars.KMS_SECRET_ENV || 'prod' }}
+          # Where each credential lives. NPM_TOKEN is at the org root, so its
+          # path is empty; the store credentials have a path of their own. Set
+          # either variable to move a credential without editing this file.
+          KMS_NPM_PATH: ${{ vars.KMS_NPM_PATH || '' }}
+          KMS_STORE_PATH: ${{ vars.KMS_STORE_PATH || 'extension-publish' }}
         run: |
-          # FAIL, do not exit 0. This used to warn and succeed, and the result was
-          # a publish pipeline that could not be told apart from a working one:
-          # every step below gates on `env.<CRED> != ''`, so an absent machine
-          # identity skipped all of them and the job went GREEN having shipped
-          # nothing. v1.9.37 was tagged, the tag reached git.hanzo.ai, a runner
-          # picked the job up, it finished in ~20s, and npm stayed on 1.9.36 with
-          # no error anywhere. A release that silently no-ops is worse than one
-          # that breaks loudly.
+          # Fail rather than export nothing. Every publish step below gates on
+          # `env.<CRED> != ''`, so an absent identity would skip all of them and
+          # the job would finish green having shipped nothing.
           if [ -z "$KMS_CLIENT_ID" ] || [ -z "$KMS_CLIENT_SECRET" ]; then
-            echo "::error::KMS machine identity absent — cannot pull publish creds. Seed KMS_CLIENT_ID/KMS_CLIENT_SECRET as git.hanzo.ai Actions secrets (org or repo scope)."
+            echo "::error::KMS machine identity absent. Seed KMS_CLIENT_ID/KMS_CLIENT_SECRET as git.hanzo.ai Actions secrets (org or repo scope)."
             exit 1
           fi
-          KMS=https://kms.hanzo.ai; ORG=hanzo; ENVN=prod; P=extension-publish
-          TOKEN=$(curl -sf "$KMS/v1/kms/auth/login" -H 'Content-Type: application/json' \
-            -d "{\"clientId\":\"$KMS_CLIENT_ID\",\"clientSecret\":\"$KMS_CLIENT_SECRET\"}" | jq -r .accessToken)
-          [ -n "$TOKEN" ] && [ "$TOKEN" != null ] || { echo "::error::KMS login failed"; exit 1; }
-          for KEY in CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN AMO_API_KEY AMO_API_SECRET NPM_TOKEN; do
-            VAL=$(curl -sf "$KMS/v1/kms/orgs/$ORG/secrets/$P/$KEY?env=$ENVN" \
-              -H "Authorization: Bearer $TOKEN" | jq -r '.secret.value // empty')
+          TOKEN=$(curl -fsS "$KMS_ENDPOINT/v1/kms/auth/login" -H 'Content-Type: application/json' \
+            -d "{\"clientId\":\"$KMS_CLIENT_ID\",\"clientSecret\":\"$KMS_CLIENT_SECRET\"}" \
+            | jq -r '.accessToken // empty')
+          if [ -z "$TOKEN" ]; then
+            echo "::error::KMS login failed at $KMS_ENDPOINT/v1/kms/auth/login (check KMS_CLIENT_ID/KMS_CLIENT_SECRET)."
+            exit 1
+          fi
+          # Flat form, answering {name, env, value} — the contract cloud's
+          # embedded KMS serves, and the same read @hanzo/ui and @hanzo/logo use.
+          # The read is org-scoped by the token's owner claim, so the org is not
+          # a path segment.
+          for spec in "$KMS_STORE_PATH:CHROME_EXTENSION_ID" "$KMS_STORE_PATH:CHROME_CLIENT_ID" \
+                      "$KMS_STORE_PATH:CHROME_CLIENT_SECRET" "$KMS_STORE_PATH:CHROME_REFRESH_TOKEN" \
+                      "$KMS_STORE_PATH:AMO_API_KEY" "$KMS_STORE_PATH:AMO_API_SECRET" \
+                      "$KMS_NPM_PATH:NPM_TOKEN"; do
+            KEYPATH=${spec%:*}; KEY=${spec##*:}
+            # No -f: a 404 must report WHICH key was empty, not just exit 22.
+            VAL=$(curl -sS "$KMS_ENDPOINT/v1/kms/secrets/${KEYPATH:+$KEYPATH/}$KEY?env=$KMS_SECRET_ENV" \
+              -H "Authorization: Bearer $TOKEN" | jq -r '.value // empty')
             if [ -n "$VAL" ]; then echo "::add-mask::$VAL"; fi
             echo "$KEY=$VAL" >> "$GITHUB_ENV"
           done
@@ -127,11 +141,11 @@ jobs:
             --api-key "$AMO_API_KEY" --api-secret "$AMO_API_SECRET" \
             --channel listed --id "hanzo-ai@hanzo.ai"
 
-      # npm — canonical home is here, and now the ONLY home: the .github npm job
-      # this once ran beside was deleted with the rest of GitHub CI (6977db0),
-      # BEFORE this path had ever published anything. That is how 1.9.37 shipped
-      # nowhere. pnpm publish skips versions already on npm, so re-running is
-      # idempotent.
+      # npm — the canonical and only home for these packages. pnpm publish skips
+      # a version already on the registry, so re-running is idempotent. A single
+      # package that cannot build must not strand the other thirty-two, so a
+      # per-package failure is tolerated here and the registry check below is
+      # what decides whether the release actually shipped.
       - name: Publish @hanzo/* to npm
         if: steps.ahead.outputs.yes == 'true' && env.NPM_TOKEN != ''
         run: |
@@ -141,12 +155,29 @@ jobs:
           pnpm -r --if-present run build || true
           pnpm -r publish --access public --no-git-checks --ignore-scripts --report-summary || true
 
-      # Say what actually shipped. Each publish step above is deliberately gated on
-      # its own credential so partial provisioning ships exactly what KMS has — but
-      # that makes a skipped store indistinguishable from a published one in a green
-      # run, which is the failure this whole file just got fixed for. This step
-      # cannot change what happened; it makes what happened READABLE, and fails the
-      # job if a tag published nowhere at all.
+      # Ask the registry, because the registry is the only thing that knows.
+      # Without this a tolerated publish failure reads exactly like a success,
+      # which is the one way this job can lie.
+      - name: npm serves what the tree declares
+        if: steps.ahead.outputs.yes == 'true' && env.NPM_TOKEN != ''
+        run: |
+          VERSION=$(node -p "require('./packages/browser/package.json').version")
+          n=0
+          while [ "$n" -lt 10 ]; do
+            if curl -fsS "https://registry.npmjs.org/@hanzo%2fbrowser-extension/$VERSION" >/dev/null 2>&1; then
+              echo "npm serves @hanzo/browser-extension@$VERSION"
+              exit 0
+            fi
+            n=$((n + 1))
+            sleep 6
+          done
+          echo "::error::npm does not serve @hanzo/browser-extension@$VERSION — the publish did not land."
+          exit 1
+
+      # Say what actually shipped. Each publish step above is gated on its own
+      # credential so partial provisioning ships exactly what KMS has; this step
+      # names which targets that was, so a skipped store is legible rather than
+      # silent, and fails the job if a release published nowhere at all.
       - name: Publish summary
         if: always() && steps.ahead.outputs.yes == 'true'
         run: |
