@@ -290,14 +290,19 @@ describe('webextension-polyfill integration', () => {
 });
 
 describe('Firefox register identity', () => {
-  it('Firefox sends `browser: BROWSER_NAME` so multi-browser routing works', () => {
-    // Pre-1.9.0 the register payload omitted `browser`, so the bridge
-    // server stored the client as 'unknown' and the user couldn't route
-    // commands by browser name. Verify the field is present.
-    const registerBlock = firefoxBg.slice(
-      firefoxBg.indexOf('private register():'),
-      firefoxBg.indexOf('private register():') + 1500,
-    );
-    expect(registerBlock).toMatch(/browser:\s*BROWSER_NAME/);
+  it('Firefox names itself in its provider id, so routing can address it', () => {
+    // Multi-browser routing addresses a browser by name. That name rides the
+    // provider id the extension registers with zapd — `browser:<engine>/default`
+    // — which is the whole identity the router stores.
+    expect(firefoxBg).toMatch(/providerId:\s*`browser:\$\{BROWSER_NAME\}\/default`/);
+    expect(firefoxBg).toMatch(/const BROWSER_NAME = 'firefox'/);
+  });
+
+  it('carries no second transport beside the native one', () => {
+    // One native primitive: no WebSocket, no localhost port, no CDP bridge.
+    // A dormant opt-in second path is still a second path.
+    expect(firefoxBg).not.toMatch(/new WebSocket\(/);
+    expect(firefoxBg).not.toMatch(/ws:\/\//);
+    expect(firefoxBg).not.toMatch(/HANZO_LEGACY_CDP/);
   });
 });
