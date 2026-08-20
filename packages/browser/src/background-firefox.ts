@@ -41,12 +41,6 @@ import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
 // Declare browser API for TypeScript
 declare const browser: typeof chrome;
 
-interface CDPMessage {
-  id: number;
-  method: string;
-  params?: Record<string, unknown>;
-}
-
 interface CDPResponse {
   id: number;
   result?: Record<string, unknown>;
@@ -92,114 +86,9 @@ const controlSession: ControlSession = {
 // =============================================================================
 
 class HanzoFirefoxExtension {
-  private wsConnection: WebSocket | null = null;
-  private cdpPort: number = 9223;
-  private reconnectTimeout: number = 3000;
 
   constructor() {
     console.log('[Hanzo] Firefox extension initializing...');
-    // Legacy ws://:9223 CDP bridge is OPT-IN (globalThis.HANZO_LEGACY_CDP). The
-    // default (and only) transport is the ZAP native host — see
-    // ensureNativeZap() at EOF — matching Chrome. Without a bridge server the
-    // WS just error-looped, so it no longer runs unless explicitly enabled.
-    if ((globalThis as { HANZO_LEGACY_CDP?: boolean }).HANZO_LEGACY_CDP) this.connect();
-  }
-
-  private connect(): void {
-    const url = `ws://localhost:${this.cdpPort}/cdp`;
-    console.log(`[Hanzo] Connecting to ${url}`);
-
-    this.wsConnection = new WebSocket(url);
-
-    this.wsConnection.onopen = () => {
-      console.log('[Hanzo] WebSocket CONNECTED');
-      this.register();
-    };
-
-    this.wsConnection.onmessage = async (event) => {
-      try {
-        const message = JSON.parse(event.data as string);
-
-        // Handle extension-request messages from sendToExtension()
-        if (message.type === 'extension-request') {
-          console.log('[Hanzo] Extension request:', message.action);
-          const result = await this.handleExtensionRequest(message.action, message.params || {});
-          this.send({ type: 'extension-response', id: message.id, result });
-          return;
-        }
-
-        console.log('[Hanzo] Received:', message.method || 'response');
-        const response = await this.handleCommand(message as CDPMessage);
-        this.send(response);
-      } catch (e) {
-        console.error('[Hanzo] Message handler error:', e);
-        this.send({ id: 0, error: { code: -1, message: String(e) } });
-      }
-    };
-
-    this.wsConnection.onerror = (error) => {
-      console.error('[Hanzo] WebSocket error:', error);
-    };
-
-    this.wsConnection.onclose = () => {
-      console.log('[Hanzo] Disconnected, reconnecting...');
-      setTimeout(() => this.connect(), this.reconnectTimeout);
-    };
-  }
-
-  private register(): void {
-    // Tell the bridge server explicitly that we're Firefox so the
-    // `browser` parameter on multi-browser actions can route to us by
-    // name (e.g. `{ action: 'navigate', browser: 'firefox', url: '...' }`).
-    // Without this the bridge falls back to the User-Agent sniff in
-    // `assignClientId` which we can't observe from the SW (no navigator
-    // headers on a WebSocket message).
-    this.send({
-      type: 'register',
-      role: 'cdp-provider',
-      browser: BROWSER_NAME, // 'firefox'
-      capabilities: [
-        'navigate', 'screenshot', 'click', 'dblclick', 'hover', 'type',
-        'evaluate', 'tabs', 'fill', 'clear', 'reload', 'goBack', 'goForward',
-        'select', 'check', 'uncheck', 'press_key', 'content', 'snapshot',
-        'getText', 'getHTML', 'getAttribute', 'getElementInfo', 'getPageInfo',
-        'querySelectorAll', 'waitForSelector', 'waitForNavigation',
-        // CSP-safe text/label primitives + composite waits (1.9.16+)
-        'clickByText', 'fillByLabel', 'findByText', 'listForm',
-        'press', 'scroll', 'waitForText', 'waitForMutation',
-        'submitForm', 'uploadFile', 'dialogAccept',
-        'observe', 'observeRead', 'observeStop',
-        // Coordinate-level Input.* (1.9.16+)
-        'Input.dispatchMouseEvent', 'Input.scrollWheel',
-        // DOM.* + Page.* aliases (1.9.16+)
-        'DOM.querySelector', 'DOM.scrollIntoView', 'DOM.focus',
-        'Page.printToPDF',
-        // Existing legacy
-        'fetch', 'cookies', 'localStorage', 'injectScript', 'injectCSS',
-        'createTab', 'closeTab', 'activateTab', 'history',
-        'observeMutations', 'computedStyles', 'boundingRects',
-        'setHTML', 'setText', 'setAttribute', 'removeAttribute',
-        'setStyle', 'addClass', 'removeClass', 'insertElement', 'removeElement',
-        'monitor', 'audit',
-      ],
-    });
-  }
-
-  private send(data: unknown): void {
-    if (this.wsConnection?.readyState === WebSocket.OPEN) {
-      this.wsConnection.send(JSON.stringify(data));
-    }
-  }
-
-  private async handleCommand(message: CDPMessage): Promise<CDPResponse> {
-    const { id, method, params = {} } = message;
-
-    try {
-      const result = await this.executeMethod(method, params);
-      return { id, result };
-    } catch (e) {
-      return { id, error: { code: -1, message: String(e) } };
-    }
   }
 
   /**
@@ -1932,9 +1821,6 @@ class HanzoFirefoxExtension {
       .replace(/\n/g, '\\n');
   }
 
-  isBridgeConnected(): boolean {
-    return this.wsConnection !== null && this.wsConnection.readyState === WebSocket.OPEN;
-  }
 }
 
 // =============================================================================
@@ -2875,7 +2761,9 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
       // Bridge & Usage
       // =======================================================================
       case 'bridge.status': {
-        const bridgeConnected = hanzoExtension.isBridgeConnected();
+        // Connected means zapd LISTS us as a provider, which is what
+        // `nativeZap.connected` holds. An open port is not the same claim.
+        const bridgeConnected = nativeZap.connected;
         sendResponse({
           success: true,
           connected: bridgeConnected,
