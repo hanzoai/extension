@@ -7,19 +7,12 @@
 // this global so importing it once at the entrypoint is enough.
 import 'webextension-polyfill';
 
-import type { ZapState, ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
-import {
-  createZapManager,
-  encodeZapMessage,
-  handleZapMessage,
-  MSG_REQUEST,
-  type ZapManager,
-} from './shared/zap.js';
+import type { ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
+import { handleZapMessage } from './shared/zap.js';
 import { ensureNativeZap, type NativeZapState } from './shared/native-zap.js';
 import {
   getRagConfig as getSharedRagConfig,
   normalizeRagSnippets,
-  queryRagFromZap,
   queryRagFromEndpoint,
 } from './shared/rag.js';
 import {
@@ -115,13 +108,6 @@ chrome.webNavigation.onCommitted.addListener((details) => {
   }
 });
 
-// =============================================================================
-// ZAP Protocol Integration (shared module)
-// =============================================================================
-
-const zapMgr: ZapManager = createZapManager();
-const zapState = zapMgr.state;
-
 const controlSession: ControlSession = {
   active: false,
   tabId: null,
@@ -130,10 +116,6 @@ const controlSession: ControlSession = {
 };
 
 // Default ports (overridable via chrome.storage.local settings).
-// NOTE: ZAP discovery is mDNS-only (HIP-0069); the legacy zapPorts setting
-// is no longer consulted for discovery — kept here only because other
-// surfaces (status display, settings UI) still expose it during the
-// removal window.
 const DEFAULT_MCP_PORT = CFG_MCP_PORT;
 const DEFAULT_CDP_PORT = CFG_CDP_PORT;
 const DEFAULT_RAG_TOP_K = CFG_RAG_TOP_K;
@@ -370,13 +352,8 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
   switch (request.action) {
     // --- ZAP Protocol actions (delegated to shared module) ---
     case 'zap.status':
-    case 'zap.discover':
-    case 'zap.connect':
-    case 'zap.callTool':
-    case 'zap.listTools': {
-      handleZapMessage(request.action, request, sendResponse, zapMgr, BROWSER_NAME, VERSION);
+      handleZapMessage(request.action, sendResponse, nativeZap);
       break;
-    }
 
     // --- Local AI ---
     case 'runLocalAI':
@@ -590,19 +567,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     }
 
     case 'ai.control.cancel':
-      // User clicked Stop — notify ZAP/MCP to cancel current task
       await stopControlSession();
-      if (zapMgr.state.connected) {
-        for (const [, conn] of zapMgr.connections) {
-          if (conn.readyState === WebSocket.OPEN) {
-            conn.send(encodeZapMessage(MSG_REQUEST, {
-              id: `cancel-${++zapMgr.requestIdCounter}`,
-              method: 'notifications/controlCancelled',
-              params: {},
-            }));
-          }
-        }
-      }
       sendResponse({ success: true });
       break;
 
@@ -685,12 +650,8 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
           includeTabContext: request.includeTabContext !== undefined
             ? !!request.includeTabContext
             : config.includeTabContext,
-          useZapMemory: request.useZapMemory !== undefined
-            ? !!request.useZapMemory
-            : config.useZapMemory,
           endpoint: String(request.endpoint ?? config.endpoint ?? '').trim(),
           apiKey: String(request.apiKey ?? config.apiKey ?? '').trim(),
-          mcpId: request.mcpId ? String(request.mcpId) : undefined,
           pageContext: request.pageContext && typeof request.pageContext === 'object'
             ? {
                 url: request.pageContext.url ? String(request.pageContext.url) : undefined,
@@ -704,13 +665,8 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
           break;
         }
 
-        let snippets = await queryRagFromZap(params, zapMgr);
-        let source = snippets.length ? 'zap-memory' : 'none';
-
-        if (!snippets.length && params.endpoint) {
-          snippets = await queryRagFromEndpoint(params);
-          source = snippets.length ? 'rag-endpoint' : source;
-        }
+        const snippets = params.endpoint ? await queryRagFromEndpoint(params) : [];
+        const source = snippets.length ? 'rag-endpoint' : 'none';
 
         sendResponse({
           success: true,
@@ -917,19 +873,6 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 
     // --- Content script element selection (routed from content script) ---
     case 'elementSelected':
-      // Forward to ZAP-connected MCPs (primary)
-      if (zapMgr.state.connected) {
-        for (const [, conn] of zapMgr.connections) {
-          if (conn.readyState === WebSocket.OPEN) {
-            conn.send(encodeZapMessage(MSG_REQUEST, {
-              id: `evt-${++zapMgr.requestIdCounter}`,
-              method: 'notifications/elementSelected',
-              params: request.data,
-            }));
-          }
-        }
-      }
-      // Also forward to legacy MCP WebSocket (fallback)
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(request.data));
       }
@@ -1446,7 +1389,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         const keys = request.keys || [
           'selectedProvider', 'selectedModel', 'customLLMEndpoints', 'ollamaUrl',
           'anthropicApiKey', 'openaiApiKey', 'hanzoApiKey',
-          'mcpPort', 'cdpPort', 'zapPorts',
+          'mcpPort', 'cdpPort',
           'source-maps', 'webgpu-ai', 'browser-control', 'tab-filesystem',
           'activeOrgId', 'browserBackend',
         ];
@@ -1847,6 +1790,7 @@ const nativeZap: NativeZapState = {
   connected: false,
   port: null,
   providerId: `browser:${BROWSER_NAME}/default`,
+  caps: [],
 };
 const browserDispatch = (method: string, params: any) => cdpBridge.dispatchMethod(method, params);
 ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, debugLog);
@@ -1876,7 +1820,7 @@ try {
 
 
 // Export for testing
-export { browserControl, webgpuAI, zapMgr, zapState };
+export { browserControl, webgpuAI, nativeZap };
 
 // omnibox keyword: type `hanzo <query>` in the address bar -> the Hanzo answer
 // engine. This is the ONE search entry that actually works in this browser:

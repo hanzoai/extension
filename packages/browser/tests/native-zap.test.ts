@@ -2,7 +2,7 @@
 // never registers shipped. These drive `ensureNativeZap` against a fake
 // chrome.runtime port that speaks the real zapd frames.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ensureNativeZap, decodeProviderIds, type NativeZapState } from '../src/shared/native-zap';
+import { ensureNativeZap, decodeProviders, type NativeZapState } from '../src/shared/native-zap';
 
 const HELLO = 1, WELCOME = 2, PROVIDERS_LIST = 3, PROVIDERS = 4;
 
@@ -19,15 +19,15 @@ function putStr(a: number[], s: string) {
 }
 
 /** Encode a PROVIDERS body exactly as zapd's frame.rs does. */
-function encodeProviders(ids: string[]): Uint8Array {
+function encodeProviders(ids: string[], caps: string[] = ['browser.navigate']): Uint8Array {
   const a: number[] = [];
   putU16(a, ids.length);
   for (const id of ids) {
     putStr(a, id);
     a.push(1);            // role = provider
     putStr(a, 'hanzo');   // brand
-    putU16(a, 1);         // caps count
-    putStr(a, 'browser.navigate');
+    putU16(a, caps.length);
+    for (const c of caps) putStr(a, c);
   }
   return new Uint8Array(a);
 }
@@ -74,7 +74,7 @@ beforeEach(() => {
 });
 
 function freshState(): NativeZapState {
-  return { connected: false, port: null, providerId: 'browser:chrome/default' };
+  return { connected: false, port: null, providerId: 'browser:chrome/default', caps: [] };
 }
 const run = (s: NativeZapState) =>
   ensureNativeZap(s, 'hanzo', ['browser.navigate'], () => null, () => {});
@@ -201,13 +201,54 @@ describe('disconnect', () => {
   });
 });
 
-describe('decodeProviderIds', () => {
+describe('decodeProviders', () => {
   it('round-trips the zapd PROVIDERS body', () => {
     const ids = ['browser:chrome/dbc/default', 'browser:firefox/dbc/default'];
-    expect(decodeProviderIds(encodeProviders(ids))).toEqual(ids);
+    expect(decodeProviders(encodeProviders(ids, ['browser.tabs', 'browser.dom']))).toEqual([
+      { id: ids[0], role: 1, brand: 'hanzo', caps: ['browser.tabs', 'browser.dom'] },
+      { id: ids[1], role: 1, brand: 'hanzo', caps: ['browser.tabs', 'browser.dom'] },
+    ]);
   });
 
   it('reads an empty registry', () => {
-    expect(decodeProviderIds(encodeProviders([]))).toEqual([]);
+    expect(decodeProviders(encodeProviders([]))).toEqual([]);
+  });
+});
+
+describe('caps come from our own registry entry', () => {
+  it('reports what the router says this browser serves', () => {
+    const s = freshState();
+    run(s);
+    const id = 'browser:chrome/dbc/default';
+    ports[0].emit({ t: WELCOME, from: 'zapd', to: id, payload: '' });
+    ports[0].emit({
+      t: PROVIDERS, from: 'zapd', to: id,
+      payload: b64encode(encodeProviders([id], ['browser.tabs', 'browser.navigate'])),
+    });
+    expect(s.connected).toBe(true);
+    expect(s.caps).toEqual(['browser.tabs', 'browser.navigate']);
+  });
+
+  it('clears caps when the router stops listing us', () => {
+    const s = freshState();
+    register(s);
+    expect(s.caps).toEqual(['browser.navigate']);
+    run(s);
+    ports[0].emit({ t: PROVIDERS, from: 'zapd', to: s.providerId, payload: b64encode(encodeProviders([])) });
+    expect(s.connected).toBe(false);
+    expect(s.caps).toEqual([]);
+  });
+
+  it('another browser\'s caps are not ours', () => {
+    const s = freshState();
+    run(s);
+    const id = 'browser:chrome/dbc/default';
+    ports[0].emit({ t: WELCOME, from: 'zapd', to: id, payload: '' });
+    ports[0].emit({
+      t: PROVIDERS, from: 'zapd', to: id,
+      payload: b64encode(encodeProviders(['browser:firefox/dbc/default'], ['browser.dom'])),
+    });
+    expect(s.connected).toBe(false);
+    expect(s.caps).toEqual([]);
   });
 });

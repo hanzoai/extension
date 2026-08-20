@@ -3,8 +3,6 @@
  */
 
 import type { RagSnippet, RagQueryParams } from './types.js';
-import type { ZapManager } from './zap.js';
-import { zapCallTool, hasZapTool } from './zap.js';
 
 const DEFAULT_RAG_TOP_K = 5;
 
@@ -15,7 +13,6 @@ export async function getRagConfig(storage: typeof chrome.storage.local): Promis
   knowledgeBase: string;
   topK: number;
   includeTabContext: boolean;
-  useZapMemory: boolean;
 }> {
   return new Promise((resolve) => {
     storage.get([
@@ -24,7 +21,6 @@ export async function getRagConfig(storage: typeof chrome.storage.local): Promis
       'hanzo_rag_kb',
       'hanzo_rag_top_k',
       'hanzo_rag_include_tab_context',
-      'hanzo_rag_use_zap',
     ], (result: any) => {
       const parsedTopK = Number.parseInt(String(result.hanzo_rag_top_k ?? DEFAULT_RAG_TOP_K), 10);
       resolve({
@@ -33,7 +29,6 @@ export async function getRagConfig(storage: typeof chrome.storage.local): Promis
         knowledgeBase: String(result.hanzo_rag_kb || '').trim(),
         topK: Number.isFinite(parsedTopK) ? Math.max(1, Math.min(parsedTopK, 20)) : DEFAULT_RAG_TOP_K,
         includeTabContext: result.hanzo_rag_include_tab_context !== false,
-        useZapMemory: result.hanzo_rag_use_zap !== false,
       });
     });
   });
@@ -79,48 +74,6 @@ export function normalizeRagSnippets(raw: any): RagSnippet[] {
     .filter((item): item is RagSnippet => !!item);
 
   return snippets.slice(0, 20);
-}
-
-/** Query RAG from ZAP-connected memory tool */
-export async function queryRagFromZap(params: RagQueryParams, mgr: ZapManager): Promise<RagSnippet[]> {
-  if (!params.useZapMemory || !mgr.state.connected || !hasZapTool(mgr, 'memory')) {
-    return [];
-  }
-
-  const payloads: Record<string, unknown>[] = [
-    {
-      action: 'query',
-      query: params.query,
-      top_k: params.topK,
-      limit: params.topK,
-      kb: params.knowledgeBase || undefined,
-      page_context: params.pageContext,
-    },
-    {
-      query: params.query,
-      topK: params.topK,
-      limit: params.topK,
-      knowledge_base: params.knowledgeBase || undefined,
-      context: params.pageContext,
-    },
-  ];
-
-  for (const payload of payloads) {
-    try {
-      const raw = await zapCallTool(mgr, 'memory', payload, params.mcpId);
-      const snippets = normalizeRagSnippets(raw);
-      if (snippets.length) {
-        return snippets.map((snippet) => ({
-          ...snippet,
-          source: snippet.source || 'zap-memory',
-        }));
-      }
-    } catch {
-      // Try alternative payload shape before giving up.
-    }
-  }
-
-  return [];
 }
 
 /** Query RAG from HTTP endpoint */

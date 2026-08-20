@@ -18,21 +18,13 @@
 import 'webextension-polyfill';
 
 import type { ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
-import {
-  createZapManager,
-  zapRequest,
-  zapCallTool,
-  hasZapTool,
-  handleZapMessage,
-  type ZapManager,
-} from './shared/zap.js';
+import { handleZapMessage } from './shared/zap.js';
 import { ensureNativeZap, type NativeZapState } from './shared/native-zap.js';
 import { fetchAllUsage } from './shared/usage.js';
 import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 import {
   getRagConfig,
   normalizeRagSnippets,
-  queryRagFromZap,
   queryRagFromEndpoint,
 } from './shared/rag.js';
 import {
@@ -87,9 +79,6 @@ function isPrivilegedTab(tab: chrome.tabs.Tab | undefined): boolean {
   return PRIVILEGED_URL_PATTERNS.some((rx) => rx.test(url));
 }
 
-// Shared ZAP manager (replaces inline ZAP protocol code)
-const zapMgr: ZapManager = createZapManager();
-
 const controlSession: ControlSession = {
   active: false,
   tabId: null,
@@ -97,9 +86,8 @@ const controlSession: ControlSession = {
   startedAt: null,
 };
 
-// ZAP discovery is started AFTER the extension class is instantiated
-// because the inbound request handler delegates to its dispatchMethod().
-// See bottom of file for the discoverZapServers() call.
+// The zapd registration lives at the bottom of the file: it dispatches inbound
+// commands through the extension class, so it waits for that instance.
 
 // =============================================================================
 
@@ -112,7 +100,7 @@ class HanzoFirefoxExtension {
     console.log('[Hanzo] Firefox extension initializing...');
     // Legacy ws://:9223 CDP bridge is OPT-IN (globalThis.HANZO_LEGACY_CDP). The
     // default (and only) transport is the ZAP native host — see
-    // discoverZapServers() at EOF — matching Chrome. Without a bridge server the
+    // ensureNativeZap() at EOF — matching Chrome. Without a bridge server the
     // WS just error-looped, so it no longer runs unless explicitly enabled.
     if ((globalThis as { HANZO_LEGACY_CDP?: boolean }).HANZO_LEGACY_CDP) this.connect();
   }
@@ -1979,13 +1967,11 @@ async function getValidAccessToken(): Promise<string | null> {
 // Message Handler
 // =============================================================================
 
-browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
+browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: (r: any) => void) => {
   (async () => {
     // --- ZAP Protocol (handled by shared module) ---
-    if (typeof request.action === 'string' && request.action.startsWith('zap.')) {
-      if (handleZapMessage(request.action, request, sendResponse, zapMgr, BROWSER_NAME, VERSION)) {
-        return;
-      }
+    if (typeof request.action === 'string' && handleZapMessage(request.action, sendResponse, nativeZap)) {
+      return;
     }
 
     switch (request.action) {
@@ -2045,12 +2031,8 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
             includeTabContext: request.includeTabContext !== undefined
               ? !!request.includeTabContext
               : config.includeTabContext,
-            useZapMemory: request.useZapMemory !== undefined
-              ? !!request.useZapMemory
-              : config.useZapMemory,
             endpoint: String(request.endpoint ?? config.endpoint ?? '').trim(),
             apiKey: String(request.apiKey ?? config.apiKey ?? '').trim(),
-            mcpId: request.mcpId ? String(request.mcpId) : undefined,
             pageContext: request.pageContext && typeof request.pageContext === 'object'
               ? {
                   url: request.pageContext.url ? String(request.pageContext.url) : undefined,
@@ -2064,14 +2046,8 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
             break;
           }
 
-          // Try ZAP memory first (via shared module), then HTTP endpoint
-          let snippets = await queryRagFromZap(params, zapMgr);
-          let source = snippets.length ? 'zap-memory' : 'none';
-
-          if (!snippets.length && params.endpoint) {
-            snippets = await queryRagFromEndpoint(params);
-            source = snippets.length ? 'rag-endpoint' : source;
-          }
+          const snippets = params.endpoint ? await queryRagFromEndpoint(params) : [];
+          const source = snippets.length ? 'rag-endpoint' : 'none';
 
           sendResponse({
             success: true,
@@ -2593,7 +2569,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
           const keys = request.keys || [
             'selectedProvider', 'selectedModel', 'customLLMEndpoints', 'ollamaUrl',
             'anthropicApiKey', 'openaiApiKey', 'hanzoApiKey',
-            'mcpPort', 'cdpPort', 'zapPorts',
+            'mcpPort', 'cdpPort',
             'activeOrgId', 'browserBackend',
           ];
           const result = await browser.storage.local.get(keys);
@@ -2833,17 +2809,11 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
       }
 
       // =======================================================================
-      // Element Selected (forward to ZAP-connected MCPs)
+      // Element Selected (content script overlay picker)
       // =======================================================================
-      case 'elementSelected': {
-        if (zapMgr.state.connected) {
-          for (const [mcpId] of zapMgr.connections) {
-            zapRequest(zapMgr, mcpId, 'notifications/elementSelected', request.data || {}).catch(() => {});
-          }
-        }
+      case 'elementSelected':
         sendResponse({ success: true });
         break;
-      }
 
       // =======================================================================
       // Page Overlay (forwarded to content script)
@@ -3038,6 +3008,7 @@ const nativeZap: NativeZapState = {
   connected: false,
   port: null,
   providerId: `browser:${BROWSER_NAME}/default`,
+  caps: [],
 };
 const browserDispatch = (method: string, params: any) =>
   hanzoExtension.dispatchMethod(method, (params || {}) as Record<string, unknown>);
@@ -3053,8 +3024,7 @@ ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
 //
 //   2. Alarms: belt-and-suspenders for the case where no http(s) tab is
 //      open (about: pages, fresh window) AND the background gets
-//      suspended. Alarm fires every 30s, wakes the page, re-discovers
-//      if the ZAP socket is gone.
+//      suspended. The alarm wakes the page and reconciles the registration.
 // =============================================================================
 browser.runtime.onConnect.addListener((port) => {
   if (port.name !== 'zap-keepalive') return;
@@ -3066,9 +3036,8 @@ browser.runtime.onConnect.addListener((port) => {
 
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
 try {
-  // Belt-and-suspenders: even if the discovery interval is suspended (e.g.
-  // background page idled out), the alarm wakes it every 15s and triggers
-  // a one-shot discovery probe.
+  // Belt-and-suspenders: even with the background page idled out, the alarm
+  // wakes it every 15s and reconciles once.
   browser.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.25 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;

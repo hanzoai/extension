@@ -105,7 +105,6 @@ class HanzoSidebar {
       logoutBtn: document.getElementById('logout-btn'),
       saveSettings: document.getElementById('save-settings'),
       defaultModel: document.getElementById('default-model'),
-      ragUseZap: document.getElementById('rag-use-zap'),
       ragIncludeTabContext: document.getElementById('rag-include-tab-context'),
       ragTopK: document.getElementById('rag-top-k'),
       ragKb: document.getElementById('rag-kb'),
@@ -620,7 +619,6 @@ class HanzoSidebar {
         query,
         topK,
         includeTabContext: !!this.el.tabContextEnabled?.checked,
-        useZapMemory: !!this.el.ragUseZap?.checked,
         knowledgeBase: this.el.ragKb?.value || '',
         endpoint: this.el.ragEndpoint?.value || '',
         apiKey: this.el.ragApiKey?.value || '',
@@ -771,35 +769,24 @@ class HanzoSidebar {
   async connectToMCP() {
     try {
       const zapResponse = await chrome.runtime.sendMessage({ action: 'zap.status' });
-      if (zapResponse?.success) {
-        const zap = zapResponse.zap;
-        const toolCount = zap.mcps?.reduce((sum, m) => sum + (m.tools?.length || 0), 0) || 0;
-        this.updateMCPStatus(zap.connected, toolCount, zap.mcps?.length || 0);
-        if (zap.connected) {
-          const toolsResp = await chrome.runtime.sendMessage({ action: 'zap.listTools' });
-          this.updateMCPToolList(toolsResp?.success ? toolsResp.tools : []);
-        } else {
-          this.updateMCPToolList([]);
-        }
-      } else {
-        this.updateMCPStatus(false);
-        this.updateMCPToolList([]);
-      }
+      const zap = zapResponse?.success ? zapResponse.zap : null;
+      this.updateMCPStatus(!!zap?.connected, zap?.caps || []);
     } catch {
-      this.updateMCPStatus(false);
-      this.updateMCPToolList([]);
+      this.updateMCPStatus(false, []);
     }
   }
 
-  updateMCPStatus(connected, toolCount = 0, mcpCount = 0) {
+  /** `caps` is what the zapd registry lists for this browser. */
+  updateMCPStatus(connected, caps = []) {
     this.el.mcpStatus.innerHTML = connected ? `
       <span class="status-indicator connected"></span>
-      ${mcpCount > 0 ? `ZAP: ${mcpCount} MCP(s)` : 'Connected'}
+      Registered
     ` : `
       <span class="status-indicator disconnected"></span>
       Disconnected
     `;
-    this.el.mcpTools.textContent = toolCount;
+    this.el.mcpTools.textContent = caps.length;
+    this.updateMCPToolList(caps);
   }
 
   // Built-in @hanzo/mcp tool categories (always available)
@@ -832,19 +819,10 @@ class HanzoSidebar {
     if (this.el.toolCountBadge) this.el.toolCountBadge.textContent = String(total);
   }
 
-  updateMCPToolList(tools) {
+  updateMCPToolList(caps) {
     if (!this.el.mcpToolList) return;
-    if (!tools || !tools.length) {
-      this.el.mcpToolList.textContent = '';
-      return;
-    }
+    this.el.mcpToolList.textContent = caps?.length ? `ZAP: ${[...caps].sort().join(', ')}` : '';
 
-    const names = Array.from(new Set(tools.map((tool) => tool.name))).sort();
-    const preview = names.slice(0, 20);
-    const suffix = names.length > preview.length ? `\n... +${names.length - preview.length} more` : '';
-    this.el.mcpToolList.textContent = `ZAP: ${preview.join(', ')}${suffix}`;
-
-    // Update total count
     const builtinCount = HanzoSidebar.BUILTIN_TOOLS.reduce((sum, c) => sum + c.tools.length, 0);
     this.updateToolCount(builtinCount);
   }
@@ -1488,11 +1466,6 @@ class HanzoSidebar {
         this.el.startHanzoMcp.disabled = !!hasTools;
         if (hasTools) this.el.startHanzoMcp.textContent = 'Running';
       }
-
-      // Collect ZAP-discovered MCP servers
-      if (zapResp?.success && zapResp.zap?.mcps?.length) {
-        mcpServers.push(...zapResp.zap.mcps);
-      }
     } catch {
       if (this.el.hanzoMcpStatus) {
         this.el.hanzoMcpStatus.innerHTML = `<span class="status-indicator disconnected"></span> Stopped`;
@@ -1718,7 +1691,6 @@ class HanzoSidebar {
     chrome.storage.local.get([
       'mcpPort',
       'cdpPort',
-      'zapPorts',
       'nodePort',
       'hanzo_default_model',
       'hanzo_rag_endpoint',
@@ -1726,18 +1698,15 @@ class HanzoSidebar {
       'hanzo_rag_kb',
       'hanzo_rag_top_k',
       'hanzo_rag_include_tab_context',
-      'hanzo_rag_use_zap',
       'hanzo_chat_rag_enabled',
       'hanzo_chat_tab_context_enabled',
     ], (result) => {
       const mcpPort = document.getElementById('mcp-port-setting');
       const cdpPort = document.getElementById('cdp-port-setting');
-      const zapPorts = document.getElementById('zap-ports-setting');
       const nodePort = document.getElementById('node-port-setting');
 
       if (mcpPort) mcpPort.value = result.mcpPort || 3001;
       if (cdpPort) cdpPort.value = result.cdpPort || 9223;
-      if (zapPorts) zapPorts.value = (result.zapPorts || [9999,9998,9997,9996,9995]).join(',');
       if (nodePort) nodePort.value = result.nodePort || 52415;
       if (result.hanzo_default_model && this.el.defaultModel) {
         this.el.defaultModel.value = result.hanzo_default_model;
@@ -1748,7 +1717,6 @@ class HanzoSidebar {
       if (this.el.ragKb) this.el.ragKb.value = result.hanzo_rag_kb || '';
       if (this.el.ragTopK) this.el.ragTopK.value = String(result.hanzo_rag_top_k || 5);
       if (this.el.ragIncludeTabContext) this.el.ragIncludeTabContext.checked = result.hanzo_rag_include_tab_context !== false;
-      if (this.el.ragUseZap) this.el.ragUseZap.checked = result.hanzo_rag_use_zap !== false;
       if (this.el.ragEnabled) this.el.ragEnabled.checked = result.hanzo_chat_rag_enabled !== false;
       if (this.el.tabContextEnabled) this.el.tabContextEnabled.checked = result.hanzo_chat_tab_context_enabled !== false;
       this.setRagStatus(this.el.ragEnabled?.checked ? 'Ready' : 'RAG disabled');
@@ -1823,16 +1791,12 @@ class HanzoSidebar {
   async saveSettings() {
     const mcpPort = parseInt(document.getElementById('mcp-port-setting')?.value) || 3001;
     const cdpPort = parseInt(document.getElementById('cdp-port-setting')?.value) || 9223;
-    const zapPorts = (document.getElementById('zap-ports-setting')?.value || '')
-      .split(',').map(p => parseInt(p.trim())).filter(p => p > 0 && p < 65536);
-
     const nodePort = parseInt(document.getElementById('node-port-setting')?.value) || 52415;
 
     await chrome.storage.local.set({
       mcpPort,
       cdpPort,
       nodePort,
-      zapPorts: zapPorts.length ? zapPorts : [9999,9998,9997,9996,9995],
       hanzo_default_model: this.el.defaultModel?.value || 'auto',
       'safe-mode': document.getElementById('safe-mode')?.checked,
       'enable-webgpu': document.getElementById('enable-webgpu')?.checked,
@@ -1842,7 +1806,6 @@ class HanzoSidebar {
       hanzo_rag_kb: this.el.ragKb?.value?.trim() || '',
       hanzo_rag_top_k: Math.max(1, Math.min(parseInt(this.el.ragTopK?.value || '5', 10) || 5, 20)),
       hanzo_rag_include_tab_context: !!this.el.ragIncludeTabContext?.checked,
-      hanzo_rag_use_zap: !!this.el.ragUseZap?.checked,
       hanzo_chat_rag_enabled: !!this.el.ragEnabled?.checked,
       hanzo_chat_tab_context_enabled: !!this.el.tabContextEnabled?.checked,
     });
@@ -1854,8 +1817,7 @@ class HanzoSidebar {
         mcpPort,
         cdpPort,
         nodePort,
-        zapPorts: zapPorts.length ? zapPorts : [9999,9998,9997,9996,9995],
-        defaultModel: this.el.defaultModel?.value || 'auto',
+          defaultModel: this.el.defaultModel?.value || 'auto',
         safeMode: !!document.getElementById('safe-mode')?.checked,
         maxAgents: parseInt(document.getElementById('max-agents')?.value) || 3,
         enableWebGPU: !!document.getElementById('enable-webgpu')?.checked,

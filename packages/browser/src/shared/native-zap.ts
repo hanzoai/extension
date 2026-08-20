@@ -55,28 +55,37 @@ function decodeCmd(p: Uint8Array): { method: string; params: Record<string, stri
   return { method, params };
 }
 
+export interface Provider {
+  id: string;
+  role: number;
+  brand: string;
+  caps: string[];
+}
+
 // PROVIDERS body: count(u16) + per entry id(str) + role(u8) + brand(str) +
-// caps(u16 + str…). We only need the ids — that is the registry's answer to
-// "am I reachable?".
-export function decodeProviderIds(p: Uint8Array): string[] {
+// caps(u16 + str…). The registry is the router's own answer to both "am I
+// reachable?" and "what does it say I serve?".
+export function decodeProviders(p: Uint8Array): Provider[] {
   const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
   const dec = new TextDecoder();
   let o = 0;
+  const str = (): string => {
+    const n = dv.getUint16(o, true); o += 2;
+    const s = dec.decode(p.subarray(o, o + n)); o += n;
+    return s;
+  };
   const n = dv.getUint16(o, true); o += 2;
-  const ids: string[] = [];
+  const out: Provider[] = [];
   for (let i = 0; i < n; i++) {
-    const il = dv.getUint16(o, true); o += 2;
-    ids.push(dec.decode(p.subarray(o, o + il))); o += il;
-    o += 1; // role
-    const bl = dv.getUint16(o, true); o += 2;
-    o += bl; // brand
+    const id = str();
+    const role = dv.getUint8(o); o += 1;
+    const brand = str();
     const nc = dv.getUint16(o, true); o += 2;
-    for (let c = 0; c < nc; c++) {
-      const cl = dv.getUint16(o, true); o += 2;
-      o += cl;
-    }
+    const caps: string[] = [];
+    for (let c = 0; c < nc; c++) caps.push(str());
+    out.push({ id, role, brand, caps });
   }
-  return ids;
+  return out;
 }
 
 export interface NativeZapState {
@@ -87,6 +96,9 @@ export interface NativeZapState {
    *  device-stamped id once WELCOME names it. Re-stamping is idempotent, so
    *  reconnecting with the refined id yields the same id. */
   providerId: string;
+  /** What the router's registry says this browser serves. Read from our own
+   *  PROVIDERS entry, so it reports what other peers can actually reach. */
+  caps: string[];
   /** A liveness probe is outstanding. Two ticks with no PROVIDERS reply means
    *  the port is open but deaf — the wedge this state exists to catch. */
   probing?: boolean;
@@ -100,6 +112,12 @@ function send(port: chrome.runtime.Port, t: number, from: string, payload?: Uint
 }
 
 const helloBody = (brand: string, caps: string[]) => encodeHello(ROLE_PROVIDER, brand, caps);
+
+/** Unregistered: nothing of ours is reachable through the router. */
+function offline(state: NativeZapState) {
+  state.connected = false;
+  state.caps = [];
+}
 
 /** Connect to zapd via the native host, register as a browser provider, and
  *  dispatch inbound ROUTE commands to the browser.
@@ -128,12 +146,12 @@ function connectNativeZap(
   try {
     port = rt.connectNative('ai.hanzo.zap');
   } catch (e: any) {
-    state.connected = false;
+    offline(state);
     log('[Hanzo/ZAP] native host ai.hanzo.zap is not installed');
     return;
   }
   state.port = port;
-  state.connected = false;
+  offline(state);
   state.probing = false;
 
   // Register as a provider.
@@ -153,11 +171,12 @@ function connectNativeZap(
         break;
       case PROVIDERS: {
         state.probing = false;
-        const listed = decodeProviderIds(payload).includes(state.providerId);
-        if (listed !== state.connected) {
-          log(`[Hanzo/ZAP] ${listed ? 'registered' : 'dropped by router'}: ${state.providerId}`);
+        const mine = decodeProviders(payload).find((p) => p.id === state.providerId);
+        if (!!mine !== state.connected) {
+          log(`[Hanzo/ZAP] ${mine ? 'registered' : 'dropped by router'}: ${state.providerId}`);
         }
-        state.connected = listed;
+        state.connected = !!mine;
+        state.caps = mine ? mine.caps : [];
         break;
       }
       case ERROR:
@@ -185,7 +204,7 @@ function connectNativeZap(
 
   port.onDisconnect.addListener(() => {
     if (state.port !== port) return; // replaced by a newer port — nothing to do
-    state.connected = false;
+    offline(state);
     state.probing = false;
     state.port = null;
     const err = rt.lastError?.message;
@@ -225,7 +244,7 @@ export function ensureNativeZap(
   }
   if (state.probing) {
     log('[Hanzo/ZAP] native host is not answering — reconnecting');
-    state.connected = false;
+    offline(state);
     connectNativeZap(state, brand, caps, dispatch, log); // tears the deaf port down
     return;
   }
@@ -238,7 +257,7 @@ export function ensureNativeZap(
   } catch {
     // postMessage throws on an already-dead port: reconnect on the next tick.
     state.probing = false;
-    state.connected = false;
+    offline(state);
     state.port = null;
   }
 }
