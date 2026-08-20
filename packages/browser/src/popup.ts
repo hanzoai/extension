@@ -332,13 +332,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (chrome.runtime.lastError) return;
       if (response?.success) {
         const zap = response.zap;
-        if (zap.connected) {
-          const mcpCount = zap.mcps?.length || 0;
-          const toolCount = zap.mcps?.reduce((sum: number, m: any) => sum + (m.tools?.length || 0), 0) || 0;
-          setStatus(zapStatus, zapDetail, true, `${mcpCount} MCP, ${toolCount} tools`);
-        } else {
-          setStatus(zapStatus, zapDetail, false, 'Not connected');
-        }
+        setStatus(zapStatus, zapDetail, zap.connected,
+          zap.connected ? `${zap.caps?.length || 0} tools` : 'Not registered');
       }
     });
 
@@ -396,14 +391,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function loadSettings() {
-    chrome.storage.local.get(['mcpPort', 'cdpPort', 'zapPorts'], (result) => {
+    chrome.storage.local.get(['mcpPort', 'cdpPort'], (result) => {
       const mcpPortInput = document.getElementById('mcp-port-setting') as HTMLInputElement | null;
       const cdpPortInput = document.getElementById('cdp-port-setting') as HTMLInputElement | null;
-      const zapPortsInput = document.getElementById('zap-ports-setting') as HTMLInputElement | null;
 
       if (mcpPortInput) mcpPortInput.value = String(result.mcpPort || 3001);
       if (cdpPortInput) cdpPortInput.value = String(result.cdpPort || 9223);
-      if (zapPortsInput) zapPortsInput.value = (result.zapPorts || [9999, 9998, 9997, 9996, 9995]).join(',');
     });
 
     // Inspect-modifier display + recorder.
@@ -476,13 +469,10 @@ document.addEventListener('DOMContentLoaded', () => {
   saveSettings?.addEventListener('click', () => {
     const mcpPortVal = parseInt(document.getElementById('mcp-port-setting')?.value) || 3001;
     const cdpPortVal = parseInt(document.getElementById('cdp-port-setting')?.value) || 9223;
-    const zapPortsVal = (document.getElementById('zap-ports-setting')?.value || '')
-      .split(',').map(p => parseInt(p.trim())).filter(p => p > 0 && p < 65536);
 
     chrome.storage.local.set({
       mcpPort: mcpPortVal,
       cdpPort: cdpPortVal,
-      zapPorts: zapPortsVal.length ? zapPortsVal : [9999, 9998, 9997, 9996, 9995],
     }, () => {
       saveSettings.textContent = 'Saved!';
       setTimeout(() => { saveSettings.textContent = 'Save Settings'; }, 1500);
@@ -493,12 +483,9 @@ document.addEventListener('DOMContentLoaded', () => {
   testConnection?.addEventListener('click', () => {
     testConnection.textContent = 'Testing...';
     testConnection.disabled = true;
-
-    chrome.runtime.sendMessage({ action: 'zap.discover' }, () => {
-      refreshStatus();
-      testConnection.textContent = 'Test Connection';
-      testConnection.disabled = false;
-    });
+    refreshStatus();
+    testConnection.textContent = 'Test Connection';
+    testConnection.disabled = false;
   });
 
   // Feature toggles

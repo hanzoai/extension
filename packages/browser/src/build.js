@@ -106,7 +106,7 @@ async function build() {
 
   // Build sidebar + popup UI scripts (TypeScript-first, with JS fallback).
   await esbuild.build({
-    entryPoints: [fs.existsSync('src/sidebar.ts') ? 'src/sidebar.ts' : 'src/sidebar.js'],
+    entryPoints: ['src/sidebar.ts'],
     bundle: true,
     outfile: out('sidebar.js'),
     platform: 'browser',
@@ -115,7 +115,7 @@ async function build() {
   });
 
   await esbuild.build({
-    entryPoints: [fs.existsSync('src/popup.ts') ? 'src/popup.ts' : 'src/popup.js'],
+    entryPoints: ['src/popup.ts'],
     bundle: true,
     outfile: out('popup.js'),
     platform: 'browser',

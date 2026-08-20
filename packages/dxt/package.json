@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/dxt",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "Hanzo AI DXT Bundle",
   "main": "server.js",
   "scripts": {
