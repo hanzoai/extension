@@ -329,8 +329,18 @@ server.on('elementSelected', (data) => {
 
   // Generate Safari Xcode project (macOS + iOS) if safari-web-extension-converter exists.
   // Project goes to dist/safari-xcode/ so it never collides with the dist/safari/ web-ext dir.
+  // Safari's converter is only present with Xcode, so its absence is a skip and
+  // not a failure. Anything else IS a failure: a swallowed error here printed
+  // "Xcode not available" while the real cause was something else, and the
+  // project read as generated when nothing had been written.
+  let haveConverter = true;
   try {
     execSync('xcrun --find safari-web-extension-converter', { stdio: 'ignore' });
+  } catch {
+    haveConverter = false;
+    console.log('Safari: skipped, no safari-web-extension-converter (Xcode not installed)');
+  }
+  if (haveConverter) {
     console.log('Generating Safari Xcode project (macOS + iOS)...');
     execSync(
       `xcrun safari-web-extension-converter ${out('chrome')}/ ` +
@@ -340,9 +350,21 @@ server.on('elementSelected', (data) => {
       `--no-prompt --no-open --force`,
       { stdio: 'inherit' }
     );
+
+    // The converter writes Xcode's stock handler, which logs a message and
+    // echoes it back. Ours carries the last hop to zapd — Chrome and Firefox
+    // get there by spawning the host over stdio, and Safari cannot spawn a
+    // binary, so it writes to the router's socket itself. Copied AFTER the
+    // conversion, because --force rewrites that file every run.
+    const handler = 'SafariWebExtensionHandler.swift';
+    const shared = path.join(out('safari-xcode'), 'Hanzo AI', 'Shared (Extension)', handler);
+    if (fs.existsSync(path.dirname(shared))) {
+      fs.copyFileSync(path.join(__dirname, 'safari', handler), shared);
+      console.log(`Safari: ${handler} bridged to zapd`);
+    } else {
+      throw new Error(`Safari: no Shared (Extension) dir at ${shared} — the converter changed its layout`);
+    }
     console.log(`📦 Safari: ${out('safari-xcode')} (macOS + iOS Xcode project)`);
-  } catch {
-    console.log('⚠️  Safari: skipped (Xcode not available)');
   }
 
   console.log('✅ Browser extension built successfully!');
