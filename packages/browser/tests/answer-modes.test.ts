@@ -3,7 +3,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GuiProvider } from '@hanzo/gui';
 import guiConfig from '@hanzo/ui/gui-config';
-import { Composer, MODES, SOURCES, type Mode } from '../src/answer/Composer.js';
+import { Toolbar, MODES, SOURCES, type Mode } from '../src/answer/Toolbar.js';
 
 /**
  * The answer surface offers FOUR modes: Chat, Search, News, Research.
@@ -15,58 +15,59 @@ import { Composer, MODES, SOURCES, type Mode } from '../src/answer/Composer.js';
  * mode (hanzoai/cloud apps/answer/mode.go); this is the client half of that.
  *
  * Rendered, not read: the tabs and the source pills are what a user actually
- * gets, so the assertions run against the markup the composer emits.
+ * gets, so the assertions run against the markup they emit. They are what is
+ * left local now that `@hanzo/ui/chat` owns the composer — the field, the Enter
+ * rule and the send control are the shell's and are asserted there.
+ *
+ * Selected by `data-mode` / `data-source` / `data-on`, not by class name: the
+ * controls are `@hanzo/ui` buttons whose classes belong to the design system and
+ * change with it, while these attributes are this file's own contract.
  */
 
 const props = (mode: Mode) => ({
-  value: '',
-  onChange: () => {},
-  onSubmit: () => {},
   mode,
   setMode: () => {},
   sources: new Set<string>(),
   toggleSource: () => {},
-  models: [],
-  model: { id: 'auto', name: 'Auto', description: '', tier: '', family: 'auto', context: null },
-  setModel: () => {},
-  busy: false,
 });
 
-// The composer now renders through REAL @hanzo/ui, so it mounts the way every
-// consumer must: under GuiProvider — outside it, a gui component throws on
-// first paint.
+// The toolbar renders REAL @hanzo/ui, so it mounts the way every consumer must:
+// under GuiProvider — outside it, a gui component throws on first paint.
 const draw = (mode: Mode) =>
   renderToStaticMarkup(
     React.createElement(
       GuiProvider,
       { config: guiConfig, defaultTheme: 'dark' },
-      React.createElement(Composer, props(mode)),
+      React.createElement(Toolbar, props(mode)),
     ),
   );
-const labels = (html: string) =>
-  [...html.matchAll(/class="ae-mode[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]);
+
+/** The value of `attr` on every element carrying it, in document order. */
+const attrs = (html: string, attr: string) =>
+  [...html.matchAll(new RegExp(`${attr}="([^"]+)"`, 'g'))].map((m) => m[1]);
+
+/** The value of `attr` on the elements that are also marked `data-on`. */
+const on = (html: string, attr: string) =>
+  [...html.matchAll(new RegExp(`<[^>]*${attr}="([^"]+)"[^>]*data-on="true"`, 'g'))].map((m) => m[1]);
 
 describe('answer modes', () => {
   it('names four, in escalating effort, with no Deep', () => {
     expect(MODES.map((m) => m.id)).toEqual(['chat', 'search', 'news', 'research']);
-    expect(labels(draw('search'))).toEqual(['Chat', 'Search', 'News', 'Research']);
+    expect(attrs(draw('search'), 'data-mode')).toEqual(['chat', 'search', 'news', 'research']);
   });
 
   it('marks exactly the selected tab, for every mode it offers', () => {
     for (const m of MODES) {
-      const on = [...draw(m.id).matchAll(/class="ae-mode on"[^>]*>([^<]+)</g)].map((x) => x[1]);
-      expect(on, m.id).toEqual([m.label]);
+      expect(on(draw(m.id), 'data-mode'), m.id).toEqual([m.id]);
     }
   });
 
   it('offers the six sources to ground a web answer, and none to Chat', () => {
-    const pills = (html: string) =>
-      [...html.matchAll(/class="ae-chip[^"]*"[^>]*>@([^<]+)</g)].map((m) => m[1]);
-    expect(pills(draw('search'))).toEqual(SOURCES);
+    expect(attrs(draw('search'), 'data-source')).toEqual(SOURCES);
     // Chat goes straight to the model, so there is nothing to source from —
-    // the row itself stays (it is the left half of a space-between).
-    expect(pills(draw('chat'))).toEqual([]);
-    expect(draw('chat')).toContain('class="ae-chips"');
+    // the row itself stays (dropping it would slide the toolbar left).
+    expect(attrs(draw('chat'), 'data-source')).toEqual([]);
+    expect(draw('chat')).toContain('data-slot="sources"');
   });
 
   it('leaves no path back to the retired mode', () => {

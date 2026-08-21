@@ -2,6 +2,11 @@
 // like Firefox / Safari natively do. No-op on those runtimes.
 import 'webextension-polyfill';
 
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { GuiProvider } from '@hanzo/gui';
+import guiConfig from '@hanzo/ui/gui-config';
+import type { ModelCatalogEntry } from '@hanzo/ui/models';
 import {
   CHAT_BUDGETS,
   debugLog,
@@ -14,14 +19,37 @@ import {
   trimMessagesToBudget,
 } from './runtime-guard';
 import { API_BASE_URL as HANZO_API_BASE } from './shared/config.js';
+import { Chat } from './Chat.js';
 
 // Hanzo AI Browser Extension Sidebar — Chat + Tools + Settings
+//
+// The chat tab is `@hanzo/ui/chat`, mounted at #chat and driven from here: this
+// class stays the whole wire (auth, retrieval, budgets, dedupe, the stream,
+// persistence) and hands the surface nothing but values and callbacks. Tools and
+// Settings remain plain DOM — they are panels of controls, not a chat.
+
+/** The router entry, always valid, so the picker is never empty or fabricated. */
+const AUTO: ModelCatalogEntry = {
+  id: 'auto',
+  label: 'Auto',
+  family: 'Router',
+  description: 'Routes to the best model',
+  modality: 'chat',
+};
 
 class HanzoSidebar {
   constructor() {
     this.agents = new Map();
     this.currentTab = 'chat';
     this.messages = [];
+    // What the chat surface draws. Every field here is a prop; nothing in this
+    // class reads the chat DOM.
+    this.draft = '';
+    this.models = [AUTO];
+    this.model = 'auto';
+    this.rag = true;
+    this.tabContext = true;
+    this.ragStatus = 'Ready';
     this.streaming = false;
     this.streamController = null;
     this.authenticated = false;
@@ -53,19 +81,10 @@ class HanzoSidebar {
   initializeUI() {
     this.el = {
       // Auth
-      authSection: document.getElementById('auth-section'),
-      authBtn: document.getElementById('auth-btn'),
       tabBar: document.getElementById('tab-bar'),
 
       // Chat
       tabChat: document.getElementById('tab-chat'),
-      chatMessages: document.getElementById('chat-messages'),
-      chatInput: document.getElementById('chat-input'),
-      sendBtn: document.getElementById('send-btn'),
-      modelSelect: document.getElementById('model-select'),
-      ragEnabled: document.getElementById('rag-enabled'),
-      tabContextEnabled: document.getElementById('tab-context-enabled'),
-      ragStatus: document.getElementById('rag-status'),
 
       // Tools
       tabTools: document.getElementById('tab-tools'),
@@ -119,45 +138,66 @@ class HanzoSidebar {
       buildMcpStatus: document.getElementById('build-mcp-status'),
       footerVersion: document.getElementById('footer-version'),
     };
+
+    // One root, created once. Every later change is a re-render of the same
+    // tree — the failure this replaced was a second module clearing the chat
+    // container and re-mounting, which left every cached handle in this class
+    // pointing at a detached node.
+    this.root = createRoot(document.getElementById('chat'));
+    // Auto alone until a catalog arrives. This is also what fills the Settings
+    // tab's default-model select, so neither picker is ever written by hand.
+    this.setModels([]);
+  }
+
+  /** Draw the chat surface from this class's current values. */
+  paint() {
+    this.root.render(
+      React.createElement(
+        GuiProvider,
+        { config: guiConfig, defaultTheme: 'dark' },
+        React.createElement(Chat, {
+          turns: this.messages,
+          draft: this.draft,
+          onDraft: (v) => {
+            this.draft = v;
+            this.paint();
+          },
+          onSend: () => void this.sendMessage(),
+          onStop: () => this.cancelStream(),
+          onRetry: () => void this.retry(),
+          busy: this.streaming,
+          models: this.models,
+          model: this.model,
+          onModel: (id) => {
+            this.model = id;
+            this.paint();
+          },
+          rag: this.rag,
+          onRag: (on) => {
+            this.rag = on;
+            this.setRagStatus(on ? 'RAG enabled' : 'RAG disabled');
+          },
+          tab: this.tabContext,
+          onTab: (on) => {
+            this.tabContext = on;
+            this.setRagStatus(this.rag ? (on ? 'Tab context on' : 'Tab context off') : 'RAG disabled');
+          },
+          status: this.ragStatus,
+          signedIn: this.authenticated,
+          onSignIn: () => void this.login(),
+          onSignUp: () => void this.signup(),
+        }),
+      ),
+    );
   }
 
   setupEventListeners() {
-    // Auth (delegated so lazy-mounted React login card keeps working)
-    document.addEventListener('click', (event) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest('#auth-btn')) {
-        event.preventDefault();
-        void this.login();
-        return;
-      }
-      if (target.closest('#signup-btn')) {
-        event.preventDefault();
-        void this.signup();
-      }
-    });
-
     // Tabs
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
     });
 
-    // Chat
-    this.el.sendBtn.addEventListener('click', () => this.sendMessage());
-    this.el.chatInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        this.sendMessage();
-      }
-    });
-    this.el.chatInput.addEventListener('input', () => this.scheduleAutoResize());
-    this.el.ragEnabled?.addEventListener('change', () => {
-      this.setRagStatus(this.el.ragEnabled.checked ? 'RAG enabled' : 'RAG disabled');
-    });
-    this.el.tabContextEnabled?.addEventListener('change', () => {
-      if (!this.el.ragEnabled?.checked) return;
-      this.setRagStatus(this.el.tabContextEnabled.checked ? 'Tab context on' : 'Tab context off');
-    });
+    // Chat raises its own events as props — see paint().
 
     // Tools
     this.el.refreshTabs.addEventListener('click', () => this.refreshTabFilesystem());
@@ -210,7 +250,6 @@ class HanzoSidebar {
   async checkAuth() {
     // Always show tabs and initialize tools — auth only gates chat
     this.el.tabBar.classList.remove('hidden');
-    this.el.authSection.classList.add('hidden');
     this.switchTab('chat'); // Default to chat (shows login prompt if not authenticated)
 
     this.loadSettings();
@@ -232,12 +271,7 @@ class HanzoSidebar {
   async login() {
     if (this.authInFlight) return;
     this.authInFlight = true;
-
-    const authBtn = document.getElementById('auth-btn') as HTMLButtonElement | null;
-    if (authBtn) {
-      authBtn.disabled = true;
-      authBtn.textContent = 'Signing in...';
-    }
+    this.paint();
 
     try {
       const response = await chrome.runtime.sendMessage({ action: 'auth.login' });
@@ -251,11 +285,7 @@ class HanzoSidebar {
       this.showError('Sign in failed');
     } finally {
       this.authInFlight = false;
-      const latestAuthBtn = document.getElementById('auth-btn') as HTMLButtonElement | null;
-      if (latestAuthBtn) {
-        latestAuthBtn.disabled = false;
-        latestAuthBtn.textContent = 'Sign in';
-      }
+      this.paint();
     }
   }
 
@@ -304,27 +334,16 @@ class HanzoSidebar {
   }
 
   showChatLoginPrompt() {
+    // Auth gates chat and nothing else — Tools keeps working signed out, so the
+    // prompt lives inside the chat tab rather than over the whole sidebar.
     this.authenticated = false;
-    // Show login prompt in chat area instead of blocking entire sidebar
-    const chatLogin = document.getElementById('chat-login-prompt');
-    if (chatLogin) chatLogin.classList.remove('hidden');
-    const chatComposer = document.getElementById('chat-composer');
-    if (chatComposer) chatComposer.classList.add('hidden');
-    // Hide chat messages / welcome when not authenticated
-    const chatMessages = document.getElementById('chat-messages');
-    if (chatMessages) chatMessages.classList.add('hidden');
-    // Hide account panel when not authenticated
     if (this.el.accountPanel) this.el.accountPanel.classList.add('hidden');
+    this.paint();
   }
 
   hideChatLoginPrompt() {
     this.authenticated = true;
-    const chatLogin = document.getElementById('chat-login-prompt');
-    if (chatLogin) chatLogin.classList.add('hidden');
-    const chatComposer = document.getElementById('chat-composer');
-    if (chatComposer) chatComposer.classList.remove('hidden');
-    const chatMessages = document.getElementById('chat-messages');
-    if (chatMessages) chatMessages.classList.remove('hidden');
+    this.paint();
   }
 
   // ===========================================================================
@@ -369,31 +388,76 @@ class HanzoSidebar {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'chat.listModels' });
       if (response?.success && response.models?.length) {
-        const select = this.el.modelSelect;
-        select.innerHTML = '';
-        const autoOpt = document.createElement('option');
-        autoOpt.value = 'auto';
-        autoOpt.textContent = 'Auto (cost-aware)';
-        select.appendChild(autoOpt);
-
-        for (const model of response.models) {
-          const opt = document.createElement('option');
-          opt.value = model.id;
-          opt.textContent = model.name || model.id;
-          select.appendChild(opt);
-        }
-        select.value = 'auto';
-        // Also populate settings default model
-        this.el.defaultModel.innerHTML = select.innerHTML;
+        this.setModels(response.models.map((m) => ({
+          id: m.id,
+          label: m.name || m.id,
+          // Stated, not inferred: the account's own chat list. The picker's id
+          // heuristic would otherwise drop a name that merely reads like an
+          // embedding model.
+          modality: 'chat',
+        })));
       }
     } catch (error) {
       debugLog('Failed to load models:', error);
-      // Keep default options
+      // Auto stands alone — always valid, never fabricated.
     }
   }
 
+  /**
+   * Replace the catalog, keeping Auto first and the current choice reachable.
+   * The Settings tab's default-model select reads the same list, so the two can
+   * never offer different models.
+   */
+  setModels(entries: ModelCatalogEntry[]) {
+    const seen = new Set([AUTO.id]);
+    this.models = [AUTO, ...entries.filter((m) => !seen.has(m.id) && seen.add(m.id))];
+    if (!this.models.some((m) => m.id === this.model)) this.model = AUTO.id;
+
+    if (this.el.defaultModel) {
+      const chosen = this.el.defaultModel.value;
+      this.el.defaultModel.innerHTML = '';
+      for (const m of this.models) {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.label || m.id;
+        this.el.defaultModel.appendChild(opt);
+      }
+      if (this.models.some((m) => m.id === chosen)) this.el.defaultModel.value = chosen;
+    }
+    this.paint();
+  }
+
+  /** Abandon the turn in flight. The composer's send control is also its stop. */
+  cancelStream() {
+    if (!this.streaming) return;
+    this.streamController?.abort();
+    void chrome.runtime.sendMessage({ action: 'chat.cancel' }).catch(() => {});
+    void recordUsageDelta({ canceledRequests: 1 });
+    this.streaming = false;
+    this.streamController = null;
+    this.paint();
+  }
+
+  /**
+   * Ask the last question again, in place of the failure it produced.
+   *
+   * The dedupe key has to go with it: a retry is BY DEFINITION the request that
+   * just ran, so leaving the key set means the second attempt is skipped as a
+   * duplicate and the control does nothing at all.
+   */
+  async retry() {
+    const failed = this.messages[this.messages.length - 1];
+    if (!failed?.error) return;
+    const asked = this.messages[this.messages.length - 2];
+    if (asked?.role !== 'user') return;
+    this.messages.length -= 2;
+    this.draft = asked.content;
+    this.lastRequestKey = null;
+    await this.sendMessage();
+  }
+
   async sendMessage() {
-    const text = this.el.chatInput?.value?.trim();
+    const text = this.draft.trim();
     if (!text) return;
     if (!this.authenticated) {
       // Double-check auth status in case it was set externally
@@ -410,14 +474,7 @@ class HanzoSidebar {
       }
     }
 
-    if (this.streaming && this.streamController) {
-      this.streamController.abort();
-      await chrome.runtime.sendMessage({ action: 'chat.cancel' }).catch(() => {});
-      await recordUsageDelta({ canceledRequests: 1 });
-      this.streaming = false;
-      this.streamController = null;
-      this.el.sendBtn.disabled = false;
-    }
+    this.cancelStream();
 
     const requestId = ++this.requestEpoch;
 
@@ -429,11 +486,11 @@ class HanzoSidebar {
     }
 
     const userMessage = { role: 'user', content: text };
-    const selectedModel = this.el.modelSelect.value || 'auto';
+    const selectedModel = this.model || 'auto';
     let requestMessages = [...this.messages, userMessage];
 
     this.ragContext = null;
-    if (this.el.ragEnabled?.checked) {
+    if (this.rag) {
       this.setRagStatus('Retrieving context...');
       const ragResp = await this.requestRagContext(text);
       if (ragResp?.success && Array.isArray(ragResp.snippets) && ragResp.snippets.length) {
@@ -462,9 +519,9 @@ class HanzoSidebar {
       return;
     }
 
-    const availableModelIds = Array.from(this.el.modelSelect?.options || [])
-      .map((option) => option.value)
-      .filter((value) => value && value !== 'auto');
+    const availableModelIds = this.models
+      .map((m) => m.id)
+      .filter((id) => id !== AUTO.id);
     const resolvedModel = pickModelForTokenBudget(selectedModel, availableModelIds, budgeted.inputTokens);
     const maxTokens = Math.min(
       CHAT_BUDGETS.maxOutputTokens,
@@ -489,21 +546,16 @@ class HanzoSidebar {
       );
     }
 
-    // Add user message to transcript
+    // The turn, in the transcript. The assistant turn is appended EMPTY and
+    // filled in place: the surface reads `busy` on the last turn to draw the
+    // waiting state, so there is no separate typing element to insert and remove.
     this.messages.push(userMessage);
-    this.appendMessage('user', text);
-
-    // Clear input
-    this.el.chatInput.value = '';
-    this.scheduleAutoResize();
-
-    // Show typing
+    const assistant = { role: 'assistant', content: '' };
+    this.messages.push(assistant);
+    this.draft = '';
     this.streaming = true;
-    this.el.sendBtn.disabled = true;
-    const typingEl = this.showTyping();
+    this.paint();
 
-    // Create assistant message element
-    const assistantEl = this.appendMessage('assistant', '');
     let fullContent = '';
 
     try {
@@ -528,7 +580,6 @@ class HanzoSidebar {
         throw new Error(`API error ${response.status}: ${errText}`);
       }
 
-      typingEl.remove();
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -555,8 +606,8 @@ class HanzoSidebar {
               const delta = parsed.choices?.[0]?.delta?.content;
               if (delta) {
                 fullContent += delta;
-                assistantEl.innerHTML = this.renderMarkdown(fullContent);
-                this.scrollToBottom();
+                assistant.content = fullContent;
+                this.paint();
               }
             } catch {}
           }
@@ -565,10 +616,10 @@ class HanzoSidebar {
 
       if (this.ragContext?.snippets?.length) {
         fullContent += this.buildRagCitationBlock(this.ragContext);
-        assistantEl.innerHTML = this.renderMarkdown(fullContent);
       }
+      assistant.content = fullContent;
+      this.paint();
 
-      this.messages.push({ role: 'assistant', content: fullContent });
       this.lastInputTokens = budgeted.inputTokens;
       this.lastOutputTokens = estimateTextTokens(fullContent);
       await recordUsageDelta({
@@ -581,18 +632,21 @@ class HanzoSidebar {
         void this.refreshUsageMetrics();
       }
     } catch (error) {
-      typingEl.remove();
       if (error?.name !== 'AbortError') {
-        assistantEl.remove();
-        this.appendError(error?.message || 'Chat failed');
+        // The empty assistant turn becomes the failure: replacing it in place
+        // keeps the question and its outcome adjacent, which a removed bubble
+        // plus a floating error did not.
+        assistant.error = error?.message || 'Chat failed';
         await recordUsageDelta({ errors: 1 });
+      } else if (!fullContent) {
+        this.messages.pop();
       }
     } finally {
       if (requestId === this.requestEpoch) {
         this.streaming = false;
         this.streamController = null;
-        this.el.sendBtn.disabled = false;
       }
+      this.paint();
     }
   }
 
@@ -611,14 +665,14 @@ class HanzoSidebar {
 
   async requestRagContext(query) {
     try {
-      const pageContext = this.el.tabContextEnabled?.checked ? await this.getActiveTabContext() : null;
+      const pageContext = this.tabContext ? await this.getActiveTabContext() : null;
       const topK = Math.max(1, Math.min(parseInt(this.el.ragTopK?.value || '5', 10) || 5, 20));
 
       return await chrome.runtime.sendMessage({
         action: 'rag.query',
         query,
         topK,
-        includeTabContext: !!this.el.tabContextEnabled?.checked,
+        includeTabContext: this.tabContext,
         knowledgeBase: this.el.ragKb?.value || '',
         endpoint: this.el.ragEndpoint?.value || '',
         apiKey: this.el.ragApiKey?.value || '',
@@ -662,77 +716,8 @@ class HanzoSidebar {
   }
 
   setRagStatus(text) {
-    if (!this.el.ragStatus) return;
-    this.el.ragStatus.textContent = text || 'Ready';
-  }
-
-  appendMessage(role, content) {
-    // Remove welcome message
-    const welcome = this.el.chatMessages.querySelector('.chat-welcome');
-    if (welcome) welcome.remove();
-
-    const div = document.createElement('div');
-    div.className = `msg msg-${role}`;
-    div.innerHTML = role === 'assistant' ? this.renderMarkdown(content) : this.escapeHtml(content);
-    this.el.chatMessages.appendChild(div);
-    this.scrollToBottom();
-    return div;
-  }
-
-  appendError(message) {
-    const div = document.createElement('div');
-    div.className = 'msg-error';
-    div.textContent = message;
-    this.el.chatMessages.appendChild(div);
-    this.scrollToBottom();
-  }
-
-  showTyping() {
-    const div = document.createElement('div');
-    div.className = 'typing-indicator';
-    div.innerHTML = '<span></span><span></span><span></span>';
-    this.el.chatMessages.appendChild(div);
-    this.scrollToBottom();
-    return div;
-  }
-
-  scrollToBottom() {
-    this.el.chatMessages.scrollTop = this.el.chatMessages.scrollHeight;
-  }
-
-  scheduleAutoResize() {
-    requestAnimationFrame(() => this.autoResize());
-  }
-
-  autoResize() {
-    const el = this.el.chatInput;
-    el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-  }
-
-  // Minimal markdown: code blocks, inline code, bold, italic, line breaks
-  renderMarkdown(text) {
-    if (!text) return '';
-    let html = this.escapeHtml(text);
-
-    // Code blocks: ```lang\n...\n```
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-      return `<pre><code>${code.trim()}</code></pre>`;
-    });
-
-    // Inline code: `...`
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-    // Bold: **...**
-    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-
-    // Italic: *...*
-    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-
-    // Line breaks
-    html = html.replace(/\n/g, '<br>');
-
-    return html;
+    this.ragStatus = text || 'Ready';
+    this.paint();
   }
 
   escapeHtml(text) {
@@ -746,12 +731,7 @@ class HanzoSidebar {
       chrome.storage.local.get(['hanzo_chat_messages'], (result) => {
         if (result.hanzo_chat_messages?.length) {
           this.messages = result.hanzo_chat_messages;
-          // Render stored messages
-          const welcome = this.el.chatMessages.querySelector('.chat-welcome');
-          if (welcome) welcome.remove();
-          for (const msg of this.messages) {
-            this.appendMessage(msg.role, msg.content);
-          }
+          this.paint();
         }
         resolve();
       });
@@ -1315,44 +1295,16 @@ class HanzoSidebar {
     }
   }
 
+  /**
+   * Fold the model hub's findings into the one catalog the picker reads.
+   * Family is what groups the picker, so "Cloud" and "Local" stay the sections
+   * they were as optgroups.
+   */
   updateModelSelect(cloud: any[], local: any[]) {
-    const select = this.el.modelSelect as HTMLSelectElement;
-    if (!select) return;
-
-    // Save current selection
-    const currentVal = select.value;
-
-    // Clear except "Auto"
-    while (select.options.length > 1) select.remove(1);
-
-    // Add cloud models
-    if (cloud.length > 0) {
-      const group = document.createElement('optgroup');
-      group.label = 'Cloud';
-      for (const m of cloud.slice(0, 20)) {
-        const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.textContent = m.name || m.id;
-        group.appendChild(opt);
-      }
-      select.appendChild(group);
-    }
-
-    // Add local models
-    if (local.length > 0) {
-      const group = document.createElement('optgroup');
-      group.label = 'Local';
-      for (const m of local) {
-        const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.textContent = m.name || m.id;
-        group.appendChild(opt);
-      }
-      select.appendChild(group);
-    }
-
-    // Restore selection
-    if (currentVal) select.value = currentVal;
+    this.setModels([
+      ...cloud.slice(0, 20).map((m) => ({ id: m.id, label: m.name || m.id, family: 'Cloud', modality: 'chat' })),
+      ...local.map((m) => ({ id: m.id, label: m.name || m.id, family: 'Local', modality: 'chat' })),
+    ]);
   }
 
   formatBytes(bytes: number): string {
@@ -1717,9 +1669,9 @@ class HanzoSidebar {
       if (this.el.ragKb) this.el.ragKb.value = result.hanzo_rag_kb || '';
       if (this.el.ragTopK) this.el.ragTopK.value = String(result.hanzo_rag_top_k || 5);
       if (this.el.ragIncludeTabContext) this.el.ragIncludeTabContext.checked = result.hanzo_rag_include_tab_context !== false;
-      if (this.el.ragEnabled) this.el.ragEnabled.checked = result.hanzo_chat_rag_enabled !== false;
-      if (this.el.tabContextEnabled) this.el.tabContextEnabled.checked = result.hanzo_chat_tab_context_enabled !== false;
-      this.setRagStatus(this.el.ragEnabled?.checked ? 'Ready' : 'RAG disabled');
+      this.rag = result.hanzo_chat_rag_enabled !== false;
+      this.tabContext = result.hanzo_chat_tab_context_enabled !== false;
+      this.setRagStatus(this.rag ? 'Ready' : 'RAG disabled');
     });
 
     this.populateBuildInfo();
@@ -1806,8 +1758,8 @@ class HanzoSidebar {
       hanzo_rag_kb: this.el.ragKb?.value?.trim() || '',
       hanzo_rag_top_k: Math.max(1, Math.min(parseInt(this.el.ragTopK?.value || '5', 10) || 5, 20)),
       hanzo_rag_include_tab_context: !!this.el.ragIncludeTabContext?.checked,
-      hanzo_chat_rag_enabled: !!this.el.ragEnabled?.checked,
-      hanzo_chat_tab_context_enabled: !!this.el.tabContextEnabled?.checked,
+      hanzo_chat_rag_enabled: this.rag,
+      hanzo_chat_tab_context_enabled: this.tabContext,
     });
 
     // Sync settings to ~/.hanzo/extension/config.json via CDP bridge

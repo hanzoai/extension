@@ -32,12 +32,39 @@ const ENGINES = ['chrome', 'firefox', 'safari'];
 // So each ceiling is back to just above its measured size, and the ratchet
 // works again.
 const BUDGETS = {
-  'background.js': 200, // 180.5
+  'background.js': 200, // 176.5
   'content-script.js': 62, // 55.4
-  'sidebar.js': 66, // 59.3
-  'popup.js': 55, // 49.0
-  // 549.2 — RAISED from 500, deliberately and with the reason, which is what
-  // this file asks of anyone adding weight.
+  // 739.9 — RAISED from 66, which is the largest single jump this file has ever
+  // taken, so here is what bought it.
+  //
+  // Chat in the sidebar was hand-written: its own composer markup in
+  // sidebar.html, its own five-regex markdown, its own scroll-to-bottom, its own
+  // typing dots — about 40KB of surface that had already drifted from the new
+  // tab's (that markdown turned every newline into a <br> and never made a
+  // list). It is now @hanzo/ui/chat, the same shell, so the gui runtime arrives
+  // on a page that had none of it.
+  //
+  // What arrives is the RUNTIME, not the components. Measured by esbuild
+  // metafile: react-dom 177KB + @hanzogui/themes 82KB + @hanzogui/web 80KB +
+  // react-native-web 73KB + react-native-svg 28KB, against @hanzo/ui's own
+  // 22KB. Tree-shaking is working; a component system costs what it costs, and
+  // the newtab note below records why the themes table cannot be trimmed.
+  //
+  // Nothing is shared between the two: they are separate documents loading
+  // separate bundles, so each pays the runtime once. The cost is parse, from a
+  // local file, on a panel the user opened deliberately.
+  'sidebar.js': 760,
+  'popup.js': 55, // 48.5
+  // 716.3 — RAISED from 570. The +167 is @hanzo/ui/chat plus the shared model
+  // picker, which is a Popover + Command combobox (gui floating 14KB, popover
+  // 12KB, Command) where this surface used to draw a plain filtered div menu.
+  // The local composer, model menu and citation chip are deleted, so the trade
+  // is one picker's machinery for three hand-rolled components.
+  //
+  // The gui runtime below is the rest, and was already here.
+  //
+  // 549.2 was itself RAISED from 500, deliberately and with the reason, which is
+  // what this file asks of anyone adding weight.
   //
   // The answer surface renders through the REAL @hanzo/ui on @hanzo/gui — the
   // one substrate shared with web/desktop/mobile — and the gui runtime is the
@@ -54,7 +81,7 @@ const BUDGETS = {
   // filters at runtime; it is correct, and it saves nothing here, because both
   // configs still import the full table. A build-time subset would have to
   // re-encode in the same compact form.
-  'newtab.js': 570,
+  'newtab.js': 740,
   'onboarding.js': 35, // 31.0
 };
 

@@ -8,9 +8,6 @@
 </head>
 <body>
   <div class="sidebar-container">
-    <!-- Auth section (hidden — login prompt is inside Chat tab) -->
-    <section id="auth-section" class="hidden"></section>
-
     <!-- Tab Bar (always visible) -->
     <nav id="tab-bar" class="tab-bar hidden">
       <button class="tab active" data-tab="chat">Chat</button>
@@ -18,72 +15,13 @@
       <button class="tab" data-tab="settings">Settings</button>
     </nav>
 
-    <!-- Chat Tab -->
+    <!-- Chat Tab.
+         One mount node and nothing else. The thread, the composer and the
+         signed-out card are `@hanzo/ui/chat`, rendered by sidebar.ts — markup
+         here would be a second implementation of controls this page already
+         has, which is exactly how the composer forked the first time. -->
     <div id="tab-chat" class="tab-content hidden">
-      <!-- Login prompt (shown when not authenticated) -->
-      <div id="chat-login-prompt" class="chat-login-prompt hidden">
-        <div class="auth-card compact">
-          <svg class="auth-logo" viewBox="0 0 67 67" xmlns="http://www.w3.org/2000/svg">
-            <path d="M22.21 67V44.6369H0V67H22.21Z" fill="currentColor"/>
-            <path d="M0 44.6369L22.21 46.8285V44.6369H0Z" fill="currentColor" opacity="0.75"/>
-            <path d="M66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184Z" fill="currentColor"/>
-            <path d="M22.21 0H0V22.3184H22.21V0Z" fill="currentColor"/>
-            <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z" fill="currentColor"/>
-            <path d="M66.6753 22.3185L44.5098 20.0822V22.3185H66.6753Z" fill="currentColor" opacity="0.75"/>
-            <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z" fill="currentColor"/>
-          </svg>
-          <p class="auth-headline">Sign in to Hanzo AI</p>
-          <p class="auth-sub">Chat with Zen AI models, use browser tools, and build with AI agents.</p>
-          <button id="auth-btn" class="auth-signin-btn">Sign in</button>
-          <button id="signup-btn" class="auth-create-btn">Create account</button>
-          <p class="auth-note">Browser tools work without sign-in. <a href="https://docs.hanzo.ai" target="_blank">Learn more</a></p>
-        </div>
-      </div>
-      <div id="chat-messages" class="chat-messages">
-        <div class="chat-welcome">
-          <svg viewBox="0 0 67 67" xmlns="http://www.w3.org/2000/svg" width="28" height="28" style="opacity:0.25">
-            <path d="M22.21 67V44.6369H0V67H22.21Z" fill="currentColor"/>
-            <path d="M66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184Z" fill="currentColor"/>
-            <path d="M22.21 0H0V22.3184H22.21V0Z" fill="currentColor"/>
-            <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z" fill="currentColor"/>
-            <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z" fill="currentColor"/>
-          </svg>
-          <p>Ask anything. Powered by Hanzo Cloud.</p>
-        </div>
-      </div>
-      <div id="chat-composer" style="padding:10px;flex-shrink:0;border-top:1px solid rgba(255,255,255,0.10);background:#0f0f0f;">
-        <div style="background:#171717;border:1px solid rgba(255,255,255,0.15);border-radius:10px;overflow:hidden;">
-          <textarea id="chat-input" placeholder="Ask anything..." rows="1"
-            style="display:block;width:100%;padding:10px 12px 4px;background:transparent;border:none;color:#fafafa;font-size:13px;font-family:inherit;line-height:1.5;resize:none;outline:none;min-height:36px;max-height:120px;box-sizing:border-box;"></textarea>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px 8px;gap:4px;">
-            <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:0;overflow:hidden;">
-              <select id="model-select"
-                style="padding:3px 18px 3px 6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.10);border-radius:6px;color:#a3a3a3;font-size:10px;font-family:inherit;cursor:pointer;-moz-appearance:none;appearance:none;white-space:nowrap;max-width:110px;text-overflow:ellipsis;overflow:hidden;height:22px;line-height:16px;flex-shrink:0;">
-                <!-- Auto is the only hand-written entry: it is the router, always
-                     valid. Every other option is appended by loadModels() from
-                     chat.listModels, so the picker can never advertise a model the
-                     account cannot reach. -->
-                <option value="auto">Auto</option>
-              </select>
-              <label title="RAG context" style="display:inline-flex;align-items:center;gap:2px;font-size:10px;color:#666;cursor:pointer;white-space:nowrap;padding:2px 4px;flex-shrink:0;">
-                <input type="checkbox" id="rag-enabled" checked style="width:11px;height:11px;accent-color:#fafafa;cursor:pointer;margin:0;">
-                <span>RAG</span>
-              </label>
-              <label title="Include active tab" style="display:inline-flex;align-items:center;gap:2px;font-size:10px;color:#666;cursor:pointer;white-space:nowrap;padding:2px 4px;flex-shrink:0;">
-                <input type="checkbox" id="tab-context-enabled" checked style="width:11px;height:11px;accent-color:#fafafa;cursor:pointer;margin:0;">
-                <span>Tab</span>
-              </label>
-              <span id="rag-status" style="font-size:9px;color:#666;white-space:nowrap;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,0.04);">Ready</span>
-            </div>
-            <button id="send-btn" title="Send (Enter)"
-              style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:#fafafa;border:none;border-radius:50%;color:#000;cursor:pointer;flex-shrink:0;">
-              <svg viewBox="0 0 16 16" fill="none" style="width:13px;height:13px;">
-                <path d="M3 13V3l10 5-10 5z" fill="currentColor"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
+      <div id="chat"></div>
     </div>
 
     <!-- Tools Tab -->
@@ -343,9 +281,10 @@
           <h3>AI Models</h3>
           <label class="setting-item">
             <span>Default Model</span>
-            <select id="default-model">
-              <option value="auto">Auto (cost-aware)</option>
-            </select>
+            <!-- Filled by setModels() from the one catalog the chat picker
+                 reads. Empty here on purpose: a hand-written option is a model
+                 offered without the account being asked. -->
+            <select id="default-model"></select>
           </label>
           <label class="setting-item">
             <span>Enable WebGPU</span>

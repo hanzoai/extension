@@ -18,33 +18,42 @@ async function build() {
   console.log('Building browser extension...');
   console.log('Output root:', OUT);
 
-  // The extension renders on plain DOM elements styled by the sibling CSS —
-  // it consumes neither `@hanzo/ui` nor `@hanzo/gui`. That is a bundle-budget
-  // decision, measured: under this same esbuild config a single `@hanzo/ui`
-  // Button costs +154,347 raw / +54,470 gzip (193,568/60,222 bare-React →
-  // 347,915/114,692), and only builds at all once the consumer adds
-  // react-native-web plus `.web.*` resolveExtensions, because @hanzo/gui
-  // reaches react-native through @hanzogui/lucide-icons-2 → react-native-svg.
-  // newtab.js ships on every new tab at 181,077 raw / 57,435 gzip today, so
-  // that one primitive would very nearly double it. scripts/check-bundle-budgets.mjs
-  // is the gate: adopt the package when the delta fits the budget, not before.
-
-  // The Usage panel runs the headless @hanzo/usage engine in the background
-  // context. It's a published npm dependency (^0.1.6) — esbuild resolves it
-  // from node_modules like any package, so the build works identically locally
-  // and on CI (no sibling-repo path assumption).
-
-  // The answer engine (new-tab landing) consumes the @hanzo/ai SDK: `search`
-  // for the grounded modes and `chat.completions` for Chat — the ONE place
-  // each capability is defined.
-  // It's a published npm dependency (^0.2.3), so esbuild resolves it from
-  // node_modules like any other package — works identically locally and on CI
-  // (no sibling-repo path assumption).
+  // Both React surfaces — the new-tab answer engine and the sidebar's chat —
+  // draw with `@hanzo/ui/chat` on `@hanzo/gui`, the one component system shared
+  // with web/desktop/mobile. What that costs is measured, per bundle, in
+  // scripts/check-bundle-budgets.mjs, which fails the build when a bundle grows
+  // past its ceiling: growth is argued for by raising a number in a diff.
+  //
+  // Everything they consume is a published npm dependency — @hanzo/ai for the
+  // wire, @hanzo/usage for the usage panel — so esbuild resolves from
+  // node_modules and the build is identical locally and on CI. No sibling-repo
+  // path assumption anywhere.
 
   // Ensure dist directories exist
   for (const d of ['', 'chrome', 'firefox', 'safari']) {
     fs.mkdirSync(out(d), { recursive: true });
   }
+
+  // What a React surface needs to bundle @hanzo/ui on @hanzo/gui — the one
+  // substrate the web app / desktop / mobile share. The gui runtime is written
+  // cross-platform, so it must be resolved for the web: `.web.*` first
+  // (react-native-svg et al ship native fabric files at their plain specifier,
+  // and esbuild cannot parse Flow), `react-native` → `react-native-web`, and a
+  // defined process.env (the runtime reads NODE_ENV / TAMAGUI_TARGET; an
+  // extension page has no `process`).
+  //
+  // Stated ONCE. The sidebar built without it and died on Flow syntax inside
+  // react-native — a failure with no mention of the missing alias, in a package
+  // neither surface names.
+  const WEB = {
+    alias: { 'react-native': 'react-native-web' },
+    resolveExtensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js', '.json'],
+    define: {
+      'process.env.NODE_ENV': '"production"',
+      'process.env.TAMAGUI_TARGET': '"web"',
+    },
+    banner: { js: 'var process=globalThis.process??{env:{NODE_ENV:"production"}};' },
+  };
 
   // Publishable event-ingest key (pk-…) for POST api.hanzo.ai/v1/event, inlined
   // into every bundle that can emit telemetry (the surfaces importing
@@ -104,14 +113,18 @@ async function build() {
     format: 'esm'
   });
 
-  // Build sidebar + popup UI scripts (TypeScript-first, with JS fallback).
+  // Sidebar — Chat on the shared @hanzo/ui/chat shell, plus the Tools and
+  // Settings panels. It is a shipped page bundle carrying the gui runtime, so
+  // it ships the way newtab does: minified, no inline map.
   await esbuild.build({
+    ...WEB,
     entryPoints: ['src/sidebar.ts'],
     bundle: true,
     outfile: out('sidebar.js'),
     platform: 'browser',
     target: ['chrome90', 'firefox91', 'safari14'],
     minify: true,
+    define: { ...WEB.define, ...TELEMETRY_DEFINE },
   });
 
   await esbuild.build({
@@ -125,14 +138,10 @@ async function build() {
   });
 
   // Answer engine (new-tab landing + omnibox/address-bar search target).
-  // React surface consuming the @hanzo/ai `search` primitive; monochrome.
-  // Renders through the REAL @hanzo/ui (on @hanzo/gui) — the one substrate the
-  // web app / desktop / mobile share — so the gui runtime needs web resolution:
-  // `.web.*` first (react-native-svg et al ship native fabric files at their
-  // plain specifiers), `react-native` → `react-native-web`, and a defined
-  // process.env (the gui runtime reads NODE_ENV / TAMAGUI_TARGET; an extension
-  // page has no `process`).
+  // React surface consuming the @hanzo/ai `search` primitive, drawn with
+  // @hanzo/ui/chat.
   await esbuild.build({
+    ...WEB,
     entryPoints: ['src/newtab.ts'],
     bundle: true,
     outfile: out('newtab.js'),
@@ -141,14 +150,7 @@ async function build() {
     // New-tab page loads on every tab — ship it lean (minified, no inline map).
     minify: true,
     sourcemap: false,
-    alias: { 'react-native': 'react-native-web' },
-    resolveExtensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js', '.json'],
-    define: {
-      'process.env.NODE_ENV': '"production"',
-      'process.env.TAMAGUI_TARGET': '"web"',
-      ...TELEMETRY_DEFINE,
-    },
-    banner: { js: 'var process=globalThis.process??{env:{NODE_ENV:"production"}};' },
+    define: { ...WEB.define, ...TELEMETRY_DEFINE },
   });
 
   // Onboarding (new-install consent ask: insights + opt-in training).

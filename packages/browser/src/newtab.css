@@ -230,23 +230,11 @@ a {
   padding: 24px;
   overflow-y: auto;
 }
-.ae-hero-card {
-  width: 100%;
-  max-width: 720px;
-}
 .ae-news {
   width: 100%;
   max-width: 720px;
 }
 .ae-news-head,
-.ae-followups-head,
-.ae-model-group-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-3);
-  margin-bottom: 10px;
-}
 .ae-news-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -275,351 +263,20 @@ a {
   color: var(--text-3);
 }
 
-/* ── Input card ──────────────────────────────────────────── */
-.ae-card {
-  background: var(--surface-2);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
-  box-shadow:
-    0 8px 40px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.02);
-  /* NOT overflow:hidden. The model picker menu is position:absolute inside this
-     card and opens UPWARD, so a clip here truncates it to the card's box: the
-     "Search models…" filter, the Auto row and the whole Enso group get cut off
-     and only the last row plus the plan banner survive — which reads as "the
-     picker is broken / Enso is missing" rather than as a clipping bug. Nothing
-     here needs clipping: .ae-input is transparent, .ae-card-row has no
-     background, and the chips/modes/send button carry their own radii and sit
-     inside the padding, so none of them paint into the rounded corners. */
-  overflow: visible;
-}
-.ae-input {
-  display: block;
-  width: 100%;
-  resize: none;
-  padding: 16px 18px 6px;
-  min-height: 30px;
-  max-height: 200px;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 15px;
-  line-height: 1.5;
-}
-.ae-input::placeholder {
-  color: var(--text-3);
-}
-/* The composer field is @hanzo/ui's Textarea (data-slot is the design system's
-   own marker). It auto-grows by line count, so the browser's manual resize
-   grip is noise inside the card. */
-.ae-card textarea[data-slot="textarea"] {
-  resize: none;
-}
-.ae-card-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px 10px;
-  flex-wrap: wrap;
-}
-.ae-chips {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-.ae-chip {
-  padding: 4px 9px;
-  border-radius: 999px;
-  cursor: pointer;
-  background: var(--glass);
-  border: 1px solid var(--border);
-  color: var(--text-3);
-  font-size: 11px;
-  font-family: inherit;
-}
-.ae-chip:hover {
-  color: var(--text-2);
-  background: var(--surface-2);
-}
-/* Selected is a step UP the surface ladder, not a white lozenge (chat ModeChips). */
-.ae-chip.on {
-  background: var(--surface-active);
-  color: var(--text);
-  border-color: transparent;
-  font-weight: 500;
-}
-.ae-card-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.ae-modes {
-  display: flex;
-  gap: 2px;
-  background: var(--glass);
-  border-radius: var(--radius-xs);
-  padding: 2px;
-}
-.ae-mode {
-  padding: 4px 9px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: var(--text-3);
-  font-size: 11.5px;
-  font-family: inherit;
-  border-radius: 5px;
-}
-.ae-mode:hover {
-  color: var(--text-2);
-}
-.ae-mode.on {
-  background: var(--surface-active);
-  color: var(--text);
-  font-weight: 500;
-}
-.ae-send {
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--text);
-  color: #000;
-  border: none;
-  border-radius: 50%;
-}
-.ae-send:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
+/* ── Answer prose ────────────────────────────────────────────
+   The turn is `@hanzo/ui/chat` Message; markdown is this surface's own
+   pipeline, so this is its stylesheet and the only CSS left for an answer. */
 
-/* ── Model picker ────────────────────────────────────────── */
-.ae-picker {
-  position: relative;
-}
-.ae-picker-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  padding: 6px 10px;
-  background: var(--glass);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  color: var(--text-2);
-  font-size: 12px;
-  font-family: inherit;
-}
-.ae-picker-btn:hover {
-  color: var(--text);
-  border-color: var(--border-2);
-}
-.ae-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-2);
-}
-.ae-picker-menu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
-  z-index: 40;
-  width: 320px;
-  max-height: 420px;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-2);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
-  overflow: hidden;
-}
-.ae-picker-filter {
-  margin: 8px;
-  padding: 8px 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 13px;
-  outline: none;
-}
-.ae-picker-list {
-  overflow-y: auto;
-  padding: 0 6px 6px;
-}
-.ae-model-group-label {
-  padding: 8px 8px 4px;
-  margin: 0;
-}
-.ae-model-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  text-align: left;
-  padding: 8px 10px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  border-radius: var(--radius-xs);
-  color: var(--text);
-  font-family: inherit;
-}
-.ae-model-row:hover {
-  background: var(--glass);
-}
-.ae-model-row.active {
-  background: var(--glass-2);
-}
-.ae-model-name {
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.ae-model-desc {
-  font-size: 11px;
-  color: var(--text-3);
-  line-height: 1.3;
-}
-.ae-badge {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--glass-2);
-  color: var(--text-2);
-}
-.ae-plan-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
-  font-size: 11.5px;
-  color: var(--text-2);
-  background: var(--surface);
-}
-.ae-plan-tiers {
-  display: flex;
-  gap: 8px;
-}
-.ae-plan-tier b {
-  color: var(--text);
-}
-
-/* ── Answer view ─────────────────────────────────────────── */
-.ae-answer-wrap {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.ae-answer-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 32px 28px 20px;
-}
-.ae-answer-scroll > * {
-  max-width: 760px;
-  margin-left: auto;
-  margin-right: auto;
-}
-.ae-question {
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 0 0 20px;
-}
-.ae-sources {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 16px;
-  margin-bottom: 8px;
-}
-/* Source card — chat AnswerView: 160px, number pill first, favicon, host, 3-line title. */
-.ae-source {
-  flex: 0 0 168px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  transition: background 0.12s ease;
-}
-.ae-source:hover {
-  background: var(--surface-2);
-}
-.ae-source-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.ae-source-head img {
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-.ae-source-host {
-  font-size: 11px;
-  color: var(--text-2);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ae-source-idx {
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-2);
-  background: var(--surface-3);
-  border-radius: 50%;
-}
-.ae-source-title {
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--text);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.ae-status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-2);
-  font-size: 14px;
-  padding: 8px 0;
-}
-
-.ae-answer.markdown {
+.markdown {
   font-size: 15px;
   line-height: 1.65;
   color: var(--text);
 }
+
+.markdown > *:last-child {
+  margin-bottom: 0;
+}
+
 .markdown h2 {
   font-size: 20px;
   margin: 22px 0 10px;
@@ -664,78 +321,7 @@ a {
   font-family: "Geist Mono", ui-monospace, monospace;
 }
 
-.ae-followups {
-  margin-top: 26px;
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
-}
-.ae-followup {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 12px 4px;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-}
-.ae-followup:hover {
-  color: var(--text);
-}
-.ae-followup:hover .ae-followup-arrow {
-  color: var(--text);
-  transform: translateX(2px);
-}
-.ae-followup-arrow {
-  color: var(--text-3);
-  transition: transform 0.12s ease;
-}
-
-.ae-error {
-  color: var(--text-2);
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-.ae-auth {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 8px 0;
-}
-.ae-auth p {
-  margin: 0;
-  color: var(--text-2);
-  font-size: 15px;
-}
-
-.ae-answer-composer {
-  padding: 12px 28px 20px;
-  border-top: 1px solid var(--border);
-  background: var(--bg);
-}
-.ae-answer-composer > .ae-card {
-  max-width: 760px;
-  margin: 0 auto;
-}
-
 /* ── Spinner ─────────────────────────────────────────────── */
-.ae-spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: inline-block;
-  border: 2px solid var(--border-2);
-  border-top-color: var(--text);
-  animation: ae-spin 0.7s linear infinite;
-}
 @keyframes ae-spin {
   to {
     transform: rotate(360deg);
@@ -777,51 +363,11 @@ a {
     justify-content: flex-start;
     padding-top: 48px;
   }
-  .ae-answer-scroll {
-    padding: 20px 16px 16px;
-  }
-  .ae-answer-composer {
-    padding: 10px 16px 16px;
-  }
-  .ae-question {
-    font-size: 21px;
-  }
-  /* Input card: let the control row wrap so the model picker + send stay
-     reachable at narrow widths (mobile-first). */
-  .ae-card-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-  .ae-card-right {
-    justify-content: space-between;
-  }
-  .ae-modes {
-    flex: 1;
-    justify-content: space-between;
-  }
-  .ae-source {
-    flex-basis: 150px;
-  }
-}
-
-/* The fallback escape hatch on the expired-session card. Quiet: it is the
-   second choice, offered so the surface is never a dead end. */
-.ae-fallback-link {
-  display: inline-block;
-  margin-top: 12px;
-  color: var(--text-3);
-  font-size: 13px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.ae-fallback-link:hover {
-  color: var(--text);
 }
 
 /* ── Generative result widgets ───────────────────────────── */
-/* margin-left/right stay AUTO: .ae-answer-scroll > * centres its children at
-   760px, and a `margin: 4px 0 18px` shorthand here silently resets those to 0 —
+/* margin-left/right stay AUTO: the thread centres its children at a reading
+   measure, and a `margin: 4px 0 18px` shorthand here silently resets those to 0 —
    the widgets then hugged the left edge while the prose beside them stayed
    centred. Set only the block margins. */
 .ae-widgets {
