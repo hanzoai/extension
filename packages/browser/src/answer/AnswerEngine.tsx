@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createAiClient, type AiClient, type SearchEvent, type SearchSource } from '@hanzo/ai';
+import { Button, SizableText, XStack, YStack } from '@hanzo/ui';
+import { Composer, Failure, Message, Sources, Step, Thread, type Source } from '@hanzo/ui/chat';
+import { ModelSelector, type ModelCatalogEntry } from '@hanzo/ui/models';
 import { fetchNews, type NewsItem } from './news.js';
-import { AUTO_MODEL, fetchModelCatalog, type ChatModel, type ModelGroup } from './model-catalog.js';
-import { renderMarkdown } from './markdown.js';
+import { AUTO, fetchCatalog } from './model-catalog.js';
+import { Prose } from '../shared/Prose.js';
 import { capture, contributeTrainingSample } from '../shared/consent.js';
-import { Composer, type Mode } from './Composer.js';
+import { Toolbar, type Mode } from './Toolbar.js';
 import { Rail } from './Rail.js';
-import { Source } from './Source.js';
 import { Stories } from './Stories.js';
 import { Widgets } from './WidgetView.js';
 import { extractWidgets } from './widget.js';
@@ -16,14 +18,13 @@ import { DEFAULT_PROVIDER_ID, fallbackUrl, loadProviderId, providerById } from '
  * Hanzo Answer Engine — the shared AI-answer surface (query → streamed answer +
  * inline citations + sources + live news). Backend = api.hanzo.ai ONLY, reached
  * through @hanzo/ai: `search` for the grounded modes, `chat.completions` for
- * Chat (each capability defined in exactly one place). Strict monochrome per
- * the Hanzo brand.
+ * Chat (each capability defined in exactly one place).
  *
- * This file holds the state and the wire. Everything it draws with is a
- * presentational sibling — Rail, Composer (Models), Source, Stories — each one
- * a component whose data and effects arrive as props, so the same parts can be
- * lifted into @hanzo/ui and mounted by chat and app without dragging the
- * extension's transport along.
+ * It draws with `@hanzo/ui/chat` — Thread, Message, Sources, Composer — and
+ * `@hanzo/ui/models` for the picker. This file is the state and the wire; the
+ * presentation is the shell every Hanzo chat surface shares. What is left local
+ * is only what is true HERE: the modes and sources in the composer's toolbar
+ * slot, the widgets the answer can emit, and the news rail.
  */
 
 /**
@@ -51,6 +52,28 @@ async function* converse(
   yield { type: 'done', answer, sources: [] };
 }
 
+/** What each wire stage is called on the surface. */
+const STAGE: Record<string, string> = {
+  planning: 'Planning research',
+  searching: 'Searching the web',
+  reading: 'Reading sources',
+  writing: 'Writing the answer',
+};
+
+/** How wide the model picker is allowed to be in the composer's toolbar row. */
+const PICKER = 176;
+
+/** A cited source in the shell's vocabulary. The favicon is the mark; the host
+ *  initial stands in when a site serves none, so a citation always renders. */
+function cite(s: SearchSource): Source {
+  return {
+    id: s.url,
+    title: s.title || s.url,
+    href: s.url,
+    ...(s.favicon ? { icon: <img src={s.favicon} alt="" width={16} height={16} /> } : null),
+  };
+}
+
 export interface AnswerEngineProps {
   apiBase: string;
   /** Resolves the current IAM bearer, or null when signed out. */
@@ -62,26 +85,27 @@ export interface AnswerEngineProps {
 }
 
 export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: AnswerEngineProps) {
-  // Sidebar hidden by default — the answer surface should read like hanzo.chat:
-  // a single centered column. A fixed toggle (below) brings the rail back.
+  // Rail hidden by default — the answer surface should read like hanzo.chat:
+  // a single centered column. Its own header control brings it back.
   const [collapsed, setCollapsed] = useState(true);
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
   const [mode, setMode] = useState<Mode>('search');
   const [sources, setSources] = useState<Set<string>>(new Set());
-  const [modelGroups, setModelGroups] = useState<ModelGroup[]>([]);
-  const [model, setModel] = useState<ChatModel>(AUTO_MODEL);
+  const [models, setModels] = useState<ModelCatalogEntry[]>([]);
+  const [model, setModel] = useState<string>(AUTO);
   const [news, setNews] = useState<NewsItem[]>([]);
   // True once the user picks a model themselves, so the catalog's default-to-Enso
   // never overwrites a deliberate choice made while the fetch was still in flight.
   const picked = useRef(false);
-  const chooseModel = useCallback((m: ChatModel) => {
+  const chooseModel = useCallback((id: string) => {
     picked.current = true;
-    setModel(m);
+    setModel(id);
   }, []);
 
   const [phase, setPhase] = useState<'idle' | 'running' | 'done'>('idle');
-  const [status, setStatus] = useState('');
+  /** What the answer is doing right now, as the shell's Step reads it. */
+  const [step, setStep] = useState<{ name: string; detail?: string }>({ name: '' });
   const [answer, setAnswer] = useState('');
   const [answerSources, setAnswerSources] = useState<SearchSource[]>([]);
   const [followUps, setFollowUps] = useState<string[]>([]);
@@ -98,17 +122,17 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
   // Enso is the default, selected once the catalog lands. It cannot be the
   // useState seed: the catalog is fetched at runtime, so naming a model before
   // it arrives would hardcode an id the server may not serve — the whole point
-  // of model-catalog.ts is that the list is never fabricated. AUTO_MODEL is the
-  // seed and the fallback, so a failed/slow fetch degrades to "routes to the
-  // best model" instead of a dead selection. Only the initial pick is
-  // overridden: `picked` guards a user's choice against a late catalog resolve.
+  // of model-catalog.ts is that the list is never fabricated. Auto is the seed
+  // and the fallback, so a failed/slow fetch degrades to "routes to the best
+  // model" instead of a dead selection. Only the initial pick is overridden:
+  // `picked` guards a user's choice against a late catalog resolve.
   useEffect(() => {
-    fetchModelCatalog()
-      .then(({ groups }) => {
-        setModelGroups(groups);
+    fetchCatalog()
+      .then((entries) => {
+        setModels(entries);
         if (picked.current) return;
-        const enso = groups.find((g) => g.family === 'enso')?.models[0];
-        if (enso) setModel(enso);
+        const enso = entries.find((m) => /enso/i.test(m.family ?? ''));
+        if (enso) setModel(enso.id);
       })
       .catch(() => {});
     fetchNews().then(setNews).catch(() => {});
@@ -162,21 +186,21 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
 
       setSubmitted(question);
       setPhase('running');
-      setStatus(mode === 'chat' ? 'Thinking' : 'Searching the web');
+      setStep({ name: mode === 'chat' ? 'Thinking' : 'Searching the web' });
       setAnswer('');
       setAnswerSources([]);
       setFollowUps([]);
       setError('');
       setNeedAuth(false);
-      void capture('answer_search', { mode, model: model.id });
+      void capture('answer_search', { mode, model });
       let fullAnswer = '';
 
       const stream =
         mode === 'chat'
-          ? converse(client, question, model.id, ctrl.signal)
+          ? converse(client, question, model, ctrl.signal)
           : (client.search(question, {
               mode,
-              model: model.id,
+              model,
               sources: [...sources],
               signal: ctrl.signal,
             }) as AsyncGenerator<SearchEvent>);
@@ -184,15 +208,10 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
         for await (const ev of stream) {
           switch (ev.type) {
             case 'status':
-              setStatus(
-                ev.stage === 'planning'
-                  ? 'Planning research' + (ev.detail ? `: ${ev.detail}` : '')
-                  : ev.stage === 'searching'
-                    ? 'Searching the web' + (ev.detail ? `: ${ev.detail}` : '')
-                    : ev.stage === 'reading'
-                      ? 'Reading sources' + (ev.detail ? `: ${ev.detail}` : '')
-                      : 'Writing the answer',
-              );
+              setStep({
+                name: STAGE[ev.stage] ?? 'Writing the answer',
+                ...(ev.detail ? { detail: ev.detail } : null),
+              });
               break;
             case 'sources':
               setAnswerSources(ev.sources);
@@ -206,10 +225,10 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
               break;
             case 'done':
               setPhase('done');
-              void capture('answer_shown', { mode, model: model.id });
+              void capture('answer_shown', { mode, model });
               // Opt-in only: no-ops unless the user turned on training
               // contribution (the consent module gates the send).
-              void contributeTrainingSample({ query: question, answer: fullAnswer, model: model.id });
+              void contributeTrainingSample({ query: question, answer: fullAnswer, model });
               break;
             case 'error':
               if (ev.error.includes('__NO_TOKEN__') || /401|invalid api key/i.test(ev.error)) {
@@ -241,6 +260,10 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
   }, [initialQuery, run]);
 
   const submit = useCallback(() => void run(query), [query, run]);
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    setPhase('done');
+  }, []);
   const toggleSource = useCallback((s: string) => {
     setSources((prev) => {
       const next = new Set(prev);
@@ -261,27 +284,22 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
     setNeedAuth(false);
   }, []);
 
-  const composer = (busy: boolean) => (
-    <Composer
-      value={query}
-      onChange={setQuery}
-      onSubmit={submit}
-      mode={mode}
-      setMode={setMode}
-      sources={sources}
-      toggleSource={toggleSource}
-      models={modelGroups}
-      model={model}
-      setModel={chooseModel}
-      busy={busy}
-    />
+  const busy = phase === 'running';
+  const composer = (
+    <Composer value={query} onChange={setQuery} onSend={submit} onStop={stop} busy={busy}>
+      <Toolbar mode={mode} setMode={setMode} sources={sources} toggleSource={toggleSource} />
+      {/* Boxed: the picker's trigger is `width: "100%"`, so left free in the
+          toolbar row it takes everything and pushes the send control out. */}
+      <XStack width={PICKER} shrink={0}>
+        <ModelSelector models={models} value={model} onChange={chooseModel} size="sm" />
+      </XStack>
+    </Composer>
   );
+
+  const { prose, widgets } = extractWidgets(answer);
 
   return (
     <div className={'ae-root' + (collapsed ? ' collapsed' : '')}>
-      {/* No fixed reveal button: the rail itself is always present now, and it
-          carries its own expand control. A floating toggle only existed because
-          the collapsed rail rendered nothing to click. */}
       <Rail
         collapsed={collapsed}
         toggle={() => setCollapsed((v) => !v)}
@@ -291,28 +309,18 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
 
       <main className="ae-main">
         {phase === 'idle' ? (
-          <div className="ae-hero">
-            <div className="ae-hero-card">{composer(false)}</div>
+          <YStack flex={1} justify="center" items="center" gap="$6" px="$4" py="$6">
+            <YStack width="100%" maxW={768}>
+              {composer}
+            </YStack>
             <Stories items={news} />
-          </div>
+          </YStack>
         ) : (
-          <div className="ae-answer-wrap">
-            <div className="ae-answer-scroll">
-              <h1 className="ae-question">{submitted}</h1>
+          <>
+            <Thread>
+              <Message role="user">{submitted}</Message>
 
-              {answerSources.length > 0 && (
-                <div className="ae-sources">
-                  {answerSources.map((s, i) => (
-                    <Source key={s.url} source={s} index={i} />
-                  ))}
-                </div>
-              )}
-
-              {phase === 'running' && !answer && (
-                <div className="ae-status">
-                  <span className="ae-spinner" /> {status}…
-                </div>
-              )}
+              {answerSources.length > 0 && <Sources sources={answerSources.map(cite)} />}
 
               {needAuth ? (
                 /* Reached only when a token EXISTED and the call still came back
@@ -321,20 +329,24 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
                    Both doors are offered: renew the session for an AI answer, or
                    take the same query to the configured engine. A dead end here
                    would strand someone who simply needs to sign in again. */
-                <div className="ae-auth">
-                  <p>Your Hanzo session expired. Sign in again for AI answers.</p>
-                  <button className="ae-signin big" onClick={signIn}>
-                    Sign in
-                  </button>
-                  <a
-                    className="ae-fallback-link"
-                    href={fallbackUrl(providerId, submitted) || undefined}
-                  >
-                    Search {providerById(providerId).label} instead
-                  </a>
-                </div>
+                <YStack gap="$3" items="flex-start">
+                  <SizableText size="$3">
+                    Your Hanzo session expired. Sign in again for AI answers.
+                  </SizableText>
+                  <XStack gap="$3" items="center">
+                    <Button onPress={signIn}>Sign in</Button>
+                    <a
+                      href={fallbackUrl(providerId, submitted) || undefined}
+                      style={{ color: 'inherit', opacity: 0.7, fontSize: 13 }}
+                    >
+                      Search {providerById(providerId).label} instead
+                    </a>
+                  </XStack>
+                </YStack>
               ) : error ? (
-                <div className="ae-error">{error}</div>
+                <Message role="assistant">
+                  <Failure onRetry={() => void run(submitted)}>{error}</Failure>
+                </Message>
               ) : (
                 /* The answer picks its own presentation: any widget blocks it
                    emitted render as real components, and the prose is what is
@@ -342,42 +354,55 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
                    as raw JSON. Extraction runs per frame against a STREAMING,
                    half-written document, which is why an unterminated fence is
                    left alone until it closes. */
-                (() => {
-                  const { prose, widgets } = extractWidgets(answer);
-                  return (
-                    <>
-                      <Widgets widgets={widgets} />
-                      <div
-                        className="ae-answer markdown"
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown(prose) }}
-                      />
-                    </>
-                  );
-                })()
+                <Message role="assistant" busy={busy && !answer}>
+                  {busy && !answer ? (
+                    <Step name={step.name} status="running" {...(step.detail ? { detail: step.detail } : null)} />
+                  ) : null}
+                  <Widgets widgets={widgets} />
+                  <Prose text={prose} />
+                </Message>
               )}
 
               {followUps.length > 0 && (
-                <div className="ae-followups">
-                  <div className="ae-followups-head">Follow-up</div>
+                <YStack gap="$1.5">
+                  <SizableText size="$1" color="$color10" fontWeight="500">
+                    Follow-up
+                  </SizableText>
                   {followUps.map((f) => (
-                    <button
+                    <XStack
                       key={f}
-                      className="ae-followup"
-                      onClick={() => {
+                      items="center"
+                      gap="$2"
+                      px="$3"
+                      py="$2"
+                      rounded="$3"
+                      borderWidth={1}
+                      borderColor="$borderColor"
+                      cursor="pointer"
+                      role="button"
+                      tabIndex={0}
+                      hoverStyle={{ backgroundColor: '$color3' }}
+                      onPress={() => {
                         setQuery(f);
                         void run(f);
                       }}
                     >
-                      {f}
-                      <span className="ae-followup-arrow">→</span>
-                    </button>
+                      <SizableText size="$2" flex={1}>
+                        {f}
+                      </SizableText>
+                      <SizableText size="$2" color="$color10">
+                        →
+                      </SizableText>
+                    </XStack>
                   ))}
-                </div>
+                </YStack>
               )}
-            </div>
+            </Thread>
 
-            <div className="ae-answer-composer">{composer(phase === 'running')}</div>
-          </div>
+            <YStack width="100%" maxW={768} self="center" px="$3" pb="$4">
+              {composer}
+            </YStack>
+          </>
         )}
       </main>
     </div>

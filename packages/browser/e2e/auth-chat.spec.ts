@@ -14,13 +14,21 @@ import { test, expect } from './fixtures';
  *   - IAM at iam.hanzo.ai / hanzo.id must be reachable
  *   - LLM gateway at api.hanzo.ai must be reachable
  *   - Extension must be built: npm run build
+ *   - HANZO_E2E_PASSWORD in the environment
+ *
+ * The password comes from the environment and nowhere else. Written into this
+ * file it would be a live credential published in every clone of the repo, and
+ * a test that reads one from disk is a test that teaches everyone to keep one
+ * there. Absent, these skip: `e2e/turn.spec.ts` already proves the surface
+ * against a seeded identity, so nothing here is the only cover for anything.
  */
 
 const TEST_USER = 'z';
 const TEST_EMAIL = 'z@hanzo.ai';
+const PASSWORD = process.env.HANZO_E2E_PASSWORD;
 
-// These tests require live IAM/LLM access — skip in CI
-const descFn = process.env.CI ? test.describe.skip : test.describe;
+// Live IAM/LLM access, and a credential this machine was given.
+const descFn = process.env.CI || !PASSWORD ? test.describe.skip : test.describe;
 
 descFn('Auth + Chat', () => {
   test('login via tab-based OAuth flow and verify user stored', async ({ context, extensionId }) => {
@@ -28,16 +36,16 @@ descFn('Auth + Chat', () => {
     await sidebar.goto(`chrome-extension://${extensionId}/sidebar.html`);
     await sidebar.waitForTimeout(500);
 
-    // Switch to chat tab — should show login prompt
+    // Switch to chat tab — signed out, the shell shows the sign-in card.
     await sidebar.locator('[data-tab="chat"]').click();
-    const loginPrompt = sidebar.locator('#chat-login-prompt');
-    await expect(loginPrompt).toBeVisible();
+    const chat = sidebar.locator('#chat');
+    await expect(chat).toContainText('Sign in to Hanzo AI');
 
     // Click "Sign in" — this sends auth.login to the background,
     // which opens a new tab to hanzo.id/oauth/authorize
     const [authPage] = await Promise.all([
       context.waitForEvent('page'),
-      sidebar.locator('#auth-btn').click(),
+      chat.getByRole('button', { name: 'Sign in' }).click(),
     ]);
 
     // Wait for the Hanzo IAM login page to load
@@ -52,7 +60,7 @@ descFn('Auth + Chat', () => {
 
     if (await usernameInput.isVisible({ timeout: 5000 }).catch(() => false)) {
       await usernameInput.fill(TEST_USER);
-      await passwordInput.fill('IloveHanzo2026!!!');
+      await passwordInput.fill(PASSWORD!);
 
       // Submit the form
       const submitBtn = authPage.locator('button[type="submit"], .login-button, button:has-text("Sign In"), button:has-text("Sign in")');
@@ -108,7 +116,7 @@ descFn('Auth + Chat', () => {
     });
 
     // Get a real token via direct API call
-    const tokenResult = await sidebar.evaluate(async () => {
+    const tokenResult = await sidebar.evaluate(async (password: string) => {
       try {
         const resp = await fetch('https://iam.hanzo.ai/v1/iam/login', {
           method: 'POST',
@@ -117,7 +125,7 @@ descFn('Auth + Chat', () => {
             application: 'hanzo-browser',
             organization: 'hanzo',
             username: 'z',
-            password: 'IloveHanzo2026!!!',
+            password,
             type: 'token',
           }),
         });
@@ -133,7 +141,7 @@ descFn('Auth + Chat', () => {
       } catch (e: any) {
         return { success: false, error: e.message };
       }
-    });
+    }, PASSWORD!);
 
     expect(tokenResult.success).toBe(true);
 
@@ -144,30 +152,24 @@ descFn('Auth + Chat', () => {
     // Switch to chat tab
     await sidebar.locator('[data-tab="chat"]').click();
 
-    // Login prompt should be hidden, composer should be visible
-    const composer = sidebar.locator('#chat-composer');
-    await expect(composer).not.toHaveClass(/hidden/, { timeout: 5000 });
+    // Signed in, the shell shows the composer.
+    const field = sidebar.locator('[data-slot="composer-field"]');
+    await expect(field).toBeVisible({ timeout: 5000 });
 
-    // Select a Zen model
-    const modelSelect = sidebar.locator('#model-select');
-    const options = await modelSelect.locator('option').allTextContents();
-    const zenOption = options.find(o => o.toLowerCase().includes('zen'));
-    if (zenOption) {
-      await modelSelect.selectOption({ label: zenOption });
-    }
+    // Pick a Zen model if the account's catalog offers one.
+    const picker = sidebar.getByRole('combobox');
+    await picker.click();
+    const zen = sidebar.locator('[data-slot="command-item"]', { hasText: /zen/i }).first();
+    if (await zen.isVisible().catch(() => false)) await zen.click();
+    else await sidebar.keyboard.press('Escape');
 
-    // Type a message and send
-    const chatInput = sidebar.locator('#chat-input');
-    await chatInput.fill('Hello, say "pong" and nothing else.');
-    await sidebar.locator('#send-btn').click();
+    // Type a message and send.
+    await field.fill('Hello, say "pong" and nothing else.');
+    await field.press('Enter');
 
-    // Wait for a response (the assistant message should appear)
-    const assistantMsg = sidebar.locator('.message.assistant');
-    await expect(assistantMsg.first()).toBeVisible({ timeout: 30_000 });
-
-    // Verify response contains text
-    const responseText = await assistantMsg.first().textContent();
-    expect(responseText).toBeTruthy();
-    expect(responseText!.length).toBeGreaterThan(0);
+    // The answer arrives as an assistant turn with text in it.
+    const answer = sidebar.locator('[data-slot="message"][data-role="assistant"]').first();
+    await expect(answer).toBeVisible({ timeout: 30_000 });
+    await expect(answer).not.toBeEmpty({ timeout: 30_000 });
   });
 });
