@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/browser-extension",
-  "version": "1.9.54",
+  "version": "1.9.55",
   "description": "Hanzo AI Browser Extension",
   "main": "dist/background.js",
   "scripts": {
@@ -16,9 +16,10 @@
     "@hanzo/data": "^1.2.3",
     "@hanzo/event": "^0.3.18",
     "@hanzo/gui": "^8.1.1",
-    "@hanzo/ui": "^8.0.64",
+    "@hanzo/ui": "^8.1.2",
     "@hanzo/usage": "^0.1.6",
     "@hanzogui/config": "^8.1.1",
+    "@hanzogui/lucide-icons-2": "^8.1.1",
     "@supabase/supabase-js": "^2.50.3",
     "axios": "^1.10.0",
     "chalk": "^4.1.2",
