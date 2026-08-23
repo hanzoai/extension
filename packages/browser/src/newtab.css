@@ -36,7 +36,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family:
-    "Geist Sans",
+    "Zen",
     -apple-system,
     BlinkMacSystemFont,
     "SF Pro Text",
@@ -318,7 +318,7 @@ a {
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 0.9em;
-  font-family: "Geist Mono", ui-monospace, monospace;
+  font-family: "Zen Mono", ui-monospace, monospace;
 }
 
 /* ── Spinner ─────────────────────────────────────────────── */
