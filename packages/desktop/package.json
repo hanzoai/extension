@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hanzo AI desktop app \u2014 the ambient omnipresence layer. A cross-platform (macOS/Windows/Linux) menubar/tray app with a global hotkey that pops a Hanzo assistant over any app: ask, summarize the clipboard, rewrite, explain, translate, and fix grammar, wired to the api.hanzo.ai gateway via the published @hanzo/ai. Built on Tauri v2.",
   "type": "module",
   "scripts": {

@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/procore",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hanzo AI for Procore \u2014 AI over your construction project: summarize an RFI, draft an RFI response, extract action items and risks, and summarize project status. An embedded-app panel plus an OAuth + API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
   "type": "module",
   "scripts": {
