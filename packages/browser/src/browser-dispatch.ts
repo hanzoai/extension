@@ -3,6 +3,7 @@
 import { ActionRateLimiter, debugLog, loadDebugFlagFromStorage } from './runtime-guard';
 import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
 import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
+import { detail, shrink } from './shared/shrink.js';
 
 /**
  * Coerce the named params from string → number in place.
@@ -160,6 +161,18 @@ export class CDPBridge {
   }
   
   async screenshot(tabId: number, options?: {
+    format?: 'jpeg' | 'png' | 'webp';
+    quality?: number;
+    maxWidth?: number;
+    clip?: { x: number; y: number; width: number; height: number };
+    fullPage?: boolean;
+  }): Promise<string> {
+    const { format, quality, max } = detail(options ?? {});
+    const raw = await this.grab(tabId, { ...options, format, quality });
+    return shrink(raw, max, quality, `image/${format}`);
+  }
+
+  private async grab(tabId: number, options: {
     format?: 'jpeg' | 'png' | 'webp';
     quality?: number;
     clip?: { x: number; y: number; width: number; height: number };

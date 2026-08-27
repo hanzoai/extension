@@ -37,6 +37,7 @@ import {
   type BrowserAdapter,
 } from './shared/auth.js';
 import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
+import { detail, shrink } from './shared/shrink.js';
 
 // Declare browser API for TypeScript
 declare const browser: typeof chrome;
@@ -560,10 +561,9 @@ class HanzoFirefoxExtension {
       // =====================================================================
       case 'Page.captureScreenshot':
       case 'hanzo.screenshot': {
-        const format = (params.format as string) || 'jpeg';
-        const quality = (params.quality as number) || (format === 'jpeg' ? 80 : undefined);
-        const opts: any = { format: format as 'png' | 'jpeg' };
-        if (quality !== undefined) opts.quality = quality;
+        const { format, quality, max } = detail(params);
+        const opts: any = { format };
+        if (format === 'jpeg') opts.quality = quality;
         // tab is the resolved target (already set via resolveTab at top of
         // executeMethod). If the caller targeted a non-foreground tab we
         // briefly activate it so captureVisibleTab can render it. We
@@ -587,8 +587,9 @@ class HanzoFirefoxExtension {
           }
         }
         if (!dataUrl) throw new Error('captureVisibleTab returned empty result');
-        const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-        return { data: base64, format, size: base64.length };
+        const raw = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+        const base64 = await shrink(raw, max, quality, `image/${format}`);
+        return { data: base64, format: max > 0 ? 'jpeg' : format, size: base64.length };
       }
 
       // =====================================================================
