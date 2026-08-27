@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/canvas-lms",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hanzo AI for Canvas LMS \u2014 AI over your course: summarize a course, draft assignment feedback, generate quiz/discussion questions, summarize student submissions, and draft an announcement. An embedded-app panel plus an OAuth + API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
   "type": "module",
   "scripts": {

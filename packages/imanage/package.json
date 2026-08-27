@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/imanage",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hanzo AI for iManage Work \u2014 AI over your legal document management system: summarize a document, extract key clauses / dates / parties, search-and-synthesize a matter/workspace, and compare a document set. An embedded-app panel plus an OAuth + Work-API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
   "type": "module",
   "scripts": {

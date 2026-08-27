@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/quickbooks",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hanzo AI for QuickBooks Online \u2014 AI over your books: summarize financials, explain reports, draft invoice line descriptions, categorize transactions, and ask about the books. A web panel plus an Intuit OAuth2 + Accounting API v3 proxy, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
   "type": "module",
   "scripts": {

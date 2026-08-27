@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/zendesk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hanzo AI for Zendesk \u2014 a ticket-sidebar Support app (ZAFv2) that summarizes tickets, drafts replies in the agent's voice, suggests next steps, and writes back into the reply box, built on the published @hanzo/ai headless client against api.hanzo.ai.",
   "type": "module",
   "scripts": {

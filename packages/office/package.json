@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/office-addin",
-  "version": "1.9.31",
+  "version": "1.9.32",
   "description": "Hanzo AI for Microsoft Office — Word, Excel, and PowerPoint task pane. AI over your document, wired to the same api.hanzo.ai gateway and hanzo.id IAM as the browser extension.",
   "dependencies": {
     "@hanzo/auth": "workspace:*"

@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/pdf",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hanzo AI for PDFs — a self-contained web PDF workspace (PDF.js viewer + Hanzo AI side panel). Read, ask, summarize, and extract over filings, discovery, and executed contracts, wired to the same api.hanzo.ai gateway as the Office add-in.",
   "type": "module",
   "scripts": {

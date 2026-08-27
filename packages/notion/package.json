@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/notion",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hanzo AI for Notion \u2014 summarize a page, draft/expand content, extract action items into a database, and ask about a page/workspace. Model calls route through the api.hanzo.ai gateway; Notion access via OAuth2 (public integration) + REST v1 with a server-side token proxy.",
   "type": "module",
   "scripts": {

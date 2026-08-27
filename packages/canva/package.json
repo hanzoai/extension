@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/canva",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hanzo AI for Canva \u2014 a side-panel Apps SDK app: generate marketing copy, rewrite the selected text, translate, brainstorm content ideas, and ask about the design. An @canva/app-ui-kit React panel that reads the selection/page via @canva/design and adds/replaces text elements, running the model gateway through the published @hanzo/ai over api.hanzo.ai.",
   "type": "module",
   "scripts": {

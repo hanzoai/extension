@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/gworkspace-addon",
-  "version": "1.9.30",
+  "version": "1.9.31",
   "description": "Hanzo AI for Google Workspace — a Google Docs, Sheets, Slides, and Gmail add-on (Apps Script + CardService). AI over your document, wired to the same api.hanzo.ai gateway as the browser extension and the Office add-in.",
   "type": "module",
   "scripts": {
