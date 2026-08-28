@@ -40,3 +40,12 @@ packages:
 
 onlyBuiltDependencies:
   - better-sqlite3
+
+catalog:
+  '@hanzo/ai': 0.6.7
+  '@hanzo/data': 1.2.4
+  '@hanzo/event': 0.3.37
+  '@hanzo/gui': 8.3.0
+  '@hanzo/iam': 0.21.17
+  '@hanzo/ui': 8.25.0
+  '@hanzo/usage': 0.1.7

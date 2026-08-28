@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/hubspot",
   "version": "1.0.0",
-  "description": "Hanzo AI for HubSpot \u2014 AI over your CRM records: summarize a contact/company/deal, draft an email, suggest next steps, and ask anything, with one-click write-back as a Note or Task. A CRM card UI extension plus a serverless backend that holds the Hanzo key and calls @hanzo/ai over the api.hanzo.ai gateway; the key never reaches the browser.",
+  "description": "Hanzo AI for HubSpot — AI over your CRM records: summarize a contact/company/deal, draft an email, suggest next steps, and ask anything, with one-click write-back as a Note or Task. A CRM card UI extension plus a serverless backend that holds the Hanzo key and calls @hanzo/ai over the api.hanzo.ai gateway; the key never reaches the browser.",
   "type": "module",
   "main": "./dist/cjs/index.js",
   "module": "./dist/index.js",
@@ -22,8 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.3.1",
-    "@hanzo/iam": "^0.21.7"
+    "@hanzo/ai": "catalog:",
+    "@hanzo/iam": "catalog:"
   },
   "peerDependencies": {
     "@hubspot/ui-extensions": ">=0.15.0",

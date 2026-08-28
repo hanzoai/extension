@@ -3,7 +3,7 @@
   "name": "hanzo-ai",
   "version": "1.0.0",
   "title": "Hanzo AI",
-  "description": "Hanzo AI in the Raycast command bar \u2014 ask Hanzo, and summarize, explain, rewrite, translate, or fix the grammar of your selection or clipboard, wired to the api.hanzo.ai gateway via the published @hanzo/ai.",
+  "description": "Hanzo AI in the Raycast command bar — ask Hanzo, and summarize, explain, rewrite, translate, or fix the grammar of your selection or clipboard, wired to the api.hanzo.ai gateway via the published @hanzo/ai.",
   "icon": "hanzo-icon.png",
   "author": "hanzo",
   "categories": [
@@ -105,8 +105,8 @@
     }
   ],
   "dependencies": {
-    "@hanzo/ai": "^0.3.1",
-    "@hanzo/iam": "^0.21.7",
+    "@hanzo/ai": "catalog:",
+    "@hanzo/iam": "catalog:",
     "@raycast/api": "^1.104.0",
     "@raycast/utils": "^2.2.0",
     "react": "^19.0.0"

@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/desktop",
   "version": "1.0.1",
-  "description": "Hanzo AI desktop app \u2014 the ambient omnipresence layer. A cross-platform (macOS/Windows/Linux) menubar/tray app with a global hotkey that pops a Hanzo assistant over any app: ask, summarize the clipboard, rewrite, explain, translate, and fix grammar, wired to the api.hanzo.ai gateway via the published @hanzo/ai. Built on Tauri v2.",
+  "description": "Hanzo AI desktop app — the ambient omnipresence layer. A cross-platform (macOS/Windows/Linux) menubar/tray app with a global hotkey that pops a Hanzo assistant over any app: ask, summarize the clipboard, rewrite, explain, translate, and fix grammar, wired to the api.hanzo.ai gateway via the published @hanzo/ai. Built on Tauri v2.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -13,8 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.3.1",
-    "@hanzo/iam": "^0.21.7",
+    "@hanzo/ai": "catalog:",
+    "@hanzo/iam": "catalog:",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-global-shortcut": "^2.3.2"

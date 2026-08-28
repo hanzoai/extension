@@ -12,12 +12,12 @@
     "check:bundle-budget": "node scripts/check-bundle-budgets.mjs"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.3.1",
-    "@hanzo/data": "^1.2.3",
-    "@hanzo/event": "^0.3.18",
-    "@hanzo/gui": "^8.1.1",
-    "@hanzo/ui": "^8.1.2",
-    "@hanzo/usage": "^0.1.6",
+    "@hanzo/ai": "catalog:",
+    "@hanzo/data": "catalog:",
+    "@hanzo/event": "catalog:",
+    "@hanzo/gui": "catalog:",
+    "@hanzo/ui": "catalog:",
+    "@hanzo/usage": "catalog:",
     "@hanzogui/config": "^8.1.1",
     "@hanzogui/lucide-icons-2": "^8.1.1",
     "@supabase/supabase-js": "^2.50.3",
