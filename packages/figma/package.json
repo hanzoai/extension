@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/figma",
   "version": "1.0.1",
-  "description": "Hanzo AI for Figma — a plugin that rewrites, translates, content-fills, critiques (with accessibility notes), renames, and generates copy variants for the selected layers, built on the published @hanzo/ai headless client against api.hanzo.ai. The AI call runs in the plugin iframe; the main thread reads the selection and writes results back onto the canvas.",
+  "description": "Hanzo AI for Figma \u2014 a plugin that rewrites, translates, content-fills, critiques (with accessibility notes), renames, and generates copy variants for the selected layers, built on the published @hanzo/ai headless client against api.hanzo.ai. The AI call runs in the plugin iframe; the main thread reads the selection and writes results back onto the canvas.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -14,11 +14,11 @@
     "@hanzo/iam": "catalog:"
   },
   "devDependencies": {
-    "@figma/plugin-typings": "^1.130.0",
-    "@types/node": "^20.19.9",
-    "esbuild": "0.25.8",
-    "typescript": "5.8.3",
-    "vitest": "3.2.6"
+    "@figma/plugin-typings": "catalog:",
+    "@types/node": "catalog:",
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18.0.0"

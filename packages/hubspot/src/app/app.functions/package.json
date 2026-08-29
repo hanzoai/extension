@@ -1,12 +1,12 @@
 {
   "name": "hanzo-hubspot-functions",
   "version": "0.1.0",
-  "description": "Serverless backend for Hanzo AI for HubSpot — holds the Hanzo API key and calls @hanzo/ai; reads/writes CRM records with the app's OAuth token.",
+  "description": "Serverless backend for Hanzo AI for HubSpot \u2014 holds the Hanzo API key and calls @hanzo/ai; reads/writes CRM records with the app's OAuth token.",
   "author": "Hanzo AI",
   "license": "MIT",
   "dependencies": {
     "@hanzo/ai": "catalog:",
     "@hanzo/hubspot": "workspace:*",
-    "@hubspot/api-client": "^11.2.0"
+    "@hubspot/api-client": "catalog:"
   }
 }

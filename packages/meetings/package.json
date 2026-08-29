@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/meetings",
   "version": "1.0.1",
-  "description": "Hanzo AI for Zoom + Google Meet — an in-meeting assistant that summarizes calls, extracts action items, drafts follow-ups, and answers questions about the meeting. A Zoom App and a Google Meet add-on over one shared panel, wired to the api.hanzo.ai gateway and hanzo.id IAM.",
+  "description": "Hanzo AI for Zoom + Google Meet \u2014 an in-meeting assistant that summarizes calls, extracts action items, drafts follow-ups, and answers questions about the meeting. A Zoom App and a Google Meet add-on over one shared panel, wired to the api.hanzo.ai gateway and hanzo.id IAM.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -11,16 +11,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@googleworkspace/meet-addons": "1.2.0",
+    "@googleworkspace/meet-addons": "catalog:",
     "@hanzo/ai": "catalog:",
     "@hanzo/iam": "catalog:",
-    "@zoom/appssdk": "0.16.39"
+    "@zoom/appssdk": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "20.14.0",
-    "esbuild": "0.25.8",
-    "typescript": "5.8.3",
-    "vitest": "3.2.6"
+    "@types/node": "catalog:",
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -28,6 +28,17 @@ import { Chat } from './Chat.js';
 // persistence) and hands the surface nothing but values and callbacks. Tools and
 // Settings remain plain DOM — they are panels of controls, not a chat.
 
+/**
+ * A turn's identity, minted where the turn is made.
+ *
+ * The thread keys its rows on it, so it has to be unique within the list and
+ * the same across renders — the content is neither, since two turns can read
+ * the same and a streaming one changes on every frame. Storage keeps the wire
+ * message and not the key, so a restored conversation is re-minted on load.
+ */
+let minted = 0;
+const identify = (turn) => ({ ...turn, id: `t${++minted}` });
+
 /** The router entry, always valid, so the picker is never empty or fabricated. */
 const AUTO: ModelCatalogEntry = {
   id: 'auto',
@@ -43,8 +54,8 @@ class HanzoSidebar {
     this.currentTab = 'chat';
     this.messages = [];
     // What the chat surface draws. Every field here is a prop; nothing in this
-    // class reads the chat DOM.
-    this.draft = '';
+    // class reads the chat DOM. The draft is NOT here — the composer holds it,
+    // and hands it over on send.
     this.models = [AUTO];
     this.model = 'auto';
     this.rag = true;
@@ -157,12 +168,7 @@ class HanzoSidebar {
         { config: guiConfig, defaultTheme: 'dark' },
         React.createElement(Chat, {
           turns: this.messages,
-          draft: this.draft,
-          onDraft: (v) => {
-            this.draft = v;
-            this.paint();
-          },
-          onSend: () => void this.sendMessage(),
+          onSend: (text) => void this.sendMessage(text),
           onStop: () => this.cancelStream(),
           onRetry: () => void this.retry(),
           busy: this.streaming,
@@ -451,13 +457,12 @@ class HanzoSidebar {
     const asked = this.messages[this.messages.length - 2];
     if (asked?.role !== 'user') return;
     this.messages.length -= 2;
-    this.draft = asked.content;
     this.lastRequestKey = null;
-    await this.sendMessage();
+    await this.sendMessage(asked.content);
   }
 
-  async sendMessage() {
-    const text = this.draft.trim();
+  async sendMessage(draft: string) {
+    const text = (draft || '').trim();
     if (!text) return;
     if (!this.authenticated) {
       // Double-check auth status in case it was set externally
@@ -485,7 +490,7 @@ class HanzoSidebar {
       return;
     }
 
-    const userMessage = { role: 'user', content: text };
+    const userMessage = identify({ role: 'user', content: text });
     const selectedModel = this.model || 'auto';
     let requestMessages = [...this.messages, userMessage];
 
@@ -550,9 +555,8 @@ class HanzoSidebar {
     // filled in place: the surface reads `busy` on the last turn to draw the
     // waiting state, so there is no separate typing element to insert and remove.
     this.messages.push(userMessage);
-    const assistant = { role: 'assistant', content: '' };
+    const assistant = identify({ role: 'assistant', content: '' });
     this.messages.push(assistant);
-    this.draft = '';
     this.streaming = true;
     this.paint();
 
@@ -730,7 +734,7 @@ class HanzoSidebar {
     return new Promise((resolve) => {
       chrome.storage.local.get(['hanzo_chat_messages'], (result) => {
         if (result.hanzo_chat_messages?.length) {
-          this.messages = result.hanzo_chat_messages;
+          this.messages = result.hanzo_chat_messages.map(identify);
           this.paint();
         }
         resolve();

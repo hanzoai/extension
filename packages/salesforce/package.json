@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/salesforce",
   "version": "1.0.1",
-  "description": "Hanzo AI for Salesforce — an SFDX package: a Lightning Web Component assistant on Account/Opportunity/Case/Lead/Contact record pages, backed by Apex callouts to the api.hanzo.ai/v1 gateway (same OpenAI-compatible wire format as the browser extension, Office add-in, and Slack app). Summarize, draft, extract next steps, ask — then write back a Task, Note, or Chatter post.",
+  "description": "Hanzo AI for Salesforce \u2014 an SFDX package: a Lightning Web Component assistant on Account/Opportunity/Case/Lead/Contact record pages, backed by Apex callouts to the api.hanzo.ai/v1 gateway (same OpenAI-compatible wire format as the browser extension, Office add-in, and Slack app). Summarize, draft, extract next steps, ask \u2014 then write back a Task, Note, or Chatter post.",
   "type": "module",
   "scripts": {
     "validate": "node scripts/validate-source.mjs",
@@ -14,7 +14,7 @@
     "org:open": "sf org open"
   },
   "devDependencies": {
-    "vitest": "^3.2.6"
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18.0.0"

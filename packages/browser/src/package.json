@@ -26,16 +26,16 @@
     "developer-tools"
   ],
   "dependencies": {
-    "ws": "^8.18.0",
-    "commander": "^11.0.0",
-    "chalk": "^5.3.0"
+    "ws": "catalog:",
+    "commander": "catalog:",
+    "chalk": "catalog:"
   },
   "devDependencies": {
-    "@types/ws": "^8.5.0",
-    "typescript": "^5.0.0",
-    "esbuild": "^0.25.0"
+    "@types/ws": "catalog:",
+    "typescript": "catalog:",
+    "esbuild": "catalog:"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": ">=1"
   }
 }

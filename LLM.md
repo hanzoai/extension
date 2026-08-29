@@ -42,6 +42,50 @@ Wire to zapd: the binary ZAP router envelope (`zap-proto/zapd/src/frame.rs`); th
 browser↔host hop is native-messaging JSON, base64'd, quarantined in the host. Host +
 per-browser manifests come from `zapd install-host` (`zap-proto/zapd`).
 
+## Surfaces — one chat shell, two mounts
+
+Both React surfaces draw chat with **`@hanzo/ui/chat`** (Thread, Message,
+Composer, Sources, Code, Step, Failure) and pick models with `@hanzo/ui/models`
+`ModelSelector`. There is no local composer, no local model menu, no local
+message list, no second markdown renderer. Select on the shell's `data-slot`
+contract, never on class names.
+
+- `src/newtab.ts` -> `answer/AnswerEngine.tsx` — the answer engine. Local parts
+  are only what is true here: `answer/Toolbar.tsx` (modes + source pills, the
+  composer's toolbar slot), Stories, WidgetView, and `answer/model-catalog.ts`,
+  which reads the PUBLIC catalog host because `@hanzo/ui/models`' own
+  `fetchModelCatalog` reads the authenticated `/models` and would 401 a
+  signed-out query.
+- `src/sidebar.ts` -> `src/Chat.tsx` — the sidebar's chat tab, mounted at the one
+  node `#chat`. `sidebar.html` declares NO chat control; `sidebar.ts` keeps the
+  entire wire (auth, retrieval, budgets, dedupe, the stream, persistence) and
+  passes values and callbacks. Tools and Settings stay plain DOM.
+- `src/shared/markdown.ts` + `shared/Prose.tsx` — the ONE markdown pipeline for
+  both. `blocks()` splits prose from fenced code so code renders through the
+  shell's `Code` (language label + copy) instead of a `<pre>` string.
+
+**`answer/Rail.tsx` is deliberately NOT the shell's Sidebar.** `Sidebar` has no
+collapsed presentation, and `SidebarIconButton` takes only a label, so it cannot
+carry the `aria-expanded` that `tests/answer-rail.test.ts` asserts. A rail that
+cannot announce its own state is worse than one that is not the shell's. Revisit
+when the shell can express a collapsed rail.
+
+Three shell shapes to know, all found by driving the built extension:
+
+1. `ModelSelector`'s trigger is `width: "100%"`. Left free in a `Composer`
+   toolbar row it takes the whole row and pushes the send control off the edge —
+   box it (`PICKER` in both surfaces).
+2. `Thread`'s horizontal padding is coupled to its reading-measure cap, so
+   `maxWidth={0}` (fill, which a ~360px column needs) also removes the gutters.
+   The surface supplies them.
+3. The `Composer` toolbar row does not wrap for its children. Ten controls do
+   not fit one row, so `Toolbar` wraps inside its own box.
+
+Proof lives in `e2e/turn.spec.ts`: the built extension in Chrome, a seeded
+identity and a scripted SSE body, driving type -> Enter -> stream -> anchoring.
+A vitest render exercises none of the gui runtime, the MV3 policy or the worker.
+
+
 ## Versioning
 Patch only (X.Y.Z+1), never major. `package.json` is the source of truth; `build.js`
 stamps it into every manifest (chrome/firefox/safari).

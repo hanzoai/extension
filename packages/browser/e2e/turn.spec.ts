@@ -79,6 +79,18 @@ test.describe('a turn in the sidebar', () => {
 
     const composer = page.locator('[data-slot="composer"]');
     await expect(composer).toBeVisible({ timeout: 15_000 });
+
+    // The composer is the SHELL's now — `Chat` draws it, so the surface can no
+    // longer wrap it in a padded box and has to inset the frame itself. The
+    // frame is `width: "100%"`, and a margin on top of that puts its right edge
+    // past the panel, so this measures both edges rather than trusting the prop.
+    const inset = await composer.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return { left: box.left, right: window.innerWidth - box.right };
+    });
+    expect(inset.left).toBeGreaterThanOrEqual(4);
+    expect(inset.right).toBeGreaterThanOrEqual(4);
+
     await page.screenshot({ path: 'test-results/sidebar-idle.png' });
 
     const field = page.locator('[data-slot="composer-field"]');
@@ -134,9 +146,15 @@ test.describe('a turn in the sidebar', () => {
     expect(atBottom).toBeLessThanOrEqual(48); // SLACK
     await page.screenshot({ path: 'test-results/sidebar-turn.png' });
 
-    // And the top of the thread: the question sits inside the column's gutter
+    // And the top of the thread: both turns sit inside the column's gutter
     // rather than against the edge. `Thread` drops its own padding when the
-    // reading-measure cap is off, so the surface supplies it.
+    // reading-measure cap is off, so the surface supplies it through `column`.
+    //
+    // The ANSWER is measured, not only the question. A right-aligned bubble in a
+    // thread long enough to scroll clears the edge by the scrollbar's width on
+    // its own, so a question-only check passed with no gutter at all — it was
+    // reading the scrollbar. The assistant turn is full-bleed and has nothing
+    // else holding it off the edge. Measured at 12px each side; 8 is the floor.
     const thread = page.locator('[data-slot="thread"]');
     await thread.evaluate((el) => {
       el.scrollTop = 0;
@@ -144,12 +162,134 @@ test.describe('a turn in the sidebar', () => {
     await page.waitForFunction(
       () => (document.querySelector('[data-slot="thread"]') as HTMLElement).scrollTop === 0,
     );
-    const bubble = page.locator('[data-bubble="true"]');
-    const [right, width] = await Promise.all([
-      bubble.evaluate((el) => el.getBoundingClientRect().right),
-      page.evaluate(() => window.innerWidth),
-    ]);
-    expect(width - right).toBeGreaterThanOrEqual(8);
+    const gutters = await page.evaluate(() => {
+      const edges = (el: Element | null) => {
+        const box = el!.getBoundingClientRect();
+        return { left: box.left, right: window.innerWidth - box.right };
+      };
+      return {
+        question: edges(document.querySelector('[data-bubble="true"]')),
+        answer: edges(document.querySelector('[data-slot="message"][data-role="assistant"]')),
+      };
+    });
+    expect(gutters.question.right).toBeGreaterThanOrEqual(8);
+    expect(gutters.answer.left).toBeGreaterThanOrEqual(8);
+    expect(gutters.answer.right).toBeGreaterThanOrEqual(8);
     await page.screenshot({ path: 'test-results/sidebar-top.png' });
+  });
+
+  /**
+   * Retry, now that the composer holds the draft.
+   *
+   * It used to work by writing the question back into the draft and calling
+   * send, which is no longer possible — the draft belongs to `@hanzo/ui/chat`'s
+   * `Chat` and nothing outside it can set it. So retry reads the question off
+   * the failed turn and sends it directly, and this is what says that still
+   * asks the same question rather than sending an empty one.
+   */
+  test('retries the question that failed, without it ever being in the box', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 400, height: 800 });
+
+    await page.route('https://api.hanzo.ai/v1/models', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":[]}' }),
+    );
+
+    // The first attempt breaks; the second answers. Same URL, so the retry has
+    // to be a real second request.
+    let attempt = 0;
+    await page.route('https://api.hanzo.ai/v1/chat/completions', (route) => {
+      attempt += 1;
+      if (attempt === 1) return route.fulfill({ status: 500, body: 'upstream is down' });
+      return route.fulfill({
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+        body: sse(['It is a shade of blue.']),
+      });
+    });
+
+    await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
+    await page.evaluate(
+      (expiresAt) =>
+        new Promise<void>((resolve) =>
+          chrome.storage.local.set(
+            {
+              hanzo_iam_access_token: 'e2e-token',
+              hanzo_iam_expires_at: expiresAt,
+              hanzo_iam_user: { name: 'E2E', email: 'z@hanzo.ai' },
+            },
+            () => resolve(),
+          ),
+        ),
+      Date.now() + 3_600_000,
+    );
+    await page.reload();
+
+    const field = page.locator('[data-slot="composer-field"]');
+    const turns = page.locator('[data-slot="message"]');
+    await field.fill('What colour is the sky?');
+    await field.press('Enter');
+
+    // The failure lands in place of the answer, carrying its own retry.
+    const retry = page.locator('[data-slot="failure-retry"]');
+    await expect(retry).toBeVisible({ timeout: 15_000 });
+    await expect(turns).toHaveCount(2);
+
+    // The box is empty — the question is in the thread, not back in the draft.
+    expect(await field.inputValue()).toBe('');
+
+    await retry.click();
+
+    await expect(turns.nth(1)).toContainText('It is a shade of blue.', { timeout: 15_000 });
+    await expect(turns).toHaveCount(2);
+    await expect(turns.nth(0)).toContainText('What colour is the sky?');
+    expect(attempt).toBe(2);
+    expect(await field.inputValue()).toBe('');
+  });
+
+  /**
+   * A conversation restored from storage still draws.
+   *
+   * The thread keys its rows on a turn's `id`, and storage holds the wire
+   * message, which has none — so `sidebar.ts` mints one per turn on load. This
+   * is the only path where that minting does any work.
+   */
+  test('draws a conversation restored from storage', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 400, height: 800 });
+    await page.route('https://api.hanzo.ai/v1/models', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"data":[]}' }),
+    );
+
+    await page.goto(`chrome-extension://${extensionId}/sidebar.html`);
+    await page.evaluate(
+      (expiresAt) =>
+        new Promise<void>((resolve) =>
+          chrome.storage.local.set(
+            {
+              hanzo_iam_access_token: 'e2e-token',
+              hanzo_iam_expires_at: expiresAt,
+              hanzo_iam_user: { name: 'E2E', email: 'z@hanzo.ai' },
+              hanzo_chat_messages: [
+                { role: 'user', content: 'Where did we get to?' },
+                { role: 'assistant', content: 'We were here.' },
+              ],
+            },
+            () => resolve(),
+          ),
+        ),
+      Date.now() + 3_600_000,
+    );
+    await page.reload();
+
+    const turns = page.locator('[data-slot="message"]');
+    await expect(turns).toHaveCount(2, { timeout: 15_000 });
+    await expect(turns.nth(0)).toHaveAttribute('data-role', 'user');
+    await expect(turns.nth(0)).toContainText('Where did we get to?');
+    await expect(turns.nth(1)).toHaveAttribute('data-role', 'assistant');
+    await expect(turns.nth(1)).toContainText('We were here.');
   });
 });

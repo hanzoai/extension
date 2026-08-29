@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/gitlab",
   "version": "1.0.1",
-  "description": "Hanzo AI on GitLab — a webhook service that reviews merge requests, triages issues, and answers @hanzo mentions, built on @hanzo/ai and @hanzo/iam.",
+  "description": "Hanzo AI on GitLab \u2014 a webhook service that reviews merge requests, triages issues, and answers @hanzo mentions, built on @hanzo/ai and @hanzo/iam.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,9 +23,9 @@
     "@hanzo/iam": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.3.0",
-    "vitest": "^3.2.6"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "keywords": [
     "hanzo",

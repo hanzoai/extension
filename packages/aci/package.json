@@ -23,19 +23,19 @@
   "author": "Hanzo AI",
   "license": "MIT",
   "dependencies": {
-    "jsautogui": "^2.0.9",
-    "@nut-tree-fork/nut-js": "^4.2.6",
-    "robotjs": "^0.6.0",
-    "sharp": "^0.33.5",
-    "tesseract.js": "^5.1.1"
+    "jsautogui": "catalog:",
+    "@nut-tree-fork/nut-js": "catalog:",
+    "robotjs": "catalog:",
+    "sharp": "catalog:",
+    "tesseract.js": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^20.10.5",
-    "typescript": "^5.3.3",
-    "vitest": "^3.2.6",
-    "eslint": "^8.56.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "@typescript-eslint/parser": "^6.19.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "eslint": "catalog:",
+    "@typescript-eslint/eslint-plugin": "catalog:",
+    "@typescript-eslint/parser": "catalog:"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/canvas-lms",
   "version": "1.0.1",
-  "description": "Hanzo AI for Canvas LMS — AI over your course: summarize a course, draft assignment feedback, generate quiz/discussion questions, summarize student submissions, and draft an announcement. An embedded-app panel plus an OAuth + API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
+  "description": "Hanzo AI for Canvas LMS \u2014 AI over your course: summarize a course, draft assignment feedback, generate quiz/discussion questions, summarize student submissions, and draft an announcement. An embedded-app panel plus an OAuth + API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -15,10 +15,10 @@
     "@hanzo/iam": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^20.14.0",
-    "esbuild": "^0.25.8",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.6"
+    "@types/node": "catalog:",
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18.0.0"

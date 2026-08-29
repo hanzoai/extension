@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/workday",
   "version": "1.0.1",
-  "description": "Hanzo AI for Workday — AI over your people data: summarize a worker or team, draft a job description / requisition, summarize an org and headcount, answer HR / policy questions, and draft review feedback. An embedded-app panel plus a read-only OAuth + API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
+  "description": "Hanzo AI for Workday \u2014 AI over your people data: summarize a worker or team, draft a job description / requisition, summarize an org and headcount, answer HR / policy questions, and draft review feedback. An embedded-app panel plus a read-only OAuth + API-proxy service, built on @hanzo/ai and @hanzo/iam over the api.hanzo.ai gateway.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -15,10 +15,10 @@
     "@hanzo/iam": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^20.14.0",
-    "esbuild": "^0.25.8",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.6"
+    "@types/node": "catalog:",
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18.0.0"

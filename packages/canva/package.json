@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/canva",
   "version": "1.0.1",
-  "description": "Hanzo AI for Canva — a side-panel Apps SDK app: generate marketing copy, rewrite the selected text, translate, brainstorm content ideas, and ask about the design. An @canva/app-ui-kit React panel that reads the selection/page via @canva/design and adds/replaces text elements, running the model gateway through the published @hanzo/ai over api.hanzo.ai.",
+  "description": "Hanzo AI for Canva \u2014 a side-panel Apps SDK app: generate marketing copy, rewrite the selected text, translate, brainstorm content ideas, and ask about the design. An @canva/app-ui-kit React panel that reads the selection/page via @canva/design and adds/replaces text elements, running the model gateway through the published @hanzo/ai over api.hanzo.ai.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -12,24 +12,24 @@
   "dependencies": {
     "@hanzo/ai": "catalog:",
     "@hanzo/iam": "catalog:",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "peerDependencies": {
-    "@canva/app-ui-kit": "^5.0.0",
-    "@canva/asset": "^2.0.0",
-    "@canva/design": "^2.0.0"
+    "@canva/app-ui-kit": ">=5",
+    "@canva/asset": ">=2",
+    "@canva/design": ">=2"
   },
   "devDependencies": {
-    "@canva/app-ui-kit": "^5.12.0",
-    "@canva/asset": "^2.3.0",
-    "@canva/design": "^2.10.0",
-    "@types/node": "^20.14.0",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "esbuild": "^0.25.8",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.6"
+    "@canva/app-ui-kit": "catalog:",
+    "@canva/asset": "catalog:",
+    "@canva/design": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18.0.0"

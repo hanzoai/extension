@@ -8,7 +8,7 @@
     "package": "npm run build"
   },
   "devDependencies": {
-    "archiver": "^7.0.1"
+    "archiver": "catalog:"
   },
   "license": "MIT",
   "publishConfig": {

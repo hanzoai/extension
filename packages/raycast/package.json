@@ -3,7 +3,7 @@
   "name": "hanzo-ai",
   "version": "1.0.0",
   "title": "Hanzo AI",
-  "description": "Hanzo AI in the Raycast command bar — ask Hanzo, and summarize, explain, rewrite, translate, or fix the grammar of your selection or clipboard, wired to the api.hanzo.ai gateway via the published @hanzo/ai.",
+  "description": "Hanzo AI in the Raycast command bar \u2014 ask Hanzo, and summarize, explain, rewrite, translate, or fix the grammar of your selection or clipboard, wired to the api.hanzo.ai gateway via the published @hanzo/ai.",
   "icon": "hanzo-icon.png",
   "author": "hanzo",
   "categories": [
@@ -107,18 +107,18 @@
   "dependencies": {
     "@hanzo/ai": "catalog:",
     "@hanzo/iam": "catalog:",
-    "@raycast/api": "^1.104.0",
-    "@raycast/utils": "^2.2.0",
-    "react": "^19.0.0"
+    "@raycast/api": "catalog:",
+    "@raycast/utils": "catalog:",
+    "react": "catalog:"
   },
   "devDependencies": {
-    "@raycast/eslint-config": "^2.2.0",
-    "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "eslint": "^9.0.0",
-    "prettier": "^3.3.0",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.6"
+    "@raycast/eslint-config": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "scripts": {
     "build": "ray build -e dist",

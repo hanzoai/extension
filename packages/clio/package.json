@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/clio",
   "version": "1.0.1",
-  "description": "Hanzo AI inside Clio — summarize matters, draft correspondence, extract key dates & obligations, and write the output back as a Clio note or activity. Model calls route through the api.hanzo.ai gateway; Clio access via OAuth2 + REST v4.",
+  "description": "Hanzo AI inside Clio \u2014 summarize matters, draft correspondence, extract key dates & obligations, and write the output back as a Clio note or activity. Model calls route through the api.hanzo.ai gateway; Clio access via OAuth2 + REST v4.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -11,10 +11,10 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^20.14.0",
-    "esbuild": "^0.25.8",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.6"
+    "@types/node": "catalog:",
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=18.0.0"
