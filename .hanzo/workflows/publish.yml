@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: hanzo-build-linux-amd64
+    runs-on: [hanzo-build-linux-amd64]
     container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
