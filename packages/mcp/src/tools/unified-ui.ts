@@ -108,13 +108,7 @@ async function checkHanzoRegistry(): Promise<boolean> {
     const response = await fetch('https://ui.hanzo.ai/registry/index.json');
     return response.ok;
   } catch {
-    // Try alternate endpoints
-    try {
-      const response = await fetch('https://ui.hanzo.ai/api/registry');
-      return response.ok;
-    } catch {
-      return false;
-    }
+    return false;
   }
 }
 
