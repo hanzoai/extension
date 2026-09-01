@@ -19,8 +19,8 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.3.1",
-    "@hanzo/iam": "^0.21.7",
+    "@hanzo/ai": "^0.6.16",
+    "@hanzo/iam": "^0.21.18",
     "@octokit/app": "^16.1.2",
     "@octokit/webhooks": "^14.2.0"
   },

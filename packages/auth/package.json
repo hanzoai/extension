@@ -24,6 +24,6 @@
     "src"
   ],
   "dependencies": {
-    "@hanzo/iam": "^0.21.7"
+    "@hanzo/iam": "^0.21.18"
   }
 }

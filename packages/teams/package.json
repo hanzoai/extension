@@ -32,9 +32,9 @@
     "package": "node manifest/build.mjs"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.3.1",
+    "@hanzo/ai": "^0.6.16",
     "@hanzo/cards": "workspace:*",
-    "@hanzo/iam": "^0.21.7",
+    "@hanzo/iam": "^0.21.18",
     "botbuilder": "^4.23.3",
     "restify": "^11.1.0"
   },

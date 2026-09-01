@@ -19,9 +19,9 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.3.1",
+    "@hanzo/ai": "^0.6.16",
     "@hanzo/cards": "workspace:*",
-    "@hanzo/iam": "^0.21.7",
+    "@hanzo/iam": "^0.21.18",
     "@slack/bolt": "^4.7.3"
   },
   "devDependencies": {

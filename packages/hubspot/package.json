@@ -22,8 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hanzo/ai": "^0.3.1",
-    "@hanzo/iam": "^0.21.7"
+    "@hanzo/ai": "^0.6.16",
+    "@hanzo/iam": "^0.21.18"
   },
   "peerDependencies": {
     "@hubspot/ui-extensions": ">=0.15.0",
