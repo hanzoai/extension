@@ -988,7 +988,7 @@ class HanzoPageOverlay {
         right: 0;
         width: min(var(--hanzo-overlay-width, 420px), 100vw);
         z-index: 2147483645;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         pointer-events: none;
       }
 
@@ -1990,7 +1990,7 @@ const inlineConsole = (() => {
     if (root) return;
     root = document.createElement('div');
     root.id = 'hanzo-console-root';
-    root.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;z-index:2147483646;font-family:Zen Mono,Menlo,Consolas,monospace;font-size:12px;display:none;';
+    root.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;z-index:2147483646;font-family:Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;font-size:12px;display:none;';
     root.innerHTML = `
       <div style="background:rgba(0,0,0,0.92);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.15);border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
         <div id="hanzo-console-output" style="max-height:200px;overflow-y:auto;padding:8px 12px;color:#ccc;white-space:pre-wrap;word-break:break-all;"></div>
