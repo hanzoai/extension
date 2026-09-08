@@ -26,7 +26,8 @@
     "commander": "catalog:",
     "react-native-web": "catalog:",
     "webextension-polyfill": "catalog:",
-    "ws": "catalog:"
+    "ws": "catalog:",
+    "@hanzo/logo": "catalog:"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

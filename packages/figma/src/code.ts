@@ -148,12 +148,12 @@ async function applyEdits(edits: TextEdit[]): Promise<number> {
 }
 
 /** Insert a fresh text node with `text`, placed just below the selection (or at
- *  the viewport center when nothing is selected), and select it. Uses the
- *  Inter Regular default font Figma guarantees is available. */
+ *  the viewport center when nothing is selected), and select it. The node comes
+ *  with the editor's own default face; load THAT rather than naming a family,
+ *  which the editor may not have. */
 async function insertText(text: string): Promise<void> {
   const node = figma.createText();
-  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
-  node.fontName = { family: 'Inter', style: 'Regular' };
+  await figma.loadFontAsync(node.fontName as FontName);
   node.characters = text;
 
   const sel = figma.currentPage.selection[0];
