@@ -1,4 +1,4 @@
-# Native store-publish — Hanzo Git act_runner (label hanzo-build-linux-amd64).
+# Native store-publish — Hanzo Git act_runner (label linux-amd64).
 # This is the SYSTEM OF RECORD for publishing the browser extension to the
 # Chrome Web Store + Firefox AMO, and for the npm package. GitHub only mirrors.
 #
@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: [hanzo-build-linux-amd64]
+    runs-on: [linux-amd64]
     container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4

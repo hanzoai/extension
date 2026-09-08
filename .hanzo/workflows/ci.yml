@@ -1,4 +1,4 @@
-# Native CI — Hanzo Git act_runners (label hanzo-build-linux-amd64).
+# Native CI — Hanzo Git act_runners (label linux-amd64).
 # amd64 test + build gate; mirrors the amd64 lanes of .github/workflows/ci.yml.
 # The macOS (Safari) and cross-platform Playwright matrix stay on GitHub-hosted
 # runners until native macOS/Windows act_runners are green
@@ -15,7 +15,7 @@ on:
 
 jobs:
   test:
-    runs-on: [hanzo-build-linux-amd64]
+    runs-on: [linux-amd64]
     container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
       - run: pnpm --filter hanzo-ide test:vitest
 
   build:
-    runs-on: [hanzo-build-linux-amd64]
+    runs-on: [linux-amd64]
     container: node:22-bookworm
     needs: [test]
     steps:
