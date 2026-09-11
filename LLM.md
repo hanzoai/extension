@@ -3,7 +3,9 @@
 Browser extension (`packages/browser`) that joins the shared local **zapd** fabric.
 One native primitive — no WebSocket, no localhost port, no mDNS, no CDP bridge.
 Ships Chrome / Firefox / Safari. Build: esbuild (`src/build.js`, `pnpm build`);
-tests: vitest.
+tests: vitest. Install from the repo root with `pnpm install`; pnpm 11 reads
+`allowBuilds` in `pnpm-workspace.yaml`, which lets only `better-sqlite3` run
+install scripts.
 
 ## Architecture (native ZAP)
 
@@ -46,17 +48,11 @@ per-browser manifests come from `zapd install-host` (`zap-proto/zapd`).
 Patch only (X.Y.Z+1), never major. `package.json` is the source of truth; `build.js`
 stamps it into every manifest (chrome/firefox/safari).
 
-## CI/CD (native — Hanzo Git, KMS, act_runner)
-Git of record is `git.hanzo.ai/hanzoai/extension`; GitHub is a mirror.
-- **`.hanzo/workflows/*`** — the ONLY pipeline, on `hanzo-build-linux-amd64`
-  act_runners: `ci.yml` (amd64 test + build), `publish.yml` (Chrome Web Store +
-  Firefox AMO + npm). Renamed from `.gitea/workflows` in `cc622bc`. The forge
-  reads this path natively and FIRST — `hanzoai/git modules/setting/actions.go`
-  `WorkflowDirs: [".hanzo/workflows", ".gitea/workflows", ".github/workflows"]`
-  (since `61ceddeb`, shipped in v1.26.26+).
-- **`.github/workflows/` is EMPTY** — GitHub CI was deleted in `6977db0`. Nothing
-  builds, publishes or syncs there. Do not "restore" it: GitHub is a mirror, and a
-  second plane is exactly what the migration removed.
+## CI/CD
+- Workflows live in `.github/workflows/`, moved there from `.hanzo/workflows/` in
+  `7bfd1e1`: `ci.yml` (push and pull request) and `publish.yml` (push and manual
+  dispatch) run on the `linux-amd64` runners; `cicd.yml` calls
+  `hanzoai/ci/.github/workflows/build.yml@v1`.
 - Secrets are **KMS only**. The pipeline logs in with the KMS machine identity
   (`KMS_CLIENT_ID`/`KMS_CLIENT_SECRET`, org-level Actions secrets on
   git.hanzo.ai, inherited by every `hanzoai` repo) and reads each credential at

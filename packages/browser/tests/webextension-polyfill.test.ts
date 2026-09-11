@@ -22,6 +22,10 @@ import * as path from 'path';
 const pkg = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'),
 );
+const workspace = fs.readFileSync(
+  path.join(__dirname, '..', '..', '..', 'pnpm-workspace.yaml'),
+  'utf8',
+);
 
 describe('webextension-polyfill is a runtime dependency', () => {
   it('listed in dependencies (not devDependencies)', () => {
@@ -30,8 +34,13 @@ describe('webextension-polyfill is a runtime dependency', () => {
 
   it('pinned to a known version (no caret) so MV3 behavior is reproducible', () => {
     // Caret ranges across major versions of the polyfill have historically
-    // changed return-value shapes. Pin to a known version.
-    const v = pkg.dependencies['webextension-polyfill'];
+    // changed return-value shapes. Pin to a known version. A `catalog:` spec
+    // takes its version from pnpm-workspace.yaml.
+    const spec = pkg.dependencies['webextension-polyfill'];
+    const v =
+      spec === 'catalog:'
+        ? workspace.match(/^\s+'?webextension-polyfill'?:\s*'([^']+)'/m)?.[1]
+        : spec;
     expect(v).not.toMatch(/^\^/);
     expect(v).toMatch(/^\d+\.\d+\.\d+$/);
   });

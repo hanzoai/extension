@@ -1,6 +1,6 @@
 /**
- * Tab ID resolution shared between Chrome (cdp-bridge.ts) and Firefox
- * (background-firefox.ts) so both bridges accept the same set of input
+ * Tab ID resolution shared between Chrome (browser-dispatch.ts) and Firefox
+ * (background-firefox.ts) so both dispatch paths accept the same set of input
  * formats:
  *
  *   - number                   → returned as-is.

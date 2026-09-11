@@ -977,8 +977,7 @@ export class BrowserControl {
   async captureFullPage(tabId: number): Promise<string> {
     // Capture full page by scrolling and stitching
     const pageInfo = await this.getPageInfo(tabId);
-    // For simplicity, capture visible viewport — full-page stitching requires
-    // CDP which is handled by cdp-bridge-server.ts
+    // Captures the visible viewport; full-page stitching is not implemented.
     return this.captureScreenshot(tabId, { format: 'png' });
   }
 

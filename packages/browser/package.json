@@ -27,7 +27,8 @@
     "react-native-web": "catalog:",
     "webextension-polyfill": "catalog:",
     "ws": "catalog:",
-    "@hanzo/logo": "catalog:"
+    "@hanzo/logo": "catalog:",
+    "react-hook-form": "catalog:"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

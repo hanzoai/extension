@@ -74,7 +74,7 @@ async function build() {
     bundle: true,
     outfile: out('content-script.js'),
     platform: 'browser',
-    target: ['chrome90', 'firefox91', 'safari14'],
+    target: ['chrome90', 'firefox91', 'safari15'],
     minify: true
   });
 
@@ -85,7 +85,7 @@ async function build() {
     outfile: out('background.js'),
     platform: 'browser',
     minify: true,
-    target: ['chrome90', 'safari14'],
+    target: ['chrome90', 'safari15'],
     format: 'esm',
     external: ['chrome', 'browser'],
   });
@@ -122,7 +122,7 @@ async function build() {
     bundle: true,
     outfile: out('sidebar.js'),
     platform: 'browser',
-    target: ['chrome90', 'firefox91', 'safari14'],
+    target: ['chrome90', 'firefox91', 'safari15'],
     minify: true,
     define: { ...WEB.define, ...TELEMETRY_DEFINE },
   });
@@ -132,7 +132,7 @@ async function build() {
     bundle: true,
     outfile: out('popup.js'),
     platform: 'browser',
-    target: ['chrome90', 'firefox91', 'safari14'],
+    target: ['chrome90', 'firefox91', 'safari15'],
     minify: true,
     define: { ...TELEMETRY_DEFINE },
   });
@@ -146,7 +146,7 @@ async function build() {
     bundle: true,
     outfile: out('newtab.js'),
     platform: 'browser',
-    target: ['chrome90', 'firefox91', 'safari14'],
+    target: ['chrome90', 'firefox91', 'safari15'],
     // New-tab page loads on every tab — ship it lean (minified, no inline map).
     minify: true,
     sourcemap: false,
@@ -159,7 +159,7 @@ async function build() {
     bundle: true,
     outfile: out('onboarding.js'),
     platform: 'browser',
-    target: ['chrome90', 'firefox91', 'safari14'],
+    target: ['chrome90', 'firefox91', 'safari15'],
     minify: true,
     sourcemap: false,
     define: { ...TELEMETRY_DEFINE },
