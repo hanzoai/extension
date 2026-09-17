@@ -370,8 +370,8 @@ catalogs:
       specifier: ^8.5.1
       version: 8.5.1
     typescript:
-      specifier: 7.0.2
-      version: 7.0.2
+      specifier: 6.0.3
+      version: 6.0.3
     uuid:
       specifier: ^14.0.2
       version: 14.0.2
@@ -564,7 +564,11 @@ overrides:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      tsgo:
+        specifier: npm:typescript@7.0.2
+        version: typescript@7.0.2
 
   apps/site:
     devDependencies:
@@ -601,16 +605,16 @@ importers:
         version: 26.4.0
       '@typescript-eslint/eslint-plugin':
         specifier: 'catalog:'
-        version: 8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2))(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
+        version: 8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       '@typescript-eslint/parser':
         specifier: 'catalog:'
-        version: 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
+        version: 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       eslint:
         specifier: 'catalog:'
         version: 10.10.0(supports-color@10.2.2)
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -623,7 +627,7 @@ importers:
     devDependencies:
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -711,7 +715,7 @@ importers:
         version: 19.2.8(react@19.2.8)
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -754,7 +758,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -776,7 +780,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -788,10 +792,10 @@ importers:
         version: 26.4.0
       tsup:
         specifier: 'catalog:'
-        version: 8.5.1(postcss@8.5.10)(supports-color@10.2.2)(typescript@7.0.2)(yaml@2.8.3)
+        version: 8.5.1(postcss@8.5.10)(supports-color@10.2.2)(typescript@6.0.3)(yaml@2.8.3)
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -806,7 +810,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -840,7 +844,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -865,7 +869,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -893,7 +897,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -918,7 +922,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -943,7 +947,7 @@ importers:
         version: 26.4.0
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -962,7 +966,7 @@ importers:
         version: 26.4.0
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -987,7 +991,7 @@ importers:
     devDependencies:
       '@hubspot/ui-extensions':
         specifier: 'catalog:'
-        version: 0.15.1(@remote-ui/react@5.0.8(react-reconciler@0.29.2(react@19.2.8))(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
+        version: 0.15.1(@remote-ui/react@5.0.8(react-reconciler@0.29.2(react@19.2.8))(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
       '@types/node':
         specifier: 'catalog:'
         version: 26.4.0
@@ -999,7 +1003,7 @@ importers:
         version: 19.2.8
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1021,7 +1025,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1073,7 +1077,7 @@ importers:
         version: 6.1.3
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1128,10 +1132,10 @@ importers:
         version: 30.5.1(@types/node@26.4.0)(supports-color@10.2.2)
       ts-jest:
         specifier: 'catalog:'
-        version: 29.4.12(@babel/core@7.29.6(supports-color@10.2.2))(@jest/transform@30.5.1(supports-color@10.2.2))(@jest/types@30.5.1)(babel-jest@30.5.1(@babel/core@7.29.6(supports-color@10.2.2))(supports-color@10.2.2))(esbuild@0.28.2)(jest-util@30.5.1)(jest@30.5.1(@types/node@26.4.0)(supports-color@10.2.2))(typescript@7.0.2)
+        version: 29.4.12(@babel/core@7.29.6(supports-color@10.2.2))(@jest/transform@30.5.1(supports-color@10.2.2))(@jest/types@30.5.1)(babel-jest@30.5.1(@babel/core@7.29.6(supports-color@10.2.2))(supports-color@10.2.2))(esbuild@0.28.2)(jest-util@30.5.1)(jest@30.5.1(@types/node@26.4.0)(supports-color@10.2.2))(typescript@6.0.3)
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
     optionalDependencies:
       '@lancedb/lancedb':
         specifier: 'catalog:'
@@ -1172,7 +1176,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1194,7 +1198,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1213,7 +1217,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1232,7 +1236,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1248,7 +1252,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1270,7 +1274,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1292,7 +1296,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1317,7 +1321,7 @@ importers:
     devDependencies:
       '@raycast/eslint-config':
         specifier: 'catalog:'
-        version: 2.2.0(eslint@10.10.0(supports-color@8.1.1))(prettier@3.9.6)(supports-color@8.1.1)(typescript@7.0.2)
+        version: 2.2.0(eslint@10.10.0(supports-color@8.1.1))(prettier@3.9.6)(supports-color@8.1.1)(typescript@6.0.3)
       '@types/node':
         specifier: 'catalog:'
         version: 26.4.0
@@ -1332,7 +1336,7 @@ importers:
         version: 3.9.6
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1381,7 +1385,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1406,7 +1410,7 @@ importers:
         version: 3.5.3
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1431,7 +1435,7 @@ importers:
         version: 26.4.0
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1462,10 +1466,10 @@ importers:
         version: 8.5.12
       tsup:
         specifier: 'catalog:'
-        version: 8.5.1(postcss@8.5.10)(supports-color@10.2.2)(typescript@7.0.2)(yaml@2.8.3)
+        version: 8.5.1(postcss@8.5.10)(supports-color@10.2.2)(typescript@6.0.3)(yaml@2.8.3)
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1517,7 +1521,7 @@ importers:
         version: 10.10.0(supports-color@10.2.2)
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1535,7 +1539,7 @@ importers:
         version: 2.116.0(@opentelemetry/api@1.9.1)
       '@typescript-eslint/typescript-estree':
         specifier: 'catalog:'
-        version: 8.70.0(supports-color@8.1.1)(typescript@7.0.2)
+        version: 8.70.0(supports-color@8.1.1)(typescript@6.0.3)
       axios:
         specifier: 'catalog:'
         version: 1.20.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
@@ -1620,10 +1624,10 @@ importers:
         version: 8.18.1
       '@typescript-eslint/eslint-plugin':
         specifier: 'catalog:'
-        version: 8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2))(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+        version: 8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       '@typescript-eslint/parser':
         specifier: 'catalog:'
-        version: 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+        version: 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(vitest@4.1.11)
@@ -1671,7 +1675,7 @@ importers:
         version: 22.1.0
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1693,7 +1697,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -1718,7 +1722,7 @@ importers:
         version: 0.28.2
       typescript:
         specifier: 'catalog:'
-        version: 7.0.2
+        version: 6.0.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
@@ -13265,6 +13269,11 @@ packages:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
       typescript: '>=4.8.4 <6.1.0'
 
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
     engines: {node: '>=16.20.0'}
@@ -17313,7 +17322,7 @@ snapshots:
     dependencies:
       hono: 4.12.27
 
-  '@hubspot/ui-extensions@0.15.1(@remote-ui/react@5.0.8(react-reconciler@0.29.2(react@19.2.8))(react@19.2.8))(react@19.2.8)(typescript@7.0.2)':
+  '@hubspot/ui-extensions@0.15.1(@remote-ui/react@5.0.8(react-reconciler@0.29.2(react@19.2.8))(react@19.2.8))(react@19.2.8)(typescript@6.0.3)':
     dependencies:
       '@remote-ui/core': 2.2.7
       '@remote-ui/react': 5.0.8(react-reconciler@0.29.2(react@19.2.8))(react@19.2.8)
@@ -17321,7 +17330,7 @@ snapshots:
       react-reconciler: 0.29.2(react@19.2.8)
       tinyspy: 4.0.4
     optionalDependencies:
-      typescript: 7.0.2
+      typescript: 6.0.3
 
   '@huggingface/jinja@0.2.2':
     optional: true
@@ -19877,22 +19886,22 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@raycast/eslint-config@2.2.0(eslint@10.10.0(supports-color@8.1.1))(prettier@3.9.6)(supports-color@8.1.1)(typescript@7.0.2)':
+  '@raycast/eslint-config@2.2.0(eslint@10.10.0(supports-color@8.1.1))(prettier@3.9.6)(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@eslint/js': 9.39.4
-      '@raycast/eslint-plugin': 2.2.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      '@raycast/eslint-plugin': 2.2.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       eslint: 10.10.0(supports-color@8.1.1)
       eslint-config-prettier: 10.1.8(eslint@10.10.0(supports-color@8.1.1))
       globals: 17.7.0
       prettier: 3.9.6
-      typescript: 7.0.2
-      typescript-eslint: 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      typescript: 6.0.3
+      typescript-eslint: 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
     transitivePeerDependencies:
       - supports-color
 
-  '@raycast/eslint-plugin@2.2.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)':
+  '@raycast/eslint-plugin@2.2.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       eslint: 10.10.0(supports-color@8.1.1)
     transitivePeerDependencies:
       - supports-color
@@ -21038,114 +21047,114 @@ snapshots:
     dependencies:
       '@types/yargs-parser': 21.0.3
 
-  '@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2))(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/parser': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       '@typescript-eslint/scope-manager': 8.62.1
-      '@typescript-eslint/type-utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
-      '@typescript-eslint/utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/type-utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       '@typescript-eslint/visitor-keys': 8.62.1
       eslint: 10.10.0(supports-color@8.1.1)
       ignore: 7.0.5
       natural-compare: 1.4.0
-      ts-api-utils: 2.5.0(typescript@7.0.2)
-      typescript: 7.0.2
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/eslint-plugin@8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2))(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)':
+  '@typescript-eslint/eslint-plugin@8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
+      '@typescript-eslint/parser': 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       '@typescript-eslint/scope-manager': 8.70.0
-      '@typescript-eslint/type-utils': 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
-      '@typescript-eslint/utils': 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
+      '@typescript-eslint/type-utils': 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       '@typescript-eslint/visitor-keys': 8.70.0
       eslint: 10.10.0(supports-color@10.2.2)
       ignore: 7.0.5
       natural-compare: 1.4.0
-      ts-api-utils: 2.5.0(typescript@7.0.2)
-      typescript: 7.0.2
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/eslint-plugin@8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2))(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/eslint-plugin@8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/parser': 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       '@typescript-eslint/scope-manager': 8.70.0
-      '@typescript-eslint/type-utils': 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
-      '@typescript-eslint/utils': 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/type-utils': 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       '@typescript-eslint/visitor-keys': 8.70.0
       eslint: 10.10.0(supports-color@8.1.1)
       ignore: 7.0.5
       natural-compare: 1.4.0
-      ts-api-utils: 2.5.0(typescript@7.0.2)
-      typescript: 7.0.2
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/parser@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/parser@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/scope-manager': 8.62.1
       '@typescript-eslint/types': 8.62.1
-      '@typescript-eslint/typescript-estree': 8.62.1(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/typescript-estree': 8.62.1(supports-color@8.1.1)(typescript@6.0.3)
       '@typescript-eslint/visitor-keys': 8.62.1
       debug: 4.4.3(supports-color@8.1.1)
       eslint: 10.10.0(supports-color@8.1.1)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)':
+  '@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/scope-manager': 8.70.0
       '@typescript-eslint/types': 8.70.0
-      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@10.2.2)(typescript@7.0.2)
+      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@10.2.2)(typescript@6.0.3)
       '@typescript-eslint/visitor-keys': 8.70.0
       debug: 4.4.3(supports-color@10.2.2)
       eslint: 10.10.0(supports-color@10.2.2)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/scope-manager': 8.70.0
       '@typescript-eslint/types': 8.70.0
-      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@8.1.1)(typescript@6.0.3)
       '@typescript-eslint/visitor-keys': 8.70.0
       debug: 4.4.3(supports-color@8.1.1)
       eslint: 10.10.0(supports-color@8.1.1)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/project-service@8.62.1(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/project-service@8.62.1(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.62.1(typescript@7.0.2)
+      '@typescript-eslint/tsconfig-utils': 8.62.1(typescript@6.0.3)
       '@typescript-eslint/types': 8.62.1
       debug: 4.4.3(supports-color@8.1.1)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/project-service@8.70.0(supports-color@10.2.2)(typescript@7.0.2)':
+  '@typescript-eslint/project-service@8.70.0(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.70.0(typescript@7.0.2)
+      '@typescript-eslint/tsconfig-utils': 8.70.0(typescript@6.0.3)
       '@typescript-eslint/types': 8.70.0
       debug: 4.4.3(supports-color@10.2.2)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/project-service@8.70.0(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/project-service@8.70.0(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.70.0(typescript@7.0.2)
+      '@typescript-eslint/tsconfig-utils': 8.70.0(typescript@6.0.3)
       '@typescript-eslint/types': 8.70.0
       debug: 4.4.3(supports-color@8.1.1)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
@@ -21159,47 +21168,47 @@ snapshots:
       '@typescript-eslint/types': 8.70.0
       '@typescript-eslint/visitor-keys': 8.70.0
 
-  '@typescript-eslint/tsconfig-utils@8.62.1(typescript@7.0.2)':
+  '@typescript-eslint/tsconfig-utils@8.62.1(typescript@6.0.3)':
     dependencies:
-      typescript: 7.0.2
+      typescript: 6.0.3
 
-  '@typescript-eslint/tsconfig-utils@8.70.0(typescript@7.0.2)':
+  '@typescript-eslint/tsconfig-utils@8.70.0(typescript@6.0.3)':
     dependencies:
-      typescript: 7.0.2
+      typescript: 6.0.3
 
-  '@typescript-eslint/type-utils@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/type-utils@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/types': 8.62.1
-      '@typescript-eslint/typescript-estree': 8.62.1(supports-color@8.1.1)(typescript@7.0.2)
-      '@typescript-eslint/utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/typescript-estree': 8.62.1(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       debug: 4.4.3(supports-color@8.1.1)
       eslint: 10.10.0(supports-color@8.1.1)
-      ts-api-utils: 2.5.0(typescript@7.0.2)
-      typescript: 7.0.2
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/type-utils@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)':
+  '@typescript-eslint/type-utils@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/types': 8.70.0
-      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@10.2.2)(typescript@7.0.2)
-      '@typescript-eslint/utils': 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
+      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@10.2.2)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       debug: 4.4.3(supports-color@10.2.2)
       eslint: 10.10.0(supports-color@10.2.2)
-      ts-api-utils: 2.5.0(typescript@7.0.2)
-      typescript: 7.0.2
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/type-utils@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/type-utils@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/types': 8.70.0
-      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@8.1.1)(typescript@7.0.2)
-      '@typescript-eslint/utils': 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       debug: 4.4.3(supports-color@8.1.1)
       eslint: 10.10.0(supports-color@8.1.1)
-      ts-api-utils: 2.5.0(typescript@7.0.2)
-      typescript: 7.0.2
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
@@ -21207,81 +21216,81 @@ snapshots:
 
   '@typescript-eslint/types@8.70.0': {}
 
-  '@typescript-eslint/typescript-estree@8.62.1(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/typescript-estree@8.62.1(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/project-service': 8.62.1(supports-color@8.1.1)(typescript@7.0.2)
-      '@typescript-eslint/tsconfig-utils': 8.62.1(typescript@7.0.2)
+      '@typescript-eslint/project-service': 8.62.1(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/tsconfig-utils': 8.62.1(typescript@6.0.3)
       '@typescript-eslint/types': 8.62.1
       '@typescript-eslint/visitor-keys': 8.62.1
       debug: 4.4.3(supports-color@8.1.1)
       minimatch: 10.2.3
       semver: 7.8.5
       tinyglobby: 0.2.17
-      ts-api-utils: 2.5.0(typescript@7.0.2)
-      typescript: 7.0.2
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/typescript-estree@8.70.0(supports-color@10.2.2)(typescript@7.0.2)':
+  '@typescript-eslint/typescript-estree@8.70.0(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/project-service': 8.70.0(supports-color@10.2.2)(typescript@7.0.2)
-      '@typescript-eslint/tsconfig-utils': 8.70.0(typescript@7.0.2)
+      '@typescript-eslint/project-service': 8.70.0(supports-color@10.2.2)(typescript@6.0.3)
+      '@typescript-eslint/tsconfig-utils': 8.70.0(typescript@6.0.3)
       '@typescript-eslint/types': 8.70.0
       '@typescript-eslint/visitor-keys': 8.70.0
       debug: 4.4.3(supports-color@10.2.2)
       minimatch: 10.2.3
       semver: 7.8.5
       tinyglobby: 0.2.17
-      ts-api-utils: 2.5.0(typescript@7.0.2)
-      typescript: 7.0.2
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/typescript-estree@8.70.0(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/typescript-estree@8.70.0(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/project-service': 8.70.0(supports-color@8.1.1)(typescript@7.0.2)
-      '@typescript-eslint/tsconfig-utils': 8.70.0(typescript@7.0.2)
+      '@typescript-eslint/project-service': 8.70.0(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/tsconfig-utils': 8.70.0(typescript@6.0.3)
       '@typescript-eslint/types': 8.70.0
       '@typescript-eslint/visitor-keys': 8.70.0
       debug: 4.4.3(supports-color@8.1.1)
       minimatch: 10.2.3
       semver: 7.8.5
       tinyglobby: 0.2.17
-      ts-api-utils: 2.5.0(typescript@7.0.2)
-      typescript: 7.0.2
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/utils@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/utils@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.10.0(supports-color@8.1.1))
       '@typescript-eslint/scope-manager': 8.62.1
       '@typescript-eslint/types': 8.62.1
-      '@typescript-eslint/typescript-estree': 8.62.1(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/typescript-estree': 8.62.1(supports-color@8.1.1)(typescript@6.0.3)
       eslint: 10.10.0(supports-color@8.1.1)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/utils@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)':
+  '@typescript-eslint/utils@8.70.0(eslint@10.10.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.10.0(supports-color@10.2.2))
       '@typescript-eslint/scope-manager': 8.70.0
       '@typescript-eslint/types': 8.70.0
-      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@10.2.2)(typescript@7.0.2)
+      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@10.2.2)(typescript@6.0.3)
       eslint: 10.10.0(supports-color@10.2.2)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/utils@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)':
+  '@typescript-eslint/utils@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.10.0(supports-color@8.1.1))
       '@typescript-eslint/scope-manager': 8.70.0
       '@typescript-eslint/types': 8.70.0
-      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/typescript-estree': 8.70.0(supports-color@8.1.1)(typescript@6.0.3)
       eslint: 10.10.0(supports-color@8.1.1)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
@@ -28880,15 +28889,15 @@ snapshots:
       node-addon-api: 8.9.2
       node-gyp-build: 4.8.4
 
-  ts-api-utils@2.5.0(typescript@7.0.2):
+  ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:
-      typescript: 7.0.2
+      typescript: 6.0.3
 
   ts-dedent@2.3.0: {}
 
   ts-interface-checker@0.1.13: {}
 
-  ts-jest@29.4.12(@babel/core@7.29.6(supports-color@10.2.2))(@jest/transform@30.5.1(supports-color@10.2.2))(@jest/types@30.5.1)(babel-jest@30.5.1(@babel/core@7.29.6(supports-color@10.2.2))(supports-color@10.2.2))(esbuild@0.28.2)(jest-util@30.5.1)(jest@30.5.1(@types/node@26.4.0)(supports-color@10.2.2))(typescript@7.0.2):
+  ts-jest@29.4.12(@babel/core@7.29.6(supports-color@10.2.2))(@jest/transform@30.5.1(supports-color@10.2.2))(@jest/types@30.5.1)(babel-jest@30.5.1(@babel/core@7.29.6(supports-color@10.2.2))(supports-color@10.2.2))(esbuild@0.28.2)(jest-util@30.5.1)(jest@30.5.1(@types/node@26.4.0)(supports-color@10.2.2))(typescript@6.0.3):
     dependencies:
       bs-logger: 0.2.6
       fast-json-stable-stringify: 2.1.0
@@ -28899,7 +28908,7 @@ snapshots:
       make-error: 1.3.6
       semver: 7.8.5
       type-fest: 4.41.0
-      typescript: 7.0.2
+      typescript: 6.0.3
       yargs-parser: 21.1.1
     optionalDependencies:
       '@babel/core': 7.29.6(supports-color@10.2.2)
@@ -28915,7 +28924,7 @@ snapshots:
 
   tsscmp@1.0.6: {}
 
-  tsup@8.5.1(postcss@8.5.10)(supports-color@10.2.2)(typescript@7.0.2)(yaml@2.8.3):
+  tsup@8.5.1(postcss@8.5.10)(supports-color@10.2.2)(typescript@6.0.3)(yaml@2.8.3):
     dependencies:
       bundle-require: 5.1.0(esbuild@0.27.7)
       cac: 6.7.14
@@ -28936,7 +28945,7 @@ snapshots:
       tree-kill: 1.2.2
     optionalDependencies:
       postcss: 8.5.10
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - jiti
       - supports-color
@@ -29020,16 +29029,18 @@ snapshots:
       tunnel: 0.0.6
       underscore: 1.13.8
 
-  typescript-eslint@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2):
+  typescript-eslint@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.62.1(@typescript-eslint/parser@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2))(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
-      '@typescript-eslint/parser': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
-      '@typescript-eslint/typescript-estree': 8.62.1(supports-color@8.1.1)(typescript@7.0.2)
-      '@typescript-eslint/utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
+      '@typescript-eslint/eslint-plugin': 8.62.1(@typescript-eslint/parser@8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/parser': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/typescript-estree': 8.62.1(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.62.1(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       eslint: 10.10.0(supports-color@8.1.1)
-      typescript: 7.0.2
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
+
+  typescript@6.0.3: {}
 
   typescript@7.0.2:
     optionalDependencies:

@@ -127,7 +127,7 @@
     "fix-lint": "ray lint --fix",
     "publish": "npx @raycast/api@latest publish",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "../../node_modules/tsgo/bin/tsc --noEmit --incremental false"
   },
   "engines": {
     "node": ">=18.0.0"

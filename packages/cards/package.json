@@ -23,7 +23,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "../../node_modules/tsgo/bin/tsc --noEmit --incremental false"
   },
   "devDependencies": {
     "@types/node": "catalog:",
