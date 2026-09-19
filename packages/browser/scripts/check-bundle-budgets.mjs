@@ -34,6 +34,12 @@ const ENGINES = ['chrome', 'firefox', 'safari'];
 const BUDGETS = {
   'background.js': 200, // 176.5
   'content-script.js': 62, // 55.4
+  // 761.5 — RAISED from 760. The page did not change; its dependencies did.
+  // Against the 739.9 build, by esbuild metafile: @hanzo/ui 8.1.2 -> 8.27.0
+  // +17.2KB (dist/tw.js, imported by its sx, box and css modules), @hanzo/event
+  // +3.5KB and the @hanzo/events names it now pulls in +2.9KB, @hanzogui/web
+  // +0.9KB, @hanzogui/telemetry -3.9KB.
+  //
   // 739.9 — RAISED from 66, which is the largest single jump this file has ever
   // taken, so here is what bought it.
   //
@@ -53,8 +59,18 @@ const BUDGETS = {
   // Nothing is shared between the two: they are separate documents loading
   // separate bundles, so each pays the runtime once. The cost is parse, from a
   // local file, on a panel the user opened deliberately.
-  'sidebar.js': 760,
+  'sidebar.js': 780,
   'popup.js': 55, // 48.5
+  // 755.4 — RAISED from 740. Against the 716.3 build, by esbuild metafile:
+  // @hanzo/ui 8.1.2 -> 8.27.0 +17.6KB (dist/tw.js), @hanzo/ai 0.3.1 -> 0.6.7
+  // +11.2KB, the answer mark from @hanzo/logo +6.2KB, @hanzo/event and the
+  // @hanzo/events names +6.4KB, @hanzogui/web +0.9KB, @hanzogui/telemetry
+  // -3.9KB.
+  //
+  // It measured 773.2 until @hanzo/event moved to 0.3.41. The page imported
+  // 0.3.37 itself while @hanzogui/telemetry asked for ^0.3.40, and both copies
+  // shipped. One version is one copy.
+  //
   // 716.3 — RAISED from 570. The +167 is @hanzo/ui/chat plus the shared model
   // picker, which is a Popover + Command combobox (gui floating 14KB, popover
   // 12KB, Command) where this surface used to draw a plain filtered div menu.
@@ -81,7 +97,7 @@ const BUDGETS = {
   // filters at runtime; it is correct, and it saves nothing here, because both
   // configs still import the full table. A build-time subset would have to
   // re-encode in the same compact form.
-  'newtab.js': 740,
+  'newtab.js': 775,
   'onboarding.js': 35, // 31.0
 };
 
