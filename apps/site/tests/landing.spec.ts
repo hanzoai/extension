@@ -118,22 +118,20 @@ test.describe('Dev Landing Page', () => {
     await expect(pricingCards.locator('text=$199/month').first()).toBeVisible();
   });
 
-  test('subscribe buttons redirect correctly', async ({ page, context }) => {
+  test('subscribe buttons redirect correctly', async ({ page }) => {
     await page.goto('/src/dev.html');
-    
-    // Listen for new pages (popups/tabs)
-    const pagePromise = context.waitForEvent('page');
-    
+
+    // subscribe() sends this tab to the signup page; it opens no new one. The
+    // signup page is answered here, so the test needs no network.
+    await page.route('https://cloud.hanzo.ai/**', (route) => route.fulfill({ body: '' }));
+
     // Click subscribe button - use first() in case there are multiple subscribe buttons
     await page.locator('button:has-text("Start Pro Trial")').first().click();
-    
-    // Get the new page
-    const newPage = await pagePromise;
-    await newPage.waitForLoadState();
-    
-    // Check URL
-    expect(newPage.url()).toContain('cloud.hanzo.ai/signup');
-    expect(newPage.url()).toContain('plan=pro');
-    expect(newPage.url()).toContain('product=dev');
+    await page.waitForURL((url) => url.host === 'cloud.hanzo.ai');
+
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/signup');
+    expect(url.searchParams.get('plan')).toBe('pro');
+    expect(url.searchParams.get('product')).toBe('dev');
   });
 });
