@@ -53,3 +53,12 @@ jobs:
       - name: Check bundle budgets
         working-directory: packages/browser
         run: pnpm run check:bundle-budget
+
+      # The built extension, driven in Chromium. It is the one suite that
+      # renders the sidebar and the new tab inside an MV3 page, so a page that
+      # throws on its first paint fails here and passes everything above.
+      - name: Extension e2e
+        working-directory: packages/browser
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm run test:e2e

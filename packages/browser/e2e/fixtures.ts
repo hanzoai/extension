@@ -3,15 +3,19 @@ import path from 'path';
 
 const extensionPath = path.resolve(__dirname, '../../../dist/chrome');
 
-// Custom fixture that launches a persistent browser context with the extension loaded
+// Custom fixture that launches a persistent browser context with the extension loaded.
+//
+// The `chromium` channel is the full browser, and its headless mode loads
+// extensions; the default headless shell does not. So the suite runs on a
+// runner with no display, and `--headed` still opens the window.
 export const test = base.extend<{
   context: BrowserContext;
   extensionId: string;
 }>({
-  // eslint-disable-next-line no-empty-pattern
-  context: async ({}, use) => {
+  context: async ({ headless }, use) => {
     const context = await chromium.launchPersistentContext('', {
-      headless: false,
+      channel: 'chromium',
+      headless,
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,

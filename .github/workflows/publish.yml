@@ -63,6 +63,21 @@ jobs:
             echo "yes=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # What ships is what was checked: the unit suite, the bundle budgets, and
+      # the built extension driven in Chromium, the one suite that renders the
+      # sidebar and the new tab inside an MV3 page. Before the credential read,
+      # so a release that fails here asks KMS for nothing and uploads nothing.
+      - name: Build and check the release
+        id: check
+        if: steps.ahead.outputs.yes == 'true'
+        working-directory: packages/browser
+        run: |
+          node src/build.js
+          pnpm test
+          pnpm run check:bundle-budget
+          pnpm exec playwright install --with-deps chromium
+          pnpm run test:e2e
+
       - name: Load publish credentials from KMS
         if: steps.ahead.outputs.yes == 'true'
         env:
@@ -105,11 +120,6 @@ jobs:
             if [ -n "$VAL" ]; then echo "::add-mask::$VAL"; fi
             echo "$KEY=$VAL" >> "$GITHUB_ENV"
           done
-
-      - name: Build browser extension
-        if: steps.ahead.outputs.yes == 'true'
-        working-directory: packages/browser
-        run: node src/build.js
 
       - name: Package (web-ext — no zip binary on the runner)
         if: steps.ahead.outputs.yes == 'true'
@@ -181,6 +191,10 @@ jobs:
       - name: Publish summary
         if: always() && steps.ahead.outputs.yes == 'true'
         run: |
+          if [ "${{ steps.check.outcome }}" != "success" ]; then
+            echo "::error::the release checks failed, so nothing was uploaded"
+            exit 1
+          fi
           shipped=0
           for pair in "CHROME_EXTENSION_ID:Chrome Web Store" "AMO_API_KEY:Firefox Add-ons" "NPM_TOKEN:npm"; do
             key=${pair%%:*}; label=${pair#*:}
