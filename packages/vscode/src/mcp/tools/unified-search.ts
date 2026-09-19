@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { MCPTool } from '../server';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface SearchResult {
     type: 'grep' | 'symbol' | 'git' | 'filename' | 'ast';
@@ -17,16 +17,16 @@ interface SearchResult {
 }
 
 export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTool {
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '.';
-
-    async function searchGrep(query: string, filePattern?: string): Promise<SearchResult[]> {
+    async function searchGrep(query: string, root: string | undefined, filePattern?: string): Promise<SearchResult[]> {
+        if (!root) {return [];}
         try {
-            const includeFlag = filePattern ? `--glob "${filePattern}"` : '';
-            // The trailing `.` is the path to search. Given none, rg reads stdin
-            // when stdin is a pipe, and exec's stdin is a pipe that never closes,
-            // so the search waited forever.
-            const cmd = `rg --json "${query}" ${includeFlag} --max-count 50 .`;
-            const { stdout } = await execAsync(cmd, { cwd: workspaceRoot, maxBuffer: 10 * 1024 * 1024 });
+            // rg is always given the directory. Given none, it reads stdin when
+            // stdin is a pipe, and its stdin here is a pipe that never closes.
+            const glob = filePattern ? ['--glob', filePattern] : [];
+            const { stdout } = await execFileAsync(
+                'rg', ['--json', '--max-count', '50', ...glob, '--', query, root],
+                { maxBuffer: 10 * 1024 * 1024 }
+            );
             
             const results: SearchResult[] = [];
             const lines = stdout.split('\n').filter(line => line.trim());
@@ -56,7 +56,7 @@ export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTo
         }
     }
 
-    async function searchSymbols(query: string): Promise<SearchResult[]> {
+    async function searchSymbols(query: string, dir: string | undefined): Promise<SearchResult[]> {
         try {
             // Use VS Code's symbol search
             const symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
@@ -66,7 +66,8 @@ export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTo
             
             if (!symbols) {return [];}
             
-            return symbols.slice(0, 30).map(symbol => ({
+            const under = dir ? symbols.filter(s => s.location.uri.fsPath.startsWith(dir)) : symbols;
+            return under.slice(0, 30).map(symbol => ({
                 type: 'symbol' as const,
                 file: symbol.location.uri.fsPath,
                 line: symbol.location.range.start.line + 1,
@@ -80,12 +81,13 @@ export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTo
         }
     }
 
-    async function searchGit(query: string): Promise<SearchResult[]> {
+    async function searchGit(query: string, root: string | undefined): Promise<SearchResult[]> {
+        if (!root) {return [];}
         try {
             // Search in git commit messages
-            const { stdout: commitSearch } = await execAsync(
-                `git log --grep="${query}" --oneline --max-count=20`,
-                { cwd: workspaceRoot }
+            const { stdout: commitSearch } = await execFileAsync(
+                'git', ['log', `--grep=${query}`, '--oneline', '--max-count=20'],
+                { cwd: root }
             );
             
             const results: SearchResult[] = [];
@@ -104,9 +106,9 @@ export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTo
             
             // Search in git file history
             try {
-                const { stdout: fileSearch } = await execAsync(
-                    `git log --all --full-history -- "*${query}*" --oneline --max-count=10`,
-                    { cwd: workspaceRoot }
+                const { stdout: fileSearch } = await execFileAsync(
+                    'git', ['log', '--all', '--full-history', '--oneline', '--max-count=10', '--', `*${query}*`],
+                    { cwd: root }
                 );
                 
                 if (fileSearch.trim()) {
@@ -130,10 +132,10 @@ export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTo
         }
     }
 
-    async function searchFilenames(query: string): Promise<SearchResult[]> {
+    async function searchFilenames(query: string, dir: string | undefined): Promise<SearchResult[]> {
         try {
             const pattern = `**/*${query}*`;
-            const files = await vscode.workspace.findFiles(pattern, null, 50);
+            const files = await vscode.workspace.findFiles(dir ? new vscode.RelativePattern(dir, pattern) : pattern, null, 50);
             
             return files.map(file => ({
                 type: 'filename' as const,
@@ -157,6 +159,10 @@ export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTo
                     type: 'string',
                     description: 'Search query'
                 },
+                path: {
+                    type: 'string',
+                    description: 'Directory to search, absolute or relative to the workspace (default: the workspace)'
+                },
                 include: {
                     type: 'array',
                     items: { type: 'string' },
@@ -176,27 +182,35 @@ export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTo
         },
         handler: async (args: {
             query: string;
+            path?: string;
             include?: string[];
             file_pattern?: string;
             max_results?: number;
         }) => {
             const searchTypes = args.include || ['grep', 'symbol', 'git', 'filename'];
             const maxResults = args.max_results || 20;
+            // `dir` is the path the caller gave, absolute or relative to the
+            // open folder. grep and git run in it, else in the folder. With
+            // neither there is no project and they search nothing: the extension
+            // host's working directory is not one.
+            const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const dir = !args.path ? undefined : path.isAbsolute(args.path) ? args.path : folder && path.join(folder, args.path);
+            const root = args.path ? dir : folder;
             
             // Run all searches in parallel
             const searchPromises: Promise<SearchResult[]>[] = [];
             
             if (searchTypes.includes('grep')) {
-                searchPromises.push(searchGrep(args.query, args.file_pattern));
+                searchPromises.push(searchGrep(args.query, root, args.file_pattern));
             }
             if (searchTypes.includes('symbol')) {
-                searchPromises.push(searchSymbols(args.query));
+                searchPromises.push(searchSymbols(args.query, dir));
             }
             if (searchTypes.includes('git')) {
-                searchPromises.push(searchGit(args.query));
+                searchPromises.push(searchGit(args.query, root));
             }
             if (searchTypes.includes('filename')) {
-                searchPromises.push(searchFilenames(args.query));
+                searchPromises.push(searchFilenames(args.query, dir));
             }
             
             const allResults = await Promise.all(searchPromises);

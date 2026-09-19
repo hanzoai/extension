@@ -227,23 +227,33 @@ suite('MCP Tools Integration Test Suite', () => {
     });
 
     suite('Unified Search Tool', () => {
-        test('should perform unified search', async () => {
+        // The text half is rg. The test host gets the login shell's PATH, so it
+        // is the rg the machine has.
+        test('grep finds the fixture line in the path it was given', async () => {
             const tool = createUnifiedSearchTool(mockContext);
-            
-            // Create test content
-            await fs.promises.writeFile(
-                path.join(testDir, 'unified.ts'),
-                'export function unifiedSearch() { return "results"; }'
-            );
+            const file = path.join(testDir, 'unified.ts');
+            await fs.promises.writeFile(file, 'export function unifiedSearch() { return "results"; }');
 
-            // Test unified search
-            const result = await tool.handler({
-                query: 'unified',
-                path: testDir
-            });
+            const result = await tool.handler({ query: 'unifiedSearch', include: ['grep'], path: testDir });
 
-            assert.ok(result);
-            // Result format may vary, just ensure it doesn't crash
+            assert.ok(result.includes('## Text Matches (1)'), result);
+            assert.ok(result.includes(`📄 ${file}:1\n   export function unifiedSearch()`), result);
+        });
+
+        test('with no folder open and no path, grep searches nothing', async () => {
+            // This host opens no folder. The old fallback searched `.`, the
+            // extension host's working directory, which here holds a match.
+            assert.strictEqual(vscode.workspace.workspaceFolders, undefined);
+            const tool = createUnifiedSearchTool(mockContext);
+            await fs.promises.writeFile(path.join(testDir, 'unified.ts'), 'unifiedSearch');
+            const cwd = process.cwd();
+            process.chdir(testDir);
+            try {
+                const result = await tool.handler({ query: 'unifiedSearch', include: ['grep'] });
+                assert.strictEqual(result, 'No results found for "unifiedSearch"');
+            } finally {
+                process.chdir(cwd);
+            }
         });
     });
 
