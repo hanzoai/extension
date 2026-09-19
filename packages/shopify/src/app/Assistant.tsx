@@ -9,7 +9,7 @@
 // are the server's, mirrored here for labels so the buttons never drift from
 // what the server will run.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type JSX } from 'react';
 import {
   Badge,
   BlockStack,

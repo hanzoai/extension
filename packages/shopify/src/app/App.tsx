@@ -5,6 +5,7 @@
 // fetch built in main.tsx. This file is deliberately thin: it wires the provider
 // and hands the built Api + launch context to the Assistant.
 
+import type { JSX } from 'react';
 import { AppProvider, Page, Text, BlockStack, Banner } from '@shopify/polaris';
 import enTranslations from '@shopify/polaris/locales/en.json';
 import { Assistant } from './Assistant';

@@ -12,7 +12,7 @@
 // parses the reply → the panel shows it and inserts it via canva.ts (replace the
 // selection in place, or add a new text element).
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 import {
   Alert,
   Box,
