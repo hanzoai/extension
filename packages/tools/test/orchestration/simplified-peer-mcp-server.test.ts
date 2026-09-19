@@ -83,8 +83,10 @@ describe('SimplifiedPeerMCPServer', () => {
       onclose: vi.fn()
     };
     
-    vi.mocked(Server).mockReturnValue(mockServer);
-    vi.mocked(StdioServerTransport).mockReturnValue(mockTransport);
+    // Both are called with `new`. Vitest 4 constructs a mock through its
+    // implementation, so a return value or an arrow function cannot stand in.
+    vi.mocked(Server).mockImplementation(function () { return mockServer; });
+    vi.mocked(StdioServerTransport).mockImplementation(function () { return mockTransport; });
     
     mcpServer = new SimplifiedPeerMCPServer(
       mockAgentConfig,
@@ -459,7 +461,7 @@ describe('SimplifiedPeerMCPServer', () => {
 
   describe('error handling', () => {
     it('should handle server initialization errors', () => {
-      vi.mocked(Server).mockImplementation(() => {
+      vi.mocked(Server).mockImplementation(function () {
         throw new Error('Server init failed');
       });
 

@@ -92,8 +92,9 @@ describe('SwarmOrchestrator', () => {
       runTool: vi.fn().mockResolvedValue('Task completed successfully')
     };
     
-    vi.mocked(AgentSwarmManager).mockImplementation(() => mockSwarmManager);
-    vi.mocked(CLIToolManager).mockImplementation(() => mockToolManager);
+    // Both are called with `new`, which vitest 4 cannot do to an arrow function.
+    vi.mocked(AgentSwarmManager).mockImplementation(function () { return mockSwarmManager; });
+    vi.mocked(CLIToolManager).mockImplementation(function () { return mockToolManager; });
     
     orchestrator = new SwarmOrchestrator();
   });
