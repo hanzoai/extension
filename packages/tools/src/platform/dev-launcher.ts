@@ -209,7 +209,7 @@ export class DevLauncher extends EventEmitter {
             this.monitor.log('info', 'launcher', `Created worktree for ${instance.type}`);
         } catch (error) {
             this.monitor.log('error', 'launcher', `Failed to create worktree: ${error.message}`);
-            throw new Error(`Failed to create worktree: ${error.message}`);
+            throw new Error(`Failed to create worktree: ${error.message}`, { cause: error });
         }
     }
 
@@ -244,7 +244,7 @@ export class DevLauncher extends EventEmitter {
         };
         
         // Special handling for specific tools
-        let fullCommand = command;
+        const fullCommand = command;
         let fullArgs = [...args];
         
         switch (instance.type) {

@@ -107,7 +107,7 @@ export class AgentSwarmManager {
       
       return this.config;
     } catch (error) {
-      throw new Error(`Failed to load agent configuration: ${error}`);
+      throw new Error(`Failed to load agent configuration: ${error}`, { cause: error });
     }
   }
 

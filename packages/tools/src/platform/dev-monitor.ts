@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
-import { performance } from 'perf_hooks';
+import { performance, PerformanceObserver } from 'perf_hooks';
 
 export interface DevToolSession {
     id: string;
@@ -100,7 +100,6 @@ export class DevMonitor extends EventEmitter {
 
     private setupPerformanceMonitoring(): void {
         try {
-            const { PerformanceObserver } = require('perf_hooks');
             this.perfObserver = new PerformanceObserver((items) => {
                 for (const entry of items.getEntries()) {
                     this.log('debug', 'performance', `${entry.name}: ${entry.duration}ms`);

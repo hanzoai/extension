@@ -401,11 +401,12 @@ export class MultiAgentOrchestrator extends EventEmitter {
                     .map(([key, value]) => `### ${key}\n\n${value}`)
                     .join('\n\n---\n\n');
             
-            case 'vote':
+            case 'vote': {
                 // Find consensus among outputs
                 // This is simplified - real implementation would be more sophisticated
                 const consensus = this.findConsensus(outputs);
                 return consensus || outputs[0];
+            }
             
             case 'best':
                 // Pick the longest/most detailed output
