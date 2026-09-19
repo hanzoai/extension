@@ -34,6 +34,9 @@ const ENGINES = ['chrome', 'firefox', 'safari'];
 const BUDGETS = {
   'background.js': 200, // 176.5
   'content-script.js': 62, // 55.4
+  // 761.6 — the ceiling is 765, not the 780 it was first raised to. A second
+  // copy of @hanzo/event weighs 17.8KB (see newtab.js), and 780 had room for it.
+  //
   // 761.5 — RAISED from 760. The page did not change; its dependencies did.
   // Against the 739.9 build, by esbuild metafile: @hanzo/ui 8.1.2 -> 8.27.0
   // +17.2KB (dist/tw.js, imported by its sx, box and css modules), @hanzo/event
@@ -59,7 +62,7 @@ const BUDGETS = {
   // Nothing is shared between the two: they are separate documents loading
   // separate bundles, so each pays the runtime once. The cost is parse, from a
   // local file, on a panel the user opened deliberately.
-  'sidebar.js': 780,
+  'sidebar.js': 765,
   'popup.js': 55, // 48.5
   // 755.4 — RAISED from 740. Against the 716.3 build, by esbuild metafile:
   // @hanzo/ui 8.1.2 -> 8.27.0 +17.6KB (dist/tw.js), @hanzo/ai 0.3.1 -> 0.6.7
@@ -69,7 +72,9 @@ const BUDGETS = {
   //
   // It measured 773.2 until @hanzo/event moved to 0.3.41. The page imported
   // 0.3.37 itself while @hanzogui/telemetry asked for ^0.3.40, and both copies
-  // shipped. One version is one copy.
+  // shipped. One version is one copy. The ceiling is 760, not the 775 it was
+  // first raised to, because 775 passed the 773.2 build: a second copy has to
+  // fail here.
   //
   // 716.3 — RAISED from 570. The +167 is @hanzo/ui/chat plus the shared model
   // picker, which is a Popover + Command combobox (gui floating 14KB, popover
@@ -97,7 +102,7 @@ const BUDGETS = {
   // filters at runtime; it is correct, and it saves nothing here, because both
   // configs still import the full table. A build-time subset would have to
   // re-encode in the same compact form.
-  'newtab.js': 775,
+  'newtab.js': 760,
   'onboarding.js': 35, // 31.0
 };
 
