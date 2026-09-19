@@ -5,7 +5,7 @@
   "title": "Hanzo AI",
   "description": "Hanzo AI in the Raycast command bar \u2014 ask Hanzo, and summarize, explain, rewrite, translate, or fix the grammar of your selection or clipboard, wired to the api.hanzo.ai gateway via the published @hanzo/ai.",
   "icon": "hanzo-icon.png",
-  "author": "hanzo",
+  "author": "zeekay",
   "categories": [
     "Productivity",
     "Developer Tools"
