@@ -9,7 +9,6 @@
     "strict": false,
     "noImplicitAny": false,
     "noImplicitThis": false,
-    "alwaysStrict": false,
     "strictNullChecks": false,
     "strictFunctionTypes": false,
     "strictPropertyInitialization": false,
