@@ -72,7 +72,7 @@ async function build() {
     bundle: true,
     format: 'iife',
     platform: 'browser',
-    target: ['safari14'],
+    target: ['safari15'],
     sourcemap: false,
     minify: !watch,
     logLevel: 'info',

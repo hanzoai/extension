@@ -34,7 +34,7 @@ async function build() {
     bundle: true,
     format: 'iife',
     platform: 'browser',
-    target: ['chrome90', 'edge90', 'safari14', 'firefox90'],
+    target: ['chrome90', 'edge90', 'safari15', 'firefox90'],
     sourcemap: true,
     minify: !watch,
     define: {
