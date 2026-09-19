@@ -38,7 +38,8 @@ unit-tested.
 ## Requirements
 
 - JupyterLab **>= 4.0**
-- Node **>= 18** and `jlpm` (the JupyterLab-pinned Yarn, shipped with JupyterLab)
+- Node **>= 18** and pnpm, the workspace's package manager. The labextension
+  step runs `jupyter labextension build`, so JupyterLab has to be on `PATH`.
 - A Hanzo `sk-` API key (from <https://hanzo.ai>) for authenticated models; the
   gateway also serves public/limited models anonymously.
 
@@ -51,11 +52,11 @@ pnpm install
 cd packages/jupyter
 
 # compile TypeScript → lib/ and build the federated labextension bundle
-jlpm build          # dev build
-jlpm build:prod     # minified production build
+pnpm build          # dev build
+pnpm build:prod     # minified production build
 ```
 
-`jlpm build` runs `build:lib` (`tsc`) then `build:labextension` (`jupyter
+`pnpm build` runs `build:lib` (`tsc`) then `build:labextension` (`jupyter
 labextension build .`), emitting the federated bundle under
 `hanzo_jupyter/labextension`.
 
@@ -66,7 +67,7 @@ labextension build .`), emitting the federated bundle under
 # extension so a rebuild is picked up on JupyterLab reload
 pip install -e .
 jupyter labextension develop . --overwrite
-jlpm build
+pnpm build
 
 jupyter labextension list   # should show @hanzo/jupyter … enabled OK
 jupyter lab
@@ -109,8 +110,8 @@ Open **Settings → Settings Editor → Hanzo AI** (or edit Advanced Settings JS
 ## Test / typecheck
 
 ```bash
-jlpm test        # vitest — pure logic (notebook.ts, hanzo.ts, config.ts)
-jlpm typecheck   # tsc --noEmit
+pnpm test        # vitest — pure logic (notebook.ts, hanzo.ts, config.ts)
+pnpm typecheck   # tsc --noEmit
 ```
 
 The JupyterLab widget APIs are integration-tested by running JupyterLab; the
@@ -125,7 +126,7 @@ extraction, the action-catalog prompt builders, and `@hanzo/ai` request shaping
 - **PyPI** (the prebuilt extension end users `pip install`):
 
   ```bash
-  jlpm build:prod
+  pnpm build:prod
   pip install build twine
   python -m build              # sdist + wheel with the bundled labextension
   twine upload dist/*

@@ -3,7 +3,7 @@ lib/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 
-# Prebuilt labextension bundle + Python build artifacts (produced by jlpm build / pip)
+# Prebuilt labextension bundle + Python build artifacts (produced by pnpm build / pip)
 hanzo_jupyter/labextension/
 hanzo_jupyter/_version.py
 build/

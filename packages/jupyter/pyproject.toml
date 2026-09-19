@@ -1,5 +1,5 @@
 # Python packaging for the prebuilt JupyterLab extension. `pip install .` runs
-# `jlpm build:prod` (via hatch-jupyter-builder) to produce the federated bundle
+# `pnpm build:prod` (via hatch-jupyter-builder) to produce the federated bundle
 # under hanzo_jupyter/labextension, then ships it as data files JupyterLab
 # discovers at import. This is the standard JupyterLab 4 prebuilt-extension
 # layout (hatchling + hatch-jupyter-builder).
@@ -50,10 +50,10 @@ skip-if-exists = ["hanzo_jupyter/labextension/static/style.js"]
 
 [tool.hatch.build.hooks.jupyter-builder.build-kwargs]
 build_cmd = "build:prod"
-npm = ["jlpm"]
+npm = ["pnpm"]
 
 [tool.hatch.build.hooks.jupyter-builder.editable-build-kwargs]
 build_cmd = "build"
-npm = ["jlpm"]
+npm = ["pnpm"]
 source_dir = "src"
 build_dir = "hanzo_jupyter/labextension"
