@@ -68,6 +68,7 @@ catalog:
   '@canva/app-ui-kit': '^5.14.1'
   '@canva/asset': '^2.3.0'
   '@canva/design': '^2.12.0'
+  '@eslint/js': '^10.0.1'
   '@figma/plugin-typings': '^1.136.0'
   '@fluentui/react-components': '^9.74.7'
   '@fluentui/react-icons': '^2.0.339'

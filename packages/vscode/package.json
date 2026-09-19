@@ -332,6 +332,8 @@
     "posttest": "vitest run"
   },
   "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@stylistic/eslint-plugin": "catalog:",
     "@types/better-sqlite3": "catalog:",
     "@types/inquirer": "catalog:",
     "@types/js-yaml": "catalog:",
