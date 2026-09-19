@@ -16,7 +16,7 @@
     "compile": "pnpm -r build",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter @hanzo/cards build && pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "pnpm -r format",
     "dev:vscode": "pnpm --filter @hanzo/extension run dev",
