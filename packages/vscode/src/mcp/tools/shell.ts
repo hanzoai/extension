@@ -35,9 +35,9 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
             return result.trim() || 'Command completed successfully';
         } catch (error: any) {
             if (error.killed) {
-                throw new Error(`Command timed out after ${timeout}ms`);
+                throw new Error(`Command timed out after ${timeout}ms`, { cause: error });
             }
-            throw new Error(`Command failed: ${error.message}\n${error.stdout || ''}\n${error.stderr || ''}`);
+            throw new Error(`Command failed: ${error.message}\n${error.stdout || ''}\n${error.stderr || ''}`, { cause: error });
         }
     };
 
@@ -237,7 +237,7 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
                     activeProcesses.delete(args.name);
                     return `Killed process '${args.name}' (PID: ${processInfo.pid})`;
                 } catch (error: any) {
-                    throw new Error(`Failed to kill process: ${error.message}`);
+                    throw new Error(`Failed to kill process: ${error.message}`, { cause: error });
                 }
             }
         },
@@ -305,7 +305,7 @@ export function createShellTools(context: vscode.ExtensionContext): MCPTool[] {
                         return `Opened file: ${filePath}`;
                     }
                 } catch (error: any) {
-                    throw new Error(`Failed to open: ${error.message}`);
+                    throw new Error(`Failed to open: ${error.message}`, { cause: error });
                 }
             }
         },

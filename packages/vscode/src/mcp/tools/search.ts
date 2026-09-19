@@ -318,7 +318,7 @@ export function createSearchTools(context: vscode.ExtensionContext): MCPTool[] {
 
                     return results.length > 0 ? results.join('\n') : 'No results found in git history';
                 } catch (error: any) {
-                    throw new Error(`Git search failed: ${error.message}`);
+                    throw new Error(`Git search failed: ${error.message}`, { cause: error });
                 }
             }
         },

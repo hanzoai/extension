@@ -197,7 +197,7 @@ export class FileCollectionService {
         const isIgnored = this.ignoreFilter.ignores(relativePath);
         if (isIgnored) {
             // Try to determine which pattern caused the ignore
-            let reason = 'Default ignore pattern';
+            let reason: string;
             if (DEFAULT_IGNORED_PATTERNS.some(pattern => {
                 const regex = new RegExp(pattern.replace(/\*/g, '.*'));
                 return regex.test(relativePath);

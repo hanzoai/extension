@@ -19,7 +19,7 @@
     "experimentalDecorators": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "lib": ["ES2020"],
+    "lib": ["ES2022"],
     "skipLibCheck": true,
     "noEmitOnError": false,
     "types": ["node", "vscode", "mocha", "sinon", "ws", "lodash"],

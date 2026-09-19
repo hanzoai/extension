@@ -17,7 +17,7 @@ export const addTransformer = (
   // Replacing with binary search should be trivial in case above assumption is
   // false.
   let i = 0;
-  for (i = 0; i < T.length; ++i) {
+  for (; i < T.length; ++i) {
     if (priority > T[i].priority) {
       break;
     }

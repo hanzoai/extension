@@ -123,7 +123,7 @@ export class AuthManager {
             await this.context.globalState.update('auth_state', undefined);
         } catch (error) {
             console.error('[Hanzo] Auth initiation error:', error);
-            throw new Error('Failed to initiate authentication');
+            throw new Error('Failed to initiate authentication', { cause: error });
         }
     }
 

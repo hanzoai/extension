@@ -60,7 +60,7 @@ export class ApiClient {
             console.info(`[Hanzo] Request body size: ${(jsonBody.length / (1024 * 1024)).toFixed(2)} MB`);
         } catch (error) {
             console.error('Failed to stringify request body:', error);
-            throw new Error('Project is too large to process. Try removing some files or directories.');
+            throw new Error('Project is too large to process. Try removing some files or directories.', { cause: error });
         }
 
         // Check if we need to use chunking (for non-gzipped requests)
@@ -122,10 +122,10 @@ export class ApiClient {
                         // Check specifically for timeout errors
                         if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
                             console.error(`[Hanzo] Request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds`);
-                            throw new Error(`API request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds. This may happen with large projects or complex specifications. Try again or consider breaking your project into smaller parts.`);
+                            throw new Error(`API request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds. This may happen with large projects or complex specifications. Try again or consider breaking your project into smaller parts.`, { cause: error });
                         }
 
-                        throw new Error(`API request failed: ${error.response?.data?.message || error.response?.data || error.message}`);
+                        throw new Error(`API request failed: ${error.response?.data?.message || error.response?.data || error.message}`, { cause: error });
                     }
 
                     throw error;
@@ -174,10 +174,10 @@ export class ApiClient {
                     // Check specifically for timeout errors
                     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
                         console.error(`[Hanzo] Request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds`);
-                        throw new Error(`API request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds. This may happen with large projects or complex specifications. Try again or consider breaking your project into smaller parts.`);
+                        throw new Error(`API request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds. This may happen with large projects or complex specifications. Try again or consider breaking your project into smaller parts.`, { cause: error });
                     }
 
-                    throw new Error(`API request failed: ${error.response?.data?.message || error.response?.data || error.message}`);
+                    throw new Error(`API request failed: ${error.response?.data?.message || error.response?.data || error.message}`, { cause: error });
                 }
 
                 throw error;
@@ -288,10 +288,10 @@ export class ApiClient {
                     // Check specifically for timeout errors
                     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
                         console.error(`[Hanzo] Chunk request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds`);
-                        throw new Error(`API request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds for chunk ${chunkIndex + 1}/${totalChunks}. This may happen with large projects or complex specifications.`);
+                        throw new Error(`API request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds for chunk ${chunkIndex + 1}/${totalChunks}. This may happen with large projects or complex specifications.`, { cause: error });
                     }
 
-                    throw new Error(`API request failed for chunk ${chunkIndex + 1}/${totalChunks}: ${error.response?.data?.message || error.response?.data || error.message}`);
+                    throw new Error(`API request failed for chunk ${chunkIndex + 1}/${totalChunks}: ${error.response?.data?.message || error.response?.data || error.message}`, { cause: error });
                 }
 
                 throw error;
@@ -514,10 +514,10 @@ export class ApiClient {
                     // Check specifically for timeout errors
                     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
                         console.error(`[Hanzo] Gzipped chunk request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds`);
-                        throw new Error(`API request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds for gzipped chunk ${chunkIndex + 1}/${totalChunks}. This may happen with large projects or complex specifications.`);
+                        throw new Error(`API request timed out after ${GLOBAL_REQUEST_TIMEOUT / 1000} seconds for gzipped chunk ${chunkIndex + 1}/${totalChunks}. This may happen with large projects or complex specifications.`, { cause: error });
                     }
 
-                    throw new Error(`API request failed for gzipped chunk ${chunkIndex + 1}/${totalChunks}: ${error.response?.data?.message || error.response?.data || error.message}`);
+                    throw new Error(`API request failed for gzipped chunk ${chunkIndex + 1}/${totalChunks}: ${error.response?.data?.message || error.response?.data || error.message}`, { cause: error });
                 }
 
                 throw error;

@@ -171,7 +171,7 @@ For now, continuing with local tools only.`
                 ]
             };
         } catch (error: any) {
-            throw new Error(`Tool execution failed: ${error.message}`);
+            throw new Error(`Tool execution failed: ${error.message}`, { cause: error });
         }
     });
 

@@ -224,7 +224,7 @@ class MCPProxyManager {
 🚀 Ready to use via proxy`;
 
         } catch (error: any) {
-            throw new Error(`Failed to install ${packageName}: ${error.message}`);
+            throw new Error(`Failed to install ${packageName}: ${error.message}`, { cause: error });
         }
     }
 

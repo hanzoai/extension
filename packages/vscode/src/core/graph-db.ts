@@ -113,7 +113,7 @@ export class GraphDatabase {
 
     // Query operations
     queryNodes(query: GraphQuery): GraphNode[] {
-        let results: GraphNode[] = [];
+        let results: GraphNode[];
         
         if (query.type) {
             const nodeIds = this.nodeIndex.get(query.type) || new Set();
@@ -143,7 +143,7 @@ export class GraphDatabase {
     }
 
     getEdges(filter?: { from?: string; to?: string; type?: string }): GraphEdge[] {
-        let results: GraphEdge[] = [];
+        let results: GraphEdge[];
         
         if (filter?.from) {
             const edgeIds = this.edgeIndex.get(`from:${filter.from}`) || new Set();

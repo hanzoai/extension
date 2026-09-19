@@ -88,7 +88,7 @@ export class DevToolManager {
 
             return agentId;
         } catch (error) {
-            throw new Error(`Failed to spawn agent: ${error.message}`);
+            throw new Error(`Failed to spawn agent: ${error.message}`, { cause: error });
         }
     }
 
@@ -252,7 +252,7 @@ runAgent().catch(console.error);
             
             this.outputChannel.appendLine(`[${agent.name}] Successfully merged ${agent.branch}`);
         } catch (error) {
-            throw new Error(`Failed to merge agent: ${error.message}`);
+            throw new Error(`Failed to merge agent: ${error.message}`, { cause: error });
         }
     }
 

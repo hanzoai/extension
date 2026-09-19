@@ -384,7 +384,7 @@ Complete your task and provide a clear summary of what you accomplished.`;
         
         return response;
     } catch (error: any) {
-        throw new Error(`${agent.name} failed: ${error.message}`);
+        throw new Error(`${agent.name} failed: ${error.message}`, { cause: error });
     }
 }
 

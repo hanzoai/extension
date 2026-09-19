@@ -45,7 +45,7 @@ export function createFileSystemTools(context: vscode.ExtensionContext): MCPTool
                     
                     return result;
                 } catch (error: any) {
-                    throw new Error(`Failed to read file: ${error.message}`);
+                    throw new Error(`Failed to read file: ${error.message}`, { cause: error });
                 }
             }
         },
@@ -78,7 +78,7 @@ export function createFileSystemTools(context: vscode.ExtensionContext): MCPTool
                     await fs.writeFile(filePath, args.content, 'utf-8');
                     return `File written successfully: ${filePath}`;
                 } catch (error: any) {
-                    throw new Error(`Failed to write file: ${error.message}`);
+                    throw new Error(`Failed to write file: ${error.message}`, { cause: error });
                 }
             }
         },
@@ -132,7 +132,7 @@ export function createFileSystemTools(context: vscode.ExtensionContext): MCPTool
                     await fs.writeFile(filePath, content, 'utf-8');
                     return `File edited successfully: ${filePath}`;
                 } catch (error: any) {
-                    throw new Error(`Failed to edit file: ${error.message}`);
+                    throw new Error(`Failed to edit file: ${error.message}`, { cause: error });
                 }
             }
         },
@@ -193,7 +193,7 @@ export function createFileSystemTools(context: vscode.ExtensionContext): MCPTool
                     await fs.writeFile(filePath, content, 'utf-8');
                     return `File edited successfully with ${changeCount} changes: ${filePath}`;
                 } catch (error: any) {
-                    throw new Error(`Failed to edit file: ${error.message}`);
+                    throw new Error(`Failed to edit file: ${error.message}`, { cause: error });
                 }
             }
         },
@@ -267,7 +267,7 @@ export function createFileSystemTools(context: vscode.ExtensionContext): MCPTool
                     const tree = await buildTree(startPath);
                     return path.basename(startPath) + '/\n' + tree;
                 } catch (error: any) {
-                    throw new Error(`Failed to build directory tree: ${error.message}`);
+                    throw new Error(`Failed to build directory tree: ${error.message}`, { cause: error });
                 }
             }
         },
