@@ -104,6 +104,6 @@ export class PdfDocument {
   }
 
   destroy(): void {
-    void this.doc.destroy();
+    void this.doc.loadingTask.destroy();
   }
 }
