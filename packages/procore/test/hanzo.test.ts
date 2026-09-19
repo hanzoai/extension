@@ -50,7 +50,7 @@ describe('hanzo: buildMessages', () => {
   });
 
   it('omits the header block entirely when meta is undefined', () => {
-    const user = String(buildMessages('q', ctx).at(1)!.content);
+    const user = String(buildMessages('q', ctx)[1].content);
     expect(user).not.toContain('Project:');
     expect(user).toContain('---- task ----');
   });

@@ -153,7 +153,7 @@ describe('buildMessages', () => {
   });
 
   it('fences the selection with node ids and appends the task', () => {
-    const user = buildMessages('rewrite', snapshot(), '').at(1)!.content as string;
+    const user = buildMessages('rewrite', snapshot(), '')[1].content as string;
     expect(user).toContain('---- selection ----');
     expect(user).toContain('id=1:1');
     expect(user).toContain('Welcome back');
@@ -161,7 +161,7 @@ describe('buildMessages', () => {
   });
 
   it('leads with the honest context note', () => {
-    const user = buildMessages('rewrite', snapshot(), '').at(1)!.content as string;
+    const user = buildMessages('rewrite', snapshot(), '')[1].content as string;
     expect(user.startsWith('Context:')).toBe(true);
   });
 
