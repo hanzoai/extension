@@ -58,8 +58,10 @@ export function createServer(config: Config = loadConfig()): restify.Server {
   const server = restify.createServer({ name: 'hanzo-teams' });
   server.use(restify.plugins.bodyParser());
 
-  server.post(MESSAGES_PATH, (req, res) => {
-    adapter.process(req, res, (context) => bot.run(context));
+  // restify takes a two-argument handler only if it is async; a plain one
+  // fails the route's registration, so the server never started.
+  server.post(MESSAGES_PATH, async (req, res) => {
+    await adapter.process(req, res, (context) => bot.run(context));
   });
 
   server.get('/healthz', (_req, res, next) => {
