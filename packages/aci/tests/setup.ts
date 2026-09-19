@@ -93,30 +93,26 @@ vi.mock('sharp', () => ({
   }))
 }));
 
-// Mock tesseract.js
-vi.mock('tesseract.js', () => ({
-  default: {
-    createWorker: vi.fn(async () => ({
-      recognize: vi.fn(async () => ({
-        data: {
-          text: 'Sample OCR text',
-          words: [
-            {
-              text: 'Sample',
-              bbox: { x0: 10, y0: 10, x1: 50, y1: 30 }
-            },
-            {
-              text: 'OCR',
-              bbox: { x0: 60, y0: 10, x1: 90, y1: 30 }
-            },
-            {
-              text: 'text',
-              bbox: { x0: 100, y0: 10, x1: 130, y1: 30 }
-            }
-          ]
-        }
-      })),
-      terminate: vi.fn()
-    }))
-  }
-}));
+// Mock tesseract.js, in the shape version 7 answers: words sit in
+// blocks -> paragraphs -> lines, and `blocks` is null unless the caller asks
+// for it in the output options.
+vi.mock('tesseract.js', () => {
+  const words = [
+    { text: 'Sample', bbox: { x0: 10, y0: 10, x1: 50, y1: 30 } },
+    { text: 'OCR', bbox: { x0: 60, y0: 10, x1: 90, y1: 30 } },
+    { text: 'text', bbox: { x0: 100, y0: 10, x1: 130, y1: 30 } }
+  ];
+  return {
+    default: {
+      createWorker: vi.fn(async () => ({
+        recognize: vi.fn(async (_image: unknown, _options?: unknown, output?: { blocks?: boolean }) => ({
+          data: {
+            text: 'Sample OCR text',
+            blocks: output?.blocks ? [{ paragraphs: [{ lines: [{ words }] }] }] : null
+          }
+        })),
+        terminate: vi.fn()
+      }))
+    }
+  };
+});

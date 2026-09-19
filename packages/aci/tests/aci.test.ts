@@ -95,6 +95,13 @@ describe('ACI - Agent Computer Interface', () => {
       expect(typeof aci.findText).toBe('function');
     });
 
+    it('findText returns the centre of the word OCR found', async () => {
+      const ocr = new ACI({ ocr: true });
+      await new Promise((resolve) => setTimeout(resolve)); // the worker starts async
+      expect(await ocr.findText('ocr')).toEqual({ x: 75, y: 20 });
+      expect(await ocr.findText('absent')).toBeNull();
+    });
+
     it('should have high-level operation methods', () => {
       expect(typeof aci.clickImage).toBe('function');
       expect(typeof aci.clickText).toBe('function');

@@ -222,10 +222,13 @@ export class ACI {
     }
     
     const screenshot = await this.screenshot();
-    const result = await this.ocrWorker.recognize(screenshot.buffer);
+    // tesseract.js 7 gives word boxes only inside the block tree, and only
+    // when asked for it.
+    const result = await this.ocrWorker.recognize(screenshot.buffer, {}, { blocks: true });
     
     // Search for text in OCR results
-    const words = result.data.words;
+    const words = (result.data.blocks ?? []).flatMap((block) =>
+      block.paragraphs.flatMap((paragraph) => paragraph.lines.flatMap((line) => line.words)));
     for (const word of words) {
       if (word.text.toLowerCase().includes(text.toLowerCase())) {
         return {
