@@ -176,7 +176,7 @@ async function build() {
     format: 'esm'
   });
 
-  // Build CLI and server (for npm package)
+  // Build the CLI and its server
   await esbuild.build({
     entryPoints: ['src/cli.ts'],
     bundle: true,
@@ -194,7 +194,8 @@ async function build() {
   // Copy manifests for different browsers. package.json is the SINGLE source of
   // truth for the version — stamp it into every manifest so the three can never
   // drift apart (the "must agree" rule, enforced by the build instead of by hand).
-  const pkgVersion = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
+  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  const pkgVersion = pkg.version;
   const writeManifest = (srcPath, destPath) => {
     const m = JSON.parse(fs.readFileSync(srcPath, 'utf8'));
     m.version = pkgVersion;
@@ -262,63 +263,27 @@ async function build() {
     }
   });
 
-  // Copy package.json for npm — STAMPED with the same version as everything else.
-  //
-  // src/package.json is a TEMPLATE (name, bin, files, deps) and its own `version`
-  // field is inert; it sat at 1.0.0 while the real one climbed to 1.9.x. The
-  // browser manifests above already take `pkgVersion` from the root package.json,
-  // so leaving this one un-stamped meant the npm artifact was the ONE output that
-  // did not agree with the source of truth this file names three lines up — and a
-  // publish of it would have tried to republish 1.0.0.
-  const pkg = JSON.parse(fs.readFileSync('src/package.json', 'utf8'));
-  pkg.version = pkgVersion;
-  pkg.main = 'cli.js';
-  fs.writeFileSync(out('package.json'), JSON.stringify(pkg, null, 2));
+  // The npm package is this build: the Chrome and Firefox directories the
+  // stores get, whose manifests carry the version stamped above. package.json's
+  // publishConfig.directory points `pnpm publish` here.
+  fs.writeFileSync(out('package.json'), JSON.stringify({
+    name: pkg.name,
+    version: pkgVersion,
+    description: pkg.description,
+    license: pkg.license,
+    files: ['chrome', 'firefox'],
+  }, null, 2));
+  fs.writeFileSync(out('README.md'), `# ${pkg.name}
 
-  // Create README for npm package
-  fs.writeFileSync(out('README.md'), `# Hanzo Browser DevTools
+The Hanzo AI browser extension, built: the same directories the Chrome Web Store
+and Firefox Add-ons get, and both manifests carry this package's version.
 
-Click-to-code navigation for web developers with MCP integration.
+- \`chrome/\`: open \`chrome://extensions\`, turn on Developer mode, choose Load
+  unpacked and select the directory.
+- \`firefox/\`: open \`about:debugging#/runtime/this-firefox\`, choose Load
+  Temporary Add-on and select \`firefox/manifest.json\`.
 
-## Installation
-
-\`\`\`bash
-npm install -g @hanzoai/browser-devtools
-\`\`\`
-
-## Usage
-
-1. Start the server:
-\`\`\`bash
-hanzo-browser-server start
-\`\`\`
-
-2. Install the browser extension:
-\`\`\`bash
-hanzo-browser-server install-extension
-\`\`\`
-
-3. Ctrl+Click any element in your browser to navigate to its source code!
-
-## Features
-
-- 🎯 **Source-map support** for React, Vue, Svelte
-- 🔍 **Fallback tagging** for legacy code
-- 🚀 **MCP integration** for Claude Code
-- ⚡ **Lightning fast** WebSocket communication
-
-## Integration with Claude Code
-
-The server exposes element selection events that can be consumed by MCP tools:
-
-\`\`\`javascript
-server.on('elementSelected', (data) => {
-  // data.file - Source file path
-  // data.line - Line number
-  // data.column - Column number (if available)
-  // data.framework - Detected framework
-});
-\`\`\`
+Source: https://github.com/hanzoai/extension/tree/main/packages/browser
 `);
 
   // Copy icons if they exist
@@ -372,8 +337,7 @@ server.on('elementSelected', (data) => {
   console.log('✅ Browser extension built successfully!');
   console.log(`📦 Chrome:  ${out('chrome')}/`);
   console.log(`📦 Firefox: ${out('firefox')}/`);
-  console.log(`📦 NPM package ready in: ${OUT}/`);
-  console.log(`\nTo publish to npm: cd ${OUT} && npm publish`);
+  console.log(`📦 npm:     ${OUT}/`);
 }
 
 build().catch((error) => {
