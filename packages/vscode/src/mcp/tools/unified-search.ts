@@ -22,7 +22,10 @@ export function createUnifiedSearchTool(context: vscode.ExtensionContext): MCPTo
     async function searchGrep(query: string, filePattern?: string): Promise<SearchResult[]> {
         try {
             const includeFlag = filePattern ? `--glob "${filePattern}"` : '';
-            const cmd = `rg --json "${query}" ${includeFlag} --max-count 50`;
+            // The trailing `.` is the path to search. Given none, rg reads stdin
+            // when stdin is a pipe, and exec's stdin is a pipe that never closes,
+            // so the search waited forever.
+            const cmd = `rg --json "${query}" ${includeFlag} --max-count 50 .`;
             const { stdout } = await execAsync(cmd, { cwd: workspaceRoot, maxBuffer: 10 * 1024 * 1024 });
             
             const results: SearchResult[] = [];
