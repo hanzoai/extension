@@ -743,8 +743,10 @@
 
     <script>
         function copyCommand(command) {
+            // window.event exists only while the click is dispatched, so the
+            // button is found now, not after the clipboard write resolves.
+            const btn = event.target.closest('.btn');
             navigator.clipboard.writeText(command).then(() => {
-                const btn = event.target.closest('.btn');
                 const originalText = btn.innerHTML;
                 btn.innerHTML = '<span>✅</span> Copied!';
                 setTimeout(() => {

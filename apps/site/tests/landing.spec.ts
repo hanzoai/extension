@@ -32,11 +32,15 @@ test.describe('Hanzo.app Landing Page', () => {
     await expect(downloadSection.locator('text=Cloud Platform')).toBeVisible();
   });
 
-  test('copy command buttons work', async ({ page }) => {
+  test('copy command buttons work', async ({ page, context }) => {
+    // Headless Chromium denies a clipboard write the context has not granted;
+    // a person's browser allows it on the click.
+    await context.grantPermissions(['clipboard-write']);
     await page.goto('/');
     
-    // Test CLI copy button - use first() in case there are multiple copy buttons
-    const cliButton = page.locator('button:has-text("npm install -g @hanzo/dev")').first();
+    // Test CLI copy button. It is found by its card, not by its label: the click
+    // replaces the label, and a locator on the label stops matching right then.
+    const cliButton = page.locator('.download-card', { hasText: 'Dev CLI' }).locator('button.btn-primary');
     await cliButton.click();
     
     // Check clipboard was written (button text changes)
