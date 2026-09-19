@@ -364,6 +364,10 @@ catalogs:
 overrides:
   '@noble/hashes': 1.8.0
   zod: ^4.5.2
+  botbuilder>zod: ^3.25.76
+  botbuilder-core>zod: ^3.25.76
+  botframework-connector>zod: ^3.25.76
+  botframework-schema>zod: ^3.25.76
   '@hanzogui/adapt': 8.3.5
   '@hanzogui/animate': 8.3.5
   '@hanzogui/animate-presence': 8.3.5
@@ -13196,6 +13200,9 @@ packages:
     peerDependencies:
       zod: ^4.5.2
 
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
   zod@4.6.1:
     resolution: {integrity: sha512-341aRWQsve0rvronKNTqZpjmzdbUDlFuzHaI/XLg/Ej82qffDJRRfBTCuv7+9q/rMjB6LSLyEBnW4InJeMtt/Q==}
 
@@ -21133,7 +21140,7 @@ snapshots:
       botframework-connector: 4.23.3(debug@4.4.3(supports-color@10.2.2))(encoding@0.1.13)(supports-color@10.2.2)
       botframework-schema: 4.23.3
       uuid: 11.1.1
-      zod: 4.6.1
+      zod: 3.25.76
     transitivePeerDependencies:
       - debug
       - encoding
@@ -21169,7 +21176,7 @@ snapshots:
       fs-extra: 11.3.6
       htmlparser2: 9.1.0
       uuid: 11.1.1
-      zod: 4.6.1
+      zod: 3.25.76
     transitivePeerDependencies:
       - bufferutil
       - debug
@@ -21194,7 +21201,7 @@ snapshots:
       node-fetch: 2.7.0(encoding@0.1.13)
       openssl-wrapper: 0.3.4
       rsa-pem-from-mod-exp: 0.8.6
-      zod: 4.6.1
+      zod: 3.25.76
     transitivePeerDependencies:
       - debug
       - encoding
@@ -21204,7 +21211,7 @@ snapshots:
     dependencies:
       adaptivecards: 1.2.3
       uuid: 11.1.1
-      zod: 4.6.1
+      zod: 3.25.76
 
   botframework-streaming@4.23.3:
     dependencies:
@@ -27854,5 +27861,7 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.6.1):
     dependencies:
       zod: 4.6.1
+
+  zod@3.25.76: {}
 
   zod@4.6.1: {}

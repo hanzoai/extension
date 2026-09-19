@@ -423,6 +423,10 @@ catalog:
 overrides:
   '@noble/hashes': '1.8.0'
   'zod': '^4.5.2'
+  'botbuilder>zod': '^3.25.76'
+  'botbuilder-core>zod': '^3.25.76'
+  'botframework-connector>zod': '^3.25.76'
+  'botframework-schema>zod': '^3.25.76'
   '@hanzogui/adapt': '8.3.5'
   '@hanzogui/animate': '8.3.5'
   '@hanzogui/animate-presence': '8.3.5'
