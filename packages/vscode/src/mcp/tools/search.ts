@@ -59,8 +59,13 @@ export function createSearchTools(context: vscode.ExtensionContext): MCPTool[] {
                     const { stdout } = await execAsync(command);
                     return stdout.trim() || 'No matches found';
                 } catch (error) {
-                    // Fall back to simple file search
-                    const pattern = args.fileType ? `**/*.${args.fileType}` : '**/*';
+                    // rg exits 1 when nothing matches. That is the answer: the
+                    // search below would look again, beyond the requested path.
+                    if ((error as { code?: number }).code === 1) {return 'No matches found';}
+
+                    // No ripgrep: VS Code's file search reads the same path.
+                    const include = args.fileType ? `**/*.${args.fileType}` : '**/*';
+                    const pattern = searchPath ? new vscode.RelativePattern(searchPath, include) : include;
                     const files = await vscode.workspace.findFiles(pattern, '**/node_modules/**', maxResults);
                     const results: string[] = [];
                     

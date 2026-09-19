@@ -129,18 +129,17 @@ suite('MCP Tools Integration Test Suite', () => {
                 'Another file\nWithout the term'
             );
 
-            // Test grep. In the headless test host ripgrep is not on the child
-            // PATH and no workspace is indexed, so grep falls back to the VS Code
-            // file search which finds nothing -- the real, deterministic result
-            // here is 'No matches found'. Positive grep/git coverage lives in
-            // git-search.test.ts.
+            // Test grep. It searches testDir with rg when rg is on PATH and
+            // with VS Code's file search when it is not; both find the line.
             const result = await grepTool.handler({
                 pattern: 'search',
                 path: testDir
             });
 
             assert.ok(typeof result === 'string');
-            assert.strictEqual(result, 'No matches found');
+            assert.ok(result.includes('search1.txt'));
+            assert.ok(result.includes('search term'));
+            assert.ok(!result.includes('search2.txt'));
         });
 
         test('should find files by pattern', async () => {
