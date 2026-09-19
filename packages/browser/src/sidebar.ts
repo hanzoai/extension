@@ -54,8 +54,8 @@ class HanzoSidebar {
     this.currentTab = 'chat';
     this.messages = [];
     // What the chat surface draws. Every field here is a prop; nothing in this
-    // class reads the chat DOM. The draft is NOT here — the composer holds it,
-    // and hands it over on send.
+    // class reads the chat DOM. The draft is NOT here — Chat holds it, and
+    // hands its text to onSend.
     this.models = [AUTO];
     this.model = 'auto';
     this.rag = true;

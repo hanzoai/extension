@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Checkbox, SizableText, XStack, YStack } from '@hanzo/ui';
 import { Composer, Failure, Message, Thread } from '@hanzo/ui/chat';
 import { ModelSelector, type ModelCatalogEntry } from '@hanzo/ui/models';
@@ -10,10 +10,15 @@ import { Prose } from './shared/Prose.js';
  *
  * The sidebar is the narrow client: ~360px, an MV3 extension page, and a
  * transport that is the service worker rather than a fetch loop. None of that
- * reaches the presentation. Every turn, the draft, the model and the busy flag
- * arrive as props and every action leaves as a callback, so `sidebar.ts` keeps
- * the whole wire — token brokering, retrieval, budgets, dedupe, the stream —
- * and this file keeps none of it.
+ * reaches the presentation. Every turn, the model and the busy flag arrive as
+ * props and every action leaves as a callback, so `sidebar.ts` keeps the whole
+ * wire — token brokering, retrieval, budgets, dedupe, the stream — and this
+ * file keeps none of it.
+ *
+ * The draft is the one thing held here, as `@hanzo/ui/chat`'s own `Chat` holds
+ * it. A half-typed question belongs to this screen and nothing outside it
+ * reads it, so it stays in this component, and `onSend` gets its trimmed text.
+ * The Composer is controlled and must be handed a value on every render.
  *
  * Width is the one thing the shell is asked to bend on. `Thread` caps prose at a
  * reading measure and centres it, which in a ~360px column would inset the text
@@ -27,6 +32,8 @@ import { Prose } from './shared/Prose.js';
 const PICKER = 132;
 
 export interface Turn {
+  /** Minted by `sidebar.ts` where the turn is made. The thread keys rows on it. */
+  id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   /** The turn failed. Rendered as the shell's Failure, with a retry. */
@@ -35,9 +42,8 @@ export interface Turn {
 
 export interface ChatProps {
   turns: Turn[];
-  draft: string;
-  onDraft: (value: string) => void;
-  onSend: () => void;
+  /** Send the draft's trimmed text. The composer is already empty. */
+  onSend: (text: string) => void;
   onStop: () => void;
   /** Run the last question again. */
   onRetry: () => void;
@@ -86,6 +92,13 @@ function Toggle({
 
 export function Chat(props: ChatProps) {
   const { turns, busy, signedIn } = props;
+  const [draft, setDraft] = useState('');
+
+  // The Composer calls this only with something to send and no turn in flight.
+  const send = () => {
+    setDraft('');
+    props.onSend(draft.trim());
+  };
 
   if (!signedIn) {
     return (
@@ -121,7 +134,7 @@ export function Chat(props: ChatProps) {
           ) : (
             turns.map((t, i) => (
               <Message
-                key={i}
+                key={t.id}
                 role={t.role}
                 busy={busy && i === turns.length - 1 && t.role === 'assistant' && !t.content}
               >
@@ -140,9 +153,9 @@ export function Chat(props: ChatProps) {
 
       <YStack p="$2">
         <Composer
-          value={props.draft}
-          onChange={props.onDraft}
-          onSend={props.onSend}
+          value={draft}
+          onChange={setDraft}
+          onSend={send}
           onStop={props.onStop}
           busy={busy}
           hint={props.status}
