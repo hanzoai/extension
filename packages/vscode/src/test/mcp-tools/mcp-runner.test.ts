@@ -1,4 +1,7 @@
 import assert from 'assert';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { MCPRunnerTools } from '../../mcp/tools/mcp-runner';
 
@@ -20,7 +23,22 @@ suite('MCP Runner Tools Test Suite', () => {
         workspaceState: { get: (_k: string, d?: any) => d, update: async () => undefined }
     } as any);
 
-    setup(() => { runner = new MCPRunnerTools(makeContext()); });
+    // The runner also loads the servers in Claude Desktop's config under $HOME,
+    // so each runner is built with HOME pointing at an empty directory, and the
+    // registry holds only what these tests add.
+    let emptyHome: string;
+    suiteSetup(() => { emptyHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hanzo-home-')); });
+    suiteTeardown(() => { fs.rmSync(emptyHome, { recursive: true, force: true }); });
+
+    setup(() => {
+        const home = process.env.HOME;
+        process.env.HOME = emptyHome;
+        try {
+            runner = new MCPRunnerTools(makeContext());
+        } finally {
+            if (home === undefined) { delete process.env.HOME; } else { process.env.HOME = home; }
+        }
+    });
 
     const mcp = () => runner.getTools().find(t => t.name === 'mcp_manage')!;
 
