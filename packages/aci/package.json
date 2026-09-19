@@ -8,7 +8,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -30,6 +30,8 @@
     "tesseract.js": "catalog:"
   },
   "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@stylistic/eslint-plugin": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
