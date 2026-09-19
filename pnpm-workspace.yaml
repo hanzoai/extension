@@ -80,7 +80,7 @@ catalog:
   '@googleworkspace/meet-addons': '^1.2.0'
   '@hanzo/ai': '0.6.7'
   '@hanzo/data': '1.2.4'
-  '@hanzo/event': '0.3.37'
+  '@hanzo/event': '0.3.41'
   '@hanzo/gui': '8.3.5'
   '@hanzo/iam': '0.21.17'
   '@hanzo/logo': '1.0.24'
