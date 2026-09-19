@@ -24,7 +24,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc -p tsconfig.build.json",
     "dev": "tsup --watch",
     "start": "node dist/server.js",
     "test": "vitest run",
