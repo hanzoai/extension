@@ -35,7 +35,7 @@ describe('the npm package', () => {
       .sort();
     expect(manifests).toEqual(['chrome/manifest.json', 'firefox/manifest.json']);
     for (const m of manifests) expect(read(path.join(published, m)).version, m).toBe(pkg.version);
-  });
+  }, 30_000); // spawns npm, whose startup alone outlasts vitest's 5s default on a CI runner
 
   it('names no entry point, because an extension has none', () => {
     const manifest = read(path.join(published, 'package.json'));
