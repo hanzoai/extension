@@ -43,7 +43,7 @@ describe('exchangeCode + refreshTokens (form-encoded, HIP-0111)', () => {
 
   it('POSTs form-urlencoded to the /v1/iam token URL and normalizes', async () => {
     const fetchMock = vi.fn(async (url: string, init: any) => {
-      expect(url).toBe('https://iam.hanzo.ai/v1/iam/oauth/token');
+      expect(url).toBe('https://api.hanzo.ai/v1/iam/oauth/token');
       expect(init.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
       const body = new URLSearchParams(init.body.toString());
       expect(body.get('grant_type')).toBe('authorization_code');
@@ -57,7 +57,10 @@ describe('exchangeCode + refreshTokens (form-encoded, HIP-0111)', () => {
   });
 
   it('refresh reuses the old refresh_token when IAM does not rotate it', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ access_token: 'AT2', expires_in: 60 }) } as any)));
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      expect(url).toBe('https://api.hanzo.ai/v1/iam/oauth/token');
+      return { ok: true, json: async () => ({ access_token: 'AT2', expires_in: 60 }) } as any;
+    }));
     const t = await refreshTokens({ clientId: 'hanzo-cli', refreshToken: 'OLD' });
     expect(t.accessToken).toBe('AT2');
     expect(t.refreshToken).toBe('OLD');
@@ -70,7 +73,7 @@ describe('exchangeCode + refreshTokens (form-encoded, HIP-0111)', () => {
 
   it('userinfo reads sub/email/org', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string, init: any) => {
-      expect(url).toBe('https://iam.hanzo.ai/v1/iam/oauth/userinfo');
+      expect(url).toBe('https://api.hanzo.ai/v1/iam/oauth/userinfo');
       expect(init.headers.Authorization).toBe('Bearer AT');
       return { ok: true, json: async () => ({ sub: 'u1', email: 'z@hanzo.ai', owner: 'acme' }) } as any;
     }));

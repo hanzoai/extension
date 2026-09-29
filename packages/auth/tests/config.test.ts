@@ -7,8 +7,8 @@ describe('canonical HIP-0111 endpoints — the drift guard', () => {
     // This is the exact bug that shipped in vscode: hanzo.id/oauth/authorize,
     // missing /v1/iam. Pin every path so it can never regress.
     expect(authorizeURL()).toBe('https://hanzo.id/v1/iam/oauth/authorize');
-    expect(tokenURL()).toBe('https://iam.hanzo.ai/v1/iam/oauth/token');
-    expect(userinfoURL()).toBe('https://iam.hanzo.ai/v1/iam/oauth/userinfo');
+    expect(tokenURL()).toBe('https://api.hanzo.ai/v1/iam/oauth/token');
+    expect(userinfoURL()).toBe('https://api.hanzo.ai/v1/iam/oauth/userinfo');
     // The prefix used to be asserted a second time as a bare IAM_API_PATH
     // constant. That constant is gone — the paths come from @hanzo/iam now, so
     // there is nothing local left to drift, and these three URLs already pin

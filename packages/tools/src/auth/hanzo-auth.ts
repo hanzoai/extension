@@ -8,7 +8,7 @@ import * as crypto from 'crypto';
 
 export interface HanzoAuthConfig {
     apiUrl: string;
-    iamUrl: string;      // Hanzo IAM API (iam.hanzo.ai)
+    iamUrl: string;      // Hanzo IAM API (api.hanzo.ai)
     iamLoginUrl: string;  // Login UI (hanzo.id)
     clientId: string;
     scope: string;
@@ -44,7 +44,7 @@ export class HanzoAuth extends EventEmitter {
         super();
         this.config = {
             apiUrl: config.apiUrl || 'https://api.hanzo.ai',
-            iamUrl: config.iamUrl || 'https://iam.hanzo.ai',
+            iamUrl: config.iamUrl || 'https://api.hanzo.ai',
             iamLoginUrl: config.iamLoginUrl || 'https://hanzo.id',
             clientId: config.clientId || 'hanzo-dev-cli',
             scope: config.scope || 'api:access tools:manage',

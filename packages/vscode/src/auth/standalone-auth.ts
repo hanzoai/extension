@@ -18,6 +18,9 @@ import { execSync } from 'child_process';
 // hand; a comment is not a mechanism.
 export const IAM_API_PATH = '/v1/iam';
 
+// The IAM API host: the unified gateway. The login UI stays on hanzo.id.
+export const IAM_API_URL = 'https://api.hanzo.ai';
+
 // form() encodes a token-endpoint body as application/x-www-form-urlencoded —
 // RFC 6749 requires it; posting a JSON object (axios's default) is rejected by
 // IAM. axios serializes URLSearchParams as form and sets the header itself.
@@ -32,7 +35,7 @@ interface AuthToken {
 }
 
 interface IAMConfig {
-    endpoint: string;     // Hanzo IAM API (iam.hanzo.ai)
+    endpoint: string;     // Hanzo IAM API (api.hanzo.ai)
     loginUrl: string;     // Login UI (hanzo.id)
     clientId: string;
     clientSecret?: string;
@@ -59,9 +62,9 @@ export class StandaloneAuthManager {
         this.tokenFile = path.join(this.configDir, 'auth.json');
         this.deviceIdFile = path.join(this.configDir, 'device.json');
         
-        // IAM configuration: login UI on hanzo.id, API on iam.hanzo.ai
+        // IAM configuration: login UI on hanzo.id, API on api.hanzo.ai
         this.iamConfig = {
-            endpoint: process.env.IAM_ENDPOINT || 'https://iam.hanzo.ai',
+            endpoint: process.env.IAM_ENDPOINT || IAM_API_URL,
             loginUrl: process.env.IAM_LOGIN_URL || 'https://hanzo.id',
             clientId: process.env.IAM_CLIENT_ID || 'hanzo-mcp',
             clientSecret: process.env.IAM_CLIENT_SECRET,

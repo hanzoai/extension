@@ -14,7 +14,10 @@ suite. pnpm 11 reads `allowBuilds` in `pnpm-workspace.yaml`, which lets only
 build time and fails when rate-limited.
 
 IAM API is `api.hanzo.ai/v1/iam` (login UI `hanzo.id`). `iam.hanzo.ai` serves
-only the IAM web app — a POST there answers HTML, never a token.
+only the IAM web app — a POST there answers HTML, never a token. Verb paths
+(`get-users`, `update-user`, …) answer 410 naming the resource that replaced
+them (`iam/pkg/gone/gone.go`): `/v1/iam/<kind>` to list and create,
+`/v1/iam/<kind>/<owner>/<name>` to GET, PUT and DELETE one.
 
 ## Architecture (native ZAP)
 

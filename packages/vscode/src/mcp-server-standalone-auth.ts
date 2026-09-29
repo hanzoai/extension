@@ -37,7 +37,7 @@ Environment Variables:
   HANZO_WORKSPACE       Default workspace directory
   MCP_TRANSPORT         Transport method (stdio or tcp, default: stdio)
   MCP_PORT              Port for TCP transport (default: 3000)
-  IAM_ENDPOINT          IAM endpoint (default: https://iam.hanzo.ai)
+  IAM_ENDPOINT          IAM endpoint (default: https://api.hanzo.ai)
 
 Authentication:
   By default, the server requires authentication with your Hanzo account.

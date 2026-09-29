@@ -29,7 +29,6 @@
   <!-- Domains the task pane may navigate to (IAM login, the API gateway). -->
   <AppDomains>
     <AppDomain>https://hanzo.id</AppDomain>
-    <AppDomain>https://iam.hanzo.ai</AppDomain>
     <AppDomain>https://api.hanzo.ai</AppDomain>
     <AppDomain>https://hanzo.ai</AppDomain>
   </AppDomains>
