@@ -100,4 +100,4 @@ typecheck: install
 	pnpm typecheck
 
 clean:
-	rm -rf dist packages/*/dist apps/*/dist packages/jupyter/lib packages/jupyter/hanzo_jupyter/labextension packages/vscode/out packages/jetbrains/build
+	rm -rf dist packages/*/dist apps/*/dist packages/jupyter/lib packages/jupyter/tsconfig.tsbuildinfo packages/jupyter/hanzo_jupyter/labextension packages/vscode/out packages/jetbrains/build
