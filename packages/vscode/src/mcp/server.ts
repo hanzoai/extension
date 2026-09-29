@@ -288,15 +288,16 @@ export class MCPServer {
             
             console.log(`[MCPServer] Browser extension server started on port ${port}`);
             
-            // Show notification with instructions
-            const action = await vscode.window.showInformationMessage(
+            // Not awaited: the promise settles only when the user answers, and
+            // activation (every command registration) runs behind this call.
+            vscode.window.showInformationMessage(
                 'Browser extension server running. Alt+click elements in your browser to navigate to source.',
                 'Install Extension'
-            );
-            
-            if (action === 'Install Extension') {
-                await this.installBrowserExtension();
-            }
+            ).then(action => {
+                if (action === 'Install Extension') {
+                    return this.installBrowserExtension();
+                }
+            });
         } catch (error) {
             console.error('[MCPServer] Failed to start browser extension server:', error);
         }
