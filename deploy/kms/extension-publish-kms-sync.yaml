@@ -1,9 +1,9 @@
 # Store-publish credentials for the Hanzo browser extension — KMS is the ONLY home.
 #
-# The native publish pipeline (.gitea/workflows/publish.yml, act_runner on
-# git.hanzo.ai) reads these at publish time. No store credential lives in a
-# GitHub or Gitea Actions secret — the ONLY bootstrap credential is the KMS
-# machine identity (KMS_CLIENT_ID / KMS_CLIENT_SECRET), already provisioned.
+# The publish pipeline (.github/workflows/publish.yml, on the linux-amd64
+# runners) reads these at publish time. No store credential lives in an Actions
+# secret — the ONLY bootstrap credential is the KMS machine identity
+# (KMS_CLIENT_ID / KMS_CLIENT_SECRET), already provisioned.
 #
 # ── Operator steps (the VALUES are the store-account owner's; not in git) ──
 #   1. KMS (kms.hanzo.ai) → org `hanzo`, env `prod`, project path `/extension-publish`.
