@@ -34,7 +34,7 @@ const ENGINES = ['chrome', 'firefox', 'safari'];
 const BUDGETS = {
   'background.js': 200, // 176.5
   'content-script.js': 62, // 55.4
-  // 26.5 — the snapshot → ref engine (shared/snapshot.ts + shared/read.ts):
+  // 26.7 — the snapshot → ref engine (shared/snapshot.ts + shared/read.ts):
   // role/name computation, flat-tree walk, covered-click hit test, key default
   // actions, DOM → markdown. Injected on first use per document, not per page load.
   'page.js': 28,

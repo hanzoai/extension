@@ -230,8 +230,11 @@ function textOf(root: Element, budget = MAX_NAME * 2): string {
     }
     if (el.localName === 'select' || el.localName === 'textarea') return;
     const block = !INLINE.has(style(el).display);
+    const before = out.length;
     if (block) out += ' ';
     for (const c of flat(el)) visit(c);
+    // An element that renders no text is named by its tooltip (an icon-only vote arrow).
+    if (!out.slice(before).trim() && el.getAttribute('title')) out += ` ${el.getAttribute('title')} `;
     if (block) out += ' ';
   };
   for (const c of flat(root)) visit(c);
@@ -446,6 +449,7 @@ function visit(el: Element, out: Item[], parentCursor: string) {
     return;
   }
   const n: Item = { role, name: nameOf(el, role), el, props: propsOf(el, role), kids: [] };
+  let walked: Item[] = [];
   if (VALUED.has(role) || el.localName === 'select') n.value = formValue(el);
   if (el.localName === 'select') {
     const all = Array.from((el as HTMLSelectElement).options);
@@ -460,12 +464,21 @@ function visit(el: Element, out: Item[], parentCursor: string) {
     else n.props.push('cross-origin');
   } else if (!(role === 'img' || el.localName === 'input' || el.localName === 'textarea')) {
     walk(el, n.kids, false, cs.cursor);
+    walked = n.kids;
     // A cell holding controls is layout, not a label: its text stays as
     // children rather than becoming one long name over them.
     if (CELLS.has(role) && n.kids.some(actionable) && !el.hasAttribute('aria-label') && !el.hasAttribute('aria-labelledby')) n.name = '';
     // A name computed from content already says what the children say; keep
     // only the ones an agent can still act on (a link inside a heading).
     if (NAME_FROM_CONTENT.has(role) && n.name) n.kids = n.kids.filter(actionable);
+  }
+  // `clickable` is inferred from a pointer cursor; one wrapped around real
+  // controls is a hit area, not a control, so the controls stand on their own.
+  if (role === 'clickable' && walked.some(actionable)) {
+    if (block) pushBreak(out);
+    out.push(...walked);
+    if (block) pushBreak(out);
+    return;
   }
   if (block) pushBreak(out);
   out.push(n);

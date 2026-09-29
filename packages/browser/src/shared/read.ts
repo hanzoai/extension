@@ -157,7 +157,7 @@ export function read(opts: ReadOptions = {}): { title: string; url: string; mark
   let text = tidy(kids(document.body ?? document.documentElement, 0));
   const want = opts.filter?.trim().toLowerCase();
   if (opts.outline) {
-    text = text.split('\n').filter((l) => /^#{1,6} /.test(l) && (!want || l.toLowerCase().includes(want))).join('\n');
+    text = sections(text).map((s) => s.split('\n')[0]).filter((l) => /^#{1,6} /.test(l) && (!want || l.toLowerCase().includes(want))).join('\n');
   } else if (want) {
     text = sections(text).filter((s) => s.toLowerCase().includes(want)).join('\n\n');
   }

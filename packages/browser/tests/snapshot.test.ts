@@ -135,6 +135,11 @@ describe('snapshot tree', () => {
     expect(tree).toContain('link "Company logo"');
   });
 
+  it('names an icon-only control by the tooltip inside it', () => {
+    page(`<a href="/vote"><div class="arrow" title="upvote"></div></a>`);
+    expect(snapshot().tree).toMatch(/^- link "upvote" \[ref=e\d+\]$/m);
+  });
+
   it('shows a select as a combobox with its options, the chosen one marked', () => {
     page(`<label>Color <select><option value="r">Red</option><option value="g" selected>Green</option></select></label>`);
     const { tree } = snapshot();
@@ -148,6 +153,13 @@ describe('snapshot tree', () => {
     expect(tree).toMatch(/- clickable "Open card" \[ref=e\d+\]/);
     expect(tree).toMatch(/- clickable "Focusable" \[ref=e\d+\]/);
     expect(tree).not.toContain('Plain');
+  });
+
+  it('lets the controls inside a pointer-cursor wrapper stand on their own', () => {
+    page(`<div style="cursor:pointer">Repo files <button>Code</button> <a href="/t">Tags</a></div>`);
+    const { tree } = snapshot();
+    expect(tree).not.toContain('clickable');
+    expect(tree).toMatch(/^- text: Repo files\n- button "Code" \[ref=e\d+\]\n- link "Tags" \[ref=e\d+\]$/m);
   });
 
   it('omits what is not rendered, keeps visible children of visibility:hidden', () => {
@@ -463,5 +475,10 @@ hanzo login</pre>
     expect(faq).not.toContain('Unlimited');
     expect(read({ filter: 'nothing-here' }).markdown).toBe('(no section mentions "nothing-here")');
     expect(read({ outline: true, filter: 'pro' }).markdown).toBe('## Pro');
+  });
+
+  it('outline skips # lines inside code', () => {
+    page(`<h1>Install</h1><pre># comment in a shell block\nnpm i</pre><h2>Use</h2>`);
+    expect(read({ outline: true }).markdown).toBe('# Install\n## Use');
   });
 });
