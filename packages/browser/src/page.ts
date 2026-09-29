@@ -10,9 +10,8 @@
 import { act, boxes, probe, snapshot } from './shared/snapshot.js';
 import { read } from './shared/read.js';
 
-type Request = { op: string } & Record<string, any>;
-
-function run(req: Request): Record<string, unknown> {
+/** A page call from shared/drive.ts: `op` plus that op's own fields, typed there at the wire boundary. */
+function run(req: any): Record<string, unknown> {
   switch (req.op) {
     case 'snapshot': return snapshot(req);
     case 'read': return read(req);
@@ -24,7 +23,7 @@ function run(req: Request): Record<string, unknown> {
 
 const g = globalThis as any;
 // Injected twice (a navigation race), the first engine and its refs stay.
-g.__hanzoPage ??= (req: Request) => {
+g.__hanzoPage ??= (req: any) => {
   try {
     return { ok: true, ...run(req) };
   } catch (e) {

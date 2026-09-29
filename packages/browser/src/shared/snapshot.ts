@@ -87,8 +87,14 @@ const MAX_OPTIONS = 25;
 
 // ─── ref table ──────────────────────────────────────────────────────────────
 
+// WeakRef is ES2021 and this package's lib is ES2020; every engine it targets has it.
+declare class WeakRef<T extends object> {
+  constructor(target: T);
+  deref(): T | undefined;
+}
+
 const refs = new Map<string, WeakRef<Element>>();
-let ids = new WeakMap<Element, string>();
+const ids = new WeakMap<Element, string>();
 let seq = 0;
 
 function refFor(el: Element): string {
