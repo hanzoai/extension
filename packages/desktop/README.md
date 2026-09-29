@@ -8,7 +8,7 @@ published [`@hanzo/ai`](https://www.npmjs.com/package/@hanzo/ai). Built on
 [Tauri v2](https://tauri.app) (a Rust shell + a web frontend) — lighter and more
 native than Electron.
 
-It is the same assistant as the Raycast / Office / PDF surfaces, reusing the same
+It is the same assistant as the Office and PDF surfaces, reusing the same
 action catalog and prompt/parse contracts, packaged as a standalone always-on-top
 window you summon from anywhere.
 

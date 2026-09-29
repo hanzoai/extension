@@ -1,9 +1,8 @@
 // Desktop app config — the api.hanzo.ai model gateway (default model + endpoints)
-// and the context character budget. Endpoints and the `sk-` key guard mirror
-// @hanzo/raycast / @hanzo/office so the productivity suite stays DRY: the action
-// catalog and prompt/parse logic live in actions.ts, the thin @hanzo/ai adapter
-// in hanzo.ts, the local key store in store.ts, and the Tauri clipboard I/O in
-// clipboard.ts. This module is pure config — no I/O, no SDK.
+// and the context character budget. The action catalog and prompt/parse logic
+// live in actions.ts, the thin @hanzo/ai adapter in hanzo.ts, the local key
+// store in store.ts, and the Tauri clipboard I/O in clipboard.ts. This module is
+// pure config — no I/O, no SDK.
 
 // ---- Hanzo model gateway --------------------------------------------------
 

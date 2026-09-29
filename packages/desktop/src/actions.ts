@@ -7,10 +7,8 @@
 // clipboard.ts, hands the text here to build a request, sends it through hanzo.ts,
 // and parses the reply back here before copying/pasting via clipboard.ts.
 //
-// It mirrors @hanzo/raycast's actions core so the productivity suite stays
-// consistent: the same context/prompt/parse contracts, one code path from an
-// (action id + inputs) to a message list, and one path from a raw reply to
-// paste-ready text.
+// One code path from an (action id + inputs) to a message list, and one path
+// from a raw reply to paste-ready text.
 
 // A message in the OpenAI-compatible schema — the shape @hanzo/ai's
 // chat.completions.create takes. A local alias so the pure builders have a
