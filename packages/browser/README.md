@@ -74,9 +74,41 @@ python -c 'from hanzo_tools.browser.zapd_consumer import get_consumer; print([p[
 
 With the extension loaded in Firefox it printed `['browser:firefox/ra/default']`.
 
+## Drive a page: snapshot, then refs
+
+An agent sees a page as its accessibility tree, with a ref on every node it can
+act on, and acts by ref:
+
+```
+browser(action="snapshot", interactive=true)
+  - textbox "Email" [ref=e3]
+  - button "Subscribe" [ref=e4]
+browser(action="fill", selector="@e3", text="me@example.com")
+browser(action="click", selector="@e4")
+browser(action="read")                     the page as markdown
+```
+
+- A ref names one element while it stays on the page, across snapshots. Once
+  the element is gone, or the tab has navigated, the ref is refused: snapshot
+  again.
+- A click is refused before any event fires when another element covers the
+  target, a consent banner or a modal, and the error names the cover.
+- `screenshot annotate=true` boxes every on-screen ref, labelled `[N]` for ref
+  `@eN`, and returns the legend.
+- `browser(action="help")` lists everything past the core actions.
+
+The page half is `page.js`, which `src/shared/drive.ts` injects into the tab's
+isolated world on first use, so Chrome, Firefox and Safari run the same code
+with no debugger attached. An extension page drives a tab the same way:
+
+```js
+chrome.runtime.sendMessage({ action: 'drive', method: 'hanzo.snapshot', params: { tabId, interactive: true } })
+```
+
 ## Test
 
 ```bash
 cd packages/browser
 npx vitest run
+npx playwright test --config=e2e/playwright.config.ts e2e/snapshot-ref.spec.ts
 ```

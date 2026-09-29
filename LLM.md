@@ -93,6 +93,20 @@ through `packages/vscode/src/api/chat.ts` (bearer: the IAM session, else
   aliases) + `wrapEvaluable` (bare expression passes through; statement bodies
   → async IIFE with the trailing value auto-returned). Both dispatch paths
   consume it, so Chrome and Firefox accept identical caller JS.
+- **Snapshot → ref: the one way an agent drives a page.** `hanzo.snapshot`
+  prints the rendered accessibility tree with `[ref=eN]` on every actionable
+  node; `hanzo.act {op, selector}` clicks/fills/types/presses/selects/checks by
+  ref or CSS; `hanzo.read` is the page as markdown; `hanzo.wait`,
+  `hanzo.navigate` (returns after load), `hanzo.annotate` (label N = @eN).
+  Page half: `shared/snapshot.ts` + `shared/read.ts`, bundled as `page.js` and
+  injected into the tab's ISOLATED world on first use; background half:
+  `shared/drive.ts`, which both dispatchers call before their own switch — no
+  CDP, identical on every engine. Refs live in the isolated world (a new
+  document starts an empty table; numbering continues past the tab's last ref),
+  a removed element's ref is refused, and a click hit-tests its point first and
+  names the covering element. Extension pages reach it with runtime message
+  `{action: 'drive'}` (web pages refused). The older `hanzo.click/fill/…`
+  selector verbs are no longer called by hanzo-mcp; WXT step 3 deletes them.
 
 Wire to zapd: the binary ZAP router envelope (`zap-proto/zapd/src/frame.rs`); the
 browser↔host hop is native-messaging JSON, base64'd, quarantined in the host. Host +
