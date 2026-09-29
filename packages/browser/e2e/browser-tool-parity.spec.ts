@@ -11,6 +11,26 @@ import { test, expect, type Page } from '@playwright/test'
 
 const TEST_URL = 'https://example.com'
 
+// The spec reads the DOM it loads, so it serves that DOM itself. Live
+// example.com is whatever IANA ships this week — it dropped its <h1>, and its
+// own text says not to test against it. Navigation stays real: the browser
+// still requests these https URLs; only the response is ours.
+const TEST_PAGE = `<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Example Domain</title></head>
+  <body>
+    <h1>Example Domain</h1>
+    <p>This domain is for use in documentation examples.</p>
+    <p><a href="https://example.org/">More information</a></p>
+  </body>
+</html>`
+
+test.beforeEach(async ({ page }) => {
+  await page.route(/^https:\/\/example\.(com|org)\//, (route) =>
+    route.fulfill({ contentType: 'text/html; charset=utf-8', body: TEST_PAGE }),
+  )
+})
+
 // Helper: navigate and wait for load
 async function loadTestPage(page: Page) {
   await page.goto(TEST_URL, { waitUntil: 'domcontentloaded' })
@@ -107,15 +127,10 @@ test.describe('Evaluate', () => {
 test.describe('DOM Interaction', () => {
   test('click an element', async ({ page }) => {
     await loadTestPage(page)
-    // example.com has a link — click it
     const link = page.locator('a').first()
-    if (await link.count()) {
-      await expect(link).toBeVisible()
-      // Just verify click doesn't throw
-      await link.click().catch(() => {
-        // External navigation may fail in test, that's OK
-      })
-    }
+    await expect(link).toBeVisible()
+    await link.click()
+    await expect(page).toHaveURL(/example\.org/)
   })
 
   test('fill an input field', async ({ page }) => {
