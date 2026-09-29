@@ -2,10 +2,19 @@
 
 Browser extension (`packages/browser`) that joins the shared local **zapd** fabric.
 One native primitive — no WebSocket, no localhost port, no mDNS, no CDP bridge.
-Ships Chrome / Firefox / Safari. Build: esbuild (`src/build.js`, `pnpm build`);
-tests: vitest. Install from the repo root with `pnpm install`; pnpm 11 reads
-`allowBuilds` in `pnpm-workspace.yaml`, which lets only `better-sqlite3` run
-install scripts.
+Ships Chrome / Firefox / Safari. The rest of the workspace is the other Hanzo
+surfaces (editors, office, chat, business apps); README.md indexes them.
+
+`make build [target=chrome]` builds everything or one target into `dist/`:
+browser writes `dist/{chrome,firefox,safari}` itself, every other package builds
+in place and `dist/<name>` links to its output. `make test` runs every vitest
+suite. pnpm 11 reads `allowBuilds` in `pnpm-workspace.yaml`, which lets only
+`better-sqlite3` run install scripts. jupyter builds through
+`uvx --from 'jupyterlab>=4.5,<4.6'`: 4.6 fetches core metadata from GitHub at
+build time and fails when rate-limited.
+
+IAM API is `api.hanzo.ai/v1/iam` (login UI `hanzo.id`). `iam.hanzo.ai` serves
+only the IAM web app — a POST there answers HTML, never a token.
 
 ## Architecture (native ZAP)
 

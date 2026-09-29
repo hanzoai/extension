@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/jupyter",
   "version": "1.0.0",
-  "description": "Hanzo AI for JupyterLab \u2014 an in-notebook AI assistant. A side-panel assistant with a model picker and streaming output, plus cell actions (explain, fix/debug from a traceback, document, optimize, generate a cell from a prompt). Model calls route through the api.hanzo.ai gateway via @hanzo/ai; the Hanzo `sk-` key is set in JupyterLab settings.",
+  "description": "Hanzo AI for JupyterLab — an in-notebook AI assistant. A side-panel assistant with a model picker and streaming output, plus cell actions (explain, fix/debug from a traceback, document, optimize, generate a cell from a prompt). Model calls route through the api.hanzo.ai gateway via @hanzo/ai; the Hanzo `sk-` key is set in JupyterLab settings.",
   "keywords": [
     "jupyter",
     "jupyterlab",
@@ -39,14 +39,14 @@
     "build:prod": "pnpm clean && pnpm build:lib:prod && pnpm build:labextension",
     "build:lib": "tsc --sourceMap",
     "build:lib:prod": "tsc",
-    "build:labextension": "jupyter labextension build .",
-    "build:labextension:dev": "jupyter labextension build --development True .",
+    "build:labextension": "uvx --from 'jupyterlab>=4.5,<4.6' jupyter labextension build .",
+    "build:labextension:dev": "uvx --from 'jupyterlab>=4.5,<4.6' jupyter labextension build --development True .",
     "clean": "rimraf lib tsconfig.tsbuildinfo",
     "clean:all": "pnpm clean && rimraf hanzo_jupyter/labextension",
     "install:extension": "pnpm build",
     "watch": "run-p watch:src watch:labextension",
     "watch:src": "tsc -w --sourceMap",
-    "watch:labextension": "jupyter labextension watch .",
+    "watch:labextension": "uvx --from 'jupyterlab>=4.5,<4.6' jupyter labextension watch .",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "../../node_modules/tsgo/bin/tsc --noEmit"

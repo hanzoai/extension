@@ -1,68 +1,43 @@
-# Compiled output
-out/
+# Build output
 dist/
+out/
+build/
+.next/
 *.vsix
 *.xpi
 *.crx
+*.zip
+*.tgz
 
 # Dependencies
 node_modules/
+.pnpm-store/
+.npmrc
 
-# IDE
+# Agent files are symlinks to LLM.md
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+QWEN.md
+.claude/
+
+# Test output
+coverage/
+test-results/
+playwright-report/
 .vscode-test/
+
+# Editor, OS
 .vscode/settings.json
 .idea/
 *.swp
-*.swo
-
-# OS
 .DS_Store
-Thumbs.db
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Environment
+# Environment, logs, scratch
 .env
 .env.local
 .env.*.local
-
-# Test coverage
-coverage/
-.nyc_output/
-
-# Temporary files
-*.tmp
-*.temp
-.cache/
-
-# Claude Desktop build artifacts
-dist/claude-desktop/node_modules/
-lib/graphene/
-
-# Dev CLI artifacts
-.hanzo-dev/
-.dev/
-test/test-results.json
-test-results/
-playwright-report/
-packages/*/playwright-report/
-packages/*/dist/
-packages/*/node_modules/
-packages/*/*.tgz
-
-# Claude chats
-.claude/
-claude_chats/
-*.zip
-
-# hygiene (untrack node_modules, block common build output)
-**/node_modules/
-.pnpm-store/
-build/
-.next/
 *.log
+*.tmp
+.cache/
 tmp/
-.npmrc

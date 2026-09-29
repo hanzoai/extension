@@ -294,9 +294,9 @@
     "vscode:prepublish": "node scripts/compile-main.js || true && npm run build:mcp",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && tsc -p tsconfig.test.json && npm run lint",
     "lint": "eslint .",
-    "test": "node ./out/test/runTest.js",
+    "test": "vitest run",
+    "test:electron": "npm run compile && tsc -p tsconfig.test.json && node ./out/test/runTest.js",
     "test:simple": "node test-simple.js",
     "test:pm": "cross-env MOCHA_TEST_FILE=\"ProjectManager Test Suite\" node ./out/test/runTest.js",
     "test:auth": "cross-env MOCHA_TEST_FILE=\"Auth and API Test Suite\" node ./out/test/runTest.js",
@@ -305,7 +305,6 @@
     "test:mcp-proxy": "cross-env MOCHA_TEST_FILE=\"MCP.*Proxy Test\" node ./out/test/runTest.js",
     "test:mcp-integration": "cross-env MOCHA_TEST_FILE=\"MCP Proxy Integration\" node ./out/test/runTest.js",
     "test:coverage": "c8 npm test",
-    "test:vitest": "vitest run",
     "test:vitest:coverage": "vitest --coverage",
     "test:vitest:run": "vitest run --coverage",
     "build:mcp": "node scripts/build-mcp-standalone.js",
@@ -328,8 +327,7 @@
     "start:prod": "cross-env VSCODE_ENV=production npm run watch",
     "preview": "npx serve . -p 3000",
     "deploy": "vercel --prod",
-    "deploy:preview": "vercel",
-    "posttest": "vitest run"
+    "deploy:preview": "vercel"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",
