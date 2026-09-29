@@ -7,6 +7,7 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as os from 'os';
+import { allTools } from '../tools/index.js';
 
 const execAsync = promisify(exec);
 
@@ -120,7 +121,7 @@ export async function getSystemPrompt(projectPath: string = process.cwd()): Prom
   
   // Available Tools
   parts.push('## Available MCP Tools');
-  parts.push(`Total tools: ${(await import('../tools/index.js')).allTools.length}\n`);
+  parts.push(`Total tools: ${allTools.length}\n`);
   
   parts.push('### File Operations');
   parts.push('- `read`: Read file contents');

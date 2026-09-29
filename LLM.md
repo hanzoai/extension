@@ -31,7 +31,16 @@ to the `engines.vscode` floor, 1.90, where the chat participant API went stable.
 vsce refuses a package.json `files` beside `.vscodeignore`; `.vscodeignore` is
 an allowlist.
 
-dxt's `server.js` is build output (mcp's `dist/cli.js`), not source.
+dxt's `build` bundles mcp's `src/cli.ts` into `dist/server.js`, CommonJS with
+every dependency inlined (a .dxt has no node_modules, and no package.json to
+declare ESM), stamps package.json's version into `dist/manifest.json`, and zips
+the manifest, server and icon into `dist/hanzo-ai.dxt`. mcp imports its own
+modules statically: a dynamic `import()` of a bundled module makes esbuild wrap
+it and all it reaches, zod included, in lazy init, and the SDK then read zod
+before it ran — server.js died at load with `Class2 is not a constructor`.
+`npx @anthropic-ai/mcpb validate manifest.json` checks the manifest against the
+schema Claude Desktop installs by; a `user_config` value reaches the server only
+through `${user_config.<key>}` in `mcp_config`, here as a CLI flag.
 
 IAM API is `api.hanzo.ai/v1/iam` (login UI `hanzo.id`). `iam.hanzo.ai` serves
 only the IAM web app — a POST there answers HTML, never a token. Verb paths

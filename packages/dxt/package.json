@@ -1,18 +1,22 @@
 {
   "name": "@hanzo/dxt",
   "version": "1.8.2",
-  "description": "Hanzo AI DXT Bundle",
-  "main": "server.js",
+  "description": "Hanzo AI extension for Claude Desktop",
+  "main": "dist/server.js",
   "scripts": {
-    "build": "pnpm --filter @hanzo/mcp run build:cli && cp ../mcp/dist/cli.js server.js && chmod +x server.js"
+    "build": "node scripts/build.js"
   },
   "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "server.js",
-    "manifest.json",
-    "icon.png"
-  ]
+    "dist/server.js",
+    "dist/manifest.json",
+    "dist/icon.png"
+  ],
+  "devDependencies": {
+    "esbuild": "catalog:",
+    "yazl": "catalog:"
+  }
 }

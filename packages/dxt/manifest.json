@@ -4,7 +4,7 @@
   "display_name": "Hanzo AI",
   "version": "1.8.2",
   "description": "HIP-0300 unified tool surface for Claude — 13 action-routed tools covering filesystem, execution, code semantics, git, networking, and Hanzo platform.",
-  "long_description": "# Hanzo AI Extension\n\nHIP-0300 unified tool surface for Claude, built on the Model Context Protocol (MCP).\n\n## 13 Unified Tools\n\n### Core (7)\n- **fs** — read, write, edit, stat, list, mkdir, rm, mv, apply_patch, search_text\n- **exec** — run, background, ps, kill, logs\n- **code** — parse, search, transform, summarize (AST + LSP)\n- **git** — status, diff, log, commit, branch, stash\n- **fetch** — get, post, put, delete, download\n- **workspace** — info, config, env, dependencies\n- **computer** — mouse, keyboard, screen capture\n\n### Optional (6)\n- **think** — structured reasoning\n- **memory** — persistent knowledge storage\n- **hanzo** — iam, kms, paas, commerce, storage, auth, api\n- **plan** — task planning with step tracking\n- **tasks** — task management\n- **mode** — development modes\n\n## Authentication\n\nHanzo IAM (hanzo.id) for cloud features. Anonymous mode available for local-only tools.",
+  "long_description": "# Hanzo AI Extension\n\nHIP-0300 unified tool surface for Claude, built on the Model Context Protocol (MCP).\n\n## 13 Unified Tools\n\n### Core (7)\n- **fs** — read, write, edit, stat, list, mkdir, rm, mv, apply_patch, search_text\n- **exec** — run, background, ps, kill, logs\n- **code** — parse, search, transform, summarize (AST + LSP)\n- **git** — status, diff, log, commit, branch, stash\n- **fetch** — get, post, put, delete, download\n- **workspace** — info, config, env, dependencies\n- **ui** — browse, search and install UI components\n\n### Optional (6)\n- **think** — structured reasoning\n- **memory** — persistent knowledge storage\n- **hanzo** — iam, kms, paas, commerce, storage, auth, api\n- **plan** — task planning with step tracking\n- **tasks** — task management\n- **mode** — development modes\n\n## Authentication\n\nHanzo IAM (hanzo.id) for cloud features. Anonymous mode available for local-only tools.",
   "author": {
     "name": "Hanzo Industries Inc",
     "email": "support@hanzo.ai",
@@ -25,47 +25,16 @@
     "entry_point": "server.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/server.js"],
-      "env": {
-        "MCP_TRANSPORT": "stdio"
-      }
+      "args": ["${__dirname}/server.js", "--disable-tools", "${user_config.disabledTools}"]
     }
   },
   "user_config": {
-    "workspace": {
-      "title": "Workspace Directory",
-      "description": "Default workspace directory for file operations",
-      "type": "string",
-      "default": "~",
-      "env": "HANZO_WORKSPACE"
-    },
-    "anonymous": {
-      "title": "Anonymous Mode",
-      "description": "Run in anonymous mode without authentication (limited features)",
-      "type": "boolean",
-      "default": false,
-      "env": "HANZO_ANONYMOUS"
-    },
     "disabledTools": {
       "title": "Disabled Tools",
       "description": "Comma-separated list of tools to disable",
       "type": "string",
       "default": "",
-      "env": "HANZO_MCP_DISABLED_TOOLS"
-    },
-    "allowedPaths": {
-      "title": "Allowed Paths",
-      "description": "Comma-separated list of allowed paths for file operations",
-      "type": "string",
-      "default": "",
-      "env": "HANZO_MCP_ALLOWED_PATHS"
-    },
-    "disableWriteTools": {
-      "title": "Disable Write Tools",
-      "description": "Disable all write operations for safety",
-      "type": "boolean",
-      "default": false,
-      "env": "HANZO_MCP_DISABLE_WRITE_TOOLS"
+      "required": false
     }
   },
   "tools": [
@@ -75,7 +44,7 @@
     { "name": "git", "description": "Version control: status, diff, log, commit, branch, stash" },
     { "name": "fetch", "description": "HTTP/API operations: get, post, put, delete, download" },
     { "name": "workspace", "description": "Project context: info, config, env, dependencies" },
-    { "name": "computer", "description": "Native OS control: mouse, keyboard, screen capture" },
+    { "name": "ui", "description": "UI components: browse, search and install from Hanzo and other registries" },
     { "name": "think", "description": "Structured reasoning and planning" },
     { "name": "memory", "description": "Persistent knowledge storage and retrieval" },
     { "name": "hanzo", "description": "Hanzo platform: iam, kms, paas, commerce, storage, auth, api" },
@@ -84,8 +53,7 @@
     { "name": "mode", "description": "Development modes and programmer personalities" }
   ],
   "compatibility": {
-    "dxt_version": "0.1",
-    "runtime": {
+    "runtimes": {
       "node": ">=18.0.0"
     }
   }

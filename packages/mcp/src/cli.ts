@@ -17,21 +17,14 @@ import {
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-// ES module __dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 // Import our tools
 import { getConfiguredTools, ToolConfig } from './tools/index.js';
 import { getSystemPrompt } from './prompts/system.js';
 
-// Version from package.json
-const packageJson = JSON.parse(
-  await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf-8')
-);
+// Inlined by the bundler, so a bundle with no package.json beside it (dxt's
+// server.js) still knows its version.
+import packageJson from '../package.json' with { type: 'json' };
 
 const program = new Command();
 
