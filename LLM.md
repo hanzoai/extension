@@ -35,6 +35,9 @@ web page of its own redirects to a loopback listener (RFC 8252): IAM accepts
 and `hanzo-cli`, and refuses `localhost`. VS Code signs in one way,
 `packages/vscode/src/auth/iam.ts` (code + PKCE, tokens in SecretStorage).
 
+One default model on every surface: `zen5`, the id catalog.hanzo.ai marks
+"Zen5 (Default)". A default or fallback id must be in `api.hanzo.ai/v1/models`.
+
 ## Architecture (native ZAP)
 
     extension ─connectNative("ai.hanzo.zap")─► native host ─UDS─► zapd ◄─ hanzo-mcp

@@ -45,7 +45,7 @@ export interface ChatMessage {
 
 /** The request we send for a single non-streaming completion. */
 export interface CompletionRequest {
-  /** Model id, e.g. `zen-eco-3b`. */
+  /** Model id, e.g. `zen5`. */
   model: string;
   /** Conversation so far. */
   messages: ChatMessage[];

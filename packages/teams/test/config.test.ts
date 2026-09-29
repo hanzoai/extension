@@ -18,6 +18,8 @@ describe('loadConfig', () => {
     expect(c.port).toBe(3978);
     expect(c.models).toEqual([...DEFAULT_MODELS]);
     expect(c.defaultModel).toBe(DEFAULT_MODELS[0]);
+    expect(DEFAULT_MODELS).toEqual(['zen5', 'zen5-flash', 'zen5-mini', 'zen5-coder', 'zen5-pro']);
+    expect(c.defaultModel).toBe('zen5');
     expect(c.hanzoBaseUrl).toBeUndefined();
   });
 
@@ -29,16 +31,16 @@ describe('loadConfig', () => {
   it('parses a custom model list and default model', () => {
     const c = loadConfig({
       ...base,
-      HANZO_MODELS: 'zen-4b, zen-coder-14b ,zen-mini-8b',
-      HANZO_DEFAULT_MODEL: 'zen-mini-8b',
+      HANZO_MODELS: 'zen5-flash, zen5-coder ,zen5-mini',
+      HANZO_DEFAULT_MODEL: 'zen5-mini',
     });
-    expect(c.models).toEqual(['zen-4b', 'zen-coder-14b', 'zen-mini-8b']);
-    expect(c.defaultModel).toBe('zen-mini-8b');
+    expect(c.models).toEqual(['zen5-flash', 'zen5-coder', 'zen5-mini']);
+    expect(c.defaultModel).toBe('zen5-mini');
   });
 
   it('falls back to the first model when default is unset', () => {
-    const c = loadConfig({ ...base, HANZO_MODELS: 'zen-4b,zen-eco-3b' });
-    expect(c.defaultModel).toBe('zen-4b');
+    const c = loadConfig({ ...base, HANZO_MODELS: 'zen5-coder,zen5' });
+    expect(c.defaultModel).toBe('zen5-coder');
   });
 
   it('honors a custom port and base url', () => {
@@ -65,7 +67,7 @@ describe('loadConfig', () => {
 
   it('rejects a default model that is not in the model list', () => {
     expect(() =>
-      loadConfig({ ...base, HANZO_MODELS: 'zen-4b', HANZO_DEFAULT_MODEL: 'zen-99b' }),
+      loadConfig({ ...base, HANZO_MODELS: 'zen5-flash', HANZO_DEFAULT_MODEL: 'zen-99b' }),
     ).toThrow(/HANZO_DEFAULT_MODEL/);
   });
 });

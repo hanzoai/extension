@@ -62,8 +62,8 @@ Use the `assistantPanel` builder so adapters don't hand-assemble:
 import { assistantPanel } from '@hanzo/cards';
 
 const spec = assistantPanel({
-  models: ['zen-eco-3b', { id: 'zen-omni-30b', label: 'Zen Omni 30B' }],
-  model: 'zen-omni-30b',                 // selected; defaults to the first model
+  models: ['zen5-flash', { id: 'zen5', label: 'Zen5' }],
+  model: 'zen5',                 // selected; defaults to the first model
   actions: [
     { id: 'draft', label: 'Draft', style: 'primary' },
     { id: 'summarize', label: 'Summarize' },
@@ -130,7 +130,7 @@ const slack = new WebClient(botToken);
 const ai = createAiClient({ token });                  // defaults to https://api.hanzo.ai
 
 // Render a panel:
-const spec = assistantPanel({ models: ['zen-omni-30b'], actions: [{ id: 'draft', label: 'Draft' }] });
+const spec = assistantPanel({ models: ['zen5'], actions: [{ id: 'draft', label: 'Draft' }] });
 await slack.chat.postMessage({ channel, blocks: toSlackBlocks(spec) });
 
 // Handle interactions (Bolt-style): the action_id tells you what happened.
@@ -138,11 +138,11 @@ app.action(ActionId.PromptSubmit, async ({ ack, body, respond }) => {
   await ack();
   const prompt = body.state.values[`${PROMPT_INPUT_ID}_block`][PROMPT_INPUT_ID].value;
   const res = await ai.chat.completions.create({
-    model: 'zen-omni-30b',
+    model: 'zen5',
     messages: [{ role: 'user', content: prompt }],
   });
   const answer = res.choices[0].message.content;
-  await respond({ blocks: toSlackBlocks(assistantPanel({ models: ['zen-omni-30b'], output: answer })) });
+  await respond({ blocks: toSlackBlocks(assistantPanel({ models: ['zen5'], output: answer })) });
 });
 ```
 
@@ -153,7 +153,7 @@ import { assistantPanel, toAdaptiveCard } from '@hanzo/cards';
 import { CardFactory } from 'botbuilder';               // host SDK
 
 async function sendPanel(context, output: string) {
-  const card = toAdaptiveCard(assistantPanel({ models: ['zen-omni-30b'], output }));
+  const card = toAdaptiveCard(assistantPanel({ models: ['zen5'], output }));
   await context.sendActivity({ attachments: [CardFactory.adaptiveCard(card)] });
 }
 

@@ -51,12 +51,13 @@ describe('requestBody', () => {
   it('defaults the model and forces stream:false (Apps Script has no SSE)', () => {
     const b = requestBody(buildMessages('x', ''));
     expect(b.model).toBe(DEFAULT_MODEL);
+    expect(DEFAULT_MODEL).toBe('zen5');
     expect(b.stream).toBe(false);
     expect(Array.isArray(b.messages)).toBe(true);
   });
   it('passes an explicit model + temperature through', () => {
-    const b = requestBody(buildMessages('x', ''), { model: 'zen-pro', temperature: 0.2 });
-    expect(b.model).toBe('zen-pro');
+    const b = requestBody(buildMessages('x', ''), { model: 'zen5-pro', temperature: 0.2 });
+    expect(b.model).toBe('zen5-pro');
     expect(b.temperature).toBe(0.2);
   });
   it('never streams even when asked (contract: one-shot only)', () => {
@@ -83,7 +84,7 @@ describe('extractContent', () => {
 
 describe('parseModels', () => {
   it('reads ids from a {data:[…]} response', () => {
-    expect(parseModels({ data: [{ id: 'zen-1' }, { id: 'zen-pro' }] })).toEqual(['zen-1', 'zen-pro']);
+    expect(parseModels({ data: [{ id: 'zen5' }, { id: 'zen5-pro' }] })).toEqual(['zen5', 'zen5-pro']);
   });
   it('tolerates {models:[…]} and a bare string array', () => {
     expect(parseModels({ models: [{ id: 'a' }] })).toEqual(['a']);

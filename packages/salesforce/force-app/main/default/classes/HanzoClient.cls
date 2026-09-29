@@ -22,7 +22,7 @@ public with sharing class HanzoClient {
     public static final String CALLOUT_BASE = 'callout:Hanzo_API';
 
     /** Default model. Overridable per-request; the gateway routes it. */
-    public static final String DEFAULT_MODEL = 'zen-1';
+    public static final String DEFAULT_MODEL = 'zen5';
 
     /** Request timeout in milliseconds (Salesforce max is 120000). */
     private static final Integer TIMEOUT_MS = 120000;

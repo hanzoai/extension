@@ -32,7 +32,7 @@ export const PROMPT_INPUT_ID = 'hanzo_prompt';
 
 /** A selectable model in the model picker. */
 export interface ModelOption {
-  /** Model id sent to the AI client, e.g. `zen-eco-3b`. */
+  /** Model id sent to the AI client, e.g. `zen5`. */
   id: string;
   /** Human label shown in the picker. Defaults to `id` when omitted. */
   label?: string;

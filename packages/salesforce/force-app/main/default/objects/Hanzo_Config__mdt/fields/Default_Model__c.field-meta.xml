@@ -5,5 +5,5 @@
     <type>Text</type>
     <length>80</length>
     <required>false</required>
-    <description>The model id the assistant defaults to when a user has not chosen one, e.g. zen-1. Non-secret; the API key lives in the Hanzo_API External Credential.</description>
+    <description>The model id the assistant defaults to when a user has not chosen one, e.g. zen5. Non-secret; the API key lives in the Hanzo_API External Credential.</description>
 </CustomField>

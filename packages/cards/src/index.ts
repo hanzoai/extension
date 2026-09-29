@@ -7,7 +7,7 @@
  *
  * ```ts
  * import { assistantPanel, toSlackBlocks } from '@hanzo/cards';
- * const spec = assistantPanel({ models: ['zen-eco-3b'], output: text });
+ * const spec = assistantPanel({ models: ['zen5'], output: text });
  * await slack.chat.postMessage({ channel, blocks: toSlackBlocks(spec) });
  * ```
  *

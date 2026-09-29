@@ -15,7 +15,7 @@ function submit(action: string, extra: SubmitData = {}): SubmitData {
 
 describe('selectedModel / promptText', () => {
   it('reads the model picker value by ActionId.ModelSelect', () => {
-    expect(selectedModel({ [ActionId.ModelSelect]: 'zen-4b' })).toBe('zen-4b');
+    expect(selectedModel({ [ActionId.ModelSelect]: 'zen5' })).toBe('zen5');
     expect(selectedModel({})).toBeUndefined();
     expect(selectedModel({ [ActionId.ModelSelect]: '' })).toBeUndefined();
   });
@@ -33,8 +33,8 @@ describe('dispatch', () => {
   });
 
   it('routes a model select carrying the picker value', () => {
-    const data = submit(ActionId.ModelSelect, { [ActionId.ModelSelect]: 'zen-mini-8b' });
-    expect(dispatch(data)).toEqual({ kind: 'model_select', model: 'zen-mini-8b' });
+    const data = submit(ActionId.ModelSelect, { [ActionId.ModelSelect]: 'zen5-mini' });
+    expect(dispatch(data)).toEqual({ kind: 'model_select', model: 'zen5-mini' });
   });
 
   it('treats a model select with no value as unknown', () => {
@@ -47,12 +47,12 @@ describe('dispatch', () => {
   it('routes a prompt submit with the input text and selected model', () => {
     const data = submit(ActionId.PromptSubmit, {
       [PROMPT_INPUT_ID]: 'Explain OIDC',
-      [ActionId.ModelSelect]: 'zen-4b',
+      [ActionId.ModelSelect]: 'zen5',
     });
     expect(dispatch(data)).toEqual({
       kind: 'prompt',
       prompt: 'Explain OIDC',
-      model: 'zen-4b',
+      model: 'zen5',
     });
   });
 
@@ -83,13 +83,13 @@ describe('dispatch', () => {
     const data = submit(action, {
       chip: 'action_items',
       [PROMPT_INPUT_ID]: 'focus on blockers',
-      [ActionId.ModelSelect]: 'zen-eco-3b',
+      [ActionId.ModelSelect]: 'zen5-flash',
     });
     expect(dispatch(data)).toEqual({
       kind: 'quick_action',
       chip: 'action_items',
       prompt: 'focus on blockers',
-      model: 'zen-eco-3b',
+      model: 'zen5-flash',
     });
   });
 

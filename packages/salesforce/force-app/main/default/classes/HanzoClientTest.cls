@@ -60,6 +60,7 @@ private class HanzoClientTest {
             HanzoClient.buildMessages('x', ''), null
         );
         System.assertEquals(HanzoClient.DEFAULT_MODEL, b.get('model'));
+        System.assertEquals('zen5', HanzoClient.DEFAULT_MODEL);
         System.assertEquals(false, b.get('stream'));
         System.assert(b.get('messages') instanceof List<HanzoClient.Message>);
         System.assert(!b.containsKey('temperature'), 'temperature omitted when unset');
@@ -67,12 +68,12 @@ private class HanzoClientTest {
 
     @IsTest
     static void requestBodyPassesModelAndTemperature() {
-        HanzoClient.Options o = new HanzoClient.Options('zen-pro');
+        HanzoClient.Options o = new HanzoClient.Options('zen5-pro');
         o.temperature = 0.2;
         Map<String, Object> b = HanzoClient.requestBody(
             HanzoClient.buildMessages('x', ''), o
         );
-        System.assertEquals('zen-pro', b.get('model'));
+        System.assertEquals('zen5-pro', b.get('model'));
         System.assertEquals(0.2, b.get('temperature'));
     }
 
@@ -126,11 +127,11 @@ private class HanzoClientTest {
     @IsTest
     static void parseModelsReadsDataIds() {
         Object data = JSON.deserializeUntyped(
-            HanzoCalloutMock.modelsList(new List<String>{ 'zen-1', 'zen-pro' })
+            HanzoCalloutMock.modelsList(new List<String>{ 'zen5', 'zen5-pro' })
         );
         List<HanzoClient.ModelInfo> models = HanzoClient.parseModels(data);
         System.assertEquals(2, models.size());
-        System.assertEquals('zen-1', models[0].id);
+        System.assertEquals('zen5', models[0].id);
         System.assertEquals('hanzo', models[0].ownedBy);
     }
 
@@ -152,7 +153,7 @@ private class HanzoClientTest {
         Test.setMock(HttpCalloutMock.class, mock);
 
         Test.startTest();
-        String out = HanzoClient.ask('summarize', 'Account: Acme', new HanzoClient.Options('zen-pro'));
+        String out = HanzoClient.ask('summarize', 'Account: Acme', new HanzoClient.Options('zen5-pro'));
         Test.stopTest();
 
         System.assertEquals('Answer.', out);
@@ -161,7 +162,7 @@ private class HanzoClientTest {
         System.assert(!mock.requestEndpoint.contains('/api/'), 'no /api/ prefix');
         System.assertEquals('POST', mock.requestMethod);
         // Body: model + messages[], stream:false.
-        System.assertEquals('zen-pro', mock.requestBodyMap.get('model'));
+        System.assertEquals('zen5-pro', mock.requestBodyMap.get('model'));
         System.assertEquals(false, mock.requestBodyMap.get('stream'));
         List<Object> messages = (List<Object>) mock.requestBodyMap.get('messages');
         System.assertEquals(2, messages.size());
@@ -213,7 +214,7 @@ private class HanzoClientTest {
     @IsTest
     static void listModelsReturnsIdsOn200() {
         HanzoCalloutMock mock = new HanzoCalloutMock(
-            200, HanzoCalloutMock.modelsList(new List<String>{ 'zen-1', 'zen-coder' })
+            200, HanzoCalloutMock.modelsList(new List<String>{ 'zen5', 'zen5-coder' })
         );
         Test.setMock(HttpCalloutMock.class, mock);
         Test.startTest();

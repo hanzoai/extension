@@ -28,7 +28,7 @@ describe('gateway URLs (/v1, never /api/)', () => {
     expect(chatCompletionsURL()).not.toContain('/api/');
   });
   it('has a zen default model', () => {
-    expect(DEFAULT_MODEL).toBe('zen-1');
+    expect(DEFAULT_MODEL).toBe('zen5');
   });
 });
 

@@ -8,7 +8,7 @@
  */
 
 /** Default catalog shown in the model picker when `HANZO_MODELS` is unset. */
-export const DEFAULT_MODELS = ['zen-eco-3b', 'zen-mini-8b', 'zen-4b'] as const;
+export const DEFAULT_MODELS = ['zen5', 'zen5-flash', 'zen5-mini', 'zen5-coder', 'zen5-pro'] as const;
 
 /** Resolved, validated configuration for the Teams app. */
 export interface Config {

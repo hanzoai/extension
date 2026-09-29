@@ -7,7 +7,7 @@
 export const API_BASE_URL = 'https://api.hanzo.ai';
 
 // Default model. Overridable per-request via the picker; the gateway routes it.
-export const DEFAULT_MODEL = 'zen-1';
+export const DEFAULT_MODEL = 'zen5';
 
 // localStorage key for the pasted Hanzo API key (`sk-…`). The Zoom App and the
 // Meet add-on are static web panels (iframe/webview), not an Office host with

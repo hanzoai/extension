@@ -10,7 +10,7 @@
 export const HANZO_API_BASE_URL = 'https://api.hanzo.ai';
 
 // Default model. Overridable per-request; the gateway routes it.
-export const DEFAULT_MODEL = 'zen-1';
+export const DEFAULT_MODEL = 'zen5';
 
 export function chatCompletionsURL(): string {
   return `${HANZO_API_BASE_URL}/v1/chat/completions`;

@@ -14,7 +14,7 @@
 var API_BASE_URL = 'https://api.hanzo.ai';
 
 // Default model. Overridable per-request; the gateway routes it.
-var DEFAULT_MODEL = 'zen-1';
+var DEFAULT_MODEL = 'zen5';
 
 // PropertiesService key for the pasted Hanzo `sk-` API key.
 var APIKEY_PROP = 'hanzo.apiKey';

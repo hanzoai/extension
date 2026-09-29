@@ -16,8 +16,8 @@ object HanzoPlugin {
     // Models, chat and MCP. Sign-in is HanzoIam.
     const val API_BASE_URL = "https://api.hanzo.ai"
     
-    // Configuration
-    const val DEFAULT_MODEL = "claude-3-5-sonnet-20241022"
+    // The model the Hanzo catalog marks as its default (catalog.hanzo.ai/v1/pricing: "Zen5 (Default)").
+    const val DEFAULT_MODEL = "zen5"
     const val MAX_TOKENS = 4096
     const val TEMPERATURE = 0.7
     
@@ -37,6 +37,9 @@ object HanzoPlugin {
         }
     }
     
+    /** DEFAULT_MODEL when the catalog lists it, else the first model listed. */
+    fun defaultModel(models: List<String>): String? = DEFAULT_MODEL.takeIf { it in models } ?: models.firstOrNull()
+
     fun getAuthService(): HanzoAuthService = service()
     fun getMCPService(): HanzoMCPService = service()
     fun getSettings(): HanzoSettings = HanzoSettings.instance

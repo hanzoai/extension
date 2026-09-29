@@ -133,7 +133,7 @@ Repeat, or assign the same activation, for each object you want the panel on.
 ## Using it
 
 - **Pick a model** in the panel header (loaded from `/v1/models`; falls back to
-  the configured default, `zen-1`).
+  the configured default, `zen5`).
 - **Quick actions**: Summarize · Draft email · Next steps · Risks.
 - **Ask**: type a question about the record and hit **Ask**.
 - **Write back** the output: **Save as Task**, **Save as Note**, or **Post to

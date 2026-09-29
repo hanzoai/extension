@@ -32,7 +32,7 @@ const WRITE_TARGETS = [
     { kind: 'CHATTER', label: 'Post to Chatter' }
 ];
 
-const DEFAULT_MODEL = 'zen-1';
+const DEFAULT_MODEL = 'zen5';
 
 export default class HanzoAssistant extends LightningElement {
     @api recordId;

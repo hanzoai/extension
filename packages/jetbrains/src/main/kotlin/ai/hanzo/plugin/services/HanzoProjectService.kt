@@ -241,20 +241,8 @@ class HanzoProjectService(private val project: Project) {
         return chatHistory.toList()
     }
     
-    private fun getDefaultModels(): List<String> {
-        return listOf(
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022",
-            "gpt-4o",
-            "gpt-4o-mini",
-            "o1-preview",
-            "o1-mini",
-            "gemini-2.0-flash-exp",
-            "gemini-1.5-pro",
-            "llama-3.3-70b-instruct",
-            "qwen2.5-coder-32b-instruct"
-        )
-    }
+    // The live catalog is the model list; without it, only the default is offered.
+    private fun getDefaultModels(): List<String> = listOf(HanzoPlugin.DEFAULT_MODEL)
     
     fun initializeProject() {
         LOG.info("Initializing Hanzo AI for project: ${project.name}")

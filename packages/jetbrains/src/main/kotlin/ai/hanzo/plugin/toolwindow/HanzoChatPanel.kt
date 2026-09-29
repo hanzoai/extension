@@ -87,9 +87,7 @@ class HanzoChatPanel(private val project: Project) {
                     modelSelector.removeAllItems()
                     models.forEach { modelSelector.addItem(it) }
                     
-                    // Select default model
-                    val defaultModel = models.find { it.contains("claude") } ?: models.firstOrNull()
-                    defaultModel?.let { modelSelector.selectedItem = it }
+                    HanzoPlugin.defaultModel(models)?.let { modelSelector.selectedItem = it }
                 }
             } catch (e: Exception) {
                 showError("Failed to load models: ${e.message}")

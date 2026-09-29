@@ -84,7 +84,7 @@ private class HanzoControllerTest {
         Test.setMock(HttpCalloutMock.class, mock);
 
         Test.startTest();
-        String out = HanzoController.complete('Summarize this record', acct.Id, 'zen-1');
+        String out = HanzoController.complete('Summarize this record', acct.Id, 'zen5');
         Test.stopTest();
 
         System.assertEquals('Acme is a strategic tech account.', out);
@@ -104,10 +104,10 @@ private class HanzoControllerTest {
             new HanzoCalloutMock(200, HanzoCalloutMock.completion('ok'))
         );
         Test.startTest();
-        System.assertEquals('ok', HanzoController.complete('next steps', opp.Id, 'zen-1'));
-        System.assertEquals('ok', HanzoController.complete('draft reply', cse.Id, 'zen-1'));
-        System.assertEquals('ok', HanzoController.complete('qualify', led.Id, 'zen-1'));
-        System.assertEquals('ok', HanzoController.complete('who is this', con.Id, 'zen-1'));
+        System.assertEquals('ok', HanzoController.complete('next steps', opp.Id, 'zen5'));
+        System.assertEquals('ok', HanzoController.complete('draft reply', cse.Id, 'zen5'));
+        System.assertEquals('ok', HanzoController.complete('qualify', led.Id, 'zen5'));
+        System.assertEquals('ok', HanzoController.complete('who is this', con.Id, 'zen5'));
         Test.stopTest();
     }
 
@@ -130,7 +130,7 @@ private class HanzoControllerTest {
     static void completeRejectsBlankTask() {
         seed();
         try {
-            HanzoController.complete('   ', acct.Id, 'zen-1');
+            HanzoController.complete('   ', acct.Id, 'zen5');
             System.assert(false, 'should have thrown');
         } catch (AuraHandledException e) {
             System.assert(true);
@@ -146,7 +146,7 @@ private class HanzoControllerTest {
             new HanzoCalloutMock(200, HanzoCalloutMock.completion('x'))
         );
         try {
-            HanzoController.complete('summarize', userId, 'zen-1');
+            HanzoController.complete('summarize', userId, 'zen5');
             System.assert(false, 'should have thrown for unsupported object');
         } catch (AuraHandledException e) {
             System.assert(true);
@@ -162,7 +162,7 @@ private class HanzoControllerTest {
         );
         Test.startTest();
         try {
-            HanzoController.complete('summarize', acct.Id, 'zen-1');
+            HanzoController.complete('summarize', acct.Id, 'zen5');
             System.assert(false, 'should have thrown');
         } catch (AuraHandledException e) {
             System.assert(true);
@@ -175,13 +175,13 @@ private class HanzoControllerTest {
     static void listModelsReturnsPickerIds() {
         Test.setMock(
             HttpCalloutMock.class,
-            new HanzoCalloutMock(200, HanzoCalloutMock.modelsList(new List<String>{ 'zen-1', 'zen-pro' }))
+            new HanzoCalloutMock(200, HanzoCalloutMock.modelsList(new List<String>{ 'zen5', 'zen5-pro' }))
         );
         Test.startTest();
         List<HanzoClient.ModelInfo> models = HanzoController.listModels();
         Test.stopTest();
         System.assertEquals(2, models.size());
-        System.assertEquals('zen-1', models[0].id);
+        System.assertEquals('zen5', models[0].id);
     }
 
     // ── writeBack — Task / Note / Chatter ──────────────────────────────────

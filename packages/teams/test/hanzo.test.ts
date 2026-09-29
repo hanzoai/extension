@@ -11,7 +11,7 @@ function stubClient(overrides: Partial<AiClient> = {}): {
   const create = vi.fn(async () => ({
     choices: [{ message: { content: 'hello from hanzo' } }],
   }));
-  const list = vi.fn(async () => ({ data: [{ id: 'zen-eco-3b' }, { id: 'zen-4b' }] }));
+  const list = vi.fn(async () => ({ data: [{ id: 'zen5-flash' }, { id: 'zen5' }] }));
   const client: AiClient = {
     chat: { completions: { create } },
     models: { list },
@@ -24,14 +24,14 @@ describe('complete', () => {
   it('shapes the request with model, messages, and max_tokens', async () => {
     const { client, create } = stubClient();
     const text = await complete(client, {
-      model: 'zen-4b',
+      model: 'zen5',
       messages: [{ role: 'user', content: 'hi' }],
       maxTokens: 256,
       temperature: 0.3,
     });
     expect(text).toBe('hello from hanzo');
     expect(create).toHaveBeenCalledWith({
-      model: 'zen-4b',
+      model: 'zen5',
       messages: [{ role: 'user', content: 'hi' }],
       max_tokens: 256,
       temperature: 0.3,
@@ -40,8 +40,8 @@ describe('complete', () => {
 
   it('omits temperature and max_tokens when not provided', async () => {
     const { client, create } = stubClient();
-    await complete(client, { model: 'zen-eco-3b', messages: [] });
-    expect(create).toHaveBeenCalledWith({ model: 'zen-eco-3b', messages: [] });
+    await complete(client, { model: 'zen5-flash', messages: [] });
+    expect(create).toHaveBeenCalledWith({ model: 'zen5-flash', messages: [] });
   });
 
   it('throws on an empty completion', async () => {
@@ -66,7 +66,7 @@ describe('complete', () => {
 describe('listModels', () => {
   it('returns the model ids from the catalog', async () => {
     const { client } = stubClient();
-    expect(await listModels(client)).toEqual(['zen-eco-3b', 'zen-4b']);
+    expect(await listModels(client)).toEqual(['zen5-flash', 'zen5']);
   });
 
   it('returns [] when the catalog is shaped unexpectedly', async () => {

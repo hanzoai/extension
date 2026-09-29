@@ -4,6 +4,6 @@
     <protected>false</protected>
     <values>
         <field>Default_Model__c</field>
-        <value xsi:type="xsd:string">zen-1</value>
+        <value xsi:type="xsd:string">zen5</value>
     </values>
 </CustomMetadata>

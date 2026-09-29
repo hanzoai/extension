@@ -89,7 +89,7 @@ All secrets come from the **environment** — nothing is committed. `loadConfig`
 | `MICROSOFT_APP_TYPE`      | no       | `MultiTenant`        | `MultiTenant` / `SingleTenant` / `UserAssignedMSI`.  |
 | `MICROSOFT_APP_TENANT_ID` | no       | `""`                 | AAD tenant id (required for `SingleTenant`).         |
 | `HANZO_BASE_URL`          | no       | `https://api.hanzo.ai` | Override the AI base URL (local dev).              |
-| `HANZO_MODELS`            | no       | `zen-eco-3b,zen-mini-8b,zen-4b` | Comma-separated picker models.          |
+| `HANZO_MODELS`            | no       | `zen5,zen5-flash,zen5-mini,zen5-coder,zen5-pro` | Comma-separated picker models. |
 | `HANZO_DEFAULT_MODEL`     | no       | first of `HANZO_MODELS` | Default model id.                                |
 | `PORT`                    | no       | `3978`               | HTTP port for the messaging endpoint.                |
 

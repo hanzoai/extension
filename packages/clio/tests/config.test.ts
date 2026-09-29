@@ -19,7 +19,7 @@ describe('Hanzo gateway endpoints', () => {
     expect(modelsURL()).toBe('https://api.hanzo.ai/v1/models');
     expect(HANZO_API_BASE_URL).toBe('https://api.hanzo.ai');
     expect(chatCompletionsURL()).not.toContain('/api/');
-    expect(DEFAULT_MODEL).toBe('zen-1');
+    expect(DEFAULT_MODEL).toBe('zen5');
   });
 });
 

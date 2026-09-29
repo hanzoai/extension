@@ -10,7 +10,7 @@ import {
   QuickActionId,
 } from '../src/panels';
 
-const opts = { models: ['zen-eco-3b', 'zen-4b'], model: 'zen-eco-3b' };
+const opts = { models: ['zen5-flash', 'zen5'], model: 'zen5-flash' };
 
 // Walk an Adaptive Card body/actions tree collecting every element.type.
 function collectTypes(card: ReturnType<typeof renderCard>): string[] {
@@ -79,8 +79,8 @@ describe('welcomePanel → Adaptive Card', () => {
       (el: any) => el.type === 'Input.ChoiceSet' && el.id === ActionId.ModelSelect,
     ) as any;
     expect(choiceSet).toBeDefined();
-    expect(choiceSet.value).toBe('zen-eco-3b');
-    expect(choiceSet.choices.map((c: any) => c.value)).toEqual(['zen-eco-3b', 'zen-4b']);
+    expect(choiceSet.value).toBe('zen5-flash');
+    expect(choiceSet.choices.map((c: any) => c.value)).toEqual(['zen5-flash', 'zen5']);
   });
 
   it('renders the prompt Input.Text keyed by PROMPT_INPUT_ID', () => {

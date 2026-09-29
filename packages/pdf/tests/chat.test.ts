@@ -55,12 +55,13 @@ describe('requestBody', () => {
   it('defaults the model and disables streaming', () => {
     const b = requestBody(buildMessages('x', ctxOf('d')));
     expect(b.model).toBe(DEFAULT_MODEL);
+    expect(DEFAULT_MODEL).toBe('zen5');
     expect(b.stream).toBe(false);
     expect(Array.isArray(b.messages)).toBe(true);
   });
   it('passes an explicit model + temperature through', () => {
-    const b = requestBody(buildMessages('x', ctxOf('d')), { model: 'zen-pro', temperature: 0.1 });
-    expect(b.model).toBe('zen-pro');
+    const b = requestBody(buildMessages('x', ctxOf('d')), { model: 'zen5-pro', temperature: 0.1 });
+    expect(b.model).toBe('zen5-pro');
     expect(b.temperature).toBe(0.1);
   });
   it('enables streaming only when opts.stream is true', () => {
@@ -169,10 +170,10 @@ describe('listModels', () => {
     const fetchMock = vi.fn(async (url: string, init: any) => {
       expect(url).toBe('https://api.hanzo.ai/v1/models');
       expect(init.headers.Authorization).toBe('Bearer t');
-      return { ok: true, json: async () => ({ data: [{ id: 'zen-1' }, { id: 'zen-pro' }] }) } as any;
+      return { ok: true, json: async () => ({ data: [{ id: 'zen5' }, { id: 'zen5-pro' }] }) } as any;
     });
     vi.stubGlobal('fetch', fetchMock);
-    expect(await listModels('t')).toEqual(['zen-1', 'zen-pro']);
+    expect(await listModels('t')).toEqual(['zen5', 'zen5-pro']);
   });
 
   it('tolerates a bare string array and omits the bearer when unauthenticated', async () => {

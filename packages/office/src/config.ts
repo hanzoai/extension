@@ -5,7 +5,7 @@
 export const API_BASE_URL = 'https://api.hanzo.ai';
 
 // Default model. Overridable per-request; the gateway routes it.
-export const DEFAULT_MODEL = 'zen-1';
+export const DEFAULT_MODEL = 'zen5';
 
 // Roaming-settings keys (Office.context.roamingSettings persists per-user across
 // the user's devices). Two auth paths: the IAM OAuth token set (managed by
