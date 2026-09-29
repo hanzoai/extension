@@ -2,9 +2,9 @@
   "dxt_version": "0.1",
   "name": "hanzo-ai",
   "display_name": "Hanzo AI",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "HIP-0300 unified tool surface for Claude — 13 action-routed tools covering filesystem, execution, code semantics, git, networking, and Hanzo platform.",
-  "long_description": "# Hanzo AI Extension\n\nHIP-0300 unified tool surface for Claude, built on the Model Context Protocol (MCP).\n\n## 13 Unified Tools\n\n### Core (7)\n- **fs** — read, write, edit, stat, list, mkdir, rm, mv, apply_patch, search_text\n- **exec** — run, background, ps, kill, logs\n- **code** — parse, search, transform, summarize (AST + LSP)\n- **git** — status, diff, log, commit, branch, stash\n- **fetch** — get, post, put, delete, download\n- **workspace** — info, config, env, dependencies\n- **computer** — mouse, keyboard, screen capture\n\n### Optional (6)\n- **think** — structured reasoning\n- **memory** — persistent knowledge storage\n- **hanzo** — iam, kms, paas, commerce, storage, auth, api\n- **plan** — task planning with step tracking\n- **tasks** — task management\n- **mode** — development modes\n\n## ZAP Protocol\n\nBinary WebSocket transport for zero-latency browser extension integration. All MCP methods (tools/*, resources/*, prompts/*) work identically over ZAP.\n\n## Authentication\n\nHanzo IAM (hanzo.id) for cloud features. Anonymous mode available for local-only tools.",
+  "long_description": "# Hanzo AI Extension\n\nHIP-0300 unified tool surface for Claude, built on the Model Context Protocol (MCP).\n\n## 13 Unified Tools\n\n### Core (7)\n- **fs** — read, write, edit, stat, list, mkdir, rm, mv, apply_patch, search_text\n- **exec** — run, background, ps, kill, logs\n- **code** — parse, search, transform, summarize (AST + LSP)\n- **git** — status, diff, log, commit, branch, stash\n- **fetch** — get, post, put, delete, download\n- **workspace** — info, config, env, dependencies\n- **computer** — mouse, keyboard, screen capture\n\n### Optional (6)\n- **think** — structured reasoning\n- **memory** — persistent knowledge storage\n- **hanzo** — iam, kms, paas, commerce, storage, auth, api\n- **plan** — task planning with step tracking\n- **tasks** — task management\n- **mode** — development modes\n\n## Authentication\n\nHanzo IAM (hanzo.id) for cloud features. Anonymous mode available for local-only tools.",
   "author": {
     "name": "Hanzo Industries Inc",
     "email": "support@hanzo.ai",
@@ -16,10 +16,10 @@
     "url": "https://github.com/hanzoai/extension.git"
   },
   "homepage": "https://github.com/hanzoai/extension",
-  "documentation": "https://github.com/hanzoai/extension/blob/main/docs/MCP_INSTALLATION.md",
+  "documentation": "https://github.com/hanzoai/extension/blob/main/packages/mcp/README.md",
   "support": "https://github.com/hanzoai/extension/issues",
   "icon": "icon.png",
-  "keywords": ["mcp", "development", "tools", "ai", "hanzo", "hip-0300", "zap"],
+  "keywords": ["mcp", "development", "tools", "ai", "hanzo", "hip-0300"],
   "server": {
     "type": "node",
     "entry_point": "server.js",

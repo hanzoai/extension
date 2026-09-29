@@ -18,6 +18,13 @@ pnpm 11 reads `allowBuilds` in `pnpm-workspace.yaml`, which lets only
 `uvx --from 'jupyterlab>=4.5,<4.6'`: 4.6 fetches core metadata from GitHub at
 build time and fails when rate-limited.
 
+vscode packages with `pnpm --filter ./packages/vscode package` (`vsce package`,
+whose prepublish runs `build` and `build:mcp`). vsce reads `@types/vscode` from
+package.json and cannot parse `catalog:`, so that one devDependency is pinned
+to the `engines.vscode` floor, 1.90, where the chat participant API went stable.
+vsce refuses a package.json `files` beside `.vscodeignore`; `.vscodeignore` is
+the list. dxt's `server.js` is build output (mcp's `dist/cli.js`), not source.
+
 IAM API is `api.hanzo.ai/v1/iam` (login UI `hanzo.id`). `iam.hanzo.ai` serves
 only the IAM web app — a POST there answers HTML, never a token. Verb paths
 (`get-users`, `update-user`, …) answer 410 naming the resource that replaced

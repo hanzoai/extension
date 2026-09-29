@@ -4,11 +4,7 @@
   "description": "Hanzo AI DXT Bundle",
   "main": "server.js",
   "scripts": {
-    "build": "pnpm --filter @hanzo/mcp run build:cli && cp ../mcp/dist/cli.js server.js && chmod +x server.js",
-    "package": "npm run build"
-  },
-  "devDependencies": {
-    "archiver": "catalog:"
+    "build": "pnpm --filter @hanzo/mcp run build:cli && cp ../mcp/dist/cli.js server.js && chmod +x server.js"
   },
   "license": "MIT",
   "publishConfig": {
