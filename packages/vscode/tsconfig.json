@@ -26,5 +26,5 @@
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", ".vscode-test", "src/test/**/*", "src/**/*.test.ts", "src/mcp-server-fixed.ts", "src/mcp-server-simple.ts"]
+  "exclude": ["node_modules", ".vscode-test", "src/test/**/*", "src/**/*.test.ts", "src/mcp-server-fixed.ts"]
 }

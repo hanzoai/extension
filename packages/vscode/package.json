@@ -1,16 +1,16 @@
 {
   "name": "hanzo-ide",
   "displayName": "Hanzo AI",
-  "description": "The ultimate meta AI development platform. Manage and run all LLMs and CLI tools (Claude, Codex, Gemini, OpenHands, Aider) in one unified interface. Features MCP integration, async execution, git worktrees, and universal context sync.",
+  "description": "Hanzo AI for VS Code: the @hanzo chat participant, an MCP server that gives AI tools access to your workspace, and a project manager that analyzes your project.",
   "version": "1.9.31",
   "publisher": "hanzo-ai",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hanzoai/dev.git"
+    "url": "https://github.com/hanzoai/extension.git"
   },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Other"
@@ -51,7 +51,7 @@
       {
         "id": "hanzo",
         "name": "Hanzo",
-        "description": "Ultimate AI engineering toolkit: 200+ LLMs, 4000+ MCP servers, 53+ dev tools",
+        "description": "Chat with Hanzo AI using your workspace tools",
         "isSticky": true
       }
     ],
@@ -291,60 +291,34 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "node scripts/compile-main.js || true && npm run build:mcp",
-    "compile": "tsc -p ./",
+    "vscode:prepublish": "npm run build && npm run build:mcp",
     "watch": "tsc -watch -p ./",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:electron": "npm run compile && tsc -p tsconfig.test.json && node ./out/test/runTest.js",
-    "test:simple": "node test-simple.js",
-    "test:pm": "cross-env MOCHA_TEST_FILE=\"ProjectManager Test Suite\" node ./out/test/runTest.js",
-    "test:auth": "cross-env MOCHA_TEST_FILE=\"Auth and API Test Suite\" node ./out/test/runTest.js",
-    "test:file-collection": "cross-env MOCHA_TEST_FILE=\"FileCollectionService Test Suite\" node ./out/test/runTest.js",
-    "test:mcp": "cross-env MOCHA_TEST_FILE=\"MCP.*Tool Test Suite\" node ./out/test/runTest.js",
-    "test:mcp-proxy": "cross-env MOCHA_TEST_FILE=\"MCP.*Proxy Test\" node ./out/test/runTest.js",
-    "test:mcp-integration": "cross-env MOCHA_TEST_FILE=\"MCP Proxy Integration\" node ./out/test/runTest.js",
+    "test:electron": "npm run build && tsc -p tsconfig.test.json && node ./out/test/runTest.js",
     "test:coverage": "c8 npm test",
     "test:vitest:coverage": "vitest --coverage",
     "test:vitest:run": "vitest run --coverage",
     "build:mcp": "node scripts/build-mcp-standalone.js",
-    "build:claude-desktop": "npm run build:mcp && node scripts/build-claude-desktop.js",
     "build": "tsc -p ./",
-    "build:dxt": "node scripts/build-dxt.js",
-    "build:npm": "node scripts/build-mcp-npm.js",
-    "build:cursor": "node scripts/build-cursor.js",
-    "build:windsurf": "node scripts/build-windsurf.js",
-    "build:antigravity": "node scripts/build-antigravity.js",
-    "build:all": "node scripts/build-all-platforms.js",
-    "build:browser-extension": "node src/browser-extension/build.js",
-    "package": "npm run build:all && vsce package --no-dependencies",
-    "package:claude": "npm run build:claude-desktop",
-    "package:dxt": "npm run build:dxt",
+    "package": "vsce package --no-dependencies",
     "publish": "npm run package && npx vsce publish && ovsx publish",
-    "publish:npm": "npm run build:claude-desktop && cd dist/claude-desktop && npm publish",
     "dev": "cross-env VSCODE_ENV=development npm run watch",
     "dev:mcp": "cross-env MCP_TRANSPORT=stdio node ./out/mcp-server-standalone.js",
-    "start:prod": "cross-env VSCODE_ENV=production npm run watch",
-    "preview": "npx serve . -p 3000",
-    "deploy": "vercel --prod",
-    "deploy:preview": "vercel"
+    "start:prod": "cross-env VSCODE_ENV=production npm run watch"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",
     "@stylistic/eslint-plugin": "catalog:",
     "@types/better-sqlite3": "catalog:",
-    "@types/inquirer": "catalog:",
     "@types/js-yaml": "catalog:",
     "@types/jsdom": "catalog:",
     "@types/lodash": "catalog:",
-    "@types/minimatch": "catalog:",
     "@types/mocha": "catalog:",
     "@types/node": "catalog:",
-    "@types/node-fetch": "catalog:",
     "@types/sinon": "catalog:",
     "@types/sinonjs__fake-timers": "catalog:",
-    "@types/uuid": "catalog:",
-    "@types/vscode": "catalog:",
+    "@types/vscode": "~1.90.0",
     "@types/ws": "catalog:",
     "@typescript-eslint/eslint-plugin": "catalog:",
     "@typescript-eslint/parser": "catalog:",
@@ -352,7 +326,6 @@
     "@vscode/test-cli": "catalog:",
     "@vscode/test-electron": "catalog:",
     "@vscode/vsce": "catalog:",
-    "archiver": "catalog:",
     "better-sqlite3": "catalog:",
     "c8": "catalog:",
     "cross-env": "catalog:",
@@ -361,7 +334,6 @@
     "glob": "catalog:",
     "jsdom": "catalog:",
     "mocha": "catalog:",
-    "node-fetch": "catalog:",
     "sinon": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
@@ -376,7 +348,6 @@
     "ignore": "catalog:",
     "js-yaml": "catalog:",
     "lodash": "catalog:",
-    "minimatch": "catalog:",
     "rxdb": "catalog:",
     "rxjs": "catalog:",
     "tree-sitter": "catalog:",
@@ -402,10 +373,5 @@
   "publishConfig": {
     "access": "public"
   },
-  "files": [
-    "out",
-    "images",
-    "README.md"
-  ],
   "private": true
 }
