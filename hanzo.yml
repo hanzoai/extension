@@ -1,24 +1,17 @@
-# Canonical CI/CD config for hanzoai/extension — the one file both the
-# hanzoai/ci reusable (.hanzo/workflows/cicd.yml) and platform.hanzo.ai read.
+# CI for hanzoai/extension. The hanzoai/ci reusable, called by
+# .github/workflows/cicd.yml, runs this list on pushes to main, tags and pull
+# requests; it is the one gate. publish.yml runs the same `make check` before
+# it ships.
 #
-# No `images:`: nothing here is a container. This repo ships a pnpm workspace of
-# editor/browser/desktop extensions that are packaged and published from tags by
-# the existing lanes, so the only thing CI owes it is a gate that goes red when
-# the code breaks.
+# No `images:`: nothing here is a container. The packages publish to npm and the
+# browser stores from publish.yml.
 #
-# The gate is the amd64 lane that has been green on this fleet already
-# (.hanzo/workflows/ci.yml): install frozen, build the shared @hanzo/cards lib
-# that the consumers import dist/ from, run the three suites that actually have
-# tests, then build the browser extension and hold it to its bundle budget.
-# The budget check is armed — over budget fails, which is the point of measuring.
+# The reusable runs a gate on the runner itself, with Node 22 and the pnpm that
+# packageManager pins, and installs uv because packages/jupyter has a
+# pyproject.toml; jupyter's build runs through uvx.
 test:
-  - name: build
+  - name: check
     run: |
       set -e
-      corepack enable
       pnpm install --frozen-lockfile
-      pnpm --filter @hanzo/cards build
-      pnpm --filter @hanzo/browser-extension test
-      pnpm --filter @hanzo/aci test
-      pnpm --filter @hanzo/auth test
-      cd packages/browser && node src/build.js && pnpm run check:bundle-budget
+      make check

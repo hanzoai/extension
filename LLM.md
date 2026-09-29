@@ -7,8 +7,9 @@ surfaces (editors, office, chat, business apps); README.md indexes them.
 
 `make build [target=chrome]` builds everything or one target into `dist/`:
 browser writes `dist/{chrome,firefox,safari}` itself, every other package builds
-in place and `dist/<name>` links to its output. `make test` runs every vitest
-suite. pnpm 11 reads `allowBuilds` in `pnpm-workspace.yaml`, which lets only
+in place and `dist/<name>` links to its output. `make test` runs every
+package's suite, with Playwright's Chromium under `.cache/ms-playwright`.
+pnpm 11 reads `allowBuilds` in `pnpm-workspace.yaml`, which lets only
 `better-sqlite3` run install scripts. jupyter builds through
 `uvx --from 'jupyterlab>=4.5,<4.6'`: 4.6 fetches core metadata from GitHub at
 build time and fails when rate-limited.
@@ -61,10 +62,16 @@ Patch only (X.Y.Z+1), never major. `package.json` is the source of truth; `build
 stamps it into every manifest (chrome/firefox/safari).
 
 ## CI/CD
-- Workflows live in `.github/workflows/`, moved there from `.hanzo/workflows/` in
-  `7bfd1e1`: `ci.yml` (push and pull request) and `publish.yml` (push and manual
-  dispatch) run on the `linux-amd64` runners; `cicd.yml` calls
-  `hanzoai/ci/.github/workflows/build.yml@v1`.
+- One gate, `make check`: every package built and tested, the browser bundle
+  budget, and the extension e2e in Chromium. `cicd.yml` runs it through
+  `hanzoai/ci/.github/workflows/build.yml@v1`, which reads `hanzo.yml`'s
+  `test:`; `publish.yml` (push to main, manual dispatch) runs it before it
+  ships, and ships that build.
+- Both run natively on the `linux-amd64` runners. A runner has the docker CLI
+  and no daemon, so a `container:` job dies before its first step; it cannot
+  sudo, so nothing asks for `playwright install --with-deps` (its image carries
+  chromium's libraries). jupyter's uvx needs uv: the reusable installs it for
+  any repo with a `pyproject.toml`, and publish.yml installs it itself.
 - Secrets are **KMS only**. The pipeline logs in with the KMS machine identity
   (`KMS_CLIENT_ID`/`KMS_CLIENT_SECRET`, org-level Actions secrets on
   git.hanzo.ai, inherited by every `hanzoai` repo) and reads each credential at

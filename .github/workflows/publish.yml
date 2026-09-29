@@ -28,15 +28,24 @@ concurrency:
 
 jobs:
   publish:
+    # On the runner itself: it has the docker CLI and no daemon, so a
+    # `container:` job dies before its first step. jq and curl are in its image.
     runs-on: [linux-amd64]
-    container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-      - name: Tools (jq, pnpm)
+      # uv, because packages/jupyter builds through uvx.
+      - name: Tools (pnpm, uv)
+        shell: bash
         run: |
-          apt-get update && apt-get install -y --no-install-recommends jq curl
           corepack enable
+          command -v uv >/dev/null 2>&1 || {
+            curl -fsSL https://astral.sh/uv/install.sh | sh
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          }
       - run: pnpm install --frozen-lockfile
 
       # ── The ONE secret hop: KMS machine identity → store creds ──
@@ -63,20 +72,14 @@ jobs:
             echo "yes=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # What ships is what was checked: the unit suite, the bundle budgets, and
-      # the built extension driven in Chromium, the one suite that renders the
-      # sidebar and the new tab inside an MV3 page. Before the credential read,
-      # so a release that fails here asks KMS for nothing and uploads nothing.
+      # What ships is what was checked: `make check` is the CI gate (hanzo.yml),
+      # and the build it makes is the one the stores and npm get. Before the
+      # credential read, so a release that fails here asks KMS for nothing and
+      # uploads nothing.
       - name: Build and check the release
         id: check
         if: steps.ahead.outputs.yes == 'true'
-        working-directory: packages/browser
-        run: |
-          node src/build.js
-          pnpm test
-          pnpm run check:bundle-budget
-          pnpm exec playwright install --with-deps chromium
-          pnpm run test:e2e
+        run: make check
 
       - name: Load publish credentials from KMS
         if: steps.ahead.outputs.yes == 'true'
@@ -151,18 +154,17 @@ jobs:
             --api-key "$AMO_API_KEY" --api-secret "$AMO_API_SECRET" \
             --channel listed --id "hanzo-ai@hanzo.ai"
 
-      # npm — the canonical and only home for these packages. pnpm publish skips
-      # a version already on the registry, so re-running is idempotent. A single
-      # package that cannot build must not strand the other thirty-two, so a
-      # per-package failure is tolerated here and the registry check below is
-      # what decides whether the release actually shipped.
+      # npm — the canonical and only home for these packages. Every package was
+      # built by `make check` above. pnpm publish skips a version already on the
+      # registry, so re-running is idempotent. A single package the registry
+      # refuses must not strand the others, so a per-package failure is
+      # tolerated here and the registry check below is what decides whether the
+      # release actually shipped.
       - name: Publish @hanzo/* to npm
         if: steps.ahead.outputs.yes == 'true' && env.NPM_TOKEN != ''
         run: |
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
           echo "@hanzo:registry=https://registry.npmjs.org/" >> .npmrc
-          pnpm --filter @hanzo/cards build
-          pnpm -r --if-present run build || true
           pnpm -r publish --access public --no-git-checks --ignore-scripts --report-summary || true
 
       # Ask the registry, because the registry is the only thing that knows.

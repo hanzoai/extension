@@ -10,6 +10,7 @@ make install
 make build                  # everything
 make build target=chrome    # one target
 make test
+make check                  # the CI gate: build, test, bundle budget, e2e
 ```
 
 ## Browser

@@ -5,10 +5,11 @@
 #   make build target=chrome    one: chrome, firefox or safari (all three are
 #                               packages/browser), or any packages/<name>
 #   make test [target=…]
+#   make check                  the gate CI and every release run
 #   make typecheck
 #   make clean                  build output only; node_modules stays
 
-.PHONY: help install build test typecheck clean dist
+.PHONY: help install browsers build test check typecheck clean dist
 
 target ?= all
 pkg    := $(if $(filter chrome firefox safari,$(target)),browser,$(target))
@@ -24,6 +25,11 @@ endif
 # tests on its own.
 build.pnpm := $(if $(dir),--filter "{./$(dir)}...",-r)
 test.pnpm  := $(if $(dir),--filter "./$(dir)",-r)
+
+# Playwright's browsers live in the repo, under .cache/: a runner's shared
+# browser directory is root's, and a runner cannot sudo, so nothing here asks
+# for --with-deps.
+export PLAYWRIGHT_BROWSERS_PATH := $(CURDIR)/.cache/ms-playwright
 
 help:
 	@sed -n '1,/^$$/p' Makefile | sed 's/^# \{0,1\}//'
@@ -46,8 +52,18 @@ dist:
 	  if [ -d "$$out" ]; then name=$${out#*/}; ln -sfn "../$$out" "dist/$${name%%/*}"; fi; \
 	done
 
-test: install
+# Chromium, which apps/site's suite and the extension e2e drive.
+browsers: install
+	pnpm --filter @hanzo/browser-extension exec playwright install chromium
+
+test: browsers
 	pnpm $(test.pnpm) test
+
+# Every package built and tested, the browser bundles held to budget, and the
+# built extension driven in Chromium.
+check: build test
+	pnpm --filter @hanzo/browser-extension run check:bundle-budget
+	pnpm --filter @hanzo/browser-extension run test:e2e
 
 typecheck: install
 	pnpm typecheck
