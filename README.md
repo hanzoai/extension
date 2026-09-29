@@ -32,7 +32,7 @@ make check                  # the CI gate: build, test, bundle budget, e2e
 | Chat, meetings | `slack`, `teams`, `meetings` (Zoom, Meet) |
 | Code hosts | `github`, `gitlab` |
 | Business apps | `salesforce`, `hubspot`, `zendesk`, `shopify`, `quickbooks`, `workday`, `docusign`, `clio`, `imanage`, `procore`, `epic`, `canvas-lms` |
-| Shared libraries | `auth`, `cards`, `aci`, `mcp`, `tools` |
+| Shared libraries | `auth`, `cards`, `aci`, `mcp` |
 | Download site | `apps/site` |
 
 Each lives at `packages/<name>` with its own README; its build is linked at

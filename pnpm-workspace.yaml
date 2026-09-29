@@ -31,7 +31,6 @@ packages:
   - 'packages/sketch'
   - 'packages/slack'
   - 'packages/teams'
-  - 'packages/tools'
   - 'packages/vscode'
   - 'packages/workday'
   - 'packages/zendesk'
