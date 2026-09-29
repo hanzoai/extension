@@ -10,7 +10,8 @@ build/
 *.iws
 out/
 
-# Eclipse
+# Eclipse, and the VS Code Java extension
+bin/
 .project
 .classpath
 .settings/

@@ -7,8 +7,12 @@ surfaces (editors, office, chat, business apps); README.md indexes them.
 
 `make build [target=chrome]` builds everything or one target into `dist/`:
 browser writes `dist/{chrome,firefox,safari}` itself, every other package builds
-in place and `dist/<name>` links to its output. `make test` runs every
-package's suite, with Playwright's Chromium under `.cache/ms-playwright`.
+in place and `dist/<name>` links to its output. `packages/jetbrains` is a Gradle
+build outside the pnpm workspace: `make build` runs its `buildPlugin` too, and
+`dist/jetbrains` links to its `build/distributions`. Gradle uses the JDK on
+PATH, or fetches Temurin 21 into `.cache/jdk` when there is none (the runners
+have none and cannot sudo). `make test` runs every package's suite and the
+jetbrains Gradle tests, with Playwright's Chromium under `.cache/ms-playwright`.
 pnpm 11 reads `allowBuilds` in `pnpm-workspace.yaml`, which lets only
 `better-sqlite3` run install scripts. jupyter builds through
 `uvx --from 'jupyterlab>=4.5,<4.6'`: 4.6 fetches core metadata from GitHub at
@@ -18,7 +22,9 @@ IAM API is `api.hanzo.ai/v1/iam` (login UI `hanzo.id`). `iam.hanzo.ai` serves
 only the IAM web app — a POST there answers HTML, never a token. Verb paths
 (`get-users`, `update-user`, …) answer 410 naming the resource that replaced
 them (`iam/pkg/gone/gone.go`): `/v1/iam/<kind>` to list and create,
-`/v1/iam/<kind>/<owner>/<name>` to GET, PUT and DELETE one.
+`/v1/iam/<kind>/<owner>/<name>` to GET, PUT and DELETE one. A surface with no
+web page of its own redirects to a loopback listener (RFC 8252): IAM accepts
+`http://127.0.0.1:<any port>/callback` for `hanzo-jetbrains`.
 
 ## Architecture (native ZAP)
 
