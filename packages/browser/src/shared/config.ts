@@ -13,8 +13,9 @@
 /** Login UI domain (Hanzo ID) */
 export const IAM_LOGIN_URL = 'https://hanzo.id';
 
-/** IAM API domain (Hanzo IAM backend, fronted by Hanzo's API gateway) */
-export const IAM_API_URL = 'https://iam.hanzo.ai';
+/** IAM API — the unified gateway serves /v1/iam. iam.hanzo.ai serves only the
+ *  IAM web app, so a POST there answers HTML, never a token. */
+export const IAM_API_URL = 'https://api.hanzo.ai';
 
 /**
  * IAM API path prefix. Hanzo convention is `/v1/<service>/<endpoint>` — never
@@ -36,7 +37,7 @@ export const IAM_API_PATH = '/v1/iam';
  * NOTE: the prior value `app-hanzo` was never a registered IAM client, so the
  * PKCE token exchange always failed with `invalid_client` — login was broken
  * for every build since v1.8.0. Verify with:
- *   curl -X POST https://iam.hanzo.ai/v1/iam/oauth/token \
+ *   curl -X POST https://api.hanzo.ai/v1/iam/oauth/token \
  *     -d 'grant_type=authorization_code&client_id=hanzo-browser&code=x&code_verifier=y&redirect_uri=https://hanzo.ai/callback'
  * A registered client returns `invalid_grant` (code rejected); an unregistered
  * one returns `invalid_client`.

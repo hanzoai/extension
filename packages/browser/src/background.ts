@@ -806,25 +806,6 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       const { key, value } = request;
       // Forward to CDP bridge server so it can save to ~/.hanzo/extension/config.json
       cdpBridge.sendConfig(key, value);
-
-      // Also sync to IAM if authenticated (best-effort)
-      try {
-        const token = await auth.getValidAccessToken();
-        if (token) {
-          fetch(`${IAM_V1}/update-user`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              properties: { [key]: value },
-            }),
-          }).catch(() => {});
-        }
-      } catch {
-        // Not authenticated
-      }
       sendResponse({ success: true });
       break;
     }
@@ -1459,7 +1440,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         const token = await auth.getValidAccessToken();
         if (!token) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
 
-        const resp = await fetch(`${IAM_V1}/get-account`, {
+        const resp = await fetch(`${IAM_V1}/account`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: AbortSignal.timeout(5000),
         });
@@ -1477,13 +1458,13 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 
         // Fetch orgs the user belongs to
         try {
-          const orgsResp = await fetch(`${IAM_V1}/get-organizations`, {
+          const orgsResp = await fetch(`${IAM_V1}/organizations`, {
             headers: { Authorization: `Bearer ${token}` },
             signal: AbortSignal.timeout(5000),
           });
           if (orgsResp.ok) {
             const orgsData = await orgsResp.json();
-            for (const org of (orgsData.data || orgsData || [])) {
+            for (const org of (orgsData.organizations || [])) {
               if (!orgs.find(o => o.id === org.name)) {
                 orgs.push({ id: org.name, name: org.name, displayName: org.displayName || org.name });
               }

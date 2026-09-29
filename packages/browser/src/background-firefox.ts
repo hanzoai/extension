@@ -2571,7 +2571,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
           const token = await getValidAccessToken();
           if (!token) { sendResponse({ success: false, error: 'Not authenticated' }); break; }
 
-          const resp = await fetch(`${IAM_V1}/get-account`, {
+          const resp = await fetch(`${IAM_V1}/account`, {
             headers: { Authorization: `Bearer ${token}` },
             signal: AbortSignal.timeout(5000),
           });
@@ -2584,13 +2584,13 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
             orgs.push({ id: user.owner, name: user.owner, displayName: user.owner });
           }
           try {
-            const orgsResp = await fetch(`${IAM_V1}/get-organizations`, {
+            const orgsResp = await fetch(`${IAM_V1}/organizations`, {
               headers: { Authorization: `Bearer ${token}` },
               signal: AbortSignal.timeout(5000),
             });
             if (orgsResp.ok) {
               const orgsData = await orgsResp.json();
-              for (const org of (orgsData.data || orgsData || [])) {
+              for (const org of (orgsData.organizations || [])) {
                 if (!orgs.find(o => o.id === org.name)) {
                   orgs.push({ id: org.name, name: org.name, displayName: org.displayName || org.name });
                 }

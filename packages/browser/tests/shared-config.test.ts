@@ -27,8 +27,8 @@ describe('IAM constants', () => {
     expect(IAM_LOGIN_URL).toBe('https://hanzo.id');
   });
 
-  it('IAM_API_URL is iam.hanzo.ai', () => {
-    expect(IAM_API_URL).toBe('https://iam.hanzo.ai');
+  it('IAM_API_URL is api.hanzo.ai', () => {
+    expect(IAM_API_URL).toBe('https://api.hanzo.ai');
   });
 
   it('API_BASE_URL is api.hanzo.ai', () => {

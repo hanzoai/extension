@@ -11,7 +11,7 @@ import { test, expect } from './fixtures';
  *   4. Chat sends a message to a Zen model via api.hanzo.ai
  *
  * Requirements:
- *   - IAM at iam.hanzo.ai / hanzo.id must be reachable
+ *   - IAM at api.hanzo.ai / hanzo.id must be reachable
  *   - LLM gateway at api.hanzo.ai must be reachable
  *   - Extension must be built: npm run build
  *   - HANZO_E2E_PASSWORD in the environment
@@ -93,7 +93,7 @@ descFn('Auth + Chat', () => {
 
     expect(tokenStored.hasToken).toBe(true);
     expect(tokenStored.user).toBeTruthy();
-    // /v1/iam/get-account should have returned name and email
+    // /v1/iam/account should have returned name and email
     if (tokenStored.user) {
       expect(tokenStored.user.name).toBeTruthy();
       expect(tokenStored.user.email).toBe(TEST_EMAIL);
@@ -118,7 +118,7 @@ descFn('Auth + Chat', () => {
     // Get a real token via direct API call
     const tokenResult = await sidebar.evaluate(async (password: string) => {
       try {
-        const resp = await fetch('https://iam.hanzo.ai/v1/iam/login', {
+        const resp = await fetch('https://api.hanzo.ai/v1/iam/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
