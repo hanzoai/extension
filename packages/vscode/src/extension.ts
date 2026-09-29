@@ -68,12 +68,11 @@ export async function activate(context: vscode.ExtensionContext) {
             await authManager?.logout();
         }),
         vscode.commands.registerCommand('hanzo.debug.authState', async () => {
-            // Debug auth state functionality not implemented
-            vscode.window.showInformationMessage('Auth debug not implemented');
+            vscode.window.showInformationMessage(await authManager.describe());
         }),
         vscode.commands.registerCommand('hanzo.debug.clearAuth', async () => {
             await authManager?.logout();
-            vscode.window.showInformationMessage('Auth data cleared');
+            vscode.window.showInformationMessage('Signed out of Hanzo AI.');
         }),
         vscode.commands.registerCommand('hanzo.checkMetrics', () => {
             const metrics = metricsService?.getDetailedSummary();
@@ -88,11 +87,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(...disposables);
 
-    // Initialize authentication and show status
-    // Check authentication status on startup
-    const isAuth = await authManager.isAuthenticated();
-    if (!isAuth) {
-        vscode.window.showInformationMessage('Please login to use Hanzo AI features');
+    // Not awaited: the prompt stays up until answered, and activation must not wait on it.
+    if (!(await authManager.isAuthenticated())) {
+        vscode.window.showInformationMessage('Sign in to use Hanzo AI.', 'Sign in').then(choice => {
+            if (choice) {
+                authManager?.initiateAuth();
+            }
+        });
     }
 
     // Auto-open manager on startup if configured

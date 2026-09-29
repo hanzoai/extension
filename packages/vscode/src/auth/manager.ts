@@ -1,21 +1,13 @@
 import * as vscode from 'vscode';
-import * as crypto from 'crypto';
-import axios from 'axios';
-import { getConfig } from '../config';
+import { Canceled, Session } from './iam';
 
-interface AuthState {
-    client_id: string;
-    authorization_session_id: string;
-}
-
+/** The signed-in Hanzo IAM session. Tokens live in VS Code's SecretStorage. */
 export class AuthManager {
-    private context: vscode.ExtensionContext;
     private static instance: AuthManager;
-    private pollingInterval?: NodeJS.Timeout;
-    private config = getConfig();
+    private readonly session: Session;
 
     private constructor(context: vscode.ExtensionContext) {
-        this.context = context;
+        this.session = new Session(context.secrets);
     }
 
     public static getInstance(context: vscode.ExtensionContext): AuthManager {
@@ -25,112 +17,65 @@ export class AuthManager {
         return AuthManager.instance;
     }
 
-    private generateRandomToken(length: number = 32): string {
-        return crypto.randomBytes(length).toString('hex');
-    }
-
-    private async getOrCreateClientId(): Promise<string> {
-        let clientId = await this.context.secrets.get('client_id');
-        if (!clientId) {
-            clientId = this.generateRandomToken();
-            await this.context.secrets.store('client_id', clientId);
-        }
-        return clientId;
-    }
-
-    private async getStoredToken(): Promise<string | undefined> {
-        return this.context.secrets.get('auth_token');
-    }
-
-    private async storeToken(token: string): Promise<void> {
-        await this.context.secrets.store('auth_token', token);
-    }
-
-    private async clearToken(): Promise<void> {
-        await this.context.secrets.delete('auth_token');
-    }
-
     public async isAuthenticated(): Promise<boolean> {
-        const token = await this.getStoredToken();
-        return !!token;
+        return (await this.session.tokens()) !== undefined;
     }
 
+    /** The access token, refreshed first when it is about to expire. Null when signed out. */
     public async getAuthToken(): Promise<string | null> {
-        const token = await this.getStoredToken();
-        if (token) {
-            return token;
-        }
-        return null;
-    }
-
-    private async startPolling(authState: AuthState): Promise<void> {
-        if (this.pollingInterval) {
-            clearInterval(this.pollingInterval);
-        }
-
-        return new Promise<void>((resolve, reject) => {
-            let attempts = 0;
-            const maxAttempts = 120; // 10 minutes maximum polling time
-
-            this.pollingInterval = setInterval(async () => {
-                try {
-                    attempts++;
-                    if (attempts > maxAttempts) {
-                        clearInterval(this.pollingInterval);
-                        reject(new Error('Authentication timed out'));
-                        return;
-                    }
-
-                    const response = await axios.post('https://auth.hanzo.ai/api/check-auth', {
-                        client_id: authState.client_id,
-                        authorization_session_id: authState.authorization_session_id
-                    });
-
-                    if (response.data?.token) {
-                        clearInterval(this.pollingInterval);
-                        await this.storeToken(response.data.token);
-                        resolve();
-                    }
-                } catch (error) {
-                    console.error('[Hanzo] Auth polling error:', error);
-                    // Don't reject here, continue polling
-                }
-            }, 5000); // Poll every 5 seconds
-        });
-    }
-
-    public async initiateAuth(): Promise<void> {
         try {
-            const clientId = await this.getOrCreateClientId();
-            const authState: AuthState = {
-                client_id: clientId,
-                authorization_session_id: this.generateRandomToken()
-            };
-
-            // Store the auth state temporarily
-            await this.context.globalState.update('auth_state', authState);
-
-            // Open browser for authentication
-            const authUrl = new URL('https://auth.hanzo.ai/start');
-            authUrl.searchParams.append('client_id', authState.client_id);
-            authUrl.searchParams.append('authorization_session_id', authState.authorization_session_id);
-            await vscode.env.openExternal(vscode.Uri.parse(authUrl.toString()));
-
-            // Start polling for auth completion
-            await this.startPolling(authState);
-
-            // Clear temporary auth state
-            await this.context.globalState.update('auth_state', undefined);
+            return (await this.session.token()) ?? null;
         } catch (error) {
-            console.error('[Hanzo] Auth initiation error:', error);
-            throw new Error('Failed to initiate authentication', { cause: error });
+            console.warn('[Hanzo] Token refresh failed:', error);
+            return null;
+        }
+    }
+
+    /** Signs in through the browser. Resolves true once signed in. */
+    public async initiateAuth(): Promise<boolean> {
+        try {
+            const email = await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: 'Signing in to Hanzo AI in your browser',
+                    cancellable: true,
+                },
+                (_progress, cancel) => {
+                    const abort = new AbortController();
+                    cancel.onCancellationRequested(() => abort.abort());
+                    return this.session.signIn(
+                        url => vscode.env.openExternal(vscode.Uri.parse(url)),
+                        { signal: abort.signal },
+                    );
+                },
+            );
+            vscode.window.showInformationMessage(email ? `Signed in to Hanzo AI as ${email}.` : 'Signed in to Hanzo AI.');
+            return true;
+        } catch (error) {
+            if (!(error instanceof Canceled)) {
+                vscode.window.showErrorMessage(`Hanzo AI sign-in failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+            return false;
         }
     }
 
     public async logout(): Promise<void> {
-        await this.clearToken();
-        if (this.pollingInterval) {
-            clearInterval(this.pollingInterval);
+        try {
+            await this.session.signOut();
+        } catch (error) {
+            console.warn('[Hanzo] IAM did not revoke the refresh token:', error);
         }
+    }
+
+    /** One line on the session, for the hanzo.debug.authState command. */
+    public async describe(): Promise<string> {
+        const tokens = await this.session.tokens();
+        if (!tokens) {
+            return 'Signed out of Hanzo AI.';
+        }
+        const expiry = tokens.expiresAt === undefined
+            ? 'has no expiry'
+            : `expires ${new Date(tokens.expiresAt).toLocaleString()}`;
+        return `Signed in to Hanzo AI. The access token ${expiry}; ${tokens.refresh ? 'a refresh token renews it' : 'no refresh token renews it'}.`;
     }
 }

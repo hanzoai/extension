@@ -31,7 +31,9 @@ only the IAM web app — a POST there answers HTML, never a token. Verb paths
 them (`iam/pkg/gone/gone.go`): `/v1/iam/<kind>` to list and create,
 `/v1/iam/<kind>/<owner>/<name>` to GET, PUT and DELETE one. A surface with no
 web page of its own redirects to a loopback listener (RFC 8252): IAM accepts
-`http://127.0.0.1:<any port>/callback` for `hanzo-jetbrains`.
+`http://127.0.0.1:<any port>/callback` for `hanzo-jetbrains`, `hanzo-vscode`
+and `hanzo-cli`, and refuses `localhost`. VS Code signs in one way,
+`packages/vscode/src/auth/iam.ts` (code + PKCE, tokens in SecretStorage).
 
 ## Architecture (native ZAP)
 

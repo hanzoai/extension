@@ -105,34 +105,6 @@ async function build() {
             }
         });
         
-        // Build the authenticated version
-        await esbuild.build({
-            entryPoints: ['src/mcp-server-standalone-auth.ts'],
-            bundle: true,
-            platform: 'node',
-            target: 'node18',
-            outfile: 'out/mcp-server-standalone-auth.js',
-            external: [],
-            loader: { '.ts': 'ts' },
-            plugins: [{
-                name: 'vscode-mock',
-                setup(build) {
-                    build.onResolve({ filter: /^vscode$/ }, () => ({
-                        path: 'vscode-mock',
-                        namespace: 'vscode-mock'
-                    }));
-                    
-                    build.onLoad({ filter: /.*/, namespace: 'vscode-mock' }, () => ({
-                        contents: vscodeMock,
-                        loader: 'js'
-                    }));
-                }
-            }],
-            define: {
-                'process.env.NODE_ENV': '"production"'
-            }
-        });
-        
         // Build the fixed version for npm package
         await esbuild.build({
             entryPoints: ['src/mcp-server-fixed.ts'],

@@ -1,11 +1,5 @@
 import * as vscode from 'vscode';
 
-interface AuthConfig {
-    baseUrl: string;
-    startEndpoint: string;
-    checkEndpoint: string;
-}
-
 interface MCPConfig {
     enabled: boolean;
     port: number;
@@ -24,7 +18,6 @@ interface MCPConfig {
 
 interface Config {
     apiUrl: string;
-    auth: AuthConfig;
     mcp: MCPConfig;
     debug: boolean;
 }
@@ -36,11 +29,6 @@ interface Configs {
 const configs: Configs = {
     development: {
         apiUrl: 'http://localhost:3000/ext/v1',
-        auth: {
-            baseUrl: 'https://auth.hanzo.ai',
-            startEndpoint: '/start',
-            checkEndpoint: '/api/check-auth'
-        },
         mcp: {
             enabled: true,
             port: 3000,
@@ -55,11 +43,6 @@ const configs: Configs = {
     },
     production: {
         apiUrl: 'https://api.hanzo.ai/ext/v1',
-        auth: {
-            baseUrl: 'https://auth.hanzo.ai',
-            startEndpoint: '/start',
-            checkEndpoint: '/api/check-auth'
-        },
         mcp: {
             enabled: true,
             port: 3000,
