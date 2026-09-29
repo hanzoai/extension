@@ -18,8 +18,7 @@
 import 'webextension-polyfill';
 
 import type { ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
-import { handleZapMessage } from './shared/zap.js';
-import { ensureNativeZap, type NativeZapState } from './shared/native-zap.js';
+import { startZap } from './shared/zap.js';
 import { fetchAllUsage } from './shared/usage.js';
 import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 import {
@@ -82,7 +81,7 @@ const controlSession: ControlSession = {
   startedAt: null,
 };
 
-// The zapd registration lives at the bottom of the file: it dispatches inbound
+// The ZAP registration lives at the bottom of the file: it dispatches inbound
 // commands through the extension class, so it waits for that instance.
 
 // =============================================================================
@@ -1864,7 +1863,7 @@ async function getValidAccessToken(): Promise<string | null> {
 browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: (r: any) => void) => {
   (async () => {
     // --- ZAP Protocol (handled by shared module) ---
-    if (typeof request.action === 'string' && handleZapMessage(request.action, sendResponse, nativeZap)) {
+    if (typeof request.action === 'string' && zap.handle(request.action, request, sendResponse)) {
       return;
     }
 
@@ -2774,9 +2773,9 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
       // Bridge & Usage
       // =======================================================================
       case 'bridge.status': {
-        // Connected means zapd LISTS us as a provider, which is what
-        // `nativeZap.connected` holds. An open port is not the same claim.
-        const bridgeConnected = nativeZap.connected;
+        // Connected means the router LISTS us, which is what
+        // `zap.state.connected` holds. An open socket is not the same claim.
+        const bridgeConnected = zap.state.connected;
         sendResponse({
           success: true,
           connected: bridgeConnected,
@@ -2901,19 +2900,20 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
 
 const hanzoExtension = new HanzoFirefoxExtension();
 
-// Connect to the local zapd router via the ai.hanzo.zap native host and
-// register Firefox as a browser provider — the SAME transport Chrome uses.
-// Inbound ROUTE commands dispatch to Firefox's native browser.* dispatcher.
+// Join this machine's ZAP router over its loopback WebSocket, once paired, and
+// register Firefox as a browser node — the SAME transport Chrome uses. Inbound
+// ROUTE commands dispatch to Firefox's native browser.* dispatcher.
 const BROWSER_CAPS = ['browser.tabs', 'browser.navigate', 'browser.dom', 'browser.screenshot', 'browser.input'];
-const nativeZap: NativeZapState = {
-  connected: false,
-  port: null,
-  providerId: `browser:${BROWSER_NAME}/default`,
-  caps: [],
-};
 const browserDispatch = (method: string, params: any) =>
   hanzoExtension.dispatchMethod(method, (params || {}) as Record<string, unknown>);
-ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
+const zap = startZap({
+  brand: 'hanzo',
+  caps: BROWSER_CAPS,
+  engine: BROWSER_NAME,
+  dispatch: browserDispatch,
+  log: console.log,
+  storage: browser.storage.local,
+});
 
 // =============================================================================
 // Keep-alive — two-layer:
@@ -2923,9 +2923,9 @@ ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
 //      loaded indefinitely. This is the canonical MV3 pattern and the
 //      cheapest fix for the suspend bug — no polling required.
 //
-//   2. Alarms: belt-and-suspenders for the case where no http(s) tab is
-//      open (about: pages, fresh window) AND the background gets
-//      suspended. The alarm wakes the page and reconciles the registration.
+//   2. Alarms: for the case where no http(s) tab is open (about: pages,
+//      fresh window) AND the background gets suspended. The alarm wakes the
+//      page and restarts the reconciler's clock.
 // =============================================================================
 browser.runtime.onConnect.addListener((port) => {
   if (port.name !== 'zap-keepalive') return;
@@ -2937,14 +2937,12 @@ browser.runtime.onConnect.addListener((port) => {
 
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
 try {
-  // Belt-and-suspenders: even with the background page idled out, the alarm
-  // wakes it every 15s and reconciles once.
-  browser.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.25 });
+  // Even with the background page idled out, the alarm wakes it every 30 s
+  // and restarts the reconciler's clock.
+  browser.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.5 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
-    // Unconditional: `connected` is what the reconciler computes, so gating the
-    // tick on it would leave a stale `true` permanently unchallenged.
-    ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, console.log);
+    zap.tick();
   });
 } catch (e) {
   console.warn('[Hanzo] alarms unavailable:', e);

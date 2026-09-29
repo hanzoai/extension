@@ -305,19 +305,21 @@ describe('webextension-polyfill integration', () => {
 });
 
 describe('Firefox register identity', () => {
-  it('Firefox names itself in its provider id, so routing can address it', () => {
-    // Multi-browser routing addresses a browser by name. That name rides the
-    // provider id the extension registers with zapd — `browser:<engine>/default`
-    // — which is the whole identity the router stores.
-    expect(firefoxBg).toMatch(/providerId:\s*`browser:\$\{BROWSER_NAME\}\/default`/);
+  it('Firefox names itself in its node id, so routing can address it', () => {
+    // Multi-browser routing addresses a browser by engine. The engine rides the
+    // node name the extension registers — `browser/<engine>-<id>` (shared/zap.ts).
+    expect(firefoxBg).toMatch(/engine:\s*BROWSER_NAME/);
     expect(firefoxBg).toMatch(/const BROWSER_NAME = 'firefox'/);
   });
 
-  it('carries no second transport beside the native one', () => {
-    // One native primitive: no WebSocket, no localhost port, no CDP bridge.
-    // A dormant opt-in second path is still a second path.
-    expect(firefoxBg).not.toMatch(/new WebSocket\(/);
-    expect(firefoxBg).not.toMatch(/ws:\/\//);
-    expect(firefoxBg).not.toMatch(/HANZO_LEGACY_CDP/);
+  it('joins through the one shared transport and carries no second', () => {
+    // One primitive, shared by every engine: shared/socket.ts, started by
+    // shared/zap.ts. No native messaging, no second socket, no CDP bridge.
+    for (const bg of [firefoxBg, chromeBg]) {
+      expect(bg).toMatch(/startZap\(/);
+      expect(bg).not.toMatch(/new WebSocket\(/);
+      expect(bg).not.toMatch(/connectNative/);
+      expect(bg).not.toMatch(/HANZO_LEGACY_CDP/);
+    }
   });
 });

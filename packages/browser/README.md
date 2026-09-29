@@ -28,51 +28,45 @@ Firefox: open `about:debugging#/runtime/this-firefox`, choose Load Temporary
 Add-on and select `dist/firefox/manifest.json`. The id is `hanzo-ai@hanzo.ai`,
 and the manifest requires Firefox 109 or newer.
 
-Safari needs the Xcode wrapper around `src/safari`; this README does not cover
-it.
+Safari is built from `dist/chrome` by Xcode's `safari-web-extension-converter`
+(`make build` runs it on macOS); this README does not cover signing it.
 
 ## Let an agent drive the browser
 
-The extension opens no port. It calls `connectNative("ai.hanzo.zap")`, the
-browser starts `zapd` as that native-messaging host, and zapd registers the
-extension on the local router socket `~/.zap/run/zapd.sock` as a provider named
-`browser:<engine>/<host>/default`. An agent reaches the browser through that
-router.
+The extension connects out to this computer's ZAP router: a WebSocket to
+`127.0.0.1:<port>`, where the port is `20000 + uid mod 10000`. There is no
+helper binary, no native-messaging manifest and no daemon — the router is
+embedded in hanzo-mcp (and the dev CLI, the desktop app and the IDE), and
+whichever of them runs first serves it. The extension registers as
+`browser/<host>/<engine>-<id>`.
 
-Install zapd and its host manifests once:
+Pair once per browser. On the same computer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zap-proto/zapd/main/install.sh | sh
-zapd install-host --brand hanzo
+hanzo-mcp pair        # prints ws://127.0.0.1:<port>/#<token>
 ```
 
-`install-host` writes `ai.hanzo.zap.json` into the `NativeMessagingHosts`
-directory of each installed Chrome-family browser, allowing
-`chrome-extension://biingenefmanpecedoafkfajbnlgdmbl/`, and of Firefox, allowing
-`hanzo-ai@hanzo.ai`. The router itself starts on demand.
+Paste that code into the extension popup's **Pair** box. The router admits the
+extension only from its own extension origin and only after both sides prove
+the token (the router first); a web page can reach neither. `hanzo-mcp pair
+--reset` issues a new token and every browser pairs again.
 
 The agent side is the Python MCP server with the browser tools, on Python 3.12
 or newer:
 
 ```bash
-pip install hanzo-mcp hanzo-tools-browser 'mcp<2'
-claude mcp add hanzo-browser -- hanzo-mcp
+pip install hanzo-mcp 'mcp<2'
+claude mcp add hanzo -- hanzo-mcp
 ```
 
-`mcp<2` is required: `hanzo-tools-browser` 0.5.11 imports `FastMCP` from
-`mcp.server`, which mcp 2 removed. The first start loaded its tool packages for
-two to three minutes here, past Claude Code's 30-second connection check; after
-that, a start connected in about 12 seconds.
+`mcp<2` is required: `hanzo-tools-browser` imports `FastMCP` from `mcp.server`,
+which mcp 2 removed.
 
 The server offers `browser`, whose actions include `navigate`, `click`, `fill`,
 `url` and `title`, and `cdp`, which sends a DevTools Protocol method by name.
-Both route through zapd to the extension. To see whether zapd lists the browser:
-
-```bash
-python -c 'from hanzo_tools.browser.zapd_consumer import get_consumer; print([p["id"] for p in get_consumer().list_providers()])'
-```
-
-With the extension loaded in Firefox it printed `['browser:firefox/ra/default']`.
+Both route through the router to the extension. `zapd ls` (from
+`npm i -g @zap-proto/zapd`) lists every node on the router, the browser
+included.
 
 ## Drive a page: snapshot, then refs
 

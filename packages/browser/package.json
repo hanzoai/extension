@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/browser-extension",
-  "version": "1.9.57",
+  "version": "1.9.58",
   "description": "Hanzo AI Browser Extension",
   "scripts": {
     "build": "node src/build.js",

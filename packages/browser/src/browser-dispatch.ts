@@ -9,8 +9,8 @@ import { DRIVE, drive } from './shared/drive.js';
 /**
  * Coerce the named params from string → number in place.
  *
- * native-zap decodes every command param as a UTF-8 string (see
- * shared/native-zap.ts `decodeCmd`), but CDP methods like
+ * The ZAP transport decodes every command param as a UTF-8 string (see
+ * shared/socket.ts `decodeCmd`), but CDP methods like
  * `Input.dispatchMouseEvent` type their coordinates as doubles and reject a
  * string ("double value expected"). Callers that hand params to CDP run them
  * through this first. Absent / already-numeric / non-numeric values are left
@@ -363,9 +363,8 @@ export class CDPBridge {
     return true;
   }
   
-  // Legacy bridge client removed — the extension reaches the local zapd router
-  // via the ai.hanzo.zap native host. dispatchMethod() below remains the
-  // inbound browser-command dispatcher.
+  // The extension reaches the ZAP router over shared/socket.ts; dispatchMethod()
+  // below is the inbound browser-command dispatcher.
 
   /**
    * Public entry point for ZAP-server-initiated requests.
@@ -602,7 +601,7 @@ export class CDPBridge {
           };
           const action = 'browser.' + (actionMap[cmd] || cmd);
           // tabId LAST so the resolved numeric id wins over any string tabId in
-          // params (native-zap decodes every value as a string). BrowserControl
+          // params (the ZAP transport decodes every value as a string). BrowserControl
           // runs the verb via chrome.scripting.executeScript (MAIN world) — no
           // content script, no message bus. domDispatch calls it directly
           // because chrome.runtime.sendMessage cannot reach a listener in this

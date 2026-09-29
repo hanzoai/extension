@@ -11,7 +11,6 @@
     "webNavigation",
     "scripting",
     "cookies",
-    "nativeMessaging",
     "alarms"
   ],
   "host_permissions": [

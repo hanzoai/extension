@@ -1,7 +1,7 @@
 # Hanzo Extension
 
-Browser extension (`packages/browser`) that joins the shared local **zapd** fabric.
-One native primitive — no WebSocket, no localhost port, no mDNS, no CDP bridge.
+Browser extension (`packages/browser`) that joins this computer's **ZAP router**
+over one paired loopback WebSocket — no native messaging, no mDNS, no CDP bridge.
 Ships Chrome / Firefox / Safari. The rest of the workspace is the other Hanzo
 surfaces (editors, office, chat, business apps); README.md indexes them.
 
@@ -73,30 +73,42 @@ through `packages/vscode/src/api/chat.ts` (bearer: the IAM session, else
 `HANZO_API_KEY` or `hanzo.llm.hanzo.apiKey`), hanzo-mcp through
 `API_URL` with `HANZO_API_KEY`. Ollama and LM Studio stay: they are local.
 
-## Architecture (native ZAP)
+## Architecture (ZAP over a loopback WebSocket)
 
-    extension ─connectNative("ai.hanzo.zap")─► native host ─UDS─► zapd ◄─ hanzo-mcp
+    extension ─WebSocket 127.0.0.1:20000+uid%10000─► ZAP router ◄─UDS─ hanzo-mcp, dev, desktop, IDE
 
-- `shared/native-zap.ts` — the ONE transport. `ensureNativeZap()` is the ONE entry
-  point: drive it from the keep-alive alarm and it reconciles the extension's
-  registration against the router (opens the native port — **singleton**, one port;
-  the router does evict-and-replace — registers as provider
-  `browser:<engine>/<host>/default`, dispatches inbound ROUTE commands).
-  Cross-browser (`browser ∥ chrome`).
-  **`connected` means "zapd lists me as a provider"**, established by a
-  `PROVIDERS_LIST` probe — never merely "a port is open". A WELCOME is not proof:
-  a native port stays open while its host is wedged, so a port can be open, deaf
-  and unregistered indefinitely (the failure this replaced: zapd reporting 0
-  providers for hours while a host process was up and the extension believed it was
-  connected). The tick also re-sends HELLO on a healthy-but-unlisted port, and
-  replaces a port whose probe went unanswered. Do NOT add a second reconnect path —
-  two live hosts race for one provider id and the loser's close deregisters the
-  winner. Covered by `tests/native-zap.test.ts`.
-- The same `PROVIDERS` reply carries our entry's caps, so `decodeProviders` keeps
-  the whole entry and `state.caps` is what the router says this browser serves.
-  `shared/zap.ts` answers `zap.status` from that state — registration, provider id,
-  caps — and the sidebar's tool count is that list's length. There is no MCP-tool
-  manifest to report: the extension is a provider on zapd, not a consumer of one.
+The router is not a daemon: it is the `zapd` library embedded in every Hanzo
+process that speaks ZAP, and an fcntl lock elects one per user (HIP-0069). When
+that process exits another takes over and the extension's socket reconnects to
+the same address. No native messaging, no host manifest, no binary for the
+browser to exec — which is why it works in snap and Flatpak browsers.
+
+- `shared/socket.ts` — the ONE transport. `ensureZap()` is the ONE reconciler and
+  keeps the ONE clock: every tick reschedules the next (20 s heartbeat while
+  registered, 250 ms doubling to 30 s after a drop), and the keep-alive alarm
+  only restarts that clock after the worker was stopped. The heartbeat is a
+  `PROVIDERS_LIST` probe, which is also the WebSocket traffic that keeps an MV3
+  service worker alive. **Singleton**: one socket, torn down before another.
+  Each WebSocket binary message is one ZAP router envelope, length included.
+- **Pairing.** `hanzo-mcp pair` prints `ws://127.0.0.1:<port>/#<64 hex>`; the popup
+  takes it (`zap.pair`) and `shared/zap.ts` keeps it in `storage.local`. On
+  connect the extension sends a nonce, the router answers with its nonce and
+  `HMAC(token, "zap router"‖nc‖ns)`, and only if that verifies does the
+  extension answer `HMAC(token, "zap client"‖nc‖ns)` and say HELLO. A squatter
+  on the port gets nothing. The door also refuses any Origin but ours
+  (`chrome-extension://biingenefmanpecedoafkfajbnlgdmbl`, `moz-extension://*`,
+  `safari-web-extension://*`), and a browser node may answer calls but never
+  call another node.
+- **`connected` means "the router lists me"**, established by the probe — never
+  merely "a socket is open". The tick re-sends HELLO when proven but unlisted,
+  and replaces a socket whose probe or proof went unanswered for 5 s.
+- `shared/zap.ts` — `startZap()`, used by both backgrounds: loads the pairing and
+  this install's node name (`<engine>-<4 hex>`, minted once), answers
+  `zap.status` / `zap.pair` / `zap.unpair`. `state.caps` is what the router's
+  registry says this browser serves; the sidebar's tool count is its length.
+- Safari runs the same code (the converter builds it from `dist/chrome`): WebKit
+  opens `ws://127.0.0.1` from an extension's secure context, so there is no
+  Swift bridge.
 - `background.ts` (Chrome) — dispatch via `chrome.debugger` (CDP→tab; shows the
   "debugging this browser" banner; WebKit-incompatible). **To be removed** — see WXT plan.
 - `background-firefox.ts` — native `browser.*` dispatch (no banner). The correct model.
@@ -119,10 +131,6 @@ through `packages/vscode/src/api/chat.ts` (bearer: the IAM session, else
   names the covering element. Extension pages reach it with runtime message
   `{action: 'drive'}` (web pages refused). The older `hanzo.click/fill/…`
   selector verbs are no longer called by hanzo-mcp; WXT step 3 deletes them.
-
-Wire to zapd: the binary ZAP router envelope (`zap-proto/zapd/src/frame.rs`); the
-browser↔host hop is native-messaging JSON, base64'd, quarantined in the host. Host +
-per-browser manifests come from `zapd install-host` (`zap-proto/zapd`).
 
 ## Versioning
 Patch only (X.Y.Z+1), never major. `package.json` is the source of truth; `build.js`
@@ -172,8 +180,8 @@ job if none did. If a release does not appear, confirm with
 
 One WebExtension codebase, every engine. **WXT** = build/SDK layer (build matrix,
 manifest gen, targets, MV3, Vite/TS); `webextension-polyfill` / `@wxt-dev/browser` =
-`browser.*` normalization. **Custom (keep):** `shared/native-zap.ts`, and the Safari
-`SafariWebExtensionHandler.swift` → `~/.zap/run/zapd.sock` bridge. WXT builds Safari
+`browser.*` normalization. **Custom (keep):** `shared/socket.ts` and `shared/zap.ts`,
+the same on every engine. WXT builds Safari
 but does NOT give WebKit `chrome.debugger` — so dispatch must become portable
 `browser.*` (the Firefox model is already correct).
 
@@ -182,8 +190,7 @@ but does NOT give WebKit `chrome.debugger` — so dispatch must become portable
    `browser` adapter.
 3. Collapse dispatch → delete `chrome.debugger` / `browser-dispatch.ts`; actuate over
    `tabs`/`scripting`/`webNavigation`/`browser.*` (portable, no banner, Safari-capable).
-4. Transport stays per-platform: Chrome/Firefox `connectNative` → host → `zapd.sock`;
-   Safari `SafariWebExtensionHandler.swift` → `zapd.sock`.
+4. Transport is already one for every engine: `shared/socket.ts`.
 5. CI guards (last; go red until 1–4 land): fail if `chrome.debugger`, the `debugger`
    permission, or `background-firefox.ts` appears.
 

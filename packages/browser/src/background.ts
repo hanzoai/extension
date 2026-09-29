@@ -8,8 +8,7 @@
 import 'webextension-polyfill';
 
 import type { ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
-import { handleZapMessage } from './shared/zap.js';
-import { ensureNativeZap, type NativeZapState } from './shared/native-zap.js';
+import { startZap } from './shared/zap.js';
 import {
   getRagConfig as getSharedRagConfig,
   normalizeRagSnippets,
@@ -350,11 +349,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleMessage(request: any, sender: chrome.runtime.MessageSender, sendResponse: Function) {
+  // --- ZAP: status and pairing (shared/zap.ts) ---
+  if (typeof request.action === 'string' && zap.handle(request.action, request, sendResponse as (r: any) => void)) return;
+
   switch (request.action) {
-    // --- ZAP Protocol actions (delegated to shared module) ---
-    case 'zap.status':
-      handleZapMessage(request.action, sendResponse, nativeZap);
-      break;
 
     // --- Snapshot → ref engine, for the extension's own pages ---
     case 'drive':
@@ -1767,20 +1765,20 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
-// 1. Primary: connect to the local zapd router via the ai.hanzo.zap native
-//    host and register as a browser provider. Inbound ROUTE commands are
-//    dispatched to the browser. Exactly one transport — no WebSocket, no
-//    localhost ports, no mDNS probing; the browser can never get a refused
-//    connection (connectNative attaches the host or fails once, cleanly).
+// 1. Join this machine's ZAP router over its loopback WebSocket, once paired,
+//    and register as a browser node. Inbound ROUTE commands dispatch to the
+//    browser. Exactly one transport (shared/socket.ts); the router is embedded
+//    in hanzo-mcp and the other Hanzo processes, so there is nothing to install.
 const BROWSER_CAPS = ['browser.tabs', 'browser.navigate', 'browser.dom', 'browser.screenshot', 'browser.input'];
-const nativeZap: NativeZapState = {
-  connected: false,
-  port: null,
-  providerId: `browser:${BROWSER_NAME}/default`,
-  caps: [],
-};
 const browserDispatch = (method: string, params: any) => cdpBridge.dispatchMethod(method, params);
-ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, debugLog);
+const zap = startZap({
+  brand: 'hanzo',
+  caps: BROWSER_CAPS,
+  engine: BROWSER_NAME,
+  dispatch: browserDispatch,
+  log: debugLog,
+  storage: chrome.storage.local,
+});
 
 // Keep-alive — Layer 1: Port. Content scripts in every loaded http(s) tab
 // hold a `zap-keepalive` port. As long as ANY tab has one, Chrome keeps
@@ -1790,16 +1788,15 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener(() => { /* receipt is the keep-alive */ });
 });
 
-// Keep-alive — Layer 2: Alarms. Wake the worker periodically and reconcile the
-// registration against the router. This runs unconditionally: `connected` is
-// what the reconciler *computes*, so gating the tick on it would leave a stale
-// `true` permanently unchallenged — the wedge we are fixing.
+// Keep-alive — Layer 2: Alarms. While the socket is up its 20 s heartbeat keeps
+// the worker alive; the alarm restarts the reconciler's clock after the worker
+// was stopped anyway (no pairing yet, no router yet, browser suspend).
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
 try {
-  chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.25 });
+  chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.5 });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEP_ALIVE_ALARM) return;
-    ensureNativeZap(nativeZap, 'hanzo', BROWSER_CAPS, browserDispatch, debugLog);
+    zap.tick();
   });
 } catch (e) {
   console.warn('[Hanzo] alarms unavailable:', e);
@@ -1807,7 +1804,7 @@ try {
 
 
 // Export for testing
-export { browserControl, webgpuAI, nativeZap };
+export { browserControl, webgpuAI, zap };
 
 // omnibox keyword: type `hanzo <query>` in the address bar -> the Hanzo answer
 // engine. This is the ONE search entry, and the manifest declares no

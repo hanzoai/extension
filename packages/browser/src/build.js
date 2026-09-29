@@ -332,19 +332,9 @@ Source: https://github.com/hanzoai/extension/tree/main/packages/browser
       { stdio: 'inherit' }
     );
 
-    // The converter writes Xcode's stock handler, which logs a message and
-    // echoes it back. Ours carries the last hop to zapd — Chrome and Firefox
-    // get there by spawning the host over stdio, and Safari cannot spawn a
-    // binary, so it writes to the router's socket itself. Copied AFTER the
-    // conversion, because --force rewrites that file every run.
-    const handler = 'SafariWebExtensionHandler.swift';
-    const shared = path.join(out('safari-xcode'), 'Hanzo AI', 'Shared (Extension)', handler);
-    if (fs.existsSync(path.dirname(shared))) {
-      fs.copyFileSync(path.join(__dirname, 'safari', handler), shared);
-      console.log(`Safari: ${handler} bridged to zapd`);
-    } else {
-      throw new Error(`Safari: no Shared (Extension) dir at ${shared} — the converter changed its layout`);
-    }
+    // Safari joins the ZAP router the way Chrome and Firefox do, over the
+    // loopback WebSocket in shared/socket.ts, so the converter's stock native
+    // handler is left as it writes it: nothing messages it.
     console.log(`📦 Safari: ${out('safari-xcode')} (macOS + iOS Xcode project)`);
   }
 

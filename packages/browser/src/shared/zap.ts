@@ -1,28 +1,99 @@
 /**
- * ZAP surface for the extension's own pages — what popup and sidebar may ask
- * the background about this browser's standing on the local zapd router.
+ * The extension on this machine's ZAP router — the one place both backgrounds
+ * start it, and the one place popup and sidebar ask about it.
  *
- * The answer comes from `NativeZapState`, which the reconciler keeps in step
- * with the router's registry, so every field here is something the router
- * itself asserted.
+ * Kept in `storage.local` (never `storage.sync`: the pairing belongs to this
+ * machine's router and means nothing on another):
+ *   zapPairing  the code the user pasted, `ws://127.0.0.1:<port>/#<token>`
+ *   zapName     this install's node name, `<engine>-<4 hex>`, minted once
+ *
+ * Messages:
+ *   zap.status            → { connected, paired, providerId, caps, error }
+ *   zap.pair   { code }   → pair with the router that minted `code`
+ *   zap.unpair            → forget the pairing and disconnect
  */
 
-import type { NativeZapState } from './native-zap.js';
+import { ensureZap, newZapState, parsePairing, setPairing, type ZapOpts, type ZapState } from './socket.js';
 
-/** Handle zap.* messages from sidebar/popup. Returns true if handled. */
-export function handleZapMessage(
-  action: string,
-  sendResponse: (r: any) => void,
-  state: NativeZapState,
-): boolean {
-  if (action !== 'zap.status') return false;
-  sendResponse({
-    success: true,
-    zap: {
-      connected: state.connected,
-      providerId: state.providerId,
-      caps: state.caps,
+export interface ZapStorage {
+  get(keys: string[]): Promise<Record<string, any>>;
+  set(items: Record<string, any>): Promise<void>;
+  remove(key: string): Promise<void>;
+}
+
+export interface Zap {
+  state: ZapState;
+  /** Reconcile now — the keep-alive alarm calls this after a worker restart. */
+  tick(): void;
+  /** Answer a zap.* message. Returns true if it was one. */
+  handle(action: string, request: any, sendResponse: (r: any) => void): boolean;
+}
+
+export const PAIR_HELP = 'Run `hanzo-mcp pair` (or `zapd pair`) on this computer and paste the code it prints.';
+
+export function startZap(opts: ZapOpts & { engine: string; storage: ZapStorage }): Zap {
+  const state = newZapState('');
+  let ready = false;
+
+  const loaded = (async () => {
+    const s = await opts.storage.get(['zapPairing', 'zapName']);
+    let name: string = s.zapName;
+    if (!name) {
+      const id = crypto.getRandomValues(new Uint8Array(2));
+      name = `${opts.engine}-${Array.from(id, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+      await opts.storage.set({ zapName: name });
+    }
+    state.providerId = `browser/${name}`;
+    state.pairing = typeof s.zapPairing === 'string' ? parsePairing(s.zapPairing) : null;
+    ready = true;
+    ensureZap(state, opts);
+  })();
+
+  return {
+    state,
+    tick() {
+      if (ready) ensureZap(state, opts);
     },
-  });
-  return true;
+    handle(action, request, sendResponse) {
+      switch (action) {
+        case 'zap.status':
+          sendResponse({
+            success: true,
+            zap: {
+              connected: state.connected,
+              paired: !!state.pairing,
+              providerId: state.providerId,
+              caps: state.caps,
+              error: state.error,
+            },
+          });
+          return true;
+        case 'zap.pair': {
+          const code = String(request?.code ?? '').trim();
+          const pairing = parsePairing(code);
+          if (!pairing) {
+            sendResponse({ success: false, error: `Not a pairing code. ${PAIR_HELP}` });
+            return true;
+          }
+          void loaded
+            .then(() => opts.storage.set({ zapPairing: code }))
+            .then(() => {
+              setPairing(state, pairing, opts);
+              sendResponse({ success: true });
+            });
+          return true;
+        }
+        case 'zap.unpair':
+          void loaded
+            .then(() => opts.storage.remove('zapPairing'))
+            .then(() => {
+              setPairing(state, null, opts);
+              sendResponse({ success: true });
+            });
+          return true;
+        default:
+          return false;
+      }
+    },
+  };
 }

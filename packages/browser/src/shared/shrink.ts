@@ -1,8 +1,8 @@
 /**
  * Shrink a capture where the pixels are.
  *
- * A 4480x1440 screen is ~740 KB of base64. That payload crosses native
- * messaging, then zapd, then lands in an agent's context window — where it is
+ * A 4480x1440 screen is ~740 KB of base64. That payload crosses the ZAP
+ * router, then lands in an agent's context window — where it is
  * charged by the character and costs more than the agent has to think with.
  * Downscaling in the browser means it is never built in the first place.
  *

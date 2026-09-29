@@ -295,6 +295,14 @@
         </div>
       </div>
 
+      <!-- Pairing: once per browser, with this computer's ZAP router -->
+      <div class="setting-group" id="zap-pair" hidden>
+        <label for="zap-code">Pair with this computer: run <code>hanzo-mcp pair</code> and paste the code it prints.</label>
+        <input type="text" id="zap-code" placeholder="ws://127.0.0.1:…/#…" autocomplete="off" spellcheck="false">
+        <button id="zap-pair-btn" class="btn btn-secondary" style="margin-top: 6px;">Pair</button>
+        <span id="zap-pair-error" class="status-detail"></span>
+      </div>
+
       <div class="divider"></div>
 
       <!-- Actions -->

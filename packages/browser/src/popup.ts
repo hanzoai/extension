@@ -69,6 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Status dots
   const zapStatus = document.getElementById('zap-status');
   const zapDetail = document.getElementById('zap-detail');
+  const zapPair = document.getElementById('zap-pair') as HTMLElement;
+  const zapCode = document.getElementById('zap-code') as HTMLInputElement;
+  const zapPairError = document.getElementById('zap-pair-error') as HTMLElement;
   const mcpStatus = document.getElementById('mcp-status');
   const mcpPort = document.getElementById('mcp-port');
   const cdpStatus = document.getElementById('cdp-status');
@@ -326,14 +329,35 @@ document.addEventListener('DOMContentLoaded', () => {
     detail.textContent = text;
   }
 
+  // Pairing with this computer's ZAP router: the code comes from
+  // `hanzo-mcp pair`, and the background keeps it in storage.local.
+  document.getElementById('zap-pair-btn')?.addEventListener('click', () => {
+    zapPairError.textContent = '';
+    chrome.runtime.sendMessage({ action: 'zap.pair', code: zapCode.value }, (response) => {
+      if (chrome.runtime.lastError) return;
+      if (!response?.success) {
+        zapPairError.textContent = response?.error || 'Pairing failed';
+        return;
+      }
+      zapCode.value = '';
+      setTimeout(refreshStatus, 800);
+    });
+  });
+
   function refreshStatus() {
     // ZAP Bridge
     chrome.runtime.sendMessage({ action: 'zap.status' }, (response) => {
       if (chrome.runtime.lastError) return;
       if (response?.success) {
         const zap = response.zap;
-        setStatus(zapStatus, zapDetail, zap.connected,
-          zap.connected ? `${zap.caps?.length || 0} tools` : 'Not registered');
+        const text = zap.connected ? `${zap.caps?.length || 0} tools`
+          : !zap.paired ? 'Not paired'
+          : zap.error === 'no-router' ? 'No router — start hanzo-mcp'
+          : zap.error === 'mismatch' ? 'Pairing mismatch — pair again'
+          : zap.error === 'refused' ? 'Router refused this browser'
+          : 'Connecting…';
+        setStatus(zapStatus, zapDetail, zap.connected, text);
+        zapPair.hidden = zap.connected || (zap.paired && zap.error !== 'mismatch');
       }
     });
 

@@ -50,6 +50,30 @@ test.describe('Popup', () => {
     await expect(page.locator('#gpu-status')).toBeAttached();
   });
 
+  test('pairs with this computer\'s ZAP router', async ({ context, extensionId }) => {
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
+
+    // Unpaired: the popup says so and offers the box.
+    await expect(page.locator('#zap-detail')).toHaveText('Not paired');
+    await expect(page.locator('#zap-pair')).toBeVisible();
+
+    // A code that points off this machine is refused, with where codes come from.
+    await page.fill('#zap-code', `ws://evil.example:21000/#${'07'.repeat(32)}`);
+    await page.click('#zap-pair-btn');
+    await expect(page.locator('#zap-pair-error')).toContainText('hanzo-mcp pair');
+
+    // A loopback code is kept; with no router on that port, the popup says what
+    // to start rather than claiming a connection.
+    await page.fill('#zap-code', `ws://127.0.0.1:1/#${'07'.repeat(32)}`);
+    await page.click('#zap-pair-btn');
+    await expect(page.locator('#zap-code')).toHaveValue('');
+    await page.waitForTimeout(1500);
+    await page.reload();
+    await expect(page.locator('#zap-detail')).toHaveText('No router — start hanzo-mcp');
+    await expect(page.locator('#zap-pair')).toBeHidden();
+  });
+
   test('settings button exists in main section', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
