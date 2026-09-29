@@ -50,7 +50,7 @@ class HanzoProjectService(private val project: Project) {
             val token = authService.getAuthToken() ?: return@withContext getDefaultModels()
             
             val request = Request.Builder()
-                .url("${HanzoPlugin.LLM_GATEWAY_URL}/v1/models")
+                .url("${HanzoPlugin.API_BASE_URL}/v1/models")
                 .header("Authorization", "Bearer $token")
                 .get()
                 .build()
@@ -103,7 +103,7 @@ class HanzoProjectService(private val project: Project) {
             }
             
             val request = Request.Builder()
-                .url("${HanzoPlugin.LLM_GATEWAY_URL}/v1/chat/completions")
+                .url("${HanzoPlugin.API_BASE_URL}/v1/chat/completions")
                 .header("Authorization", "Bearer $token")
                 .header("Content-Type", "application/json")
                 .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
@@ -182,7 +182,7 @@ class HanzoProjectService(private val project: Project) {
             }
             
             val request = Request.Builder()
-                .url("${HanzoPlugin.LLM_GATEWAY_URL}/v1/chat/completions")
+                .url("${HanzoPlugin.API_BASE_URL}/v1/chat/completions")
                 .header("Authorization", "Bearer $token")
                 .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
                 .build()

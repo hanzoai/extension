@@ -8,7 +8,7 @@ fun environment(key: String) = providers.environmentVariable(key)
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.21"
-    id("org.jetbrains.intellij") version "1.16.1"
+    id("org.jetbrains.intellij") version "1.17.4"
     id("org.jetbrains.changelog") version "2.2.0"
 }
 
@@ -20,12 +20,16 @@ repositories {
 }
 
 dependencies {
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // The IDE provides the Kotlin stdlib; a bundled second copy splits class
+    // identity between the plugin and the platform.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0") {
+        exclude(group = "org.jetbrains.kotlin")
+    }
     implementation("com.google.code.gson:gson:2.10.1")
-    
+
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core:5.8.0")
-    testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
     testImplementation(kotlin("test"))
 }
 
@@ -106,7 +110,7 @@ tasks {
     publishPlugin {
         dependsOn("patchChangelog")
         token = environment("PUBLISH_TOKEN")
-        channels = properties("pluginVersion").map { listOf(it.split('-').getOrElse(1) { "default" }.split('.').first()) }
+        channels = properties("pluginVersion").map { listOf(it.split('-').getOrElse(1) { "default" }.substringBefore('.')) }
     }
 
     runPluginVerifier {

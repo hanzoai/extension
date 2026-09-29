@@ -257,7 +257,7 @@ class HanzoMCPService {
     }
     
     fun isEnabled(): Boolean {
-        return HanzoPlugin.getSettings()?.enableMCP ?: true
+        return HanzoPlugin.getSettings().enableMCP
     }
     
     fun isConnected(): Boolean {

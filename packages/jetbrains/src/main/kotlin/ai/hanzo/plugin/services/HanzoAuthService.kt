@@ -1,199 +1,95 @@
 package ai.hanzo.plugin.services
 
-import com.google.gson.Gson
-import com.google.gson.JsonObject
 import com.intellij.credentialStore.CredentialAttributes
-import com.intellij.credentialStore.Credentials
+import com.intellij.ide.BrowserUtil
 import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
-import ai.hanzo.plugin.HanzoPlugin
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.util.concurrent.CompletableFuture
 
+/** The signed-in Hanzo IAM session. Tokens live in the IDE's password safe. */
 @Service(Service.Level.APP)
 class HanzoAuthService {
     companion object {
         private val LOG = Logger.getInstance(HanzoAuthService::class.java)
-        private const val SERVICE_NAME = "HanzoAI"
-        private const val ACCOUNT_NAME = "default"
-        private const val USER_ID_KEY = "hanzo.user.id"
-        private const val USER_EMAIL_KEY = "hanzo.user.email"
+        private val CREDENTIALS = CredentialAttributes("HanzoAI", "default")
+        private const val EMAIL_KEY = "hanzo.user.email"
     }
-    
-    private val client = OkHttpClient()
-    private val gson = Gson()
+
     private val properties = PropertiesComponent.getInstance()
-    
-    private var authToken: String? = null
-    private var userId: String? = null
-    private var userEmail: String? = null
-    
-    init {
-        loadStoredCredentials()
-    }
-    
-    fun isAuthenticated(): Boolean {
-        return authToken != null
-    }
-    
-    fun getAuthToken(): String? = authToken
-    
-    fun getUserId(): String? = userId
-    
-    fun getUserEmail(): String? = userEmail
-    
-    fun login(email: String, password: String): CompletableFuture<Boolean> {
-        val future = CompletableFuture<Boolean>()
-        
-        val json = JsonObject().apply {
-            addProperty("email", email)
-            addProperty("password", password)
+
+    @Volatile
+    private var tokens: HanzoIam.Tokens? = PasswordSafe.instance.getPassword(CREDENTIALS)?.let(HanzoIam::decode)
+
+    @Volatile
+    private var email: String? = properties.getValue(EMAIL_KEY)
+
+    fun isAuthenticated(): Boolean = tokens != null
+
+    fun getUserEmail(): String? = email
+
+    /** The access token, refreshed first when it is about to expire. Null when signed out. */
+    @Synchronized
+    fun getAuthToken(): String? {
+        val current = tokens ?: return null
+        if (!current.expired()) return current.access
+        val refresh = current.refresh
+        if (refresh == null) {
+            clear()
+            return null
         }
-        
-        val requestBody = gson.toJson(json).toRequestBody("application/json".toMediaType())
-        val request = Request.Builder()
-            .url("${HanzoPlugin.AUTH_URL}/v1/iam/login")
-            .post(requestBody)
-            .build()
-        
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                LOG.error("Login failed", e)
-                future.complete(false)
-            }
-            
-            override fun onResponse(call: Call, response: Response) {
-                response.use { resp ->
-                    if (resp.isSuccessful) {
-                        try {
-                            val body = resp.body?.string()
-                            val jsonResponse = gson.fromJson(body, JsonObject::class.java)
-                            
-                            authToken = jsonResponse.get("access_token")?.asString
-                            userId = jsonResponse.get("user_id")?.asString
-                            userEmail = email
-                            
-                            if (authToken != null) {
-                                saveCredentials()
-                                LOG.info("Login successful for user: $email")
-                                future.complete(true)
-                            } else {
-                                LOG.error("No auth token in response")
-                                future.complete(false)
-                            }
-                        } catch (e: Exception) {
-                            LOG.error("Failed to parse login response", e)
-                            future.complete(false)
-                        }
-                    } else {
-                        LOG.error("Login failed with status: ${resp.code}")
-                        future.complete(false)
-                    }
-                }
-            }
-        })
-        
-        return future
-    }
-    
-    fun loginWithApiKey(apiKey: String): CompletableFuture<Boolean> {
-        val future = CompletableFuture<Boolean>()
-        
-        // Validate API key format
-        if (!apiKey.startsWith("hzk_")) {
-            future.complete(false)
-            return future
+        return try {
+            HanzoIam.refresh(refresh).also(::store).access
+        } catch (e: HanzoIam.Rejected) {
+            LOG.warn("IAM refused the refresh token; signing out", e)
+            clear()
+            null
+        } catch (e: IOException) {
+            LOG.warn("Token refresh failed", e)
+            null
         }
-        
-        authToken = apiKey
-        
-        // Verify the API key by making a test request
-        val request = Request.Builder()
-            .url("${HanzoPlugin.API_BASE_URL}/v1/user/profile")
-            .header("Authorization", "Bearer $apiKey")
-            .get()
-            .build()
-        
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                LOG.error("API key validation failed", e)
-                authToken = null
-                future.complete(false)
-            }
-            
-            override fun onResponse(call: Call, response: Response) {
-                response.use { resp ->
-                    if (resp.isSuccessful) {
-                        try {
-                            val body = resp.body?.string()
-                            val jsonResponse = gson.fromJson(body, JsonObject::class.java)
-                            
-                            userId = jsonResponse.get("id")?.asString
-                            userEmail = jsonResponse.get("email")?.asString
-                            
-                            saveCredentials()
-                            LOG.info("API key login successful")
-                            future.complete(true)
-                        } catch (e: Exception) {
-                            LOG.error("Failed to parse user profile", e)
-                            authToken = null
-                            future.complete(false)
-                        }
-                    } else {
-                        LOG.error("API key validation failed with status: ${resp.code}")
-                        authToken = null
-                        future.complete(false)
-                    }
-                }
-            }
-        })
-        
-        return future
     }
-    
+
+    /**
+     * Signs in through the browser and blocks until IAM redirects back.
+     * Returns the account's email when IAM shares it.
+     */
+    fun login(canceled: () -> Boolean): String? {
+        val signedIn = HanzoIam.login(BrowserUtil::browse, canceled)
+        val info = HanzoIam.userinfo(signedIn.access)
+        store(signedIn)
+        email = info.get("email")?.takeIf { it.isJsonPrimitive }?.asString
+        properties.setValue(EMAIL_KEY, email)
+        LOG.info("Signed in to Hanzo IAM")
+        return email
+    }
+
     fun logout() {
-        authToken = null
-        userId = null
-        userEmail = null
-        clearStoredCredentials()
-        LOG.info("User logged out")
-    }
-    
-    private fun saveCredentials() {
-        if (authToken != null) {
-            val credentialAttributes = CredentialAttributes(SERVICE_NAME, ACCOUNT_NAME)
-            val credentials = Credentials(ACCOUNT_NAME, authToken)
-            PasswordSafe.instance.set(credentialAttributes, credentials)
-            
-            // Save user info
-            userId?.let { properties.setValue(USER_ID_KEY, it) }
-            userEmail?.let { properties.setValue(USER_EMAIL_KEY, it) }
+        val refresh = tokens?.refresh
+        clear()
+        if (refresh != null) {
+            ApplicationManager.getApplication().executeOnPooledThread {
+                try {
+                    HanzoIam.revoke(refresh)
+                } catch (e: IOException) {
+                    LOG.warn("IAM did not revoke the refresh token", e)
+                }
+            }
         }
+        LOG.info("Signed out of Hanzo IAM")
     }
-    
-    private fun loadStoredCredentials() {
-        val credentialAttributes = CredentialAttributes(SERVICE_NAME, ACCOUNT_NAME)
-        val credentials = PasswordSafe.instance.get(credentialAttributes)
-        
-        if (credentials != null) {
-            authToken = credentials.getPasswordAsString()
-            userId = properties.getValue(USER_ID_KEY)
-            userEmail = properties.getValue(USER_EMAIL_KEY)
-            
-            LOG.info("Loaded stored credentials for user: $userEmail")
-        }
+
+    private fun store(signedIn: HanzoIam.Tokens) {
+        tokens = signedIn
+        PasswordSafe.instance.setPassword(CREDENTIALS, HanzoIam.encode(signedIn))
     }
-    
-    private fun clearStoredCredentials() {
-        val credentialAttributes = CredentialAttributes(SERVICE_NAME, ACCOUNT_NAME)
-        PasswordSafe.instance.set(credentialAttributes, null)
-        
-        properties.unsetValue(USER_ID_KEY)
-        properties.unsetValue(USER_EMAIL_KEY)
+
+    private fun clear() {
+        tokens = null
+        email = null
+        PasswordSafe.instance.setPassword(CREDENTIALS, null)
+        properties.unsetValue(EMAIL_KEY)
     }
 }

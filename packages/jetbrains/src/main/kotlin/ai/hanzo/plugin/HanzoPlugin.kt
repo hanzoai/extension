@@ -13,10 +13,8 @@ object HanzoPlugin {
     const val PLUGIN_ID = "ai.hanzo.intellij"
     const val PLUGIN_NAME = "Hanzo AI"
     
-    // API Endpoints
+    // Models, chat and MCP. Sign-in is HanzoIam.
     const val API_BASE_URL = "https://api.hanzo.ai"
-    const val LLM_GATEWAY_URL = "https://llm.hanzo.ai"
-    const val AUTH_URL = "https://auth.hanzo.ai"
     
     // Configuration
     const val DEFAULT_MODEL = "claude-3-5-sonnet-20241022"
@@ -45,9 +43,5 @@ object HanzoPlugin {
     
     fun isInitialized(): Boolean {
         return getAuthService().isAuthenticated()
-    }
-    
-    fun getVersion(): String {
-        return javaClass.`package`.implementationVersion ?: "0.1.0"
     }
 }

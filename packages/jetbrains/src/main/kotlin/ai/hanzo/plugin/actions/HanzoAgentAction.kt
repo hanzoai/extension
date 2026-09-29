@@ -75,7 +75,7 @@ class HanzoAgentAction : AnAction() {
                     }
                     
                     ApplicationManager.getApplication().invokeLater {
-                        showResponseDialog(project, editor, selectedText, response)
+                        showResponseDialog(project, editor, response)
                     }
                 } catch (e: Exception) {
                     ApplicationManager.getApplication().invokeLater {
@@ -107,7 +107,6 @@ class HanzoAgentAction : AnAction() {
     private fun showResponseDialog(
         project: Project,
         editor: Editor,
-        originalCode: String,
         response: String
     ) {
         val dialog = ResponseDialog(project, response)

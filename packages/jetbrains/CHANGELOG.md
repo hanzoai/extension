@@ -1,6 +1,10 @@
 # Hanzo AI JetBrains Plugin Changelog
 
 ## [Unreleased]
+### Changed
+- Login opens hanzo.id in the browser (OAuth 2.0 with PKCE); the IDE no longer asks for a password or API key
+- Sessions refresh themselves, and logout revokes the refresh token
+- Chat and model listing use api.hanzo.ai
 
 ## [0.1.0] - 2024-01-05
 ### Added
