@@ -38,6 +38,7 @@ import {
 } from './shared/auth.js';
 import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
 import { detail, shrink } from './shared/shrink.js';
+import { DRIVE, drive, driveMessage } from './shared/drive.js';
 
 // Declare browser API for TypeScript
 declare const browser: typeof chrome;
@@ -342,6 +343,12 @@ class HanzoFirefoxExtension {
       tab = null as any;
     }
     const tabId: number | undefined = tab?.id ?? undefined;
+
+    // The snapshot → ref engine: the same code Chrome runs (shared/drive.ts).
+    if (DRIVE.has(method)) {
+      if (!tabId) throw new Error('No active tab');
+      return drive(browser, tabId, method, params);
+    }
 
     switch (method) {
       // =====================================================================
@@ -1862,6 +1869,11 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
     }
 
     switch (request.action) {
+      // Snapshot → ref engine, for the extension's own pages
+      case 'drive':
+        sendResponse(await driveMessage(browser, sender, request, (m, p) => hanzoExtension.dispatchMethod(m, p)));
+        break;
+
       // =======================================================================
       // Auth (Hanzo IAM OAuth2 + PKCE)
       // =======================================================================

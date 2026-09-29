@@ -30,6 +30,7 @@ const IAM_V1 = `${IAM_API_URL}${IAM_API_PATH}`;
 import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './browser-dispatch';
+import { driveMessage } from './shared/drive.js';
 import * as auth from './auth';
 import { fetchAllUsage } from './shared/usage.js';
 import { listModels, chatCompletion, ChatMessage } from './chat-client';
@@ -353,6 +354,11 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     // --- ZAP Protocol actions (delegated to shared module) ---
     case 'zap.status':
       handleZapMessage(request.action, sendResponse, nativeZap);
+      break;
+
+    // --- Snapshot → ref engine, for the extension's own pages ---
+    case 'drive':
+      sendResponse(await driveMessage(chrome, sender, request, (m, p) => cdpBridge.dispatchMethod(m, p)));
       break;
 
     // --- Local AI ---

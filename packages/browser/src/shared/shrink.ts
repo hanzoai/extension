@@ -12,14 +12,14 @@
 
 const CHUNK = 0x8000;
 
-function toBlob(base64: string, type: string): Blob {
+export function toBlob(base64: string, type: string): Blob {
   const bin = atob(base64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new Blob([bytes], { type });
 }
 
-async function toBase64(blob: Blob): Promise<string> {
+export async function toBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let bin = '';
   for (let i = 0; i < bytes.length; i += CHUNK) {

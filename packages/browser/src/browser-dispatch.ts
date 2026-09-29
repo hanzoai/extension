@@ -4,6 +4,7 @@ import { ActionRateLimiter, debugLog, loadDebugFlagFromStorage } from './runtime
 import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
 import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 import { detail, shrink } from './shared/shrink.js';
+import { DRIVE, drive } from './shared/drive.js';
 
 /**
  * Coerce the named params from string → number in place.
@@ -396,6 +397,9 @@ export class CDPBridge {
       // the user has many windows open. Always prefer explicit ids.
       const tabId = parseTabId(params?.tabId ?? params?.targetId)
                     ?? await this.getActiveTabId();
+
+      // The snapshot → ref engine: portable, no debugger attach (shared/drive.ts).
+      if (DRIVE.has(method)) return { id, result: await drive(chrome, tabId, method, params || {}) };
 
       switch (method) {
         case 'Browser.getVersion':

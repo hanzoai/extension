@@ -78,6 +78,19 @@ async function build() {
     minify: true
   });
 
+  // The snapshot → ref engine's page half. Not a manifest content script:
+  // shared/drive.ts injects it into a tab's isolated world on first use, so it
+  // also reaches tabs that were open before the extension loaded.
+  await esbuild.build({
+    entryPoints: ['src/page.ts'],
+    bundle: true,
+    outfile: out('page.js'),
+    platform: 'browser',
+    format: 'iife',
+    target: ['chrome90', 'firefox91', 'safari15'],
+    minify: true
+  });
+
   // Build background script for Chrome (with WebGPU support)
   await esbuild.build({
     entryPoints: ['src/background.ts'],
@@ -233,6 +246,7 @@ async function build() {
     const dir = out(browserName);
 
     fs.copyFileSync(out('content-script.js'), path.join(dir, 'content-script.js'));
+    fs.copyFileSync(out('page.js'), path.join(dir, 'page.js'));
     // Firefox uses IIFE background (no ESM service workers); Chrome/Safari use ESM
     if (browserName === 'firefox') {
       fs.copyFileSync(out('background-firefox.js'), path.join(dir, 'background.js'));

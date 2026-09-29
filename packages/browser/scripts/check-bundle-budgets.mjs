@@ -34,6 +34,10 @@ const ENGINES = ['chrome', 'firefox', 'safari'];
 const BUDGETS = {
   'background.js': 200, // 176.5
   'content-script.js': 62, // 55.4
+  // 26.5 — the snapshot → ref engine (shared/snapshot.ts + shared/read.ts):
+  // role/name computation, flat-tree walk, covered-click hit test, key default
+  // actions, DOM → markdown. Injected on first use per document, not per page load.
+  'page.js': 28,
   // 761.6 — the ceiling is 765, not the 780 it was first raised to. A second
   // copy of @hanzo/event weighs 17.8KB (see newtab.js), and 780 had room for it.
   //
