@@ -1804,15 +1804,14 @@ try {
 export { browserControl, webgpuAI, nativeZap };
 
 // omnibox keyword: type `hanzo <query>` in the address bar -> the Hanzo answer
-// engine. This is the ONE search entry that actually works in this browser:
-// chrome_settings_overrides.search_provider is declared beside it, but Brave
-// ignores extension search-provider overrides outright and Chrome honours them
-// only for Web Store installs — so an unpacked build has always had a dead
-// search box. The omnibox is the extension handling its own keyword, which needs
-// no browser cooperation and works unpacked, in Brave and in Chrome alike.
+// engine. This is the ONE search entry, and the manifest declares no
+// chrome_settings_overrides.search_provider: Chrome honours that key only on
+// Windows/macOS and only for Web Store installs (elsewhere it is a load-time
+// "not allowed for specified platform" warning), and Brave ignores it outright.
+// The omnibox is the extension handling its own keyword, which needs no browser
+// cooperation and works unpacked, on every platform, in Brave and Chrome alike.
 //
-// Target is hanzo.chat/?q= — the plain query form, same as any search engine, and
-// the same URL the search_provider names, so there is one link shape to remember.
+// Target is hanzo.chat/?q= — the plain query form, same as any search engine.
 try {
   const omnibox = (chrome as any).omnibox;
   if (omnibox) {

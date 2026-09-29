@@ -231,6 +231,21 @@ describe('Sidebar / chat-panel surface', () => {
   });
 });
 
+describe('Address-bar search', () => {
+  it('both manifests register the `hanzo` omnibox keyword', () => {
+    expect(JSON.parse(manifestChrome).omnibox).toEqual({ keyword: 'hanzo' });
+    expect(JSON.parse(manifestFirefox).omnibox).toEqual({ keyword: 'hanzo' });
+  });
+
+  it('neither manifest declares chrome_settings_overrides', () => {
+    // Chrome honours a search_provider override only on Windows/macOS Web
+    // Store installs and warns "not allowed for specified platform" on load
+    // everywhere else; Brave ignores it. The omnibox is the search entry.
+    expect(JSON.parse(manifestChrome).chrome_settings_overrides).toBeUndefined();
+    expect(JSON.parse(manifestFirefox).chrome_settings_overrides).toBeUndefined();
+  });
+});
+
 describe('Inspect-modifier shortcut', () => {
   it('default is Ctrl alone (NOT Alt — Alt collides with macOS)', () => {
     const shortcut = read('src/shared/shortcut.ts');

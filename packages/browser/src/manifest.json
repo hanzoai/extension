@@ -60,16 +60,6 @@
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
-  "chrome_settings_overrides": {
-    "search_provider": {
-      "name": "Hanzo",
-      "keyword": "hanzo",
-      "search_url": "https://hanzo.chat/?q={searchTerms}",
-      "favicon_url": "https://hanzo.ai/favicon.ico",
-      "encoding": "UTF-8",
-      "is_default": true
-    }
-  },
   "web_accessible_resources": [
     {
       "resources": [

@@ -2946,9 +2946,9 @@ browser.tabs.onRemoved.addListener((tabId) => {
 });
 
 // ── Omnibox → Hanzo answer engine ────────────────────────────────────────
-// Firefox's address bar can't be silently hijacked (a security boundary), and
-// `chrome_settings_overrides.search_provider` default-engine takeover is policy
-// gated. The WebExtension mechanism that DOES work without opt-in is the
+// Firefox's address bar can't be silently hijacked (a security boundary), so
+// neither manifest declares `chrome_settings_overrides.search_provider`. The
+// WebExtension mechanism that works everywhere without opt-in is the
 // omnibox keyword: type `hanzo <query>` in the address bar → the query loads
 // the Hanzo answer engine (AI answer + sources + news) with ?q=. Same surface
 // as the new-tab landing.
