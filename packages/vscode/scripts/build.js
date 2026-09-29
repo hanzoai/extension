@@ -5,13 +5,8 @@
 // needs; the .vsix has no node_modules.
 const esbuild = require('esbuild');
 
-// Left as runtime require()s, never bundled:
-// - vscode: the extension host supplies it; mcp-server.js gets VSCODE_MOCK.
-// - onnxruntime-node, @xenova/transformers: native ONNX binaries per platform.
-//   Neither is a dependency of this package; unified-rxdb-backend requires
-//   each inside try/catch and falls back to hash embeddings when absent,
-//   which in an installed .vsix is always.
-const optional = ['onnxruntime-node', '@xenova/transformers'];
+// `vscode` is left as a runtime require(): the extension host supplies it, and
+// mcp-server.js gets VSCODE_MOCK.
 
 const common = {
   bundle: true,
@@ -82,13 +77,12 @@ Promise.all([
     ...common,
     entryPoints: ['src/extension.ts'],
     outfile: 'dist/extension.js',
-    external: ['vscode', ...optional],
+    external: ['vscode'],
   }),
   esbuild.build({
     ...common,
     entryPoints: ['src/mcp-server.ts'],
     outfile: 'dist/mcp-server.js',
-    external: optional,
     plugins: [vscodeMock],
   }),
 ]).catch(() => process.exit(1));

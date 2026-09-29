@@ -188,8 +188,6 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
     "axios": "catalog:",
-    "rxdb": "catalog:",
-    "rxjs": "catalog:",
     "zod": "catalog:"
   },
   "private": true
