@@ -150,9 +150,6 @@ catalogs:
     '@types/sinon':
       specifier: ^22.0.0
       version: 22.0.0
-    '@types/sinonjs__fake-timers':
-      specifier: ^15.0.1
-      version: 15.0.1
     '@types/uuid':
       specifier: ^11.0.0
       version: 11.0.0
@@ -166,9 +163,6 @@ catalogs:
       specifier: ^8.68.0
       version: 8.70.0
     '@typescript-eslint/parser':
-      specifier: ^8.68.0
-      version: 8.70.0
-    '@typescript-eslint/typescript-estree':
       specifier: ^8.68.0
       version: 8.70.0
     '@vitest/coverage-v8':
@@ -303,15 +297,6 @@ catalogs:
     tesseract.js:
       specifier: ^7.0.0
       version: 7.0.0
-    tree-sitter:
-      specifier: ^0.25.1
-      version: 0.25.1
-    tree-sitter-javascript:
-      specifier: ^0.25.0
-      version: 0.25.0
-    tree-sitter-typescript:
-      specifier: ^0.23.2
-      version: 0.23.2
     tsup:
       specifier: ^8.5.1
       version: 8.5.1
@@ -1438,27 +1423,15 @@ importers:
 
   packages/vscode:
     dependencies:
-      '@lancedb/lancedb':
-        specifier: 'catalog:'
-        version: 0.37.1(@types/node@26.4.0)(apache-arrow@18.1.0)(encoding@0.1.13)
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.30.0(supports-color@8.1.1)(zod@4.6.1)
-      '@supabase/supabase-js':
-        specifier: 'catalog:'
-        version: 2.116.0(@opentelemetry/api@1.9.1)
-      '@typescript-eslint/typescript-estree':
-        specifier: 'catalog:'
-        version: 8.70.0(supports-color@8.1.1)(typescript@6.0.3)
       axios:
         specifier: 'catalog:'
         version: 1.20.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
       ignore:
         specifier: 'catalog:'
         version: 7.0.9
-      js-yaml:
-        specifier: 'catalog:'
-        version: 5.4.1
       lodash:
         specifier: 'catalog:'
         version: 4.18.1
@@ -1468,15 +1441,6 @@ importers:
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
-      tree-sitter:
-        specifier: 'catalog:'
-        version: 0.25.1
-      tree-sitter-javascript:
-        specifier: 'catalog:'
-        version: 0.25.0(tree-sitter@0.25.1)
-      tree-sitter-typescript:
-        specifier: 'catalog:'
-        version: 0.23.2(tree-sitter@0.25.1)
       ws:
         specifier: 'catalog:'
         version: 8.21.3
@@ -1496,12 +1460,6 @@ importers:
       '@types/better-sqlite3':
         specifier: 'catalog:'
         version: 9.6.0
-      '@types/js-yaml':
-        specifier: 'catalog:'
-        version: 4.0.9
-      '@types/jsdom':
-        specifier: 'catalog:'
-        version: 30.0.0
       '@types/lodash':
         specifier: 'catalog:'
         version: 4.17.25
@@ -1514,9 +1472,6 @@ importers:
       '@types/sinon':
         specifier: 'catalog:'
         version: 22.0.0
-      '@types/sinonjs__fake-timers':
-        specifier: 'catalog:'
-        version: 15.0.1
       '@types/vscode':
         specifier: ~1.90.0
         version: 1.90.0
@@ -1559,9 +1514,6 @@ importers:
       glob:
         specifier: 'catalog:'
         version: 13.0.6
-      jsdom:
-        specifier: 'catalog:'
-        version: 30.0.1
       mocha:
         specifier: 'catalog:'
         version: 11.8.0
@@ -6241,9 +6193,6 @@ packages:
   '@types/sinon@22.0.0':
     resolution: {integrity: sha512-TDbVpbccc2HfiqHR09Argj3mHV1KMW7sCCKj52fsl8lbRLkEn7fB1966EWhOKWUBcqfBueZuPoA7/OK1CKiy3g==}
 
-  '@types/sinonjs__fake-timers@15.0.1':
-    resolution: {integrity: sha512-Ko2tjWJq8oozHzHV+reuvS5KYIRAokHnGbDwGh/J64LntgpbuylF74ipEL24HCyRjf9FOlBiBHWBR1RlVKsI1w==}
-
   '@types/sinonjs__fake-timers@8.1.5':
     resolution: {integrity: sha512-mQkU2jY8jJEF7YHjHvsQO8+3ughTL1mcnn96igfhONmR+fUPSKIkefQYpSe8bsly2Ep7oQbn/6VG5/9/0qcArQ==}
 
@@ -10220,10 +10169,6 @@ packages:
     resolution: {integrity: sha512-D9DI/gXHvVmjHS08SVch0Em8G5S1P+QWtU31appcKT/8wFSPRcdHadIFSAntdMMVM5zz+/DL+bL/gz3UDppqtg==}
     engines: {node: ^18 || ^20 || >= 21}
 
-  node-addon-api@8.9.2:
-    resolution: {integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==}
-    engines: {node: ^18 || ^20 || >= 21}
-
   node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
@@ -11932,33 +11877,6 @@ packages:
   tree-kill@1.2.2:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
     hasBin: true
-
-  tree-sitter-javascript@0.23.1:
-    resolution: {integrity: sha512-/bnhbrTD9frUYHQTiYnPcxyHORIw157ERBa6dqzaKxvR/x3PC4Yzd+D1pZIMS6zNg2v3a8BZ0oK7jHqsQo9fWA==}
-    peerDependencies:
-      tree-sitter: ^0.21.1
-    peerDependenciesMeta:
-      tree-sitter:
-        optional: true
-
-  tree-sitter-javascript@0.25.0:
-    resolution: {integrity: sha512-1fCbmzAskZkxcZzN41sFZ2br2iqTYP3tKls1b/HKGNPQUVOpsUxpmGxdN/wMqAk3jYZnYBR1dd/y/0avMeU7dw==}
-    peerDependencies:
-      tree-sitter: ^0.25.0
-    peerDependenciesMeta:
-      tree-sitter:
-        optional: true
-
-  tree-sitter-typescript@0.23.2:
-    resolution: {integrity: sha512-e04JUUKxTT53/x3Uq1zIL45DoYKVfHH4CZqwgZhPg5qYROl5nQjV+85ruFzFGZxu+QeFVbRTPDRnqL9UbU4VeA==}
-    peerDependencies:
-      tree-sitter: ^0.21.0
-    peerDependenciesMeta:
-      tree-sitter:
-        optional: true
-
-  tree-sitter@0.25.1:
-    resolution: {integrity: sha512-mrcEdkYtHfrK1A6fs3O6FxkBo0Qig5XUXqHhxUOQu0bmPo00QF4XaSx4edpazdHwxnSCjlGKGgIqWdaN4dvTLA==}
 
   ts-api-utils@2.5.0:
     resolution: {integrity: sha512-OJ/ibxhPlqrMM0UiNHJ/0CKQkoKF243/AEmplt3qpRgkW8VG7IfOS41h7V8TjITqdByHzrjcS/2si+y4lIh8NA==}
@@ -17484,6 +17402,7 @@ snapshots:
       openai: 4.29.2(encoding@0.1.13)
     transitivePeerDependencies:
       - encoding
+    optional: true
 
   '@lezer/common@1.5.2': {}
 
@@ -18132,7 +18051,8 @@ snapshots:
       '@octokit/request-error': 7.1.0
       '@octokit/webhooks-methods': 6.0.0
 
-  '@opentelemetry/api@1.9.1': {}
+  '@opentelemetry/api@1.9.1':
+    optional: true
 
   '@oxc-project/types@0.149.0': {}
 
@@ -18943,9 +18863,11 @@ snapshots:
       '@types/filesystem': 0.0.36
       '@types/har-format': 1.2.16
 
-  '@types/command-line-args@5.2.3': {}
+  '@types/command-line-args@5.2.3':
+    optional: true
 
-  '@types/command-line-usage@5.0.4': {}
+  '@types/command-line-usage@5.0.4':
+    optional: true
 
   '@types/common-tags@1.8.1': {}
 
@@ -19271,8 +19193,6 @@ snapshots:
   '@types/sinon@22.0.0':
     dependencies:
       '@types/sinonjs__fake-timers': 8.1.5
-
-  '@types/sinonjs__fake-timers@15.0.1': {}
 
   '@types/sinonjs__fake-timers@8.1.5': {}
 
@@ -20083,6 +20003,7 @@ snapshots:
       flatbuffers: 24.12.23
       json-bignum: 0.0.3
       tslib: 2.8.1
+    optional: true
 
   arch@2.2.0: {}
 
@@ -20128,9 +20049,11 @@ snapshots:
 
   argparse@2.0.1: {}
 
-  array-back@3.1.0: {}
+  array-back@3.1.0:
+    optional: true
 
-  array-back@6.2.2: {}
+  array-back@6.2.2:
+    optional: true
 
   array-buffer-byte-length@1.0.2:
     dependencies:
@@ -20672,6 +20595,7 @@ snapshots:
   chalk-template@0.4.0:
     dependencies:
       chalk: 4.1.2
+    optional: true
 
   chalk@2.4.2:
     dependencies:
@@ -20862,6 +20786,7 @@ snapshots:
       find-replace: 3.0.0
       lodash.camelcase: 4.3.0
       typical: 4.0.0
+    optional: true
 
   command-line-usage@7.0.3:
     dependencies:
@@ -20869,6 +20794,7 @@ snapshots:
       chalk-template: 0.4.0
       table-layout: 4.1.1
       typical: 7.3.0
+    optional: true
 
   commander@10.0.1: {}
 
@@ -22189,6 +22115,7 @@ snapshots:
   find-replace@3.0.0:
     dependencies:
       array-back: 3.1.0
+    optional: true
 
   find-root@1.1.0: {}
 
@@ -22227,7 +22154,8 @@ snapshots:
   flatbuffers@1.12.0:
     optional: true
 
-  flatbuffers@24.12.23: {}
+  flatbuffers@24.12.23:
+    optional: true
 
   flatted@3.4.2: {}
 
@@ -23261,7 +23189,8 @@ snapshots:
     dependencies:
       bignumber.js: 9.3.1
 
-  json-bignum@0.0.3: {}
+  json-bignum@0.0.3:
+    optional: true
 
   json-parse-better-errors@1.0.2: {}
 
@@ -23517,7 +23446,8 @@ snapshots:
 
   lodash-es@4.18.1: {}
 
-  lodash.camelcase@4.3.0: {}
+  lodash.camelcase@4.3.0:
+    optional: true
 
   lodash.debounce@4.0.8: {}
 
@@ -24188,8 +24118,6 @@ snapshots:
     optional: true
 
   node-addon-api@8.4.0: {}
-
-  node-addon-api@8.9.2: {}
 
   node-domexception@1.0.0: {}
 
@@ -25151,7 +25079,8 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.29.7
 
-  reflect-metadata@0.2.2: {}
+  reflect-metadata@0.2.2:
+    optional: true
 
   reflect.getprototypeof@1.0.10:
     dependencies:
@@ -26125,6 +26054,7 @@ snapshots:
     dependencies:
       array-back: 6.2.2
       wordwrapjs: 5.1.0
+    optional: true
 
   table@6.9.0:
     dependencies:
@@ -26310,33 +26240,6 @@ snapshots:
 
   tree-kill@1.2.2: {}
 
-  tree-sitter-javascript@0.23.1(tree-sitter@0.25.1):
-    dependencies:
-      node-addon-api: 8.4.0
-      node-gyp-build: 4.8.4
-    optionalDependencies:
-      tree-sitter: 0.25.1
-
-  tree-sitter-javascript@0.25.0(tree-sitter@0.25.1):
-    dependencies:
-      node-addon-api: 8.4.0
-      node-gyp-build: 4.8.4
-    optionalDependencies:
-      tree-sitter: 0.25.1
-
-  tree-sitter-typescript@0.23.2(tree-sitter@0.25.1):
-    dependencies:
-      node-addon-api: 8.4.0
-      node-gyp-build: 4.8.4
-      tree-sitter-javascript: 0.23.1(tree-sitter@0.25.1)
-    optionalDependencies:
-      tree-sitter: 0.25.1
-
-  tree-sitter@0.25.1:
-    dependencies:
-      node-addon-api: 8.9.2
-      node-gyp-build: 4.8.4
-
   ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:
       typescript: 6.0.3
@@ -26486,9 +26389,11 @@ snapshots:
       csstype: 3.0.10
       free-style: 3.1.0
 
-  typical@4.0.0: {}
+  typical@4.0.0:
+    optional: true
 
-  typical@7.3.0: {}
+  typical@7.3.0:
+    optional: true
 
   ua-parser-js@1.0.41: {}
 
@@ -26917,7 +26822,8 @@ snapshots:
 
   word-wrap@1.2.5: {}
 
-  wordwrapjs@5.1.0: {}
+  wordwrapjs@5.1.0:
+    optional: true
 
   worker-loader@3.0.8(webpack@5.108.3):
     dependencies:
