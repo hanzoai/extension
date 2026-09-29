@@ -22,7 +22,7 @@
     "lib": ["ES2022"],
     "skipLibCheck": true,
     "noEmitOnError": false,
-    "types": ["node", "vscode", "mocha", "sinon", "ws", "lodash"],
+    "types": ["node", "vscode", "mocha", "sinon", "ws"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src"],

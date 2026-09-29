@@ -31,6 +31,18 @@ to the `engines.vscode` floor, 1.90, where the chat participant API went stable.
 vsce refuses a package.json `files` beside `.vscodeignore`; `.vscodeignore` is
 an allowlist.
 
+The extension speaks MCP to one server, `dist/mcp-server.js`, over the child's
+stdio (`src/mcp/server.ts`, the SDK's `StdioClientTransport`); `activate()`
+returns that client as `{ mcp }`. The child runs on `process.execPath` with
+`ELECTRON_RUN_AS_NODE=1`, VS Code's Electron as Node (Node itself under a remote
+host), so it needs no Node on PATH. It gets `HANZO_WORKSPACE` and `HANZO_CONFIG`
+(the `hanzo.*` settings as JSON), which the build's `vscode` stand-in reads, and
+serves every enabled `MCPTools` tool under the tool's own JSON Schema.
+`xvfb-run -a pnpm --filter hanzo-ide test:electron` runs the extension-host
+suite. Every Hanzo API path is `/v1/…`: `/mcp/v1/proxy` and
+`/platform/v1/<action>` 404, and the platform API is
+`/v1/platform/projects/:project/apps/:app/…`.
+
 dxt's `build` bundles mcp's `src/cli.ts` into `dist/server.js`, CommonJS with
 every dependency inlined (a .dxt has no node_modules, and no package.json to
 declare ESM), stamps package.json's version into `dist/manifest.json`, and zips

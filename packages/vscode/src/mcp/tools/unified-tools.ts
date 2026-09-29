@@ -46,7 +46,6 @@ const TOOL_MAPPING = {
     
     // Platform Tools
     'mcp': ['mcp_proxy', 'mcp_universal'],
-    'hanzo_mcp': ['platform_mcp', 'cloud_mcp'],
 };
 
 /**

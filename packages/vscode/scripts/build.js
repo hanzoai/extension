@@ -1,7 +1,8 @@
 // Bundles the two files the .vsix runs: dist/extension.js (package.json
 // `main`, loaded by the extension host) and dist/mcp-server.js (the stdio MCP
-// server src/mcp/server.ts spawns). vsce packages with --no-dependencies, so
-// each bundle carries every module it needs; the .vsix has no node_modules.
+// server src/mcp/server.ts spawns on the extension host's runtime). vsce
+// packages with --no-dependencies, so each bundle carries every module it
+// needs; the .vsix has no node_modules.
 const esbuild = require('esbuild');
 
 // Left as runtime require()s, never bundled:
@@ -10,9 +11,7 @@ const esbuild = require('esbuild');
 //   Neither is a dependency of this package; unified-rxdb-backend requires
 //   each inside try/catch and falls back to hash embeddings when absent,
 //   which in an installed .vsix is always.
-// - bufferutil, utf-8-validate: ws's optional native accelerators, required
-//   inside try/catch; without them ws uses its JavaScript implementation.
-const optional = ['onnxruntime-node', '@xenova/transformers', 'bufferutil', 'utf-8-validate'];
+const optional = ['onnxruntime-node', '@xenova/transformers'];
 
 const common = {
   bundle: true,
@@ -24,15 +23,20 @@ const common = {
   define: { 'process.env.NODE_ENV': '"production"' },
 };
 
-// The vscode API the tools touch, for a server that runs outside VS Code.
+// The vscode API the tools touch, for a server that runs outside VS Code. The
+// extension sets HANZO_WORKSPACE to its first workspace folder and HANZO_CONFIG
+// to its hanzo.* settings as JSON, which getConfiguration reads as VS Code does.
 const VSCODE_MOCK = `
 const fs = require('fs').promises;
+const settings = { hanzo: JSON.parse(process.env.HANZO_CONFIG || '{}') };
 module.exports = {
   workspace: {
     workspaceFolders: process.env.HANZO_WORKSPACE ? [{ uri: { fsPath: process.env.HANZO_WORKSPACE } }] : undefined,
     getConfiguration: (section) => ({
-      get: (key, defaultValue) =>
-        process.env['HANZO_' + section.toUpperCase() + '_' + key.toUpperCase().replace(/\\./g, '_')] || defaultValue
+      get: (key, defaultValue) => {
+        const value = [...(section ? section.split('.') : []), ...key.split('.')].reduce((node, k) => node?.[k], settings);
+        return value === undefined ? defaultValue : value;
+      }
     }),
     findFiles: async () => [],
     fs: {
@@ -82,7 +86,7 @@ Promise.all([
   }),
   esbuild.build({
     ...common,
-    entryPoints: ['src/mcp-server-fixed.ts'],
+    entryPoints: ['src/mcp-server.ts'],
     outfile: 'dist/mcp-server.js',
     external: optional,
     plugins: [vscodeMock],

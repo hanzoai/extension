@@ -1,7 +1,7 @@
 {
   "name": "hanzo-ide",
   "displayName": "Hanzo AI",
-  "description": "Hanzo AI for VS Code: the @hanzo chat participant, an MCP server that gives AI tools access to your workspace, and a project manager that analyzes your project.",
+  "description": "Hanzo AI for VS Code: the @hanzo chat participant and an MCP server that gives AI tools access to your workspace.",
   "version": "1.9.31",
   "publisher": "hanzo-ai",
   "license": "MIT",
@@ -19,13 +19,8 @@
     "productivity",
     "AI",
     "IDE",
-    "project management",
-    "context management",
-    "change tracking",
-    "knowledge base",
-    "documentation",
-    "specification",
-    "analysis"
+    "MCP",
+    "chat"
   ],
   "icon": "images/icon.png",
   "galleryBanner": {
@@ -34,16 +29,10 @@
   },
   "activationEvents": [
     "onStartupFinished",
-    "onCommand:hanzo.openManager",
-    "onCommand:hanzo.openWelcomeGuide",
-    "onCommand:hanzo.reanalyzeProject",
-    "onCommand:hanzo.triggerReminder",
     "onCommand:hanzo.login",
     "onCommand:hanzo.logout",
     "onCommand:hanzo.debug.authState",
-    "onCommand:hanzo.debug.clearAuth",
-    "onCommand:hanzo.checkMetrics",
-    "onCommand:hanzo.resetMetrics"
+    "onCommand:hanzo.debug.clearAuth"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -56,34 +45,6 @@
       }
     ],
     "commands": [
-      {
-        "command": "hanzo.openManager",
-        "title": "Hanzo: Open Project Manager"
-      },
-      {
-        "command": "hanzo.openWelcomeGuide",
-        "title": "Hanzo: View Getting Started Guide"
-      },
-      {
-        "command": "hanzo.reanalyzeProject",
-        "title": "Hanzo: Analyze Project",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "hanzo.triggerReminder",
-        "title": "Hanzo: Show Reminder",
-        "icon": "$(bell)"
-      },
-      {
-        "command": "hanzo.checkMetrics",
-        "title": "Hanzo Debug: Check Impact Metrics",
-        "icon": "$(graph)"
-      },
-      {
-        "command": "hanzo.resetMetrics",
-        "title": "Hanzo Debug: Reset Impact Metrics",
-        "icon": "$(trash)"
-      },
       {
         "command": "hanzo.login",
         "title": "Hanzo: Login"
@@ -104,77 +65,12 @@
       }
     ],
     "configuration": {
-      "title": "Hanzo AI Context Manager",
+      "title": "Hanzo AI",
       "properties": {
-        "hanzo.ide": {
-          "type": "string",
-          "enum": [
-            "cursor",
-            "copilot",
-            "continue",
-            "codium"
-          ],
-          "enumDescriptions": [
-            "Using Cursor IDE (.cursorrules)",
-            "Using GitHub Copilot (.github/copilot-instructions.md)",
-            "Using Continue (.continuerules)",
-            "Using Codium (.windsurfrules)"
-          ],
-          "default": "cursor",
-          "description": "Select which IDE to generate rules for"
-        },
         "hanzo.mcp.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable Model Context Protocol (MCP) server integration"
-        },
-        "hanzo.mcp.transport": {
-          "type": "string",
-          "enum": [
-            "stdio",
-            "tcp"
-          ],
-          "default": "stdio",
-          "description": "Transport method for MCP server communication"
-        },
-        "hanzo.mcp.port": {
-          "type": "number",
-          "default": 3000,
-          "description": "Port for MCP server when using TCP transport"
-        },
-        "hanzo.mcp.backend": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "python",
-            "typescript",
-            "rust",
-            "local-node"
-          ],
-          "enumDescriptions": [
-            "Auto-detect: prefer Python (uvx) if available, fallback to TypeScript",
-            "Python MCP via uvx (recommended, most comprehensive tools)",
-            "Built-in TypeScript MCP server",
-            "Rust MCP binary (hanzo-mcp)",
-            "Connect to local hanzod node"
-          ],
-          "default": "auto",
-          "description": "MCP backend to use. Python via uvx is recommended for the most comprehensive tool support."
-        },
-        "hanzo.mcp.pythonCommand": {
-          "type": "string",
-          "default": "uvx hanzo-mcp",
-          "description": "Command to run Python MCP server (e.g., 'uvx hanzo-mcp' or 'python -m hanzo_mcp')"
-        },
-        "hanzo.mcp.rustBinary": {
-          "type": "string",
-          "default": "hanzo-mcp",
-          "description": "Path to Rust MCP binary (when backend is 'rust')"
-        },
-        "hanzo.mcp.localNodeUrl": {
-          "type": "string",
-          "default": "http://localhost:8080",
-          "description": "URL of local hanzod node (when backend is 'local-node')"
+          "description": "Start the bundled MCP server, which serves the workspace tools over stdio"
         },
         "hanzo.mcp.allowedPaths": {
           "type": "array",
@@ -194,11 +90,6 @@
           "default": false,
           "description": "Disable all search operations in MCP tools"
         },
-        "hanzo.mcp.disableBrowserTool": {
-          "type": "boolean",
-          "default": false,
-          "description": "Disable the built-in browser tool (useful when using Antigravity's native browser)"
-        },
         "hanzo.mcp.enabledTools": {
           "type": "array",
           "items": {
@@ -214,16 +105,6 @@
           },
           "default": [],
           "description": "List of explicitly disabled MCP tools"
-        },
-        "hanzo.api.endpoint": {
-          "type": "string",
-          "default": "https://api.hanzo.ai/ext/v1",
-          "description": "API endpoint for Hanzo services"
-        },
-        "hanzo.debug": {
-          "type": "boolean",
-          "default": false,
-          "description": "Enable debug logging"
         },
         "hanzo.llm.provider": {
           "type": "string",
@@ -264,15 +145,6 @@
           "description": "Model to use in Ollama"
         }
       }
-    },
-    "menus": {
-      "editor/title": [
-        {
-          "command": "hanzo.reanalyzeProject",
-          "group": "navigation",
-          "when": "resourceScheme != extension"
-        }
-      ]
     }
   },
   "scripts": {
@@ -290,7 +162,6 @@
     "@eslint/js": "catalog:",
     "@stylistic/eslint-plugin": "catalog:",
     "@types/better-sqlite3": "catalog:",
-    "@types/lodash": "catalog:",
     "@types/mocha": "catalog:",
     "@types/node": "catalog:",
     "@types/sinon": "catalog:",
@@ -311,17 +182,15 @@
     "sinon": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
+    "ws": "catalog:",
     "@hanzo/iam": "catalog:"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
     "axios": "catalog:",
-    "ignore": "catalog:",
-    "lodash": "catalog:",
     "rxdb": "catalog:",
     "rxjs": "catalog:",
-    "zod": "catalog:",
-    "ws": "catalog:"
+    "zod": "catalog:"
   },
   "private": true
 }

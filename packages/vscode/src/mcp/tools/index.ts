@@ -29,7 +29,7 @@ import { createModeTool } from './mode';
 import { createMCPRunnerTools } from './mcp-runner';
 import { createBrowserTools } from './browser';
 import { createMCPUniversalProxyTools } from './mcp-universal-proxy';
-import { createHanzoPlatformMCPTools, registerUnixAliasTools } from './hanzo-platform-mcp';
+import { createUnixAliasTools, registerUnixAliasTools } from './unix-alias';
 import { createUnifiedReadTool, createUnifiedProjectAnalyzeTool, createUnixAliasTool, getCanonicalToolName } from './unified-tools';
 import { DevToolManager, createDevTools } from './dev-tool';
 // import { createASTAnalyzerTool } from './ast-analyzer';
@@ -92,9 +92,8 @@ export class MCPTools {
             ...createDatabaseTools(this.context),
             ...createVectorTools(this.context),
 
-            // LLM & Platform
+            // LLM
             ...createLLMTools(this.context),
-            ...createHanzoPlatformMCPTools(this.context),
 
             // MCP Management
             ...createMCPManagementTools(this.context),
@@ -112,6 +111,7 @@ export class MCPTools {
             createRulesTool(this.context),
             createModeTool(this.context),
             createUnixAliasTool(this.context),
+            ...createUnixAliasTools(this.context),
 
             // Batch operations
             ...this.batchTools.getTools(),

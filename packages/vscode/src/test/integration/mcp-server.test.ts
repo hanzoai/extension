@@ -1,103 +1,42 @@
 import assert from 'assert';
-import * as path from 'path';
-import { spawn, ChildProcess } from 'child_process';
-import * as net from 'net';
+import * as vscode from 'vscode';
+import type { Api } from '../../extension';
 
-// This suite spawns the bundled standalone MCP server (out/mcp-server-standalone.js,
-// produced by `npm run build:mcp` -- not part of `npm test`) and binds real TCP
-// ports, so it is opt-in. Set HANZO_E2E_LIVE=1 (after building the standalone
-// server) to run it.
-(process.env.HANZO_E2E_LIVE ? suite : suite.skip)('MCP Server Integration Test Suite', () => {
-    let serverProcess: ChildProcess;
-    const serverPath = path.join(__dirname, '../../../out/mcp-server-standalone.js');
+// Activation spawns the shipped dist/mcp-server.js (built by test:electron's
+// `npm run build`) on this extension host's own runtime and connects to it
+// over the child's stdio. These tests drive that same client.
+suite('MCP Server Integration Test Suite', () => {
+    let api: Api;
 
-    setup(async function() {
-        this.timeout(10000);
-        // Start server in TCP mode for testing
-        serverProcess = spawn('node', [serverPath], {
-            env: {
-                ...process.env,
-                MCP_TRANSPORT: 'tcp',
-                MCP_PORT: '3456',
-                HANZO_WORKSPACE: '/tmp/test-workspace'
-            }
-        });
-
-        // Wait for server to start
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+    suiteSetup(async function () {
+        this.timeout(30000);
+        api = await vscode.extensions.getExtension<Api>('hanzo-ai.hanzo-ide')!.activate();
     });
 
-    teardown(() => {
-        if (serverProcess) {
-            serverProcess.kill();
+    test('activation connects to the bundled server', () => {
+        assert.ok(api.mcp, 'activate() should return a connected MCP client');
+        const ext = vscode.extensions.getExtension('hanzo-ai.hanzo-ide')!;
+        assert.deepStrictEqual(api.mcp.getServerVersion(), { name: 'hanzo-ide', version: ext.packageJSON.version });
+    });
+
+    test('the server lists the workspace tools with their schemas', async () => {
+        const { tools } = await api.mcp!.listTools();
+        const names = tools.map(t => t.name);
+        for (const expected of ['read', 'write', 'edit', 'bash', 'grep', 'directory_tree']) {
+            assert.ok(names.includes(expected), `tools/list should include ${expected}`);
         }
+        const bash = tools.find(t => t.name === 'bash')!;
+        assert.strictEqual(bash.inputSchema.type, 'object');
+        assert.ok(bash.inputSchema.properties?.command, 'bash takes a command');
     });
 
-    test('Server should start and listen on TCP port', (done) => {
-        const client = net.createConnection({ port: 3456 }, () => {
-            assert.ok(true, 'Server is listening on port 3456');
-            client.end();
-            done();
-        });
-
-        client.on('error', (err) => {
-            assert.fail(`Failed to connect to server: ${err.message}`);
-        });
+    test('a tool call runs in the server and returns its output', async () => {
+        const result = await api.mcp!.callTool({ name: 'bash', arguments: { command: 'echo hanzo-mcp-ok' } });
+        assert.ok(!result.isError, JSON.stringify(result));
+        assert.deepStrictEqual(result.content, [{ type: 'text', text: 'hanzo-mcp-ok\n' }]);
     });
 
-    test('Server should handle stdio transport', async function() {
-        this.timeout(5000);
-        
-        // Kill TCP server
-        serverProcess.kill();
-        
-        // Start new server with stdio
-        const stdioServer = spawn('node', [serverPath], {
-            env: {
-                ...process.env,
-                MCP_TRANSPORT: 'stdio',
-                HANZO_WORKSPACE: '/tmp/test-workspace'
-            }
-        });
-
-        let output = '';
-        stdioServer.stderr.on('data', (data) => {
-            output += data.toString();
-        });
-
-        // Wait for startup message
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        
-        assert.ok(output.includes('[Hanzo MCP]'), 'Server should output startup message');
-        
-        stdioServer.kill();
-    });
-
-    test('Server should load without authentication in anon mode', async function() {
-        this.timeout(5000);
-        
-        // Kill current server
-        serverProcess.kill();
-        
-        // Start server with anonymous flag
-        const anonServer = spawn('node', [serverPath, '--anon'], {
-            env: {
-                ...process.env,
-                MCP_TRANSPORT: 'stdio'
-            }
-        });
-
-        let output = '';
-        anonServer.stderr.on('data', (data) => {
-            output += data.toString();
-        });
-
-        // Wait for startup
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        
-        assert.ok(output.includes('anonymous mode'), 'Server should indicate anonymous mode');
-        assert.ok(!output.includes('Authentication failed'), 'Should not fail authentication');
-        
-        anonServer.kill();
+    test('an unknown tool is refused', async () => {
+        await assert.rejects(api.mcp!.callTool({ name: 'no_such_tool', arguments: {} }), /Unknown tool: no_such_tool/);
     });
 });
