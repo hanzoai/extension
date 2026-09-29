@@ -78,12 +78,15 @@ function putStr(a: number[], s: string) {
   for (let i = 0; i < b.length; i++) a.push(b[i]);
 }
 
-// HELLO body: role(u8) + brand(str) + caps(u16 + str…). Mirrors zapd frame.rs.
+// A node's descriptor, as HELLO carries it and PROVIDERS returns it:
+// role(u8) + brand(str) + caps(u16 + str…) + attrs(u16 + (str, str)…).
+// Mirrors zapd frame.rs. The browser declares no attrs.
 function encodeHello(role: number, brand: string, caps: string[]): Uint8Array {
   const a: number[] = [role];
   putStr(a, brand);
   putU16(a, caps.length);
   for (const c of caps) putStr(a, c);
+  putU16(a, 0);
   return new Uint8Array(a);
 }
 
@@ -104,10 +107,10 @@ export function decodeCmd(p: Uint8Array): { method: string; params: Record<strin
   return { method, params };
 }
 
-export interface Provider { id: string; role: number; brand: string; caps: string[] }
+export interface Provider { id: string; role: number; brand: string; caps: string[]; attrs: Record<string, string> }
 
-// PROVIDERS body: count(u16) + per node id(str) + role(u8) + brand(str) +
-// caps(u16 + str…). The router's own answer to "am I registered, and as what?"
+// PROVIDERS body: count(u16) + per node id(str) + descriptor. The router's own
+// answer to "am I registered, and as what?"
 export function decodeProviders(p: Uint8Array): Provider[] {
   const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
   let o = 0;
@@ -125,7 +128,10 @@ export function decodeProviders(p: Uint8Array): Provider[] {
     const nc = dv.getUint16(o, true); o += 2;
     const caps: string[] = [];
     for (let c = 0; c < nc; c++) caps.push(str());
-    out.push({ id, role, brand, caps });
+    const na = dv.getUint16(o, true); o += 2;
+    const attrs: Record<string, string> = {};
+    for (let i = 0; i < na; i++) { const k = str(); attrs[k] = str(); }
+    out.push({ id, role, brand, caps, attrs });
   }
   return out;
 }

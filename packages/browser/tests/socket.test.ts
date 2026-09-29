@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTH, ERROR, HELLO, PROVIDERS, PROVIDERS_LIST, RESPONSE, ROUTE, WELCOME,
-  decodeFrame, encodeFrame, ensureZap, newZapState, parsePairing, proof, setPairing,
+  decodeFrame, decodeProviders, encodeFrame, ensureZap, newZapState, parsePairing, proof, setPairing,
   type Frame, type ZapOpts, type ZapState,
 } from '../src/shared/socket';
 
@@ -44,7 +44,7 @@ function providers(ids: string[], caps: string[] = ['browser.navigate']): Uint8A
   const u16 = (n: number) => a.push(n & 0xff, (n >> 8) & 0xff);
   const str = (s: string) => { const b = new TextEncoder().encode(s); u16(b.length); b.forEach((x) => a.push(x)); };
   u16(ids.length);
-  for (const id of ids) { str(id); a.push(1); str('hanzo'); u16(caps.length); caps.forEach(str); }
+  for (const id of ids) { str(id); a.push(1); str('hanzo'); u16(caps.length); caps.forEach(str); u16(1); str('leasable'); str('true'); }
   return new Uint8Array(a);
 }
 
@@ -149,6 +149,8 @@ describe('ensureZap', () => {
     expect(ours.t).toBe(AUTH);
     expect(Array.from(ours.payload)).toEqual(Array.from(await proof(KEY, 'zap client', nc, ns)));
     expect([hello.t, hello.from]).toEqual([HELLO, 'browser/chrome-3fa2']);
+    // The descriptor ends with its attrs count: the browser declares none.
+    expect(Array.from(hello.payload.slice(-2))).toEqual([0, 0]);
     expect(s.connected).toBe(false);
 
     await ws.recv(WELCOME, 'zapd', ID);
@@ -157,6 +159,7 @@ describe('ensureZap', () => {
     await ws.recv(PROVIDERS, 'zapd', ID, providers([ID, 'agent/dgx/hanzo-1']));
     expect(s.connected).toBe(true);
     expect(s.caps).toEqual(['browser.navigate']);
+    expect(decodeProviders(providers([ID]))[0].attrs).toEqual({ leasable: 'true' });
   });
 
   it('never registers with a router that cannot prove the token', async () => {
