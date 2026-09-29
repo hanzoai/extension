@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { MCPTools } from '../mcp/tools';
 import axios from 'axios';
-import { getConfig } from '../config';
+import { AuthManager } from '../auth/manager';
+import { complete, MODEL } from '../api/chat';
 
 interface LLMConfig {
-    provider: 'hanzo' | 'lmstudio' | 'ollama' | 'openai' | 'anthropic';
-    apiKey?: string;
+    provider: 'hanzo' | 'lmstudio' | 'ollama';
     endpoint?: string;
     model?: string;
 }
@@ -56,23 +56,10 @@ export class HanzoChatParticipant {
                     endpoint: config.get<string>('llm.ollama.endpoint', 'http://localhost:11434'),
                     model: config.get<string>('llm.ollama.model', 'llama2')
                 };
-            case 'openai':
-                return {
-                    provider: 'openai',
-                    apiKey: config.get<string>('llm.openai.apiKey'),
-                    model: config.get<string>('llm.openai.model', 'gpt-4')
-                };
-            case 'anthropic':
-                return {
-                    provider: 'anthropic',
-                    apiKey: config.get<string>('llm.anthropic.apiKey'),
-                    model: config.get<string>('llm.anthropic.model', 'claude-3-opus-20240229')
-                };
             default:
                 return {
                     provider: 'hanzo',
-                    endpoint: config.get<string>('api.endpoint', 'https://api.hanzo.ai/ext/v1'),
-                    apiKey: config.get<string>('llm.hanzo.apiKey')
+                    model: config.get<string>('llm.hanzo.model', MODEL)
                 };
         }
     }
@@ -188,12 +175,6 @@ Otherwise, respond with:
                 case 'ollama':
                     response = await this.queryOllama(systemPrompt, prompt);
                     break;
-                case 'openai':
-                    response = await this.queryOpenAI(systemPrompt, prompt);
-                    break;
-                case 'anthropic':
-                    response = await this.queryAnthropic(systemPrompt, prompt);
-                    break;
                 default:
                     response = await this.queryHanzoAPI(systemPrompt, prompt);
             }
@@ -222,25 +203,14 @@ Otherwise, respond with:
     }
     
     private async queryHanzoAPI(systemPrompt: string, userPrompt: string): Promise<string> {
-        const response = await axios.post(
-            `${this.llmConfig.endpoint}/llm/chat`,
-            {
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                model: this.llmConfig.model || 'gpt-4',
-                temperature: 0.7
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${this.llmConfig.apiKey}`,
-                    'Content-Type': 'application/json'
-                }
-            }
+        return complete(
+            await AuthManager.getInstance(this.context).bearer(),
+            [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ],
+            { model: this.llmConfig.model, temperature: 0.7 }
         );
-        
-        return response.data.choices[0].message.content;
     }
     
     private async queryLMStudio(systemPrompt: string, userPrompt: string): Promise<string> {
@@ -280,51 +250,6 @@ Otherwise, respond with:
         );
         
         return response.data.response;
-    }
-    
-    private async queryOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
-        const response = await axios.post(
-            'https://api.openai.com/v1/chat/completions',
-            {
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                model: this.llmConfig.model || 'gpt-4',
-                temperature: 0.7
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${this.llmConfig.apiKey}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        
-        return response.data.choices[0].message.content;
-    }
-    
-    private async queryAnthropic(systemPrompt: string, userPrompt: string): Promise<string> {
-        const response = await axios.post(
-            'https://api.anthropic.com/v1/messages',
-            {
-                messages: [
-                    { role: 'user', content: userPrompt }
-                ],
-                model: this.llmConfig.model || 'claude-3-opus-20240229',
-                system: systemPrompt,
-                max_tokens: 4096
-            },
-            {
-                headers: {
-                    'x-api-key': this.llmConfig.apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        
-        return response.data.content[0].text;
     }
     
     private parseToolCalls(prompt: string): Array<{ toolName: string; args: any }> {
@@ -412,7 +337,7 @@ Otherwise, respond with:
 I have access to ${tools.length} tools to help you with development tasks.
 
 ## Current LLM Provider: ${this.llmConfig.provider}
-${this.llmConfig.provider === 'hanzo' ? 'Using Hanzo AI Gateway (api.hanzo.ai)' : ''}
+${this.llmConfig.provider === 'hanzo' ? `Using ${this.llmConfig.model} on api.hanzo.ai` : ''}
 ${this.llmConfig.provider === 'lmstudio' ? `Using LM Studio at ${this.llmConfig.endpoint}` : ''}
 ${this.llmConfig.provider === 'ollama' ? `Using Ollama at ${this.llmConfig.endpoint}` : ''}
 
@@ -444,9 +369,9 @@ ${this.llmConfig.provider === 'ollama' ? `Using Ollama at ${this.llmConfig.endpo
 
 ## LLM Configuration:
 You can configure your LLM provider in VS Code settings:
-- hanzo.llm.provider: Choose from 'hanzo', 'lmstudio', 'ollama', 'openai', 'anthropic'
+- hanzo.llm.provider: Choose from 'hanzo', 'lmstudio', 'ollama'
 - hanzo.llm.[provider].endpoint: Set custom endpoints for local providers
-- hanzo.llm.[provider].model: Choose specific models
+- hanzo.llm.[provider].model: Choose specific models (hanzo: any id api.hanzo.ai/v1/models lists)
 
 Ask me to use any of these tools to help with your development tasks!`;
         

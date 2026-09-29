@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { Tool } from '../types/index.js';
+import { MODEL } from '../models.js';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import os from 'os';
@@ -53,8 +54,8 @@ export const spawnAgentTool: Tool = {
       },
       model: {
         type: 'string',
-        description: 'Model to use (e.g., claude-3-opus, gpt-4, llama-3.2-3b)',
-        default: 'claude-3-5-sonnet-20241022'
+        description: `Model id from api.hanzo.ai/v1/models (default: ${MODEL})`,
+        default: MODEL
       },
       context: {
         type: 'string',
@@ -258,8 +259,7 @@ export const llmRouterTool: Tool = {
       fallbackChain: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Fallback model chain',
-        default: ['claude-3-5-sonnet', 'gpt-4', 'gemini-pro', 'llama-3.2']
+        description: 'Fallback model ids from api.hanzo.ai/v1/models'
       }
     },
     required: ['prompt']
@@ -348,7 +348,7 @@ async function spawnAgent(args: z.infer<typeof spawnAgentSchema>) {
   
   const config: AgentConfig = {
     id: agentId,
-    model: args.model || 'claude-3-5-sonnet-20241022',
+    model: args.model || MODEL,
     prompt: args.prompt,
     context: args.context,
     outputGoal: args.outputGoal,

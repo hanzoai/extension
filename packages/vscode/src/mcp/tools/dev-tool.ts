@@ -3,6 +3,7 @@ import { spawn, ChildProcess, SpawnOptions } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
+import { MODEL } from '../../api/chat';
 
 interface DevAgent {
     id: string;
@@ -92,15 +93,16 @@ export class DevToolManager {
         }
     }
 
+    // Each agent's model as api.hanzo.ai/v1/models lists it.
     private getModelForAgent(agent: string): string {
         const modelMap = {
-            'claude': 'claude-3-opus-20240229',
-            'codex': 'code-davinci-002',
-            'gemini': 'gemini-pro',
-            'gpt4': 'gpt-4-turbo-preview',
-            'llama': 'llama-2-70b-chat'
+            'claude': 'anthropic/claude-opus-4.1',
+            'codex': 'openai/gpt-5.1-codex',
+            'gemini': 'google/gemini-2.5-pro',
+            'gpt4': 'openai/gpt-4-turbo',
+            'llama': 'meta-llama/llama-3.3-70b-instruct'
         };
-        return modelMap[agent] || 'gpt-4';
+        return modelMap[agent] || MODEL;
     }
 
     private async startAgent(agent: DevAgent, options: DevToolOptions) {

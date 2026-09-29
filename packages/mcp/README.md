@@ -125,10 +125,9 @@ HANZO_VECTOR_DB=/path/to/vector.db
 # Todo storage path
 HANZO_TODO_PATH=/path/to/todos.json
 
-# AI Provider Keys (for AI tools)
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=...
+# Hanzo API key for the AI tools, which reach every model through api.hanzo.ai
+# (default model zen5; any id GET https://api.hanzo.ai/v1/models lists)
+HANZO_API_KEY=sk-...
 ```
 
 ### Custom Tools

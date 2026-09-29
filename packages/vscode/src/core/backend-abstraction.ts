@@ -11,6 +11,7 @@ import { ASTIndex } from './ast-index';
 import { UnifiedRxDBBackend, LocalEmbeddingServer, CloudEmbeddingServer } from './unified-rxdb-backend';
 
 import { fetchPolyfill as fetch } from '../utils/fetch-polyfill';
+import { complete, MODEL } from '../api/chat';
 
 export interface BackendConfig {
     mode: 'local' | 'cloud';
@@ -21,7 +22,7 @@ export interface BackendConfig {
 
 export interface LLMProvider {
     name: string;
-    type: 'openai' | 'anthropic' | 'ollama' | 'lmstudio' | 'hanzo';
+    type: 'ollama' | 'lmstudio' | 'hanzo';
     endpoint: string;
     apiKey?: string;
     models: string[];
@@ -29,7 +30,7 @@ export interface LLMProvider {
 
 export interface EmbeddingProvider {
     name: string;
-    type: 'openai' | 'cohere' | 'sentence-transformers' | 'hanzo';
+    type: 'sentence-transformers' | 'hanzo';
     endpoint: string;
     apiKey?: string;
     model: string;
@@ -113,27 +114,10 @@ export class LocalBackend implements IBackend {
         const config = vscode.workspace.getConfiguration('hanzo.embedding');
         const provider = config.get<string>('provider', 'local');
         
-        switch (provider) {
-            case 'openai': {
-                const openaiKey = config.get<string>('openaiApiKey');
-                if (openaiKey) {
-                    return new CloudEmbeddingServer('openai', openaiKey);
-                }
-                break;
-            }
-            case 'cohere': {
-                const cohereKey = config.get<string>('cohereApiKey');
-                if (cohereKey) {
-                    return new CloudEmbeddingServer('cohere', cohereKey);
-                }
-                break;
-            }
-            case 'hanzo': {
-                const hanzoKey = config.get<string>('apiKey') || vscode.workspace.getConfiguration('hanzo').get<string>('apiKey');
-                if (hanzoKey) {
-                    return new CloudEmbeddingServer('hanzo', hanzoKey);
-                }
-                break;
+        if (provider === 'hanzo') {
+            const hanzoKey = config.get<string>('apiKey') || vscode.workspace.getConfiguration('hanzo').get<string>('apiKey');
+            if (hanzoKey) {
+                return new CloudEmbeddingServer(hanzoKey);
             }
         }
         
@@ -192,7 +176,7 @@ export class LocalBackend implements IBackend {
                 name: 'Hanzo Local',
                 type: 'hanzo',
                 endpoint: hanzoEndpoint,
-                models: ['zen1', 'zen1-mini', 'zen1-code']
+                models: [MODEL, 'zen5-mini', 'zen5-coder']
             });
         }
     }
@@ -340,7 +324,7 @@ export class LocalBackend implements IBackend {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: options.model || 'zen1',
+                model: options.model || MODEL,
                 prompt,
                 temperature: options.temperature || 0.7,
                 max_tokens: options.maxTokens || 1000
@@ -479,14 +463,16 @@ export class CloudBackend implements IBackend {
     }
     
     // LLM operations
-    async llmComplete(prompt: string, options?: any): Promise<string> {
-        const result = await this.request('/llm/complete', 'POST', { prompt, ...options });
-        return result.text;
+    async llmComplete(prompt: string, options: any = {}): Promise<string> {
+        return complete(this.authToken || this.apiKey, [{ role: 'user', content: prompt }], {
+            model: options.model,
+            temperature: options.temperature,
+            maxTokens: options.maxTokens
+        }, this.endpoint);
     }
     
     async llmEmbed(text: string): Promise<number[]> {
-        const result = await this.request('/llm/embed', 'POST', { text });
-        return result.embedding;
+        return new CloudEmbeddingServer(this.authToken || this.apiKey).embed(text);
     }
     
     // Storage operations

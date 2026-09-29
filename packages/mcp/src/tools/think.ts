@@ -4,6 +4,10 @@
  */
 
 import { Tool } from '../types/index.js';
+import { EMBEDDING_MODEL, MODEL } from '../models.js';
+
+// Two Zen 5 tiers, both listed by api.hanzo.ai/v1/models.
+const CONSENSUS = [MODEL, 'zen5-pro'];
 
 export const thinkTool: Tool = {
   name: 'think',
@@ -23,10 +27,10 @@ export const thinkTool: Tool = {
       language: { type: 'string', description: 'Programming or natural language' },
       // consensus
       question: { type: 'string', description: 'Question for reasoning / consensus' },
-      models: { type: 'array', items: { type: 'string' }, description: 'Model IDs for consensus', default: ['claude-sonnet-4-20250514', 'gpt-4o'] },
+      models: { type: 'array', items: { type: 'string' }, description: `Model ids for consensus (default: ${CONSENSUS.join(', ')})` },
       // agent
       task: { type: 'string', description: 'Task for agent delegation' },
-      model: { type: 'string', default: 'claude-sonnet-4-20250514' },
+      model: { type: 'string', description: `Model id from api.hanzo.ai/v1/models; defaults to ${MODEL}, or ${EMBEDDING_MODEL} for embed` },
       system: { type: 'string', description: 'System prompt' },
       maxTokens: { type: 'number', default: 1000 },
       temperature: { type: 'number' },
@@ -46,7 +50,7 @@ export const thinkTool: Tool = {
     required: ['action']
   },
   handler: async (args) => {
-    const apiKey = process.env.HANZO_API_KEY || process.env.API_KEY || process.env.OPENAI_API_KEY;
+    const apiKey = process.env.HANZO_API_KEY || process.env.API_KEY;
     const baseUrl = (process.env.API_URL || 'https://api.hanzo.ai') + '/v1';
 
     async function llm(prompt: string, opts: { model?: string; system?: string; maxTokens?: number; temperature?: number } = {}): Promise<string> {
@@ -54,7 +58,7 @@ export const thinkTool: Tool = {
       const msgs: any[] = [];
       if (opts.system) msgs.push({ role: 'system', content: opts.system });
       msgs.push({ role: 'user', content: prompt });
-      const body: any = { model: opts.model || args.model || 'auto', messages: msgs, max_tokens: opts.maxTokens || args.maxTokens || 1000 };
+      const body: any = { model: opts.model || args.model || MODEL, messages: msgs, max_tokens: opts.maxTokens || args.maxTokens || 1000 };
       if (opts.temperature !== undefined || args.temperature !== undefined) body.temperature = opts.temperature ?? args.temperature;
       const r = await fetch(`${baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify(body) });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -73,7 +77,7 @@ export const thinkTool: Tool = {
         case 'consensus': {
           if (!args.question) return { content: [{ type: 'text', text: 'question required' }], isError: true };
           if (!apiKey) return { content: [{ type: 'text', text: 'HANZO_API_KEY required' }], isError: true };
-          const models = args.models || ['claude-sonnet-4-20250514', 'gpt-4o'];
+          const models = args.models?.length ? args.models : CONSENSUS;
           const responses: Record<string, string> = {};
           const errors: Record<string, string> = {};
           await Promise.allSettled(models.map(async (m: string) => {
@@ -93,7 +97,7 @@ export const thinkTool: Tool = {
           if (!args.task) return { content: [{ type: 'text', text: 'task required' }], isError: true };
           if (!apiKey) return { content: [{ type: 'text', text: 'HANZO_API_KEY required' }], isError: true };
           const result = await llm(args.task, { system: args.system || `You are a specialized agent. Complete the following task thoroughly and return the result.`, model: args.model, maxTokens: args.maxTokens });
-          return { content: [{ type: 'text', text: `Agent (${args.model || 'auto'}):\n\n${result}` }] };
+          return { content: [{ type: 'text', text: `Agent (${args.model || MODEL}):\n\n${result}` }] };
         }
 
         case 'summarize': {
@@ -112,7 +116,7 @@ export const thinkTool: Tool = {
         case 'embed': {
           if (!args.text) return { content: [{ type: 'text', text: 'text required' }], isError: true };
           if (!apiKey) return { content: [{ type: 'text', text: 'HANZO_API_KEY required' }], isError: true };
-          const r = await fetch(`${baseUrl}/embeddings`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify({ model: args.model || 'text-embedding-3-small', input: args.text }) });
+          const r = await fetch(`${baseUrl}/embeddings`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify({ model: args.model || EMBEDDING_MODEL, input: args.text }) });
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const d = await r.json() as any;
           const emb = d.data?.[0]?.embedding || [];

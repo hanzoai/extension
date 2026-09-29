@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
+import { AuthManager } from '../../auth/manager';
+import { complete, MODEL } from '../../api/chat';
 
 interface LLMConfig {
     provider: string;
     model: string;
-    apiKey?: string;
     baseUrl?: string;
 }
 
@@ -32,19 +33,10 @@ export class AITools {
         // Load from settings
         const config = vscode.workspace.getConfiguration('hanzo');
         
-        // Default configurations
-        this.llmConfigs.set('openai', {
-            provider: 'openai',
-            model: config.get('llm.openai.model', 'gpt-4'),
-            apiKey: config.get('llm.openai.apiKey'),
-            baseUrl: 'https://api.openai.com/v1'
-        });
-        
-        this.llmConfigs.set('anthropic', {
-            provider: 'anthropic',
-            model: config.get('llm.anthropic.model', 'claude-3-opus-20240229'),
-            apiKey: config.get('llm.anthropic.apiKey'),
-            baseUrl: 'https://api.anthropic.com/v1'
+        // Every hosted model is reached through api.hanzo.ai; local is the user's own Ollama.
+        this.llmConfigs.set('hanzo', {
+            provider: 'hanzo',
+            model: config.get('llm.hanzo.model', MODEL)
         });
         
         this.llmConfigs.set('local', {
@@ -68,8 +60,8 @@ export class AITools {
                         },
                         provider: {
                             type: 'string',
-                            enum: ['openai', 'anthropic', 'local', 'auto'],
-                            description: 'LLM provider to use (default: auto)'
+                            enum: ['hanzo', 'local'],
+                            description: 'LLM provider to use (default: hanzo)'
                         },
                         model: {
                             type: 'string',
@@ -206,20 +198,9 @@ export class AITools {
 
     private async llmHandler(args: any): Promise<any> {
         try {
-            const provider = args.provider || 'auto';
+            const selectedProvider = args.provider || 'hanzo';
             const prompt = args.prompt;
             const system = args.system || 'You are a helpful AI assistant.';
-            
-            // Auto-select provider based on availability
-            let selectedProvider = provider;
-            if (provider === 'auto') {
-                for (const [name, config] of this.llmConfigs) {
-                    if (config.apiKey || name === 'local') {
-                        selectedProvider = name;
-                        break;
-                    }
-                }
-            }
             
             const config = this.llmConfigs.get(selectedProvider);
             if (!config) {
@@ -230,11 +211,8 @@ export class AITools {
             let response: string;
             
             switch (config.provider) {
-                case 'openai':
-                    response = await this.callOpenAI(config, prompt, system, args);
-                    break;
-                case 'anthropic':
-                    response = await this.callAnthropic(config, prompt, system, args);
+                case 'hanzo':
+                    response = await this.callHanzo(config, prompt, system, args);
                     break;
                 case 'ollama':
                     response = await this.callOllama(config, prompt, system, args);
@@ -321,16 +299,18 @@ Provide:
         const action = args.action;
         
         switch (action) {
-            case 'list':
+            case 'list': {
+                const signedIn = !!(await AuthManager.getInstance(this.context).bearer());
                 return {
                     success: true,
                     providers: Array.from(this.llmConfigs.entries()).map(([name, config]) => ({
                         name,
                         provider: config.provider,
                         model: config.model,
-                        configured: !!(config.apiKey || config.provider === 'ollama')
+                        configured: config.provider === 'ollama' || signedIn
                     }))
                 };
+            }
                 
             case 'add':
             case 'update': {
@@ -516,49 +496,19 @@ Provide:
     }
 
     // Helper methods for different LLM providers
-    private async callOpenAI(config: LLMConfig, prompt: string, system: string, args: any): Promise<string> {
-        const response = await axios.post(
-            `${config.baseUrl}/chat/completions`,
+    private async callHanzo(config: LLMConfig, prompt: string, system: string, args: any): Promise<string> {
+        return complete(
+            await AuthManager.getInstance(this.context).bearer(),
+            [
+                { role: 'system', content: system },
+                { role: 'user', content: prompt }
+            ],
             {
                 model: args.model || config.model,
-                messages: [
-                    { role: 'system', content: system },
-                    { role: 'user', content: prompt }
-                ],
                 temperature: args.temperature || 0.7,
-                max_tokens: args.max_tokens || 2000
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${config.apiKey}`,
-                    'Content-Type': 'application/json'
-                }
+                maxTokens: args.max_tokens || 2000
             }
         );
-        
-        return response.data.choices[0].message.content;
-    }
-
-    private async callAnthropic(config: LLMConfig, prompt: string, system: string, args: any): Promise<string> {
-        const response = await axios.post(
-            `${config.baseUrl}/messages`,
-            {
-                model: args.model || config.model,
-                system: system,
-                messages: [{ role: 'user', content: prompt }],
-                temperature: args.temperature || 0.7,
-                max_tokens: args.max_tokens || 2000
-            },
-            {
-                headers: {
-                    'x-api-key': config.apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        
-        return response.data.content[0].text;
     }
 
     private async callOllama(config: LLMConfig, prompt: string, system: string, args: any): Promise<string> {

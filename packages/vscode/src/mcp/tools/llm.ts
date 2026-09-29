@@ -4,8 +4,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync } from 'child_process';
+import { AuthManager } from '../../auth/manager';
+import { complete, MODEL } from '../../api/chat';
 
 const CONFIG_PATH = path.join(os.homedir(), '.hanzo', 'llm-config.json');
+
+// Two Zen 5 tiers, both listed by api.hanzo.ai/v1/models.
+const CONSENSUS = [MODEL, 'zen5-pro'];
 
 interface ProviderConfig {
     name: string;
@@ -30,9 +35,7 @@ function saveConfig(config: Record<string, ProviderConfig>): void {
 
 function detectProviders(): ProviderConfig[] {
     const found: ProviderConfig[] = [];
-    if (process.env.OPENAI_API_KEY) {found.push({ name: 'OpenAI', url: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini', 'o3-mini'] });}
-    if (process.env.ANTHROPIC_API_KEY) {found.push({ name: 'Anthropic', url: 'https://api.anthropic.com', models: ['claude-opus-4-6', 'claude-sonnet-4-6'] });}
-    if (process.env.HANZO_API_KEY) {found.push({ name: 'Hanzo', url: 'https://api.hanzo.ai/v1', models: ['zen-400b', 'zen-70b'] });}
+    found.push({ name: 'Hanzo', url: 'https://api.hanzo.ai/v1', models: [MODEL] });
     try { execSync('curl -sf http://localhost:11434/api/tags', { timeout: 2000, stdio: 'pipe' }); found.push({ name: 'Ollama', url: 'http://localhost:11434' }); } catch { /* best-effort — deliberately ignored */ }
     try { execSync('curl -sf http://localhost:1234/v1/models', { timeout: 2000, stdio: 'pipe' }); found.push({ name: 'LM Studio', url: 'http://localhost:1234/v1' }); } catch { /* best-effort — deliberately ignored */ }
     return found;
@@ -47,46 +50,22 @@ export function createLLMTools(context: vscode.ExtensionContext): MCPTool[] {
                 type: 'object',
                 properties: {
                     prompt: { type: 'string', description: 'Prompt to send to the LLM' },
-                    model: { type: 'string', description: 'Model to use (e.g., gpt-4o, claude-opus-4-6)' },
+                    model: { type: 'string', description: `Model id from api.hanzo.ai/v1/models (default: ${MODEL})` },
                     temperature: { type: 'number', description: 'Temperature for response generation (0-1)' },
                     maxTokens: { type: 'number', description: 'Maximum tokens in response' }
                 },
                 required: ['prompt']
             },
             handler: async (args: { prompt: string; model?: string; temperature?: number; maxTokens?: number }) => {
-                const providers = detectProviders();
-                const config = loadConfig();
-                const allProviders = [...providers, ...Object.values(config).filter(c => c.enabled !== false)];
-
-                if (allProviders.length === 0) {
-                    return 'No LLM providers available. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or HANZO_API_KEY, or start Ollama locally.';
-                }
-
-                // Find provider for requested model or use first available
-                let provider = allProviders[0];
-                const model = args.model || 'default';
-                for (const p of allProviders) {
-                    if (p.models?.some(m => model.includes(m) || m.includes(model))) { provider = p; break; }
-                }
-
-                // Route to Hanzo LLM gateway (unified proxy for all providers)
-                const apiKey = process.env.HANZO_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-                const baseUrl = process.env.HANZO_LLM_URL || 'https://api.hanzo.ai/v1';
-
+                // Every hosted model is served by the Hanzo gateway, api.hanzo.ai/v1.
                 try {
-                    const body = JSON.stringify({
-                        model: args.model || 'zen-70b',
-                        messages: [{ role: 'user', content: args.prompt }],
-                        temperature: args.temperature ?? 0.7,
-                        max_tokens: args.maxTokens ?? 2048
-                    });
-                    const result = execSync(`curl -sf "${baseUrl}/chat/completions" -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body.replace(/'/g, "'\\''")}'`, {
-                        stdio: 'pipe', timeout: 60000
-                    }).toString();
-                    const data = JSON.parse(result);
-                    return data.choices?.[0]?.message?.content || JSON.stringify(data);
+                    return await complete(
+                        await AuthManager.getInstance(context).bearer(),
+                        [{ role: 'user', content: args.prompt }],
+                        { model: args.model, temperature: args.temperature ?? 0.7, maxTokens: args.maxTokens ?? 2048 }
+                    );
                 } catch (e: any) {
-                    return `Error querying LLM: ${e.message}\n\nAvailable providers: ${allProviders.map(p => p.name).join(', ')}`;
+                    return `Error querying LLM: ${e.message}`;
                 }
             }
         },
@@ -98,17 +77,18 @@ export function createLLMTools(context: vscode.ExtensionContext): MCPTool[] {
                 type: 'object',
                 properties: {
                     prompt: { type: 'string', description: 'Prompt to send to multiple LLMs' },
-                    models: { type: 'array', items: { type: 'string' }, description: 'List of models to query' }
+                    models: { type: 'array', items: { type: 'string' }, description: `Model ids from api.hanzo.ai/v1/models (default: ${CONSENSUS.join(', ')})` }
                 },
                 required: ['prompt']
             },
             handler: async (args: { prompt: string; models?: string[] }) => {
-                const providers = detectProviders();
-                if (providers.length < 2) {
-                    return `Need at least 2 providers for consensus. Found: ${providers.map(p => p.name).join(', ') || 'none'}. Configure API keys for multiple providers.`;
-                }
-                const models = args.models || providers.slice(0, 3).flatMap(p => p.models?.slice(0, 1) || [p.name]);
-                return `Consensus query across ${models.length} models: ${models.join(', ')}\n\nTo use consensus, configure the Hanzo LLM gateway at https://api.hanzo.ai which supports routing to 100+ providers with built-in consensus and fallback.`;
+                const models = args.models?.length ? args.models : CONSENSUS;
+                const token = await AuthManager.getInstance(context).bearer();
+                const answers = await Promise.all(models.map(model =>
+                    complete(token, [{ role: 'user', content: args.prompt }], { model })
+                        .catch((e: Error) => `Error: ${e.message}`)
+                ));
+                return models.map((model, i) => `**${model}:**\n${answers[i]}`).join('\n\n');
             }
         },
 

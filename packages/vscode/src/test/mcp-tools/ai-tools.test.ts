@@ -39,9 +39,8 @@ suite('AI Tools Test Suite', () => {
         const result = await handler('llm_manage')({ action: 'list' });
         assert.strictEqual(result.success, true);
         const names = result.providers.map((p: any) => p.name);
-        assert.ok(names.includes('openai'));
-        assert.ok(names.includes('anthropic'));
-        assert.ok(names.includes('local'));
+        assert.deepStrictEqual(names, ['hanzo', 'local']);
+        assert.strictEqual(result.providers[0].model, 'zen5');
     });
 
     test('llm_manage validates required arguments', async () => {

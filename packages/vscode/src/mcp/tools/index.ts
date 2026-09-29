@@ -5,7 +5,6 @@ import { createFileSystemTools } from './filesystem';
 import { createShellTools } from './shell';
 import { createSearchTools } from './search';
 import { createJupyterTools } from './jupyter';
-import { createAgentTools } from './agent';
 import { createTodoTools } from './todo';
 import { createEditorTools } from './editor';
 import { createDatabaseTools } from './database';
@@ -80,7 +79,6 @@ export class MCPTools {
             createUnifiedProjectAnalyzeTool(this.context),
 
             // AI & Agents
-            ...createAgentTools(this.context),
             ...this.aiTools.getTools(),
             createThinkTool(this.context),
             createCriticTool(this.context),

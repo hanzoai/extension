@@ -230,16 +230,19 @@
           "enum": [
             "hanzo",
             "lmstudio",
-            "ollama",
-            "openai",
-            "anthropic"
+            "ollama"
           ],
           "default": "hanzo",
-          "description": "LLM provider to use for AI features"
+          "description": "LLM provider to use for AI features: hanzo is api.hanzo.ai, the others run on this machine"
+        },
+        "hanzo.llm.hanzo.model": {
+          "type": "string",
+          "default": "zen5",
+          "description": "Model on api.hanzo.ai; any id GET https://api.hanzo.ai/v1/models lists"
         },
         "hanzo.llm.hanzo.apiKey": {
           "type": "string",
-          "description": "API key for Hanzo AI Gateway"
+          "description": "Hanzo API key for api.hanzo.ai, used when not signed in (Hanzo: Login)"
         },
         "hanzo.llm.lmstudio.endpoint": {
           "type": "string",
@@ -259,24 +262,6 @@
           "type": "string",
           "default": "llama2",
           "description": "Model to use in Ollama"
-        },
-        "hanzo.llm.openai.apiKey": {
-          "type": "string",
-          "description": "OpenAI API key"
-        },
-        "hanzo.llm.openai.model": {
-          "type": "string",
-          "default": "gpt-4",
-          "description": "OpenAI model to use"
-        },
-        "hanzo.llm.anthropic.apiKey": {
-          "type": "string",
-          "description": "Anthropic API key"
-        },
-        "hanzo.llm.anthropic.model": {
-          "type": "string",
-          "default": "claude-3-opus-20240229",
-          "description": "Anthropic model to use"
         }
       }
     },

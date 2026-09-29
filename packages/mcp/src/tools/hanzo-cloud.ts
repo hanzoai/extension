@@ -11,10 +11,11 @@
  *                               pricing, tax, returns, payment methods, invoices, meters)
  * Storage (api.hanzo.ai/v1)  — object storage: buckets, objects, upload, presign
  * Auth (api.hanzo.ai/v1/iam) — authentication: login, token, account, sessions, whoami, mfa
- * API  (api.hanzo.ai/v1)     — LLM gateway: models, chat, embeddings, images, audio, files
+ * API  (api.hanzo.ai/v1)     — LLM gateway: models, chat, embeddings, images, audio
  */
 
 import { Tool } from '../types/index.js';
+import { EMBEDDING_MODEL, MODEL } from '../models.js';
 
 const API_URL  = process.env.API_URL  || 'https://api.hanzo.ai';
 // IAM is served on the unified gateway under IAM_V1.
@@ -958,29 +959,28 @@ export const authTool: Tool = {
 };
 
 // =============================================
-// API/LLM — models, chat, embeddings, images, audio, files
+// API/LLM — models, chat, embeddings, images, audio
 // =============================================
 
 export const apiTool: Tool = {
   name: 'api',
-  description: 'Hanzo API & LLM gateway: models, chat, embeddings, images, audio, files, fine-tuning, usage',
+  description: 'Hanzo API & LLM gateway: models, chat, embeddings, images, audio, usage',
   inputSchema: {
     type: 'object',
     properties: {
       action: { type: 'string', enum: [
         'models', 'chat', 'embeddings',
-        'images', 'audio', 'files', 'upload_file',
-        'fine_tunes', 'create_fine_tune',
+        'images', 'audio',
         'usage', 'health'
       ] },
-      message: { type: 'string' }, model: { type: 'string', default: 'auto' },
+      message: { type: 'string' },
+      model: { type: 'string', description: `Model id from GET /v1/models. chat defaults to ${MODEL}, embeddings to ${EMBEDDING_MODEL}; images and audio take the id you name` },
       messages: { type: 'array', items: { type: 'object' }, description: 'Full messages array' },
       system: { type: 'string' }, maxTokens: { type: 'number', default: 1000 },
       temperature: { type: 'number' }, topP: { type: 'number' },
       input: { type: 'string', description: 'Text for embeddings' },
       prompt: { type: 'string', description: 'Prompt for images/audio' },
       size: { type: 'string', description: 'Image size (256x256, 512x512, 1024x1024)' },
-      fileId: { type: 'string' }, purpose: { type: 'string', default: 'fine-tune' },
       data: { type: 'object', description: 'Additional request data' }
     },
     required: ['action']
@@ -1003,7 +1003,7 @@ export const apiTool: Tool = {
             if (args.system) msgs.push({ role: 'system', content: args.system });
             msgs.push({ role: 'user', content: args.message });
           }
-          const body: any = { model: args.model || 'auto', messages: msgs, max_tokens: args.maxTokens || 1000 };
+          const body: any = { model: args.model || MODEL, messages: msgs, max_tokens: args.maxTokens || 1000 };
           if (args.temperature !== undefined) body.temperature = args.temperature;
           if (args.topP !== undefined) body.top_p = args.topP;
           const d = await api(API_URL, '/v1/chat/completions', { method: 'POST', body: JSON.stringify(body) });
@@ -1013,27 +1013,20 @@ export const apiTool: Tool = {
         }
         case 'embeddings': {
           if (!args.input) return fail('input required');
-          const d = await api(API_URL, '/v1/embeddings', { method: 'POST', body: JSON.stringify({ model: args.model || 'text-embedding-3-small', input: args.input }) });
+          const d = await api(API_URL, '/v1/embeddings', { method: 'POST', body: JSON.stringify({ model: args.model || EMBEDDING_MODEL, input: args.input }) });
           const emb = d?.data?.[0]?.embedding || [];
           return ok(`Embedding (${emb.length} dims): [${emb.slice(0, 5).map((x: number) => x.toFixed(4)).join(', ')}...]`);
         }
+        // GET /v1/models lists no image or speech model, so neither action has a default to fall back on.
         case 'images': {
           if (!args.prompt) return fail('prompt required');
-          return ok(j(await api(API_URL, '/v1/images/generations', { method: 'POST', body: JSON.stringify({ model: args.model || 'dall-e-3', prompt: args.prompt, size: args.size || '1024x1024', ...(args.data || {}) }) })));
+          if (!args.model) return fail('model required: /v1/models lists no image model to default to');
+          return ok(j(await api(API_URL, '/v1/images/generations', { method: 'POST', body: JSON.stringify({ model: args.model, prompt: args.prompt, size: args.size || '1024x1024', ...(args.data || {}) }) })));
         }
         case 'audio': {
           if (!args.input) return fail('input required');
-          return ok(j(await api(API_URL, '/v1/audio/speech', { method: 'POST', body: JSON.stringify({ model: args.model || 'tts-1', input: args.input, ...(args.data || {}) }) })));
-        }
-        case 'files': return ok(j(await api(API_URL, '/v1/files')));
-        case 'upload_file': {
-          if (!args.data) return fail('data required with file content');
-          return ok(j(await api(API_URL, '/v1/files', { method: 'POST', body: JSON.stringify({ purpose: args.purpose || 'fine-tune', ...args.data }) })));
-        }
-        case 'fine_tunes': return ok(j(await api(API_URL, '/v1/fine_tuning/jobs')));
-        case 'create_fine_tune': {
-          if (!args.fileId) return fail('fileId required');
-          return ok(j(await api(API_URL, '/v1/fine_tuning/jobs', { method: 'POST', body: JSON.stringify({ model: args.model || 'gpt-4o-mini-2024-07-18', training_file: args.fileId, ...(args.data || {}) }) })));
+          if (!args.model) return fail('model required: /v1/models lists no speech model to default to');
+          return ok(j(await api(API_URL, '/v1/audio/speech', { method: 'POST', body: JSON.stringify({ model: args.model, input: args.input, ...(args.data || {}) }) })));
         }
         case 'usage': return ok(j(await api(API_URL, '/v1/usage')));
         case 'health': return ok(j(await api(API_URL, '/health')));

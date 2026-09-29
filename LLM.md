@@ -54,6 +54,12 @@ and `hanzo-cli`, and refuses `localhost`. VS Code signs in one way,
 
 One default model on every surface: `zen5`, the id catalog.hanzo.ai marks
 "Zen5 (Default)". A default or fallback id must be in `api.hanzo.ai/v1/models`.
+`auto` is not in it, so nothing defaults to it. Embeddings default to
+`zen-embedding`; the list has no image or speech model, so those calls take
+the id the caller names. No surface calls a provider's own API: VS Code goes
+through `packages/vscode/src/api/chat.ts` (bearer: the IAM session, else
+`HANZO_API_KEY` or `hanzo.llm.hanzo.apiKey`), hanzo-mcp through
+`API_URL` with `HANZO_API_KEY`. Ollama and LM Studio stay: they are local.
 
 ## Architecture (native ZAP)
 

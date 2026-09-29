@@ -31,6 +31,17 @@ export class AuthManager {
         }
     }
 
+    /**
+     * The bearer for api.hanzo.ai: the session's access token, else an IAM API
+     * key from HANZO_API_KEY or the hanzo.llm.hanzo.apiKey setting.
+     */
+    public async bearer(): Promise<string | undefined> {
+        return (await this.getAuthToken())
+            || process.env.HANZO_API_KEY
+            || vscode.workspace.getConfiguration('hanzo').get<string>('llm.hanzo.apiKey')
+            || undefined;
+    }
+
     /** Signs in through the browser. Resolves true once signed in. */
     public async initiateAuth(): Promise<boolean> {
         try {

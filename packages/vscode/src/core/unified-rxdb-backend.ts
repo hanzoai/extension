@@ -48,7 +48,7 @@ const documentsSchema = {
             items: {
                 type: 'number'
             },
-            maxItems: 1536, // Support up to OpenAI ada-002 size
+            maxItems: 1536,
             minItems: 0
         },
         
@@ -234,32 +234,13 @@ export class LocalEmbeddingServer implements EmbeddingServer {
     }
 }
 
-// Cloud embedding server (OpenAI, Cohere, etc.)
+// Cloud embedding server: api.hanzo.ai/v1/embeddings, the OpenAI-compatible gateway.
 export class CloudEmbeddingServer implements EmbeddingServer {
-    model: string;
-    dimension: number;
-    private apiKey: string;
-    private provider: 'openai' | 'cohere' | 'hanzo';
-    
-    constructor(provider: 'openai' | 'cohere' | 'hanzo', apiKey: string) {
-        this.provider = provider;
-        this.apiKey = apiKey;
-        
-        switch (provider) {
-            case 'openai':
-                this.model = 'text-embedding-ada-002';
-                this.dimension = 1536;
-                break;
-            case 'cohere':
-                this.model = 'embed-english-v2.0';
-                this.dimension = 4096;
-                break;
-            case 'hanzo':
-                this.model = 'hanzo-embed-v1';
-                this.dimension = 768;
-                break;
-        }
-    }
+    // zen-embedding is the listed embedding SKU; the gateway routes it to bge-m3, 1024 dims.
+    model = 'zen-embedding';
+    dimension = 1024;
+
+    constructor(private readonly apiKey: string) {}
     
     async embed(text: string): Promise<number[]> {
         const response = await this.callAPI([text]);
@@ -271,45 +252,13 @@ export class CloudEmbeddingServer implements EmbeddingServer {
     }
     
     private async callAPI(texts: string[]): Promise<number[][]> {
-        let url: string;
-        let body: any;
-        const headers: any = {
-            'Content-Type': 'application/json'
-        };
-        
-        switch (this.provider) {
-            case 'openai':
-                url = 'https://api.openai.com/v1/embeddings';
-                headers['Authorization'] = `Bearer ${this.apiKey}`;
-                body = {
-                    model: this.model,
-                    input: texts
-                };
-                break;
-                
-            case 'cohere':
-                url = 'https://api.cohere.ai/v1/embed';
-                headers['Authorization'] = `Bearer ${this.apiKey}`;
-                body = {
-                    model: this.model,
-                    texts: texts
-                };
-                break;
-                
-            case 'hanzo':
-                url = 'https://api.hanzo.ai/v1/embeddings';
-                headers['X-API-Key'] = this.apiKey;
-                body = {
-                    model: this.model,
-                    inputs: texts
-                };
-                break;
-        }
-        
-        const response = await fetch(url, {
+        const response = await fetch('https://api.hanzo.ai/v1/embeddings', {
             method: 'POST',
-            headers,
-            body: JSON.stringify(body)
+            headers: {
+                'Authorization': `Bearer ${this.apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ model: this.model, input: texts })
         });
         
         if (!response.ok) {
@@ -317,18 +266,7 @@ export class CloudEmbeddingServer implements EmbeddingServer {
         }
         
         const data = await response.json();
-        
-        // Extract embeddings based on provider format
-        switch (this.provider) {
-            case 'openai':
-                return data.data.map((item: any) => item.embedding);
-            case 'cohere':
-                return data.embeddings;
-            case 'hanzo':
-                return data.embeddings;
-            default:
-                throw new Error(`Unknown provider: ${this.provider}`);
-        }
+        return data.data.map((item: any) => item.embedding);
     }
 }
 
