@@ -7,6 +7,9 @@
 - Chat and model listing use api.hanzo.ai
 - The default model is zen5, the one the Hanzo catalog marks as its default; offline, the model list is that one model
 
+### Removed
+- The MCP service and its setting: api.hanzo.ai serves no MCP server connect, tools or execute API for it to call
+
 ## [0.1.0] - 2024-01-05
 ### Added
 - Initial release of Hanzo AI JetBrains Plugin

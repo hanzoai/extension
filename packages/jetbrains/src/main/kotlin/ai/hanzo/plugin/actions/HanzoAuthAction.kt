@@ -50,7 +50,6 @@ class HanzoAuthAction : AnAction() {
                 ApplicationManager.getApplication().invokeLater {
                     Messages.showInfoMessage(project, "Logged in to Hanzo AI${email?.let { " as $it" } ?: ""}.", "Hanzo AI")
                 }
-                HanzoPlugin.getMCPService().initialize()
             }
         })
     }

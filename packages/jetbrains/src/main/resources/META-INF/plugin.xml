@@ -12,7 +12,6 @@
     <h3>Key Features:</h3>
     <ul>
         <li><b>200+ LLM Models:</b> Access models from OpenAI, Anthropic, Google, Meta, and more through a single interface</li>
-        <li><b>Model Context Protocol (MCP):</b> Enhanced AI capabilities with file operations, search, and code analysis</li>
         <li><b>Symbol Search:</b> AI-powered symbol search across your entire project</li>
         <li><b>Smart Chat Interface:</b> Interactive AI assistant in a dedicated tool window</li>
         <li><b>Secure Authentication:</b> Login with your Hanzo AI account for personalized access</li>
@@ -55,7 +54,6 @@
 
         <!-- Services -->
         <applicationService serviceImplementation="ai.hanzo.plugin.services.HanzoAuthService"/>
-        <applicationService serviceImplementation="ai.hanzo.plugin.services.HanzoMCPService"/>
         <applicationService serviceImplementation="ai.hanzo.plugin.settings.HanzoSettings"/>
         <projectService serviceImplementation="ai.hanzo.plugin.services.HanzoProjectService"/>
 

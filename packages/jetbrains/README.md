@@ -6,7 +6,6 @@ Access 200+ AI models directly in your JetBrains IDE with Hanzo AI's unified pla
 ## Key Features
 
 - **200+ LLM Models**: Access models from OpenAI, Anthropic, Google, Meta, and more through a single interface
-- **Model Context Protocol (MCP)**: Enhanced AI capabilities with file operations, search, and code analysis
 - **Symbol Search**: AI-powered symbol search across your entire project
 - **Smart Chat Interface**: Interactive AI assistant in a dedicated tool window
 - **Secure Authentication**: Login with your Hanzo AI account for personalized access

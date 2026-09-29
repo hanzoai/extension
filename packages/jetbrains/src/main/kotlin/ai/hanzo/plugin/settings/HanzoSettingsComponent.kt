@@ -7,12 +7,10 @@ import javax.swing.JPanel
 
 class HanzoSettingsComponent {
     private val apiEndpointField = JBTextField()
-    private val enableMCPCheckBox = JBCheckBox("Enable Model Context Protocol (MCP)")
     private val enableSymbolSearchCheckBox = JBCheckBox("Enable AI-powered symbol search")
 
     val panel: JPanel = FormBuilder.createFormBuilder()
         .addLabeledComponent("API Endpoint:", apiEndpointField, 1, false)
-        .addComponent(enableMCPCheckBox, 1)
         .addComponent(enableSymbolSearchCheckBox, 1)
         .addComponentFillVertically(JPanel(), 0)
         .panel
@@ -21,12 +19,6 @@ class HanzoSettingsComponent {
         get() = apiEndpointField.text
         set(value) {
             apiEndpointField.text = value
-        }
-
-    var enableMCP: Boolean
-        get() = enableMCPCheckBox.isSelected
-        set(value) {
-            enableMCPCheckBox.isSelected = value
         }
 
     var enableSymbolSearch: Boolean

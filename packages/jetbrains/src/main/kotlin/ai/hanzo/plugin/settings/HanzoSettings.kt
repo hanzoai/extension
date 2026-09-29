@@ -12,7 +12,6 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 )
 class HanzoSettings : PersistentStateComponent<HanzoSettings> {
     var apiEndpoint = "https://api.hanzo.ai"
-    var enableMCP = true
     var enableSymbolSearch = true
 
     override fun getState(): HanzoSettings = this

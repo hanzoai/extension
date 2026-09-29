@@ -246,22 +246,12 @@ class HanzoProjectService(private val project: Project) {
     
     fun initializeProject() {
         LOG.info("Initializing Hanzo AI for project: ${project.name}")
-        // Initialize MCP service if enabled
-        val mcpService = HanzoPlugin.getMCPService()
-        if (mcpService.isEnabled()) {
-            mcpService.connect()
-        }
     }
     
     fun cleanupProject() {
         LOG.info("Cleaning up Hanzo AI for project: ${project.name}")
         // Clear chat history
         clearChatHistory()
-        // Disconnect MCP if connected
-        val mcpService = HanzoPlugin.getMCPService()
-        if (mcpService.isConnected()) {
-            mcpService.disconnect()
-        }
         // Close HTTP client
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
