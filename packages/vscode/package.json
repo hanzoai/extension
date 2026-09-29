@@ -45,7 +45,7 @@
     "onCommand:hanzo.checkMetrics",
     "onCommand:hanzo.resetMetrics"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "chatParticipants": [
       {
@@ -291,21 +291,15 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run build && npm run build:mcp",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "tsc -p ./ --noEmit && node scripts/build.js",
+    "build": "vsce package --no-dependencies --out dist/hanzo-ide.vsix",
     "lint": "eslint .",
     "test": "vitest run",
     "test:electron": "npm run build && tsc -p tsconfig.test.json && node ./out/test/runTest.js",
     "test:coverage": "c8 npm test",
     "test:vitest:coverage": "vitest --coverage",
     "test:vitest:run": "vitest run --coverage",
-    "build:mcp": "node scripts/build-mcp-standalone.js",
-    "build": "tsc -p ./",
-    "package": "vsce package --no-dependencies",
-    "publish": "npm run package && npx vsce publish && ovsx publish",
-    "dev": "cross-env VSCODE_ENV=development npm run watch",
-    "dev:mcp": "cross-env MCP_TRANSPORT=stdio node ./out/mcp-server-standalone.js",
-    "start:prod": "cross-env VSCODE_ENV=production npm run watch"
+    "publish": "vsce publish --packagePath dist/hanzo-ide.vsix && npx ovsx publish dist/hanzo-ide.vsix"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",
@@ -325,7 +319,6 @@
     "@vscode/vsce": "catalog:",
     "better-sqlite3": "catalog:",
     "c8": "catalog:",
-    "cross-env": "catalog:",
     "esbuild": "catalog:",
     "eslint": "catalog:",
     "glob": "catalog:",
@@ -344,23 +337,6 @@
     "rxjs": "catalog:",
     "zod": "catalog:",
     "ws": "catalog:"
-  },
-  "__metadata": {
-    "id": "fd0ca99f-75f0-4318-af8c-660c5e883c16",
-    "publisherId": "c3a25647-333f-4954-a3a7-a5487b656f72",
-    "publisherDisplayName": "hanzo-ai",
-    "targetPlatform": "undefined",
-    "isApplicationScoped": false,
-    "isPreReleaseVersion": false,
-    "hasPreReleaseVersion": false,
-    "installedTimestamp": 1743812550788,
-    "pinned": false,
-    "preRelease": false,
-    "source": "gallery",
-    "size": 15245886
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "private": true
 }

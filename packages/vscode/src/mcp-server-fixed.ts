@@ -10,6 +10,9 @@ import { z } from 'zod';
 import * as path from 'path';
 import * as fs from 'fs';
 
+// stdout carries JSON-RPC, so whatever the tools log goes to stderr.
+console.log = console.info = console.debug = console.error;
+
 // Import our existing tools
 const mockVscode = {
     workspace: {

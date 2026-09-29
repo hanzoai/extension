@@ -29,13 +29,7 @@ export class HanzoChatParticipant {
             this.handleChat.bind(this)
         );
         
-        participant.iconPath = vscode.Uri.joinPath(
-            vscode.Uri.file(__dirname),
-            '..',
-            '..',
-            'images',
-            'icon.png'
-        );
+        participant.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'images', 'icon.png');
         
         // Add follow-up provider
         participant.followupProvider = {
