@@ -56,6 +56,7 @@ module.exports = {
     })
   },
   env: { openExternal: async () => true },
+  EventEmitter: class { constructor() { this.event = () => ({ dispose() {} }); } fire() {} dispose() {} },
   Uri: { file: (p) => ({ fsPath: p }), parse: (s) => ({ fsPath: s }) },
   ViewColumn: { One: 1 },
   version: '1.0.0',

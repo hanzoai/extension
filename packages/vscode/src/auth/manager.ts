@@ -5,6 +5,9 @@ import { Canceled, Session } from './iam';
 export class AuthManager {
     private static instance: AuthManager;
     private readonly session: Session;
+    private readonly changed = new vscode.EventEmitter<void>();
+    /** Fires on signing in and out. */
+    readonly onDidChange = this.changed.event;
 
     private constructor(context: vscode.ExtensionContext) {
         this.session = new Session(context.secrets);
@@ -60,6 +63,7 @@ export class AuthManager {
                     );
                 },
             );
+            this.changed.fire();
             vscode.window.showInformationMessage(email ? `Signed in to Hanzo AI as ${email}.` : 'Signed in to Hanzo AI.');
             return true;
         } catch (error) {
@@ -76,6 +80,7 @@ export class AuthManager {
         } catch (error) {
             console.warn('[Hanzo] IAM did not revoke the refresh token:', error);
         }
+        this.changed.fire();
     }
 
     /** One line on the session, for the hanzo.debug.authState command. */

@@ -5,6 +5,7 @@ import * as path from 'path';
 // The tools read settings through vscode; each test sets what it needs here.
 const settings = new Map<string, unknown>();
 vi.mock('vscode', () => ({
+  EventEmitter: class { event = () => ({ dispose() {} }); fire() {} },
   workspace: {
     getConfiguration: (section: string) => ({
       get: (key: string, fallback?: unknown) => settings.has(`${section}.${key}`) ? settings.get(`${section}.${key}`) : fallback,

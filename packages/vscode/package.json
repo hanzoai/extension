@@ -1,7 +1,7 @@
 {
   "name": "hanzo-ide",
   "displayName": "Hanzo AI",
-  "description": "Hanzo AI for VS Code: Hanzo's MCP server for every agent, and the @hanzo chat participant.",
+  "description": "Hanzo AI for VS Code: Hanzo's MCP server and Hanzo models for every agent, and the @hanzo chat participant.",
   "version": "1.9.31",
   "publisher": "hanzo-ai",
   "license": "MIT",
@@ -48,6 +48,12 @@
       {
         "id": "hanzo",
         "label": "Hanzo"
+      }
+    ],
+    "languageModelChatProviders": [
+      {
+        "vendor": "hanzo",
+        "displayName": "Hanzo"
       }
     ],
     "commands": [
