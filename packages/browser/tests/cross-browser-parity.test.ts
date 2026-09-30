@@ -336,3 +336,15 @@ describe('Tabs are chrome.tabs on both browsers', () => {
     });
   }
 });
+
+describe('Keepalive port survives the back/forward cache', () => {
+  // Chrome reports a cached page's closed port at BOTH ends; whichever end
+  // does not read lastError logs "Unchecked runtime.lastError".
+  it('the worker end reads lastError on disconnect', () => {
+    const block = chromeBg.slice(chromeBg.indexOf("port.name !== 'zap-keepalive'"));
+    expect(block.slice(0, 600)).toMatch(/onDisconnect\.addListener\([^)]*\)\s*=>\s*\{[^}]*runtime\.lastError/);
+  });
+  it('the page end reads lastError on disconnect', () => {
+    expect(contentScript).toMatch(/onDisconnect[\s\S]{0,200}runtime\)?\?\.lastError/);
+  });
+});
