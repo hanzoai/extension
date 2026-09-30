@@ -374,13 +374,13 @@ function connectNative(state: ZapState, opts: ZapOpts): boolean {
   port.onDisconnect.addListener(() => {
     if (state.socket !== link) return;
     const why = String((globalThis as any).chrome?.runtime?.lastError?.message || '');
-    // Never heard a frame and Chrome says the host is missing or forbidden: this
-    // browser cannot start the helper, so the door is the way in.
-    if (!heard && /not found|forbidden|not allowed|native messaging host/i.test(why)) {
+    // The host closed before the router said a word: missing, forbidden, or
+    // started and gone at once (a stale manifest, a sandbox that cannot exec
+    // it). Either way this browser's way in is the door.
+    if (!heard) {
       state.native = false;
-      state.error = state.pairing ? '' : 'no-router';
       drop(state);
-      opts.log('[Hanzo/ZAP] native host unavailable (' + why + ')' + (state.pairing ? ' — using the paired door' : ''));
+      opts.log('[Hanzo/ZAP] native host unavailable' + (why ? ' (' + why + ')' : '') + ' — joining the door');
       ensureZap(state, opts);
       return;
     }

@@ -1,7 +1,8 @@
 # Hanzo Extension
 
 Browser extension (`packages/browser`) that joins this computer's **ZAP router**
-over one paired loopback WebSocket — no native messaging, no mDNS, no CDP bridge.
+with nothing to pair or register: native messaging to `hanzo-zap-host` where the
+browser allows a helper, else the router's loopback door on a well-known port.
 Ships Chrome / Firefox / Safari. The rest of the workspace is the other Hanzo
 surfaces (editors, office, chat, business apps); README.md indexes them.
 
@@ -73,32 +74,35 @@ through `packages/vscode/src/api/chat.ts` (bearer: the IAM session, else
 `HANZO_API_KEY` or `hanzo.llm.hanzo.apiKey`), hanzo-mcp through
 `API_URL` with `HANZO_API_KEY`. Ollama and LM Studio stay: they are local.
 
-## Architecture (ZAP over a loopback WebSocket)
+## Architecture (ZAP, no pairing)
 
-    extension ─WebSocket 127.0.0.1:20000+uid%10000─► ZAP router ◄─UDS─ hanzo-mcp, dev, desktop, IDE
+    extension ─native messaging (ai.hanzo.zap)─► hanzo-zap-host ─UDS─► ZAP router ◄─UDS─ hanzo-mcp, dev, desktop, IDE
+    extension ─WebSocket 127.0.0.1:21000-21007 (snap/Flatpak)──────► ZAP router
 
 The router is not a daemon: it is the `zapd` library embedded in every Hanzo
 process that speaks ZAP, and an fcntl lock elects one per user (HIP-0069). When
-that process exits another takes over and the extension's socket reconnects to
-the same address. No native messaging, no host manifest, no binary for the
-browser to exec — which is why it works in snap and Flatpak browsers.
+that process exits another takes over and the extension reconnects.
 
-- `shared/socket.ts` — the ONE transport. `ensureZap()` is the ONE reconciler and
-  keeps the ONE clock: every tick reschedules the next (20 s heartbeat while
-  registered, 250 ms doubling to 30 s after a drop), and the keep-alive alarm
-  only restarts that clock after the worker was stopped. The heartbeat is a
-  `PROVIDERS_LIST` probe, which is also the WebSocket traffic that keeps an MV3
-  service worker alive. **Singleton**: one socket, torn down before another.
-  Each WebSocket binary message is one ZAP router envelope, length included.
-- **Pairing.** `hanzo-mcp pair` prints `ws://127.0.0.1:<port>/#<64 hex>`; the popup
-  takes it (`zap.pair`) and `shared/zap.ts` keeps it in `storage.local`. On
-  connect the extension sends a nonce, the router answers with its nonce and
-  `HMAC(token, "zap router"‖nc‖ns)`, and only if that verifies does the
-  extension answer `HMAC(token, "zap client"‖nc‖ns)` and say HELLO. A squatter
-  on the port gets nothing. The door also refuses any Origin but ours
-  (`chrome-extension://biingenefmanpecedoafkfajbnlgdmbl`, `moz-extension://*`,
-  `safari-web-extension://*`), and a browser node may answer calls but never
-  call another node.
+- **Native first.** `hanzo-zap-host` (python-sdk `hanzo_tools.browser.native_host`)
+  is Chrome native messaging host `ai.hanzo.zap`, allowed for this extension's
+  id only; every hanzo-mcp start writes its manifest for Chrome, Chromium,
+  Brave, Edge and Vivaldi. It relays envelopes (base64 in `{z}`) to the
+  router's unix socket and stands for the router itself, so the browser alone
+  is enough. No AUTH: Chrome's origin check and the socket's 0600 owner are
+  the trust.
+- **Door when a browser cannot exec a helper** (snap, Flatpak): the router's
+  WebSocket on the first free port in 21000-21007 (zapd `pair::WELL_KNOWN`).
+  Our Blink origin (`chrome-extension://biingenefmanpecedoafkfajbnlgdmbl`, fixed by
+  the manifest `key`) is admitted without a proof (zapd ≥1.1.4) and says HELLO
+  at once; the extension sweeps the eight ports, then backs off. Only
+  random-origin browsers (Firefox, Safari) pair: `hanzo-mcp pair` prints
+  `ws://127.0.0.1:<port>/#<64 hex>`, kept in `storage.local`, and the connect
+  runs the mutual HMAC (router first). A browser node may answer calls but
+  never call another node.
+- `shared/socket.ts` — the ONE transport module: `Link` is a native port or a
+  door socket, `ensureZap()` the ONE reconciler on the ONE clock (20 s
+  heartbeat while registered — the `PROVIDERS_LIST` probe, which also keeps
+  the MV3 worker alive — and 250 ms doubling to 30 s after a drop).
 - **`connected` means "the router lists me"**, established by the probe — never
   merely "a socket is open". The tick re-sends HELLO when proven but unlisted,
   and replaces a socket whose probe or proof went unanswered for 5 s.

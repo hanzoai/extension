@@ -363,6 +363,14 @@ describe('native messaging', () => {
     expect(FakeSocket.all[0].url).toBe('ws://127.0.0.1:21000/');
   });
 
+  it('joins the door when the host starts and exits before saying anything', () => {
+    const s = newZapState('browser/chrome-3fa2');
+    ensureZap(s, opts());
+    FakePort.last!.gone('Native host has exited.');
+    expect(s.native).toBe(false);
+    expect(FakeSocket.all.at(-1)!.url).toBe('ws://127.0.0.1:21000/');
+  });
+
   it('retries the host when it exits after it was working', () => {
     const s = newZapState('browser/chrome-3fa2');
     ensureZap(s, opts());

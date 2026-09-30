@@ -2067,6 +2067,11 @@ try {
       try { port.postMessage({ type: 'ping', t: Date.now() }); }
       catch { clearInterval(tick); }
     }, 10_000);
-    port.onDisconnect?.addListener?.(() => clearInterval(tick));
+    // A page entering the back/forward cache closes its port; reading
+    // lastError marks that expected close as handled.
+    port.onDisconnect?.addListener?.(() => {
+      void ((chrome as any)?.runtime?.lastError);
+      clearInterval(tick);
+    });
   }
 } catch { /* not all pages let content scripts open ports — best effort */ }
