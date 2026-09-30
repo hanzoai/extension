@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 // The stdio MCP server the extension spawns (src/mcp/server.ts), bundled to
-// dist/mcp-server.js. It serves MCPTools, the registry the @hanzo chat
-// participant also uses, each tool under its own JSON Schema. scripts/build.js
-// swaps `vscode` for a stand-in that reads the workspace from HANZO_WORKSPACE
-// and the `hanzo` settings from HANZO_CONFIG, both set by the extension.
+// dist/mcp-server.js. It serves MCPTools, each tool under its own JSON Schema.
+// scripts/build.js swaps `vscode` for a stand-in that reads the workspace from
+// HANZO_WORKSPACE and the `hanzo` settings from HANZO_CONFIG, both set by the
+// extension.
 
 import * as fs from 'fs';
 import * as path from 'path';

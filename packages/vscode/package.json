@@ -40,7 +40,7 @@
       {
         "id": "hanzo",
         "name": "Hanzo",
-        "description": "Chat with Hanzo AI using your workspace tools",
+        "description": "Hanzo AI with every MCP tool, Hanzo's included",
         "isSticky": true
       }
     ],
@@ -118,43 +118,14 @@
           "default": [],
           "description": "List of explicitly disabled MCP tools"
         },
-        "hanzo.llm.provider": {
-          "type": "string",
-          "enum": [
-            "hanzo",
-            "lmstudio",
-            "ollama"
-          ],
-          "default": "hanzo",
-          "description": "LLM provider to use for AI features: hanzo is api.hanzo.ai, the others run on this machine"
-        },
         "hanzo.llm.hanzo.model": {
           "type": "string",
           "default": "zen5",
-          "description": "Model on api.hanzo.ai; any id GET https://api.hanzo.ai/v1/models lists"
+          "description": "Model on api.hanzo.ai for @hanzo when the chat view's model is not a Hanzo model, and for the AI tools; any id GET https://api.hanzo.ai/v1/models lists"
         },
         "hanzo.llm.hanzo.apiKey": {
           "type": "string",
           "description": "Hanzo API key for api.hanzo.ai, used when not signed in (Hanzo: Login)"
-        },
-        "hanzo.llm.lmstudio.endpoint": {
-          "type": "string",
-          "default": "http://localhost:1234/v1",
-          "description": "LM Studio API endpoint"
-        },
-        "hanzo.llm.lmstudio.model": {
-          "type": "string",
-          "description": "Model to use in LM Studio"
-        },
-        "hanzo.llm.ollama.endpoint": {
-          "type": "string",
-          "default": "http://localhost:11434",
-          "description": "Ollama API endpoint"
-        },
-        "hanzo.llm.ollama.model": {
-          "type": "string",
-          "default": "llama2",
-          "description": "Model to use in Ollama"
         }
       }
     }

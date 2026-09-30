@@ -1,380 +1,76 @@
 import * as vscode from 'vscode';
-import { MCPTools } from '../mcp/tools';
-import axios from 'axios';
-import { AuthManager } from '../auth/manager';
-import { complete, MODEL } from '../api/chat';
+import { MODEL } from '../api/chat';
 
-interface LLMConfig {
-    provider: 'hanzo' | 'lmstudio' | 'ollama';
-    endpoint?: string;
-    model?: string;
+const PROMPT = 'You are Hanzo, an AI agent in VS Code. Use the tools to read, change and run things in the workspace and to drive the browser, then answer briefly.';
+
+/**
+ * @hanzo: a Hanzo model with every MCP tool VS Code has, hanzo-mcp's among
+ * them. It runs on the model picked in the chat view when that is a Hanzo
+ * model, else on hanzo.llm.hanzo.model, and invokes each tool the model calls
+ * until the model answers without one.
+ */
+export function participant(context: vscode.ExtensionContext): vscode.ChatParticipant {
+    const chat = vscode.chat.createChatParticipant('hanzo', handle);
+    chat.iconPath = vscode.Uri.joinPath(context.extensionUri, 'images', 'icon.png');
+    return chat;
 }
 
-export class HanzoChatParticipant {
-    private static readonly ID = 'hanzo';  // Lowercase for @hanzo
-    private mcpTools: MCPTools;
-    private llmConfig: LLMConfig;
-    
-    constructor(private context: vscode.ExtensionContext) {
-        this.mcpTools = new MCPTools(context);
-        this.llmConfig = this.getLLMConfig();
-    }
-    
-    async initialize() {
-        await this.mcpTools.initialize();
-        
-        // Register chat participant
-        const participant = vscode.chat.createChatParticipant(
-            HanzoChatParticipant.ID,
-            this.handleChat.bind(this)
-        );
-        
-        participant.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'images', 'icon.png');
-        
-        // Add follow-up provider
-        participant.followupProvider = {
-            provideFollowups: this.provideFollowups.bind(this)
-        };
-        
-        return participant;
-    }
-    
-    private getLLMConfig(): LLMConfig {
-        const config = vscode.workspace.getConfiguration('hanzo');
-        const llmProvider = config.get<string>('llm.provider', 'hanzo');
-        
-        switch (llmProvider) {
-            case 'lmstudio':
-                return {
-                    provider: 'lmstudio',
-                    endpoint: config.get<string>('llm.lmstudio.endpoint', 'http://localhost:1234/v1'),
-                    model: config.get<string>('llm.lmstudio.model')
-                };
-            case 'ollama':
-                return {
-                    provider: 'ollama',
-                    endpoint: config.get<string>('llm.ollama.endpoint', 'http://localhost:11434'),
-                    model: config.get<string>('llm.ollama.model', 'llama2')
-                };
-            default:
-                return {
-                    provider: 'hanzo',
-                    model: config.get<string>('llm.hanzo.model', MODEL)
-                };
-        }
-    }
-    
-    private async handleChat(
-        request: vscode.ChatRequest,
-        context: vscode.ChatContext,
-        stream: vscode.ChatResponseStream,
-        token: vscode.CancellationToken
-    ): Promise<void> {
-        stream.progress('Processing your request...');
-        
-        try {
-            // First check if this is a direct tool call
-            const toolCalls = this.parseToolCalls(request.prompt);
-            
-            if (toolCalls.length > 0) {
-                // Execute tool calls directly
-                await this.executeToolCalls(toolCalls, stream);
-            } else {
-                // Use LLM to understand the request and potentially call tools
-                const response = await this.queryLLM(request.prompt, context);
-                
-                if (response.toolCalls && response.toolCalls.length > 0) {
-                    // LLM wants to use tools
-                    await this.executeToolCalls(response.toolCalls, stream);
-                } else if (response.content) {
-                    // LLM provided a direct response
-                    stream.markdown(response.content);
-                } else {
-                    // Fallback to showing available tools
-                    stream.markdown(this.getToolsHelp());
-                }
-            }
-        } catch (error: any) {
-            stream.markdown(`❌ Error: ${error.message}`);
-        }
-    }
-    
-    private async executeToolCalls(
-        toolCalls: Array<{ toolName: string; args: any }>,
-        stream: vscode.ChatResponseStream
-    ): Promise<void> {
-        for (const { toolName, args } of toolCalls) {
-            const tool = this.mcpTools.getTool(toolName);
-            if (tool) {
-                stream.progress(`Executing ${toolName}...`);
-                
-                try {
-                    const result = await tool.handler(args);
-                    
-                    // Format and stream the result
-                    if (toolName === 'read' || toolName === 'grep' || toolName === 'search') {
-                        // For file content, use code blocks
-                        stream.markdown(`\`\`\`\n${result}\n\`\`\``);
-                    } else {
-                        stream.markdown(result);
-                    }
-                } catch (error: any) {
-                    stream.markdown(`❌ Error executing ${toolName}: ${error.message}`);
-                }
-            } else {
-                stream.markdown(`❌ Unknown tool: ${toolName}`);
+export async function handle(request: vscode.ChatRequest, context: vscode.ChatContext, stream: vscode.ChatResponseStream, token: vscode.CancellationToken): Promise<void> {
+    const model = await pick(request.model);
+    const tools = vscode.lm.tools
+        .filter(tool => tool.tags.includes('mcp'))
+        .map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
+    const messages = [
+        vscode.LanguageModelChatMessage.User(PROMPT),
+        ...context.history.map(turn => turn instanceof vscode.ChatRequestTurn
+            ? vscode.LanguageModelChatMessage.User(turn.prompt)
+            : vscode.LanguageModelChatMessage.Assistant(turn.response.map(part => (part instanceof vscode.ChatResponseMarkdownPart ? part.value.value : '')).join(''))),
+        vscode.LanguageModelChatMessage.User(request.prompt),
+    ];
+
+    for (;;) {
+        const response = await model.sendRequest(messages, { tools }, token);
+        const parts: (vscode.LanguageModelTextPart | vscode.LanguageModelToolCallPart)[] = [];
+        for await (const part of response.stream) {
+            if (part instanceof vscode.LanguageModelTextPart) {
+                stream.markdown(part.value);
+                parts.push(part);
+            } else if (part instanceof vscode.LanguageModelToolCallPart) {
+                parts.push(part);
             }
         }
-    }
-    
-    private async queryLLM(
-        prompt: string,
-        context: vscode.ChatContext
-    ): Promise<{ content?: string; toolCalls?: Array<{ toolName: string; args: any }> }> {
-        try {
-            // Get all available tools for the system prompt
-            const tools = this.mcpTools.getAllTools();
-            const toolDescriptions = tools.map(t => `- ${t.name}: ${t.description}`).join('\n');
-            
-            const systemPrompt = `You are Hanzo, an AI assistant integrated into VS Code with access to powerful development tools.
+        const calls = parts.filter(part => part instanceof vscode.LanguageModelToolCallPart);
+        if (calls.length === 0) {
+            return;
+        }
+        messages.push(vscode.LanguageModelChatMessage.Assistant(parts));
 
-Available tools:
-${toolDescriptions}
-
-When the user asks you to perform tasks, analyze their request and either:
-1. Use the appropriate tools to complete the task
-2. Provide a helpful response without tools
-3. Ask for clarification if needed
-
-To use a tool, respond with a JSON block like this:
-\`\`\`json
-{
-  "toolCalls": [
-    {
-      "toolName": "read",
-      "args": { "file_path": "/path/to/file" }
-    }
-  ]
-}
-\`\`\`
-
-Otherwise, respond with:
-\`\`\`json
-{
-  "content": "Your response here"
-}
-\`\`\``;
-
-            // Query the LLM based on configuration
-            let response: string;
-            
-            switch (this.llmConfig.provider) {
-                case 'lmstudio':
-                    response = await this.queryLMStudio(systemPrompt, prompt);
-                    break;
-                case 'ollama':
-                    response = await this.queryOllama(systemPrompt, prompt);
-                    break;
-                default:
-                    response = await this.queryHanzoAPI(systemPrompt, prompt);
-            }
-            
-            // Parse the response
+        const results: vscode.LanguageModelToolResultPart[] = [];
+        for (const call of calls) {
             try {
-                const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
-                if (jsonMatch) {
-                    return JSON.parse(jsonMatch[1]);
+                const result = await vscode.lm.invokeTool(call.name, { input: call.input, toolInvocationToken: request.toolInvocationToken }, token);
+                results.push(new vscode.LanguageModelToolResultPart(call.callId, result.content));
+            } catch (error) {
+                if (token.isCancellationRequested) {
+                    throw error;
                 }
-            } catch (e) {
-                // If parsing fails, treat as plain text response
-            }
-            
-            return { content: response };
-            
-        } catch (error: any) {
-            console.error('LLM query error:', error);
-            // Fallback to direct tool parsing
-            const toolCalls = this.parseToolCalls(prompt);
-            if (toolCalls.length > 0) {
-                return { toolCalls };
-            }
-            return { content: `Error querying LLM: ${error.message}. You can still use tools directly.` };
-        }
-    }
-    
-    private async queryHanzoAPI(systemPrompt: string, userPrompt: string): Promise<string> {
-        return complete(
-            await AuthManager.getInstance(this.context).bearer(),
-            [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-            ],
-            { model: this.llmConfig.model, temperature: 0.7 }
-        );
-    }
-    
-    private async queryLMStudio(systemPrompt: string, userPrompt: string): Promise<string> {
-        const response = await axios.post(
-            `${this.llmConfig.endpoint}/chat/completions`,
-            {
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                model: this.llmConfig.model || 'local-model',
-                temperature: 0.7
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        
-        return response.data.choices[0].message.content;
-    }
-    
-    private async queryOllama(systemPrompt: string, userPrompt: string): Promise<string> {
-        const response = await axios.post(
-            `${this.llmConfig.endpoint}/api/generate`,
-            {
-                model: this.llmConfig.model || 'llama2',
-                prompt: `${systemPrompt}\n\nUser: ${userPrompt}\nAssistant:`,
-                stream: false
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        
-        return response.data.response;
-    }
-    
-    private parseToolCalls(prompt: string): Array<{ toolName: string; args: any }> {
-        const toolCalls: Array<{ toolName: string; args: any }> = [];
-        
-        // Simple pattern matching for common commands
-        const patterns = [
-            // File operations
-            { regex: /read\s+(.+)/, tool: 'read', args: (m: RegExpMatchArray) => ({ file_path: m[1].trim() }) },
-            { regex: /write\s+(.+?)\s+content:\s*(.+)/s, tool: 'write', args: (m: RegExpMatchArray) => ({ file_path: m[1].trim(), content: m[2].trim() }) },
-            { regex: /edit\s+(.+?)\s+replace\s+"(.+?)"\s+with\s+"(.+?)"/s, tool: 'edit', args: (m: RegExpMatchArray) => ({ file_path: m[1].trim(), old_string: m[2], new_string: m[3] }) },
-            
-            // Search operations
-            { regex: /search\s+"(.+?)"(?:\s+in\s+(.+))?/, tool: 'search', args: (m: RegExpMatchArray) => ({ query: m[1], include: m[2]?.trim() }) },
-            { regex: /grep\s+"(.+?)"(?:\s+(.+))?/, tool: 'grep', args: (m: RegExpMatchArray) => ({ pattern: m[1], include: m[2]?.trim() || '**/*' }) },
-            
-            // Shell operations
-            { regex: /run\s+(.+)/, tool: 'run_command', args: (m: RegExpMatchArray) => ({ command: m[1].trim() }) },
-            { regex: /bash\s+(.+)/, tool: 'bash', args: (m: RegExpMatchArray) => ({ command: m[1].trim() }) },
-            
-            // Directory operations
-            { regex: /ls\s+(.+)/, tool: 'directory_tree', args: (m: RegExpMatchArray) => ({ path: m[1].trim() }) },
-            { regex: /tree\s+(.+)/, tool: 'directory_tree', args: (m: RegExpMatchArray) => ({ path: m[1].trim() }) },
-            
-            // AI operations
-            { regex: /agent\s+(.+)/, tool: 'agent', args: (m: RegExpMatchArray) => ({ task: m[1].trim() }) },
-        ];
-        
-        for (const pattern of patterns) {
-            const match = prompt.match(pattern.regex);
-            if (match) {
-                toolCalls.push({
-                    toolName: pattern.tool,
-                    args: pattern.args(match)
-                });
-                break; // Only process first match for now
+                // The model reads a failed or declined call and chooses what to do next.
+                const message = error instanceof Error ? error.message : String(error);
+                results.push(new vscode.LanguageModelToolResultPart(call.callId, [new vscode.LanguageModelTextPart(`${call.name} failed: ${message}`)]));
             }
         }
-        
-        return toolCalls;
+        messages.push(vscode.LanguageModelChatMessage.User(results));
     }
-    
-    private provideFollowups(
-        result: vscode.ChatResult,
-        context: vscode.ChatContext,
-        token: vscode.CancellationToken
-    ): vscode.ProviderResult<vscode.ChatFollowup[]> {
-        return [
-            {
-                prompt: 'Show available tools',
-                label: 'Available Tools',
-                command: 'help'
-            },
-            {
-                prompt: 'Search for "TODO" in all files',
-                label: 'Find TODOs',
-                command: 'search'
-            },
-            {
-                prompt: 'Show current directory structure',
-                label: 'Directory Tree',
-                command: 'tree'
-            },
-            {
-                prompt: 'Configure LLM provider',
-                label: 'LLM Settings',
-                command: 'llm_manage'
-            }
-        ];
+}
+
+async function pick(chosen: vscode.LanguageModelChat): Promise<vscode.LanguageModelChat> {
+    if (chosen.vendor === 'hanzo') {
+        return chosen;
     }
-    
-    private getToolsHelp(): string {
-        const tools = this.mcpTools.getAllTools();
-        const categories: Record<string, string[]> = {
-            'File Operations': ['read', 'write', 'edit', 'multi_edit'],
-            'Search': ['search', 'grep', 'git_search', 'symbols'],
-            'Shell': ['bash', 'run_command', 'processes'],
-            'Directory': ['directory_tree', 'find_files'],
-            'AI': ['llm', 'consensus', 'mode', 'agent'],
-            'Development': ['todo_read', 'todo_write', 'critic', 'think']
-        };
-        
-        let help = `# @hanzo AI Assistant
-
-I have access to ${tools.length} tools to help you with development tasks.
-
-## Current LLM Provider: ${this.llmConfig.provider}
-${this.llmConfig.provider === 'hanzo' ? `Using ${this.llmConfig.model} on api.hanzo.ai` : ''}
-${this.llmConfig.provider === 'lmstudio' ? `Using LM Studio at ${this.llmConfig.endpoint}` : ''}
-${this.llmConfig.provider === 'ollama' ? `Using Ollama at ${this.llmConfig.endpoint}` : ''}
-
-## Available Tools by Category:\n\n`;
-        
-        for (const [category, toolNames] of Object.entries(categories)) {
-            const categoryTools = toolNames
-                .map(name => tools.find(t => t.name === name))
-                .filter(Boolean);
-            
-            if (categoryTools.length > 0) {
-                help += `### ${category}\n`;
-                for (const tool of categoryTools) {
-                    if (tool) {
-                        help += `- **${tool.name}**: ${tool.description}\n`;
-                    }
-                }
-                help += '\n';
-            }
-        }
-        
-        help += `## Example Commands:
-- "read src/index.ts"
-- "search for TODO"
-- "grep 'function' in **/*.ts"
-- "run npm test"
-- "show directory tree for src"
-- "agent analyze this codebase for security issues"
-
-## LLM Configuration:
-You can configure your LLM provider in VS Code settings:
-- hanzo.llm.provider: Choose from 'hanzo', 'lmstudio', 'ollama'
-- hanzo.llm.[provider].endpoint: Set custom endpoints for local providers
-- hanzo.llm.[provider].model: Choose specific models (hanzo: any id api.hanzo.ai/v1/models lists)
-
-Ask me to use any of these tools to help with your development tasks!`;
-        
-        return help;
+    const id = vscode.workspace.getConfiguration('hanzo').get<string>('llm.hanzo.model', MODEL);
+    const [model] = await vscode.lm.selectChatModels({ vendor: 'hanzo', id });
+    if (!model) {
+        throw new Error(`api.hanzo.ai lists no model ${id}. Set hanzo.llm.hanzo.model to an id GET https://api.hanzo.ai/v1/models lists.`);
     }
+    return model;
 }

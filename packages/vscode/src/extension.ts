@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { AuthManager } from './auth/manager';
 import { startServer } from './mcp/server';
-import { HanzoChatParticipant } from './chat/hanzo-chat-participant';
+import { participant } from './chat/hanzo-chat-participant';
 import { servers } from './lm/mcp';
 import { Models } from './lm/models';
 
@@ -19,6 +19,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Api> {
     context.subscriptions.push(
         vscode.lm.registerMcpServerDefinitionProvider('hanzo', servers),
         vscode.lm.registerLanguageModelChatProvider('hanzo', new Models(authManager)),
+        participant(context),
     );
 
     if (vscode.workspace.getConfiguration('hanzo').get<boolean>('mcp.enabled', true)) {
@@ -31,14 +32,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Api> {
             console.error('[Hanzo] MCP server failed to start:', error);
             vscode.window.showErrorMessage(`Hanzo: MCP server failed to start. ${error instanceof Error ? error.message : String(error)}`);
         }
-    }
-
-    try {
-        const participant = await new HanzoChatParticipant(context).initialize();
-        context.subscriptions.push(participant);
-    } catch (error) {
-        console.error('Failed to register chat participant:', error);
-        vscode.window.showErrorMessage(`Hanzo: Failed to initialize chat participant. ${error instanceof Error ? error.message : String(error)}`);
     }
 
     context.subscriptions.push(
