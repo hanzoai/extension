@@ -40,7 +40,7 @@ async function build() {
     format: 'esm',
     platform: 'browser',
     target: ['chrome90', 'edge90', 'firefox90', 'safari15'],
-    sourcemap: true,
+    sourcemap: watch,
     minify: !watch,
     logLevel: 'info',
   });
@@ -63,7 +63,7 @@ async function build() {
     format: 'esm',
     platform: 'node',
     target: ['node18'],
-    sourcemap: true,
+    sourcemap: watch,
     minify: !watch,
     external: ['@hanzo/ai'],
     banner: { js: "import { createRequire as __cr } from 'module'; const require = __cr(import.meta.url);" },

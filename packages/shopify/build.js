@@ -49,7 +49,7 @@ async function build() {
     jsx: 'automatic',
     loader: { '.css': 'css', '.svg': 'dataurl', '.png': 'dataurl', '.woff': 'dataurl', '.woff2': 'dataurl' },
     define: { 'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production') },
-    sourcemap: true,
+    sourcemap: watch,
     minify: !watch,
     logLevel: 'info',
   });
@@ -70,7 +70,7 @@ async function build() {
     format: 'esm',
     platform: 'node',
     target: ['node18'],
-    sourcemap: true,
+    sourcemap: watch,
     minify: !watch,
     packages: 'external',
     banner: { js: "import { createRequire as __cr } from 'module'; const require = __cr(import.meta.url);" },

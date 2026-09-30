@@ -36,7 +36,7 @@ async function build() {
     jsx: 'automatic',
     loader: { '.css': 'css', '.svg': 'dataurl', '.png': 'dataurl', '.woff': 'dataurl', '.woff2': 'dataurl' },
     define: { 'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production') },
-    sourcemap: true,
+    sourcemap: watch,
     minify: !watch,
     logLevel: 'info',
   });

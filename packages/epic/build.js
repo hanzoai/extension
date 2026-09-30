@@ -41,7 +41,7 @@ async function build() {
     format: 'iife',
     platform: 'browser',
     target: ['chrome90', 'edge90', 'safari15', 'firefox90'],
-    sourcemap: true,
+    sourcemap: watch,
     minify: !watch,
     define: {
       SMART_CLIENT_ID: JSON.stringify(SMART_CLIENT_ID),
@@ -61,7 +61,7 @@ async function build() {
     format: 'esm',
     platform: 'node',
     target: ['node18'],
-    sourcemap: true,
+    sourcemap: watch,
     minify: !watch,
     banner: { js: '// Hanzo Epic SMART-on-FHIR service — run: node server.js' },
     logLevel: 'info',

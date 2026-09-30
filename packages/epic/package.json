@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/epic",
-  "version": "1.0.1",
-  "description": "Hanzo AI for Epic (SMART on FHIR) \u2014 brings Hanzo AI into the clinician's EHR workflow. Reads the launched patient's chart over FHIR R4 (problems, meds, allergies, labs, notes) and assists: summarize the patient, draft a SOAP note, extract problems & meds, and ask about the patient. Read + assist only (no clinical write-back in v1). Model calls route through the api.hanzo.ai gateway via @hanzo/ai; SMART-on-FHIR OAuth2 (auth-code + PKCE) with server-side token exchange; PHI-bearing tokens stay server-side.",
+  "version": "1.0.2",
+  "description": "Hanzo AI for Epic (SMART on FHIR) — brings Hanzo AI into the clinician's EHR workflow. Reads the launched patient's chart over FHIR R4 (problems, meds, allergies, labs, notes) and assists: summarize the patient, draft a SOAP note, extract problems & meds, and ask about the patient. Read + assist only (no clinical write-back in v1). Model calls route through the api.hanzo.ai gateway via @hanzo/ai; SMART-on-FHIR OAuth2 (auth-code + PKCE) with server-side token exchange; PHI-bearing tokens stay server-side.",
   "type": "module",
   "scripts": {
     "build": "node build.js",
@@ -46,7 +46,6 @@
   },
   "files": [
     "dist",
-    "src",
     "README.md"
   ],
   "main": "dist/app.js"
