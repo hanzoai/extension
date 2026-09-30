@@ -16,6 +16,15 @@
   "urlFetchWhitelist": [
     "https://api.hanzo.ai/"
   ],
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "OAuth2",
+        "libraryId": "1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF",
+        "version": "43"
+      }
+    ]
+  },
   "addOns": {
     "common": {
       "name": "Hanzo AI",
@@ -29,12 +38,8 @@
       },
       "universalActions": [
         {
-          "label": "Settings — Hanzo API key",
+          "label": "Hanzo account",
           "runFunction": "onSettings"
-        },
-        {
-          "label": "Get an API key",
-          "openLink": "https://console.hanzo.ai/api-keys"
         }
       ]
     },

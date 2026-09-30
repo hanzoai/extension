@@ -51,11 +51,19 @@ describe('appsscript.json', () => {
     expect(gmail.composeTrigger.selectActions[0].runFunction).toBe('onGmailCompose');
   });
 
-  it('exposes the settings + get-key universal actions', () => {
-    const actions = manifest.addOns.common.universalActions;
-    const settings = actions.find((a) => a.runFunction === 'onSettings');
-    const getKey = actions.find((a) => a.openLink === 'https://console.hanzo.ai/api-keys');
-    expect(settings).toBeTruthy();
-    expect(getKey).toBeTruthy();
+  it('exposes the Hanzo account universal action', () => {
+    expect(manifest.addOns.common.universalActions).toEqual([
+      { label: 'Hanzo account', runFunction: 'onSettings' },
+    ]);
+  });
+
+  it('signs in through the OAuth2 for Apps Script library', () => {
+    expect(manifest.dependencies.libraries).toEqual([
+      {
+        userSymbol: 'OAuth2',
+        libraryId: '1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF',
+        version: '43',
+      },
+    ]);
   });
 });

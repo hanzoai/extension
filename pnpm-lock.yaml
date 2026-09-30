@@ -882,6 +882,9 @@ importers:
       '@google/clasp':
         specifier: 'catalog:'
         version: 3.4.1(@types/node@26.4.0)(supports-color@10.2.2)
+      '@hanzo/auth':
+        specifier: workspace:*
+        version: link:../auth
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))

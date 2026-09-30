@@ -3,8 +3,8 @@
  *
  * Mirrors packages/office/src/{config,chat}.ts, adapted to Apps Script:
  * requests go through UrlFetchApp (no fetch/SSE, so one non-streaming
- * completion per call) and the api.hanzo.ai/v1 gateway. The API key lives in
- * PropertiesService.getUserProperties() (per-user, roams with the account).
+ * completion per call) and the api.hanzo.ai/v1 gateway, with the signed-in
+ * user's Hanzo IAM token (auth.gs) as the bearer.
  *
  * The pure functions (buildMessages, requestBody, extractContent) have no Apps
  * Script dependency and are the tested core — they are re-exported for Node
@@ -16,8 +16,6 @@ var API_BASE_URL = 'https://api.hanzo.ai';
 // Default model. Overridable per-request; the gateway routes it.
 var DEFAULT_MODEL = 'zen5';
 
-// PropertiesService key for the pasted Hanzo `sk-` API key.
-var APIKEY_PROP = 'hanzo.apiKey';
 // PropertiesService key for the preferred model id.
 var MODEL_PROP = 'hanzo.model';
 
@@ -109,20 +107,23 @@ function parseModels(data) {
 
 /**
  * ask runs one non-streaming completion and returns the text to insert. token
- * may be empty (the gateway serves anonymous/limited models); when present it is
- * the Hanzo `sk-` key.
+ * is the user's IAM access token. A 401 means IAM no longer honours the session
+ * (revoked, or its refresh expired): the stored tokens are dropped, so the next
+ * action prompts sign-in.
  */
 function ask(task, selection, token, opts) {
-  var headers = {};
-  if (token) headers.Authorization = 'Bearer ' + token;
   var resp = UrlFetchApp.fetch(chatCompletionsURL(), {
     method: 'post',
     contentType: 'application/json',
-    headers: headers,
+    headers: { Authorization: 'Bearer ' + token },
     payload: JSON.stringify(requestBody(buildMessages(task, selection), opts)),
     muteHttpExceptions: true,
   });
   var code = resp.getResponseCode();
+  if (code === 401) {
+    endSession();
+    throw new Error('Your Hanzo session ended. Run it again to sign in.');
+  }
   var text = resp.getContentText();
   var data;
   try {
@@ -142,17 +143,15 @@ function ask(task, selection, token, opts) {
 }
 
 /**
- * listModels returns the routable model ids from /v1/models. Org-scoped by the
- * bearer; an empty token lists public models. Non-fatal for callers — returns []
- * on any failure so the picker falls back to the default.
+ * listModels returns the routable model ids from /v1/models, org-scoped by the
+ * bearer. Non-fatal for callers — returns [] on any failure so the picker falls
+ * back to the default.
  */
 function listModels(token) {
   try {
-    var headers = {};
-    if (token) headers.Authorization = 'Bearer ' + token;
     var resp = UrlFetchApp.fetch(modelsURL(), {
       method: 'get',
-      headers: headers,
+      headers: { Authorization: 'Bearer ' + token },
       muteHttpExceptions: true,
     });
     if (resp.getResponseCode() !== 200) return [];
@@ -162,17 +161,8 @@ function listModels(token) {
   }
 }
 
-// ── PropertiesService: per-user API key + model preference ─────────────────
+// ── PropertiesService: per-user model preference ───────────────────────────
 
-function getApiKey() {
-  return PropertiesService.getUserProperties().getProperty(APIKEY_PROP) || '';
-}
-function setApiKey(key) {
-  var props = PropertiesService.getUserProperties();
-  var trimmed = (key || '').trim();
-  if (trimmed) props.setProperty(APIKEY_PROP, trimmed);
-  else props.deleteProperty(APIKEY_PROP);
-}
 function getModel() {
   return PropertiesService.getUserProperties().getProperty(MODEL_PROP) || DEFAULT_MODEL;
 }
@@ -183,11 +173,12 @@ function setModel(model) {
 }
 
 /**
- * runTask is the single entry every host calls: read the stored key + model,
- * ask the gateway, return the text. One code path for Docs/Sheets/Slides/Gmail.
+ * runTask is the single entry every host calls: ask the gateway with the
+ * caller's IAM token and the stored model, return the text. One code path for
+ * Docs/Sheets/Slides/Gmail.
  */
-function runTask(task, selection) {
-  return ask(task, selection, getApiKey(), { model: getModel() });
+function runTask(task, selection, token) {
+  return ask(task, selection, token, { model: getModel() });
 }
 
 // Node-only export for unit tests (inert in Apps Script — no `module` there).

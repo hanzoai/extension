@@ -1,7 +1,9 @@
 // validate-manifest — a standalone preflight for `clasp push`:
-//   1. appsscript.json is valid JSON with the required scopes + whitelist.
-//   2. every runFunction / onTriggerFunction named in the manifest is defined
-//      in a src/*.gs file (no trigger pointing at a missing handler).
+//   1. appsscript.json is valid JSON with the required scopes + whitelist, and
+//      declares the OAuth2 library that runs the Hanzo IAM sign-in.
+//   2. every function named in the manifest (runFunction / onTriggerFunction)
+//      or by a callback in the code (setFunctionName, setCallbackFunction,
+//      setCustomUiCallback, actionFor_) is defined in a src/*.gs file.
 //   3. every src/*.gs parses as JavaScript.
 // Exits non-zero on any failure so it can gate a push. `npm run validate`.
 
@@ -34,6 +36,11 @@ for (const s of requiredScopes) {
 if (JSON.stringify(manifest.urlFetchWhitelist) !== JSON.stringify(['https://api.hanzo.ai/'])) {
   fail('urlFetchWhitelist must be exactly ["https://api.hanzo.ai/"]');
 }
+// Sign-in is the OAuth2 for Apps Script library, by its published script ID.
+const oauth2 = (manifest.dependencies?.libraries || []).find((l) => l.userSymbol === 'OAuth2');
+if (oauth2?.libraryId !== '1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF') {
+  fail('dependencies.libraries must declare OAuth2 (1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF)');
+}
 
 // 2. collect every function the manifest references
 const referenced = new Set();
@@ -60,10 +67,15 @@ for (const file of readdirSync(srcDir).filter((f) => f.endsWith('.gs'))) {
     continue;
   }
   for (const m of src.matchAll(/^function\s+([A-Za-z0-9_]+)\s*\(/gm)) defined.add(m[1]);
+  // A callback the code names by string is a trigger too: the host calls it.
+  const named = /(?:\.set(?:FunctionName|CallbackFunction|CustomUiCallback)|actionFor_)\('([A-Za-z0-9_]+)'/g;
+  for (const m of src.matchAll(named)) {
+    referenced.add(m[1]);
+  }
 }
 
 for (const fn of referenced) {
-  if (!defined.has(fn)) fail('manifest references undefined function: ' + fn + '()');
+  if (!defined.has(fn)) fail('undefined function named by the manifest or a callback: ' + fn + '()');
 }
 
 if (process.exitCode) {

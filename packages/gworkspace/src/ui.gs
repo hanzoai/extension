@@ -85,51 +85,22 @@ function hostFromEvent_(e) {
 // ── Home card ──────────────────────────────────────────────────────────────
 
 /**
- * buildHomeCard_ renders the sidebar: header, an onboarding hint when no key is
- * set, the model picker, a free-prompt field, the quick-action buttons, and (on
- * a prior run) the result with Insert. `state` carries prompt/output between
- * button clicks (CardService is stateless — we thread it through form inputs).
+ * buildHomeCard_ renders the sidebar: header, the model picker, a free-prompt
+ * field, the quick-action buttons, and (on a prior run) the result with Insert.
+ * `state` carries prompt/output between button clicks (CardService is stateless
+ * — we thread it through form inputs). With no Hanzo session the model picker's
+ * token read throws the sign-in prompt instead (auth.gs).
  */
 function buildHomeCard_(host, state) {
-  var hasKey = !!getApiKey();
   var card = CardService.newCardBuilder().setHeader(
     CardService.newCardHeader().setTitle(BRAND).setImageUrl(ICON_URL).setSubtitle(hostLabel_(host))
   );
-
-  if (!hasKey) {
-    card.addSection(onboardingSection_());
-    return card.build();
-  }
 
   card.addSection(promptSection_(host, state));
   card.addSection(actionsSection_(host));
   if (state && state.output) card.addSection(outputSection_(host, state));
   card.setFixedFooter(settingsFooter_());
   return card.build();
-}
-
-// onboardingSection_ — shown until an API key is saved: a one-tap path to keys +
-// the paste field.
-function onboardingSection_() {
-  var section = CardService.newCardSection().setHeader('Get started');
-  section.addWidget(
-    CardService.newTextParagraph().setText(
-      'Paste a Hanzo API key to use your models. Create one at ' +
-        '<b>console.hanzo.ai/api-keys</b>.'
-    )
-  );
-  section.addWidget(
-    CardService.newTextButton()
-      .setText('Get an API key')
-      .setOpenLink(CardService.newOpenLink().setUrl('https://console.hanzo.ai/api-keys'))
-  );
-  section.addWidget(apiKeyInput_(''));
-  section.addWidget(
-    CardService.newTextButton()
-      .setText('Save key')
-      .setOnClickAction(CardService.newAction().setFunctionName('onSaveKey'))
-  );
-  return section;
 }
 
 // promptSection_ — the model picker + the free-prompt textarea.
@@ -195,7 +166,7 @@ function settingsFooter_() {
   );
 }
 
-// ── Model picker + inputs ──────────────────────────────────────────────────
+// ── Model picker ───────────────────────────────────────────────────────────
 
 function modelPicker_() {
   var current = getModel();
@@ -204,21 +175,13 @@ function modelPicker_() {
     .setTitle('Model')
     .setFieldName('model')
     .setOnChangeAction(CardService.newAction().setFunctionName('onSelectModel'));
-  var ids = listModels(getApiKey());
+  var ids = listModels(accessToken());
   if (ids.indexOf(current) === -1) ids.unshift(current);
   if (ids.length === 0) ids = [DEFAULT_MODEL];
   for (var i = 0; i < ids.length; i++) {
     picker.addItem(ids[i], ids[i], ids[i] === current);
   }
   return picker;
-}
-
-function apiKeyInput_(value) {
-  return CardService.newTextInput()
-    .setFieldName('apikey')
-    .setTitle('Hanzo API key (sk-…)')
-    .setHint('Stored per-user, never leaves your account.')
-    .setValue(value || '');
 }
 
 // ── Settings card ──────────────────────────────────────────────────────────
@@ -230,24 +193,17 @@ function settingsCard_() {
   var card = CardService.newCardBuilder().setHeader(
     CardService.newCardHeader().setTitle('Hanzo AI — Settings')
   );
-  var section = CardService.newCardSection().setHeader('API key');
+  var section = CardService.newCardSection().setHeader('Hanzo account');
   section.addWidget(
     CardService.newTextParagraph().setText(
-      'Create a key at <b>console.hanzo.ai/api-keys</b> and paste it below. ' +
-        'It is stored in your per-user properties and sent only to api.hanzo.ai.'
+      'Signed in with Hanzo (<b>hanzo.id</b>). Models run at api.hanzo.ai under ' +
+        'your account.'
     )
   );
-  section.addWidget(apiKeyInput_(getApiKey()));
   section.addWidget(
     CardService.newTextButton()
-      .setText('Save key')
-      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-      .setOnClickAction(CardService.newAction().setFunctionName('onSaveKey'))
-  );
-  section.addWidget(
-    CardService.newTextButton()
-      .setText('Clear key')
-      .setOnClickAction(CardService.newAction().setFunctionName('onClearKey'))
+      .setText('Sign out')
+      .setOnClickAction(CardService.newAction().setFunctionName('onSignOut'))
   );
   card.addSection(section);
   return card.build();
@@ -270,18 +226,9 @@ function onOpenSettings(e) {
 
 // ── Action handlers ────────────────────────────────────────────────────────
 
-// onSaveKey persists the pasted key. From the settings sub-card we pop back to
-// the home card underneath (already the right host); from the onboarding card
-// (no card beneath) we render a fresh home card so the prompt UI appears.
-function onSaveKey(e) {
-  var key = formValue_(e, 'apikey');
-  setApiKey(key);
-  return notifyAndReturn_(e, key ? 'API key saved.' : 'API key cleared.');
-}
-
-function onClearKey(e) {
-  setApiKey('');
-  return notifyAndReturn_(e, 'API key cleared.');
+// onSignOut drops the Hanzo session; the host then shows the sign-in prompt.
+function onSignOut(e) {
+  signOut();
 }
 
 // onSelectModel persists the picked model (no reload needed — the choice sticks
@@ -297,15 +244,19 @@ function onSelectModel(e) {
  * onRun is the single button handler for the free prompt AND every quick action
  * across Docs/Sheets/Slides/Gmail. It reads the host's context, asks the
  * gateway, and re-renders the home card with the result.
+ *
+ * Every handler reads the token BEFORE its try: with no session accessToken()
+ * throws the sign-in prompt, and the host renders it only if nothing catches it.
  */
 function onRun(e) {
   var host = paramHost_(e);
   var presetTask = paramTask_(e);
   var prompt = presetTask || formValue_(e, 'prompt');
   if (!prompt) return notify_('Type an instruction or pick an action first.');
+  var token = accessToken();
   try {
     var context = readContext_(host, e);
-    var output = runTask(prompt, context);
+    var output = runTask(prompt, context, token);
     return CardService.newActionResponseBuilder()
       .setNavigation(
         CardService.newNavigation().updateCard(
@@ -339,10 +290,11 @@ function onInsert(e) {
  * compose ActionResponse.
  */
 function onDraftReply(e) {
+  var token = accessToken();
   try {
     var body = gmailThreadText(e) || gmailMessageText(e);
     var task = 'Draft a professional reply to this email. Return only the reply body.';
-    var reply = runTask(task, body);
+    var reply = runTask(task, body, token);
     return gmailDraftReply(e, reply);
   } catch (err) {
     return notify_(errMessage_(err));
@@ -356,6 +308,7 @@ function onDraftReply(e) {
  * subject the user already typed, or a brief professional email otherwise.
  */
 function onGmailCompose(e) {
+  var token = accessToken();
   try {
     var draft = e && e.draftMetadata;
     var hint = draft
@@ -363,7 +316,7 @@ function onGmailCompose(e) {
       : '';
     var task =
       'Draft a professional email body. Return only the body text — no subject, no signature.';
-    var body = runTask(task, hint);
+    var body = runTask(task, hint, token);
     return CardService.newUpdateDraftActionResponseBuilder()
       .setUpdateDraftBodyAction(
         CardService.newUpdateDraftBodyAction()
@@ -437,18 +390,6 @@ function formValue_(e, field) {
 function notify_(text) {
   return CardService.newActionResponseBuilder()
     .setNotification(CardService.newNotification().setText(text))
-    .build();
-}
-
-// notifyAndReturn_ shows a toast and rebuilds the host's home card in place, so
-// saving a key from onboarding reveals the prompt UI and saving from settings
-// returns to a current home card (root card — replaces the whole stack).
-function notifyAndReturn_(e, text) {
-  var host = hostFromEvent_(e);
-  return CardService.newActionResponseBuilder()
-    .setNotification(CardService.newNotification().setText(text))
-    .setNavigation(CardService.newNavigation().updateCard(buildHomeCard_(host, null)))
-    .setStateChanged(true)
     .build();
 }
 
