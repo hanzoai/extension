@@ -74,6 +74,25 @@ through `packages/vscode/src/api/chat.ts` (bearer: the IAM session, else
 `HANZO_API_KEY` or `hanzo.llm.hanzo.apiKey`), hanzo-mcp through
 `API_URL` with `HANZO_API_KEY`. Ollama and LM Studio stay: they are local.
 
+## Office, Outlook and Workspace add-ins
+
+- `packages/office` (Word/Excel/PowerPoint) and `packages/outlook` are served
+  from the Sites plane, not a pod: `hanzo.yml` `sites:` publishes their `dist/`
+  to `s3://hanzo-sites/hanzo/{office,outlook}` on every push to main, and
+  universe `charts/app/values/hanzo/static-sites.yaml` routes
+  `office.hanzo.ai` / `outlook.hanzo.ai` there. Each `build.js` stamps its
+  host into `manifest.xml`; the manifest URL is the sideload/AppSource URL.
+- Both sign in as IAM client `hanzo-office` (public, PKCE); its redirects
+  (`https://{office,outlook}.hanzo.ai/auth-callback.html`) are declared in
+  universe `charts/app/values/hanzo/iam-provision.yaml`, converged hourly.
+- `packages/gworkspace` (Apps Script, Drive/Docs/Sheets/Slides/Gmail) signs in
+  as `hanzo-gworkspace` through the OAuth2 for Apps Script library; its
+  redirect is the script's `usercallback`, so the Script ID from the first
+  `clasp create` must replace `SCRIPT_ID` in iam-provision.yaml. Drive uses
+  `drive.file` + `drive.addons.metadata.readonly` only (validate refuses
+  broader Drive scopes) and the Drive REST API, because DriveApp needs `drive`.
+- Live IAM rows: `curl -s 'https://hanzo.id/v1/iam/auth/application?clientId=<id>' | jq .data.redirectUris`.
+
 ## Architecture (ZAP, no pairing)
 
     extension ─native messaging (ai.hanzo.zap)─► hanzo-zap-host ─UDS─► ZAP router ◄─UDS─ hanzo-mcp, dev, desktop, IDE

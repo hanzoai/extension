@@ -98,11 +98,14 @@ covers Outlook desktop, web, and Mac.
 `dist/manifest.xml` is a valid, submittable Mail add-in manifest (validate with
 `npx office-addin-manifest validate dist/manifest.xml`). To list publicly:
 
-1. Host `dist/` at the production base (`outlook.hanzo.ai`) over HTTPS.
-2. Ensure the `hanzo-office` IAM client allows the redirect
-   `https://outlook.hanzo.ai/auth-callback.html`.
-3. Submit through **Microsoft Partner Center → Office Store** (needs a Partner
-   Center account + Microsoft's validation pass).
+1. `dist/` is already hosted: CI publishes it on every push to main (the repo's
+   `hanzo.yml` `sites:` entry `outlook`, prefix `s3://hanzo-sites/hanzo/outlook`),
+   and universe `static-sites.yaml` routes `outlook.hanzo.ai` to it.
+2. The `hanzo-office` IAM client (universe `iam-provision.yaml`) allows the
+   redirect `https://outlook.hanzo.ai/auth-callback.html`.
+3. Submit `https://outlook.hanzo.ai/manifest.xml` through **Microsoft Partner
+   Center → Marketplace offers → Office add-in** (needs a Partner Center account
+   + Microsoft's validation pass).
 
 ## Requirements
 

@@ -4,7 +4,7 @@
 # it ships.
 #
 # No `images:`: nothing here is a container. The packages publish to npm and the
-# browser stores from publish.yml.
+# browser stores from publish.yml; the Office add-ins publish as sites (below).
 #
 # The reusable runs a gate on the runner itself, with Node 22 and the pnpm that
 # packageManager pins, and installs uv because packages/jupyter has a
@@ -15,3 +15,18 @@ test:
       set -e
       pnpm install --frozen-lockfile
       make check
+
+# The Office add-ins, published to the Sites plane on every push to main:
+# office.hanzo.ai serves the Word/Excel/PowerPoint task pane and outlook.hanzo.ai
+# the Outlook one, from s3://hanzo-sites/hanzo/<slug>, routed by universe
+# charts/app/values/hanzo/static-sites.yaml. Each build stamps its own host into
+# its manifest.xml (packages/<name>/src/build.js), and each host serves the
+# auth-callback.html registered on the hanzo-office IAM client. `on` is read
+# from the first entry and gates the list.
+sites:
+  - slug: office
+    dir: packages/office/dist
+    on: [main]
+  - slug: outlook
+    dir: packages/outlook/dist
+site-build: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @hanzo/office-addin --filter @hanzo/outlook-addin build

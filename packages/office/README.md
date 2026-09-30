@@ -54,20 +54,64 @@ use inside their own Office:
   **Microsoft 365 admin center → Integrated apps** — every user gets the Hanzo
   button with no per-person install.
 
+## Hosting
+
+CI publishes `dist/` on every push to main: the repo's `hanzo.yml` `sites:`
+entry `office` builds it and uploads it to the Sites plane
+(`s3://hanzo-sites/hanzo/office`), and universe
+`charts/app/values/hanzo/static-sites.yaml` routes `office.hanzo.ai` to that
+prefix — no pod. So `https://office.hanzo.ai/manifest.xml` is always the
+manifest of main, stamped for that host. The Outlook add-in (`../outlook`)
+ships the same way at `outlook.hanzo.ai`.
+
+Sign-in is the `hanzo-office` IAM client (`type: spa`, public, PKCE), declared
+in universe `charts/app/values/hanzo/iam-provision.yaml` with the redirects
+`https://office.hanzo.ai/auth-callback.html` and
+`https://outlook.hanzo.ai/auth-callback.html`.
+
 ## Publish (AppSource — public listing)
 
 `dist/manifest.xml` is a valid, submittable manifest (verified by
-`office-addin-manifest validate`). To list publicly:
+`office-addin-manifest validate`). To list publicly, submit
+`https://office.hanzo.ai/manifest.xml` through **Microsoft Partner Center →
+Marketplace offers → Office add-in** (needs a Partner Center account and
+Microsoft's validation pass).
 
-1. Host `dist/` at the production base (`office.hanzo.ai`) over HTTPS.
-2. Register the `hanzo-office` client in IAM with redirect
-   `https://office.hanzo.ai/auth-callback.html`.
-3. Submit through **Microsoft Partner Center → Office Store** (needs a Partner
-   Center account + Microsoft's validation pass).
+## Copilot (declarative agent) — not in this repo yet
+
+A Microsoft 365 unified manifest (`manifest.json`) could carry this add-in and
+declare Hanzo as a Copilot declarative agent, but not as one small file: an
+agent that answers with Hanzo must call api.hanzo.ai through an API plugin,
+otherwise Copilot answers with Microsoft's model. That is five files plus an
+OAuth registration held by Microsoft. The steps:
+
+1. Convert the XML manifest:
+   `npx office-addin-manifest-converter convert dist/manifest.xml` writes
+   `manifest.json` (unified manifest) and its color/outline icons.
+2. In `manifest.json` (`manifestVersion` 1.19 or later) add
+   `"copilotAgents": { "declarativeAgents": [{ "id": "hanzo", "file": "declarativeAgent.json" }] }`.
+3. `declarativeAgent.json` (declarative agent schema v1.x): `name` "Hanzo AI",
+   `description`, `instructions`, and
+   `"actions": [{ "id": "hanzo", "file": "hanzo-plugin.json" }]`.
+4. `hanzo-plugin.json` (API plugin schema v2.x): one `OpenApi` runtime with
+   `"spec": { "url": "openapi.yaml" }`, `"run_for_functions": ["chat"]` and
+   `"auth": { "type": "OAuthPluginVault", "reference_id": "<step 6>" }`.
+5. `openapi.yaml`: server `https://api.hanzo.ai`, one operation
+   `POST /v1/chat/completions` with `operationId: chat`.
+6. Declare an IAM client `hanzo-copilot` in universe `iam-provision.yaml`
+   (`type: confidential`, redirect
+   `https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect`), seal its
+   secret in KMS, then in the **Teams Developer Portal → Tools → OAuth client
+   registration** register it: authorization endpoint
+   `https://hanzo.id/v1/iam/oauth/authorize`, token and refresh endpoints
+   `https://api.hanzo.ai/v1/iam/oauth/token`, scope
+   `openid profile email offline_access`, base URL `https://api.hanzo.ai`. The
+   registration ID it returns is step 4's `reference_id`.
+7. Zip `manifest.json`, the icons and the three agent files; upload the zip in
+   the **Microsoft 365 admin center → Settings → Integrated apps** (users need a
+   Microsoft 365 Copilot license).
 
 ## Not here yet
 
-- **Outlook** (mail) is a different host category with its own manifest shape —
-  a tracked follow-up, not this add-in.
 - Streaming responses (this v1 is a single non-streaming completion, which keeps
   the insert atomic).
