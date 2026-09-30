@@ -166,7 +166,6 @@
     "@types/node": "catalog:",
     "@types/sinon": "catalog:",
     "@types/vscode": "~1.90.0",
-    "@types/ws": "catalog:",
     "@typescript-eslint/eslint-plugin": "catalog:",
     "@typescript-eslint/parser": "catalog:",
     "@vitest/coverage-v8": "catalog:",
@@ -182,7 +181,6 @@
     "sinon": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "ws": "catalog:",
     "@hanzo/iam": "catalog:"
   },
   "dependencies": {

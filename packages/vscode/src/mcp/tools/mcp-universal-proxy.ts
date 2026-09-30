@@ -49,20 +49,6 @@ class MCPProxyManager {
         const knownServers: MCPServerConfig[] = [
             // NPM packages
             {
-                name: 'puppeteer',
-                package: '@modelcontextprotocol/server-puppeteer',
-                type: 'npm',
-                command: 'node',
-                args: ['node_modules/@modelcontextprotocol/server-puppeteer/dist/index.js']
-            },
-            {
-                name: 'playwright', 
-                package: '@modelcontextprotocol/server-playwright',
-                type: 'npm',
-                command: 'node',
-                args: ['node_modules/@modelcontextprotocol/server-playwright/dist/index.js']
-            },
-            {
                 name: 'sqlite',
                 package: '@modelcontextprotocol/server-sqlite',
                 type: 'npm',

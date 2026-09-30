@@ -27,7 +27,6 @@ import { BatchTools } from './batch';
 import { AITools } from './ai-tools';
 import { createModeTool } from './mode';
 import { createMCPRunnerTools } from './mcp-runner';
-import { createBrowserTools } from './browser';
 import { createMCPUniversalProxyTools } from './mcp-universal-proxy';
 import { createUnixAliasTools, registerUnixAliasTools } from './unix-alias';
 import { createUnifiedReadTool, createUnifiedProjectAnalyzeTool, createUnixAliasTool, getCanonicalToolName } from './unified-tools';
@@ -100,8 +99,7 @@ export class MCPTools {
             ...createMCPRunnerTools(this.context),
             ...createMCPUniversalProxyTools(this.context),
 
-            // Browser & Web
-            ...createBrowserTools(this.context),
+            // Web
             createWebFetchTool(this.context),
 
             // Configuration & System
@@ -183,8 +181,6 @@ export class MCPTools {
                 'batch', 'web_fetch', 'batch_search',
                 // MCP
                 'mcp',
-                // Browser
-                'browser', 'browser_close',
                 // Dev tools
                 'dev_spawn', 'dev_list', 'dev_status', 'dev_stop', 'dev_merge', 'dev_batch'
             ]);

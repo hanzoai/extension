@@ -1364,9 +1364,6 @@ importers:
       '@types/vscode':
         specifier: ~1.90.0
         version: 1.90.0
-      '@types/ws':
-        specifier: 'catalog:'
-        version: 8.18.1
       '@typescript-eslint/eslint-plugin':
         specifier: 'catalog:'
         version: 8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.10.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
@@ -1412,9 +1409,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@26.4.0)(lightningcss@1.33.0)(sass@1.60.0)(terser@5.51.2)(yaml@2.8.3))
-      ws:
-        specifier: 'catalog:'
-        version: 8.21.3
 
   packages/workday:
     dependencies:
