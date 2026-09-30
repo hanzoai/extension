@@ -175,7 +175,7 @@ function setModel(model) {
 /**
  * runTask is the single entry every host calls: ask the gateway with the
  * caller's IAM token and the stored model, return the text. One code path for
- * Docs/Sheets/Slides/Gmail.
+ * Docs/Sheets/Slides/Drive/Gmail.
  */
 function runTask(task, selection, token) {
   return ask(task, selection, token, { model: getModel() });

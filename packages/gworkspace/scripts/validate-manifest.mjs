@@ -1,6 +1,8 @@
 // validate-manifest — a standalone preflight for `clasp push`:
-//   1. appsscript.json is valid JSON with the required scopes + whitelist, and
-//      declares the OAuth2 library that runs the Hanzo IAM sign-in.
+//   1. appsscript.json is valid JSON with the required scopes + whitelist,
+//      holds no Drive scope beyond drive.file and drive.addons.metadata.readonly
+//      (drive and drive.readonly are restricted and force a CASA assessment),
+//      and declares the OAuth2 library that runs the Hanzo IAM sign-in.
 //   2. every function named in the manifest (runFunction / onTriggerFunction)
 //      or by a callback in the code (setFunctionName, setCallbackFunction,
 //      setCustomUiCallback, actionFor_) is defined in a src/*.gs file.
@@ -26,6 +28,8 @@ const requiredScopes = [
   'https://www.googleapis.com/auth/documents.currentonly',
   'https://www.googleapis.com/auth/spreadsheets.currentonly',
   'https://www.googleapis.com/auth/presentations.currentonly',
+  'https://www.googleapis.com/auth/drive.addons.metadata.readonly',
+  'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/gmail.addons.current.message.readonly',
   'https://www.googleapis.com/auth/gmail.addons.current.action.compose',
   'https://www.googleapis.com/auth/script.external_request',
@@ -33,8 +37,21 @@ const requiredScopes = [
 for (const s of requiredScopes) {
   if (!manifest.oauthScopes.includes(s)) fail('missing oauthScope: ' + s);
 }
-if (JSON.stringify(manifest.urlFetchWhitelist) !== JSON.stringify(['https://api.hanzo.ai/'])) {
-  fail('urlFetchWhitelist must be exactly ["https://api.hanzo.ai/"]');
+const driveScopes = ['drive.addons.metadata.readonly', 'drive.file'].map(
+  (s) => 'https://www.googleapis.com/auth/' + s
+);
+for (const s of manifest.oauthScopes) {
+  if (s.startsWith('https://www.googleapis.com/auth/drive') && !driveScopes.includes(s)) {
+    fail('Drive scope ' + s + ' is broader than drive.file; only ' + driveScopes.join(', ') + ' are allowed');
+  }
+}
+const whitelist = [
+  'https://api.hanzo.ai/',
+  'https://www.googleapis.com/drive/v3/',
+  'https://www.googleapis.com/upload/drive/v3/',
+];
+if (JSON.stringify(manifest.urlFetchWhitelist) !== JSON.stringify(whitelist)) {
+  fail('urlFetchWhitelist must be exactly ' + JSON.stringify(whitelist));
 }
 // Sign-in is the OAuth2 for Apps Script library, by its published script ID.
 const oauth2 = (manifest.dependencies?.libraries || []).find((l) => l.userSymbol === 'OAuth2');

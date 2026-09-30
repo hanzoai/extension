@@ -2,12 +2,13 @@
  * ui.gs — CardService UI + every add-on entry point.
  *
  * The manifest's runFunction names all resolve here: homepage triggers per host,
- * the Gmail contextual + compose triggers, the settings/universal actions, and
- * the button callbacks. The cards read/write through hanzo.gs (the API client)
- * and the per-host glue (docs/sheets/slides/gmail.gs).
+ * the Drive selection trigger, the Gmail contextual + compose triggers, the
+ * settings/universal actions, and the button callbacks. The cards read/write
+ * through hanzo.gs (the API client) and the per-host glue
+ * (docs/sheets/slides/drive/gmail.gs).
  *
  * The quick actions mirror the office task pane's chips: Draft, Summarize,
- * Explain, Tighten (redline), Continue — plus Gmail-specific reply/actions.
+ * Explain, Tighten (redline), Continue — plus Drive's and Gmail's own.
  */
 
 // QUICK_ACTIONS: the preset instructions, one source of truth for every host's
@@ -43,6 +44,24 @@ var GMAIL_ACTIONS = [
   },
 ];
 
+// DRIVE_ACTIONS: presets over the files selected in Drive.
+var DRIVE_ACTIONS = [
+  {
+    key: 'summarize_files',
+    label: 'Summarize',
+    task: 'Summarize these files: what each one is, and what they say together.',
+  },
+  {
+    key: 'draft_doc',
+    label: 'Draft a Doc',
+    task: 'Draft a new document from these files. Return only the document text.',
+  },
+];
+
+// ACTION_HANDLERS: the presets that do more than show a result; every other
+// preset runs through onRun.
+var ACTION_HANDLERS = { draft_reply: 'onDraftReply', draft_doc: 'onDraftDoc' };
+
 // ── Colors / branding ──────────────────────────────────────────────────────
 
 var BRAND = 'Hanzo AI';
@@ -65,6 +84,14 @@ function onSlidesHomepage(e) {
 function onGmailHomepage(e) {
   return buildHomeCard_('gmail', null);
 }
+function onDriveHomepage(e) {
+  return buildHomeCard_('drive', null, e);
+}
+
+// onDriveItemsSelected — Drive contextual trigger: the user selected files.
+function onDriveItemsSelected(e) {
+  return buildHomeCard_('drive', null, e);
+}
 
 // onGmailMessage — Gmail contextual trigger: an open message. Same card, with a
 // note that the actions read the open message.
@@ -79,23 +106,26 @@ function hostFromEvent_(e) {
   if (host === 'SHEETS') return 'sheets';
   if (host === 'SLIDES') return 'slides';
   if (host === 'GMAIL') return 'gmail';
+  if (host === 'DRIVE') return 'drive';
   return 'docs';
 }
 
 // ── Home card ──────────────────────────────────────────────────────────────
 
 /**
- * buildHomeCard_ renders the sidebar: header, the model picker, a free-prompt
- * field, the quick-action buttons, and (on a prior run) the result with Insert.
- * `state` carries prompt/output between button clicks (CardService is stateless
- * — we thread it through form inputs). With no Hanzo session the model picker's
- * token read throws the sign-in prompt instead (auth.gs).
+ * buildHomeCard_ renders the sidebar: header, (Drive) the selected files, the
+ * model picker, a free-prompt field, the quick-action buttons, and (on a prior
+ * run) the result with Insert. `state` carries prompt/output between button
+ * clicks (CardService is stateless — we thread it through form inputs); `e` is
+ * the event, read for the Drive selection. With no Hanzo session the model
+ * picker's token read throws the sign-in prompt instead (auth.gs).
  */
-function buildHomeCard_(host, state) {
+function buildHomeCard_(host, state, e) {
   var card = CardService.newCardBuilder().setHeader(
     CardService.newCardHeader().setTitle(BRAND).setImageUrl(ICON_URL).setSubtitle(hostLabel_(host))
   );
 
+  if (host === 'drive') card.addSection(filesSection_(e));
   card.addSection(promptSection_(host, state));
   card.addSection(actionsSection_(host));
   if (state && state.output) card.addSection(outputSection_(host, state));
@@ -124,15 +154,46 @@ function promptSection_(host, state) {
   return section;
 }
 
+// filesSection_ lists the Drive selection: an Allow button on each file Hanzo
+// may not open yet, and a note on each type with no text form.
+function filesSection_(e) {
+  var items = (e && e.drive && e.drive.selectedItems) || [];
+  var section = CardService.newCardSection().setHeader('Selected files');
+  if (items.length === 0) {
+    return section.addWidget(
+      CardService.newTextParagraph().setText(
+        'Select files in Drive, then summarize them, ask about them, or draft a Doc from them.'
+      )
+    );
+  }
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var row = CardService.newDecoratedText().setText(escapeHtml_(item.title));
+    if (!driveReadURL(item)) {
+      row.setBottomLabel('No text form; skipped');
+    } else if (!item.addonHasFileScopePermission) {
+      row.setBottomLabel('Hanzo cannot open this file yet').setButton(
+        CardService.newTextButton()
+          .setText('Allow')
+          .setOnClickAction(
+            CardService.newAction().setFunctionName('onAllowFile').setParameters({ id: item.id })
+          )
+      );
+    }
+    section.addWidget(row);
+  }
+  return section;
+}
+
 // actionsSection_ — the quick-action chips (per host). Each button runs its
 // preset task through the current host's read → ask → (output card) path.
 function actionsSection_(host) {
   var section = CardService.newCardSection().setHeader('Quick actions');
-  var actions = host === 'gmail' ? GMAIL_ACTIONS : QUICK_ACTIONS;
+  var actions = { gmail: GMAIL_ACTIONS, drive: DRIVE_ACTIONS }[host] || QUICK_ACTIONS;
   for (var i = 0; i < actions.length; i++) {
     var a = actions[i];
     if (a.key === 'draft') continue; // Draft = the free prompt above
-    var fn = a.key === 'draft_reply' ? 'onDraftReply' : 'onRun';
+    var fn = ACTION_HANDLERS[a.key] || 'onRun';
     section.addWidget(
       CardService.newTextButton().setText(a.label).setOnClickAction(actionFor_(fn, host, a.task))
     );
@@ -140,11 +201,20 @@ function actionsSection_(host) {
   return section;
 }
 
-// outputSection_ — the last result with Insert (host-specific) + Copy hint.
+// outputSection_ — the last result, with Insert where there is a document open
+// (Docs/Sheets/Slides) and Open where a Doc was just drafted (Drive).
 function outputSection_(host, state) {
   var section = CardService.newCardSection().setHeader('Result');
   section.addWidget(CardService.newTextParagraph().setText(escapeHtml_(state.output)));
-  if (host !== 'gmail') {
+  if (state.doc) {
+    section.addWidget(
+      CardService.newTextButton()
+        .setText('Open the Doc')
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setOpenLink(CardService.newOpenLink().setUrl(state.doc))
+    );
+  }
+  if (host === 'docs' || host === 'sheets' || host === 'slides') {
     section.addWidget(
       CardService.newTextButton()
         .setText('Insert into document')
@@ -242,7 +312,7 @@ function onSelectModel(e) {
 
 /**
  * onRun is the single button handler for the free prompt AND every quick action
- * across Docs/Sheets/Slides/Gmail. It reads the host's context, asks the
+ * across Docs/Sheets/Slides/Drive/Gmail. It reads the host's context, asks the
  * gateway, and re-renders the home card with the result.
  *
  * Every handler reads the token BEFORE its try: with no session accessToken()
@@ -260,7 +330,7 @@ function onRun(e) {
     return CardService.newActionResponseBuilder()
       .setNavigation(
         CardService.newNavigation().updateCard(
-          buildHomeCard_(host, { prompt: prompt, output: output })
+          buildHomeCard_(host, { prompt: prompt, output: output }, e)
         )
       )
       .build();
@@ -302,6 +372,37 @@ function onDraftReply(e) {
 }
 
 /**
+ * onDraftDoc (Drive) drafts a new Google Doc from the selected files, steered by
+ * the free prompt when it is filled, and shows the draft with a link to the Doc.
+ */
+function onDraftDoc(e) {
+  var prompt = formValue_(e, 'prompt');
+  var task = paramTask_(e) + (prompt ? '\n\nInstructions: ' + prompt : '');
+  var token = accessToken();
+  try {
+    var output = runTask(task, driveContextText(e), token);
+    var doc = driveCreateDoc(draftTitle(driveItems(e)), output);
+    return CardService.newActionResponseBuilder()
+      .setNavigation(
+        CardService.newNavigation().updateCard(
+          buildHomeCard_('drive', { prompt: prompt, output: output, doc: doc }, e)
+        )
+      )
+      .build();
+  } catch (err) {
+    return notify_(errMessage_(err));
+  }
+}
+
+// onAllowFile (Drive) asks the user to let the add-on open one file, which is
+// the per-file grant drive.file is built on.
+function onAllowFile(e) {
+  return CardService.newDriveItemsSelectedActionResponseBuilder()
+    .requestFileScope(e.parameters.id)
+    .build();
+}
+
+/**
  * onGmailCompose (compose trigger, from the manifest composeTrigger) drafts body
  * text for the message the user is composing and inserts it into the open draft.
  * The compose context has no "current message"; it drafts from the recipients /
@@ -339,6 +440,8 @@ function readContext_(host, e) {
       return sheetsContextText();
     case 'slides':
       return slidesContextText();
+    case 'drive':
+      return driveContextText(e);
     case 'gmail':
       return gmailThreadText(e) || gmailMessageText(e);
     default:
@@ -394,7 +497,7 @@ function notify_(text) {
 }
 
 function hostLabel_(host) {
-  return { docs: 'Docs', sheets: 'Sheets', slides: 'Slides', gmail: 'Gmail' }[host] || 'Workspace';
+  return { docs: 'Docs', sheets: 'Sheets', slides: 'Slides', drive: 'Drive', gmail: 'Gmail' }[host] || 'Workspace';
 }
 
 function escapeHtml_(s) {

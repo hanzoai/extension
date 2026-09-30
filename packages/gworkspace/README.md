@@ -1,10 +1,11 @@
 # Hanzo AI for Google Workspace
 
-A Google Workspace **add-on** that puts Hanzo AI inside **Google Docs, Sheets,
-Slides, and Gmail** — the Google-ecosystem counterpart to
+A Google Workspace **add-on** that puts Hanzo AI inside **Google Drive, Docs,
+Sheets, Slides, and Gmail** — the Google-ecosystem counterpart to
 [`@hanzo/office-addin`](../office) (Word/Excel/PowerPoint). Open the Hanzo panel
 from the add-on sidebar, pick a model, ask (or tap a quick action), and insert
-the result into the document.
+the result into the document. In Drive, select files and summarize them, ask
+about them, or draft a new Google Doc from them.
 
 It reuses the **same backend as everything else Hanzo**: model calls go through
 `api.hanzo.ai/v1` (OpenAI-compatible) via `UrlFetchApp`. No new API surface.
@@ -31,6 +32,8 @@ src/
   docs.gs           Docs: read selection/body, insert/replace at cursor
   sheets.gs         Sheets: read range as TSV, write result down a column
   slides.gs         Slides: read selected text/shapes, insert
+  drive.gs          Drive: read the selected files as text (Drive REST API),
+                    create a Google Doc from a draft
   gmail.gs          Gmail: read the open message/thread, draft a reply
 tests/              vitest over the pure logic (loads the .gs in a Node sandbox)
 scripts/            validate-manifest.mjs — preflight before `clasp push`
@@ -73,6 +76,8 @@ first that runs PKCE with no client secret).
 | `documents.currentonly` | read/insert in the open Doc |
 | `spreadsheets.currentonly` | read range / write cell in the open Sheet |
 | `presentations.currentonly` | read/insert in the open Slides deck |
+| `drive.addons.metadata.readonly` | the Drive selection's id, title and MIME type |
+| `drive.file` | the files the user allows from the card (one **Allow** per file), and the Docs the add-on creates |
 | `gmail.addons.current.message.readonly` | read the open message/thread |
 | `gmail.addons.current.message.metadata` | message metadata for the contextual trigger |
 | `gmail.addons.current.action.compose` | open a draft reply |
@@ -80,8 +85,15 @@ first that runs PKCE with no client secret).
 | `script.external_request` | `UrlFetchApp` to `api.hanzo.ai` (the model gateway and the IAM token endpoint) |
 | `script.locale` | user locale |
 
-`urlFetchWhitelist` is pinned to `https://api.hanzo.ai/` — the add-on can call
-**nothing else**.
+Drive holds **per-file** scopes only. `drive` and `drive.readonly` are
+restricted scopes that force a paid CASA security assessment; `validate` and the
+tests refuse any Drive scope beyond the two above. DriveApp needs the full
+`drive` scope, so `drive.gs` reads (`files/<id>/export`, `?alt=media`) and
+creates (`upload/drive/v3/files`, multipart, converted to a Doc) through the
+Drive REST API with `ScriptApp.getOAuthToken()`.
+
+`urlFetchWhitelist` is pinned to `https://api.hanzo.ai/` and the two Drive API
+prefixes — the add-on can call **nothing else**.
 
 ## Develop & test
 
@@ -147,7 +159,7 @@ In the [Apps Script editor](https://script.google.com) for the project:
 
 1. **Deploy → Test deployments**.
 2. Under **Application(s): Google Workspace Add-on**, click **Install**.
-3. Open Docs / Sheets / Slides / Gmail — the **Hanzo AI** add-on appears in the
+3. Open Drive / Docs / Sheets / Slides / Gmail — the **Hanzo AI** add-on appears in the
    right-hand add-on rail. Open it and **Sign in to Hanzo**.
 
 A test deployment installs the add-on **only for you**, from the current HEAD of

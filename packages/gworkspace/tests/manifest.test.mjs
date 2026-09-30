@@ -32,8 +32,20 @@ describe('appsscript.json', () => {
     );
   });
 
-  it('whitelists ONLY api.hanzo.ai for UrlFetch', () => {
-    expect(manifest.urlFetchWhitelist).toEqual(['https://api.hanzo.ai/']);
+  it('whitelists api.hanzo.ai and the Drive API, nothing else, for UrlFetch', () => {
+    expect(manifest.urlFetchWhitelist).toEqual([
+      'https://api.hanzo.ai/',
+      'https://www.googleapis.com/drive/v3/',
+      'https://www.googleapis.com/upload/drive/v3/',
+    ]);
+  });
+
+  it('holds only per-file Drive scopes, never the restricted drive / drive.readonly', () => {
+    const drive = manifest.oauthScopes.filter((s) => s.startsWith('https://www.googleapis.com/auth/drive'));
+    expect(drive.sort()).toEqual([
+      'https://www.googleapis.com/auth/drive.addons.metadata.readonly',
+      'https://www.googleapis.com/auth/drive.file',
+    ]);
   });
 
   it('registers a homepage trigger for every host', () => {
@@ -43,6 +55,11 @@ describe('appsscript.json', () => {
     expect(addOns.sheets.homepageTrigger.runFunction).toBe('onSheetsHomepage');
     expect(addOns.slides.homepageTrigger.runFunction).toBe('onSlidesHomepage');
     expect(addOns.gmail.homepageTrigger.runFunction).toBe('onGmailHomepage');
+    expect(addOns.drive.homepageTrigger.runFunction).toBe('onDriveHomepage');
+  });
+
+  it('wires the Drive selection trigger', () => {
+    expect(manifest.addOns.drive.onItemsSelectedTrigger.runFunction).toBe('onDriveItemsSelected');
   });
 
   it('wires the Gmail contextual + compose triggers', () => {
