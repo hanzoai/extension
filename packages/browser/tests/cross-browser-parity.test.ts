@@ -313,8 +313,9 @@ describe('Firefox register identity', () => {
   });
 
   it('joins through the one shared transport and carries no second', () => {
-    // One primitive, shared by every engine: shared/socket.ts, started by
-    // shared/zap.ts. No native messaging, no second socket, no CDP bridge.
+    // One primitive, shared by every engine: shared/socket.ts (native host
+    // first, then the door), started by shared/zap.ts. No second socket, no
+    // native port of its own, no CDP bridge.
     for (const bg of [firefoxBg, chromeBg]) {
       expect(bg).toMatch(/startZap\(/);
       expect(bg).not.toMatch(/new WebSocket\(/);
@@ -340,11 +341,23 @@ describe('Tabs are chrome.tabs on both browsers', () => {
 describe('Keepalive port survives the back/forward cache', () => {
   // Chrome reports a cached page's closed port at BOTH ends; whichever end
   // does not read lastError logs "Unchecked runtime.lastError".
-  it('the worker end reads lastError on disconnect', () => {
-    const block = chromeBg.slice(chromeBg.indexOf("port.name !== 'zap-keepalive'"));
-    expect(block.slice(0, 600)).toMatch(/onDisconnect\.addListener\([^)]*\)\s*=>\s*\{[^}]*runtime\.lastError/);
-  });
+  for (const [name, bg] of [['chrome', chromeBg], ['firefox', firefoxBg]] as const) {
+    it(`the ${name} worker end reads lastError on disconnect`, () => {
+      const block = bg.slice(bg.indexOf("port.name !== 'zap-keepalive'"));
+      expect(block.slice(0, 800)).toMatch(/onDisconnect\.addListener\([^)]*\)\s*=>\s*\{[^}]*lastError/);
+    });
+  }
   it('the page end reads lastError on disconnect', () => {
     expect(contentScript).toMatch(/onDisconnect[\s\S]{0,200}runtime\)?\?\.lastError/);
   });
+});
+
+describe('Native host on every engine that can start one', () => {
+  // Without the permission runtime.connectNative is undefined, and the engine
+  // silently falls back to the door and a pairing code.
+  for (const [name, m] of [['chrome', manifestChrome], ['firefox', manifestFirefox]] as const) {
+    it(`${name} asks for nativeMessaging`, () => {
+      expect(JSON.parse(m).permissions).toContain('nativeMessaging');
+    });
+  }
 });

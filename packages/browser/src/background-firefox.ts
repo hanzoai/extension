@@ -2933,6 +2933,9 @@ browser.runtime.onConnect.addListener((port) => {
   // even need to respond. Drop the listener silently when the content
   // script unloads.
   port.onMessage.addListener(() => { /* noop — receipt is the keep-alive */ });
+  // A tab entering the back/forward cache closes its port; read the error so
+  // the close counts as expected, as the Chrome worker does.
+  port.onDisconnect.addListener(() => { void (browser.runtime as any).lastError; });
 });
 
 const KEEP_ALIVE_ALARM = 'hanzo-zap-keepalive';
