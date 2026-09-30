@@ -413,6 +413,28 @@ export class CDPBridge {
           result = await this.getTargets();
           break;
 
+        // Tabs are chrome.tabs, named `tab-N` as getTargets names them. Passed
+        // through, the debugger reads CDP target ids and knows none of these.
+        case 'Target.createTarget': {
+          const tab = await chrome.tabs.create({ url: params?.url || 'about:blank' });
+          result = { targetId: `tab-${tab.id}`, tabId: tab.id };
+          break;
+        }
+
+        case 'Target.closeTarget':
+        case 'Target.activateTarget': {
+          // Only an explicit id: closing "the active tab" by default closes the user's.
+          const id = parseTabId(params?.tabId ?? params?.targetId);
+          if (id === null) throw new Error(`${method} needs a tab id`);
+          if (method === 'Target.closeTarget') {
+            await chrome.tabs.remove(id);
+          } else {
+            await chrome.tabs.update(id, { active: true });
+          }
+          result = { success: true };
+          break;
+        }
+
         case 'Page.navigate':
           // Background workers do not have a DOM/window; use a safe default cursor hint.
           this.notifyControlOverlay(tabId, 'ai.control.cursor', { x: 24, y: 24 });

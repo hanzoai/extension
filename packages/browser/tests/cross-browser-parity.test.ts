@@ -323,3 +323,16 @@ describe('Firefox register identity', () => {
     }
   });
 });
+
+describe('Tabs are chrome.tabs on both browsers', () => {
+  // Passed through to chrome.debugger, Target.closeTarget wants a CDP target
+  // id and refuses every `tab-N` that Target.getTargets hands out.
+  for (const [name, src] of [['chrome', cdpBridge], ['firefox', firefoxBg]] as const) {
+    it(`${name} answers Target.createTarget / closeTarget / activateTarget itself`, () => {
+      expect(src).toContain("case 'Target.createTarget'");
+      expect(src).toContain("case 'Target.closeTarget'");
+      expect(src).toContain("case 'Target.activateTarget'");
+      expect(src).toMatch(/targetId: `tab-\$\{\w+\.id\}`/);
+    });
+  }
+});
