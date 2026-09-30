@@ -8,7 +8,7 @@
 // router yet, the helper stands for it itself, so the browser alone is enough.
 //
 // Otherwise (snap and Flatpak browsers cannot exec a helper): the router's
-// loopback WebSocket door on a well-known port (21000-21007). This extension's
+// loopback WebSocket door on a well-known port (9998, else 21000-21007). This extension's
 // fixed origin is its admission there, so it needs no pairing either; only a
 // random-origin browser (Firefox, Safari) pairs, with a token.
 //
@@ -215,9 +215,11 @@ export interface Link {
 /** The native messaging host every hanzo-mcp registers for this extension. */
 export const NATIVE_HOST = 'ai.hanzo.zap';
 
-/** The door ports the router takes first (zapd `pair::WELL_KNOWN`). This
- *  extension's origin is admitted there without a pairing code. */
-export const WELL_KNOWN = [21000, 21001, 21002, 21003, 21004, 21005, 21006, 21007];
+/** The door ports the router takes, in its order (zapd `pair::WELL_KNOWN`):
+ *  9998 — ZAP over WebSocket, beside the services' native ZAP on 9999 — then
+ *  21000-21007 when 9998 is taken. This extension's origin is admitted there
+ *  without a pairing code. */
+export const WELL_KNOWN = [9998, 21000, 21001, 21002, 21003, 21004, 21005, 21006, 21007];
 
 export function newZapState(providerId: string): ZapState {
   return {

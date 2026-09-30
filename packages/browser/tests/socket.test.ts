@@ -135,7 +135,7 @@ describe('ensureZap', () => {
     const s = newZapState('browser/chrome-3fa2');
     ensureZap(s, opts());
     const ws = FakeSocket.all[0];
-    expect(ws.url).toBe('ws://127.0.0.1:21000/');
+    expect(ws.url).toBe('ws://127.0.0.1:9998/');
     ws.open();
     expect(ws.sent.map((f) => f.t)).toEqual([HELLO]);
     await ws.recv(WELCOME, 'zapd', ID);
@@ -147,9 +147,9 @@ describe('ensureZap', () => {
   it('with no pairing, sweeps the well-known ports before backing off', () => {
     const s = newZapState('browser/chrome-3fa2');
     ensureZap(s, opts());
-    for (let i = 0; i < 8; i++) FakeSocket.all.at(-1)!.close();
+    for (let i = 0; i < 9; i++) FakeSocket.all.at(-1)!.close();
     expect(FakeSocket.all.map((w) => w.url)).toEqual(
-      [21000, 21001, 21002, 21003, 21004, 21005, 21006, 21007].map((p) => `ws://127.0.0.1:${p}/`),
+      [9998, 21000, 21001, 21002, 21003, 21004, 21005, 21006, 21007].map((p) => `ws://127.0.0.1:${p}/`),
     );
     expect(s.error).toBe('no-router');
   });
@@ -282,7 +282,7 @@ describe('ensureZap', () => {
     expect(ws.closed).toBe(true);
     const next = FakeSocket.all.at(-1)!;
     expect(next).not.toBe(ws);
-    expect(next.url).toBe('ws://127.0.0.1:21000/');
+    expect(next.url).toBe('ws://127.0.0.1:9998/');
   });
 });
 
@@ -368,7 +368,7 @@ describe('native messaging', () => {
     ensureZap(s, opts());
     FakePort.last!.gone('Native host has exited.');
     expect(s.native).toBe(false);
-    expect(FakeSocket.all.at(-1)!.url).toBe('ws://127.0.0.1:21000/');
+    expect(FakeSocket.all.at(-1)!.url).toBe('ws://127.0.0.1:9998/');
   });
 
   it('retries the host when it exits after it was working', () => {

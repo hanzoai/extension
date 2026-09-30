@@ -77,7 +77,7 @@ through `packages/vscode/src/api/chat.ts` (bearer: the IAM session, else
 ## Architecture (ZAP, no pairing)
 
     extension ─native messaging (ai.hanzo.zap)─► hanzo-zap-host ─UDS─► ZAP router ◄─UDS─ hanzo-mcp, dev, desktop, IDE
-    extension ─WebSocket 127.0.0.1:21000-21007 (snap/Flatpak)──────► ZAP router
+    extension ─WebSocket 127.0.0.1:9998 (snap/Flatpak)───────────────► ZAP router
 
 The router is not a daemon: it is the `zapd` library embedded in every Hanzo
 process that speaks ZAP, and an fcntl lock elects one per user (HIP-0069). When
@@ -91,10 +91,11 @@ that process exits another takes over and the extension reconnects.
   is enough. No AUTH: Chrome's origin check and the socket's 0600 owner are
   the trust.
 - **Door when a browser cannot exec a helper** (snap, Flatpak): the router's
-  WebSocket on the first free port in 21000-21007 (zapd `pair::WELL_KNOWN`).
+  WebSocket on 9998 (ZAP over WebSocket; the services' native ZAP is 9999), else
+  the first free port in 21000-21007 (zapd `pair::WELL_KNOWN`).
   Our Blink origin (`chrome-extension://biingenefmanpecedoafkfajbnlgdmbl`, fixed by
   the manifest `key`) is admitted without a proof (zapd ≥1.1.4) and says HELLO
-  at once; the extension sweeps the eight ports, then backs off. Only
+  at once; the extension sweeps those ports, then backs off. Only
   random-origin browsers (Firefox, Safari) pair: `hanzo-mcp pair` prints
   `ws://127.0.0.1:<port>/#<64 hex>`, kept in `storage.local`, and the connect
   runs the mutual HMAC (router first). A browser node may answer calls but
