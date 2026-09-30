@@ -7,8 +7,10 @@
 // owner and Chrome's origin check are the trust. When no Hanzo process holds the
 // router yet, the helper stands for it itself, so the browser alone is enough.
 //
-// Fallback, for browsers that cannot exec a helper (snap, Flatpak) or a router
-// on another machine: the loopback WebSocket door, proven with a pairing token.
+// Otherwise (snap and Flatpak browsers cannot exec a helper): the router's
+// loopback WebSocket door on a well-known port (21000-21007). This extension's
+// fixed origin is its admission there, so it needs no pairing either; only a
+// random-origin browser (Firefox, Safari) pairs, with a token.
 //
 // Wire (HIP-0069): one ZAP router envelope per message, length prefix included —
 //   u32 len · u8 type · u16 flags · u16 from_len · u16 to_len · u32 payload_len
@@ -16,7 +18,7 @@
 // — on the native port each envelope rides as base64 in `{z}`; on the door as
 // one binary WebSocket message.
 //
-// Door pairing: `ws://127.0.0.1:<port>/#<64 hex>`. On connect:
+// Door pairing, for random-origin browsers: `ws://127.0.0.1:<port>/#<64 hex>`. On connect:
 //   extension → AUTH nc                                    (32 random bytes)
 //   router    → AUTH ns ‖ HMAC(token, "zap router" ‖ nc ‖ ns)
 //   extension → AUTH HMAC(token, "zap client" ‖ nc ‖ ns)
@@ -196,6 +198,8 @@ export interface ZapState {
   pairing: Pairing | null;
   /** Native messaging host: unknown until tried, then whether it exists. */
   native: boolean | null;
+  /** Which well-known door port to try next when unpaired. */
+  scan: number;
   error: ZapError;
   timer: ReturnType<typeof setTimeout> | null;
   backoff: number;
@@ -211,10 +215,14 @@ export interface Link {
 /** The native messaging host every hanzo-mcp registers for this extension. */
 export const NATIVE_HOST = 'ai.hanzo.zap';
 
+/** The door ports the router takes first (zapd `pair::WELL_KNOWN`). This
+ *  extension's origin is admitted there without a pairing code. */
+export const WELL_KNOWN = [21000, 21001, 21002, 21003, 21004, 21005, 21006, 21007];
+
 export function newZapState(providerId: string): ZapState {
   return {
     connected: false, socket: null, authed: false, since: 0, providerId, caps: [], probedAt: 0,
-    pairing: null, native: null, error: '', timer: null, backoff: BACKOFF_MIN,
+    pairing: null, native: null, scan: 0, error: '', timer: null, backoff: BACKOFF_MIN,
   };
 }
 
@@ -383,13 +391,16 @@ function connectNative(state: ZapState, opts: ZapOpts): boolean {
   return true;
 }
 
-/** Join over the paired loopback door (sandboxed browsers, another machine). */
-function connectDoor(state: ZapState, opts: ZapOpts, pairing: Pairing) {
+/** Join over the loopback door. With no pairing, this extension's own origin
+ *  is its admission, on one of the well-known ports; a pairing (Firefox,
+ *  Safari, a router on another port) adds the mutual proof. */
+function connectDoor(state: ZapState, opts: ZapOpts, pairing: Pairing | null) {
+  const url = pairing ? pairing.url : `ws://127.0.0.1:${WELL_KNOWN[state.scan % WELL_KNOWN.length]}/`;
   let ws: WebSocket;
   try {
-    ws = new WebSocket(pairing.url);
+    ws = new WebSocket(url);
   } catch (e: any) {
-    opts.log('[Hanzo/ZAP] cannot open ' + pairing.url + ': ' + (e?.message || e));
+    opts.log('[Hanzo/ZAP] cannot open ' + url + ': ' + (e?.message || e));
     return;
   }
   ws.binaryType = 'arraybuffer';
@@ -409,6 +420,12 @@ function connectDoor(state: ZapState, opts: ZapOpts, pairing: Pairing) {
 
   ws.onopen = () => {
     opened = true;
+    if (!pairing) {
+      // Admitted on origin: straight to HELLO.
+      state.authed = true;
+      send(link, HELLO, '', encodeHello(ROLE_PROVIDER, opts.brand, opts.caps), state.providerId);
+      return;
+    }
     send(link, AUTH, '', nc);
   };
 
@@ -421,13 +438,13 @@ function connectDoor(state: ZapState, opts: ZapOpts, pairing: Pairing) {
       drop(state);
       return;
     }
-    if (!state.authed) {
+    if (!state.authed && pairing) {
       // The only frame before the proof is the router's own proof.
       if (f.t !== AUTH || f.payload.length !== 64) { drop(state); return; }
       const ns = f.payload.slice(0, 32);
       if (!(await verify(pairing.key, 'zap router', nc, ns, f.payload.slice(32)))) {
         state.error = 'mismatch';
-        opts.log('[Hanzo/ZAP] the router on ' + pairing.url + ' does not hold our pairing token — pair again');
+        opts.log('[Hanzo/ZAP] the router on ' + url + ' does not hold our pairing token — pair again');
         drop(state);
         return;
       }
@@ -443,6 +460,19 @@ function connectDoor(state: ZapState, opts: ZapOpts, pairing: Pairing) {
 
   ws.onclose = () => {
     if (state.socket !== link) return;
+    if (!pairing && !state.connected) {
+      // Nothing of ours on this well-known port: try the next one at once,
+      // and back off only after a full sweep.
+      state.scan++;
+      if (state.scan % WELL_KNOWN.length !== 0) {
+        drop(state);
+        ensureZap(state, opts);
+        return;
+      }
+      state.error = 'no-router';
+      lost(state, opts, 'no router on the well-known ports');
+      return;
+    }
     // Never opened: nothing listens there (or the door refused our origin).
     // Opened but closed before the router's proof: the router refused us. A
     // mismatch has already said so above.
@@ -485,12 +515,8 @@ export function ensureZap(state: ZapState, opts: ZapOpts): void {
       schedule(state, opts, HEARTBEAT_MS);
       return;
     }
-    if (state.pairing) {
-      connectDoor(state, opts, state.pairing);
-      schedule(state, opts, HEARTBEAT_MS);
-      return;
-    }
-    if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+    connectDoor(state, opts, state.pairing);
+    schedule(state, opts, HEARTBEAT_MS);
     return;
   }
   const now = Date.now();

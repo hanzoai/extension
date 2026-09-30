@@ -131,11 +131,27 @@ describe('frames', () => {
 });
 
 describe('ensureZap', () => {
-  it('dials nothing until paired', () => {
+  it('with no pairing, joins the well-known door on origin alone: HELLO, no AUTH', async () => {
     const s = newZapState('browser/chrome-3fa2');
     ensureZap(s, opts());
-    vi.advanceTimersByTime(60_000);
-    expect(FakeSocket.all).toHaveLength(0);
+    const ws = FakeSocket.all[0];
+    expect(ws.url).toBe('ws://127.0.0.1:21000/');
+    ws.open();
+    expect(ws.sent.map((f) => f.t)).toEqual([HELLO]);
+    await ws.recv(WELCOME, 'zapd', ID);
+    await ws.recv(PROVIDERS, 'zapd', ID, providers([ID]));
+    expect(s.connected).toBe(true);
+    expect(s.socket?.kind).toBe('door');
+  });
+
+  it('with no pairing, sweeps the well-known ports before backing off', () => {
+    const s = newZapState('browser/chrome-3fa2');
+    ensureZap(s, opts());
+    for (let i = 0; i < 8; i++) FakeSocket.all.at(-1)!.close();
+    expect(FakeSocket.all.map((w) => w.url)).toEqual(
+      [21000, 21001, 21002, 21003, 21004, 21005, 21006, 21007].map((p) => `ws://127.0.0.1:${p}/`),
+    );
+    expect(s.error).toBe('no-router');
   });
 
   it('checks the router\'s proof before it says anything else, then registers', async () => {
@@ -259,13 +275,14 @@ describe('ensureZap', () => {
     expect(s.connected).toBe(true);
   });
 
-  it('unpairing closes the socket and stops the clock', async () => {
+  it('unpairing closes the paired socket and goes back to the well-known door', async () => {
     const s = paired();
     const ws = await register(s);
     setPairing(s, null, opts());
     expect(ws.closed).toBe(true);
-    vi.advanceTimersByTime(120_000);
-    expect(FakeSocket.all).toHaveLength(1);
+    const next = FakeSocket.all.at(-1)!;
+    expect(next).not.toBe(ws);
+    expect(next.url).toBe('ws://127.0.0.1:21000/');
   });
 });
 
