@@ -71,7 +71,8 @@ describe('startZap', () => {
     const { zap, storage } = start();
     expect((await ask(zap, 'zap.pair', { code: `  ${CODE}\n` })).success).toBe(true);
     expect(storage.data.zapPairing).toBe(CODE);
-    expect(sockets).toEqual(['ws://127.0.0.1:21000/']);
+    // Unpaired at start it knocked on the well-known door; paired, it dials the code's.
+    expect(sockets.at(-1)).toBe('ws://127.0.0.1:21000/');
     expect((await ask(zap, 'zap.status')).zap.paired).toBe(true);
   });
 
@@ -86,5 +87,12 @@ describe('startZap', () => {
   it('leaves every other action to the caller', () => {
     const { zap } = start();
     expect(zap.handle('bridge.status', {}, () => {})).toBe(false);
+  });
+});
+
+describe('the door that answered', () => {
+  it('is dialed first after a restart', async () => {
+    start(memory({ zapName: 'chrome-3fa2', zapDoor: 21000 }));
+    await vi.waitFor(() => expect(sockets[0]).toBe('ws://127.0.0.1:21000/'));
   });
 });

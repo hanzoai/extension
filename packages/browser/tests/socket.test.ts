@@ -154,6 +154,24 @@ describe('ensureZap', () => {
     expect(s.error).toBe('no-router');
   });
 
+  it('starts the next sweep at the port that answered, and still tries every port once', () => {
+    const s = newZapState('browser/chrome-3fa2');
+    const doors: number[] = [];
+    const o = { ...opts(), door: (p: number) => doors.push(p) };
+    ensureZap(s, o);
+    FakeSocket.all.at(-1)!.close();          // 9998 refused
+    FakeSocket.all.at(-1)!.open();           // 21000 answers
+    expect(doors).toEqual([21000]);
+    FakeSocket.all.at(-1)!.close();          // the router goes away before registering us
+    for (let i = 0; i < 8; i++) FakeSocket.all.at(-1)!.close();
+    expect(FakeSocket.all.slice(2).map((w) => w.url)).toEqual(
+      [21001, 21002, 21003, 21004, 21005, 21006, 21007, 9998].map((p) => `ws://127.0.0.1:${p}/`),
+    );
+    expect(s.error).toBe('no-router');
+    vi.advanceTimersByTime(60_000);
+    expect(FakeSocket.all.at(-1)!.url).toBe('ws://127.0.0.1:21000/');
+  });
+
   it('checks the router\'s proof before it says anything else, then registers', async () => {
     const s = paired();
     ensureZap(s, opts());

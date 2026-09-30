@@ -6,6 +6,7 @@
  * machine's router and means nothing on another):
  *   zapPairing  the code the user pasted, `ws://127.0.0.1:<port>/#<token>`
  *   zapName     this install's node name, `<engine>-<4 hex>`, minted once
+ *   zapDoor     the well-known door port that last answered, tried first
  *
  * Messages:
  *   zap.status            → { connected, paired, providerId, caps, error }
@@ -13,7 +14,7 @@
  *   zap.unpair            → forget the pairing and disconnect
  */
 
-import { ensureZap, newZapState, parsePairing, setPairing, type ZapOpts, type ZapState } from './socket.js';
+import { WELL_KNOWN, ensureZap, newZapState, parsePairing, setPairing, type ZapOpts, type ZapState } from './socket.js';
 
 export interface ZapStorage {
   get(keys: string[]): Promise<Record<string, any>>;
@@ -31,12 +32,20 @@ export interface Zap {
 
 export const PAIR_HELP = 'Only for a browser that cannot start a native host (snap, Flatpak): run `hanzo-mcp pair` on this computer and paste the code it prints.';
 
-export function startZap(opts: ZapOpts & { engine: string; storage: ZapStorage }): Zap {
+export function startZap(given: ZapOpts & { engine: string; storage: ZapStorage }): Zap {
   const state = newZapState('');
   let ready = false;
+  let door: number | undefined;
+  const opts = {
+    ...given,
+    door: (port: number) => { if (port !== door) { door = port; void given.storage.set({ zapDoor: port }); } },
+  };
 
   const loaded = (async () => {
-    const s = await opts.storage.get(['zapPairing', 'zapName']);
+    const s = await opts.storage.get(['zapPairing', 'zapName', 'zapDoor']);
+    door = s.zapDoor;
+    const home = WELL_KNOWN.indexOf(s.zapDoor);
+    if (home >= 0) state.scan = state.home = home;
     let name: string = s.zapName;
     if (!name) {
       const id = crypto.getRandomValues(new Uint8Array(2));

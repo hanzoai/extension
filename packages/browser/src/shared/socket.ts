@@ -200,6 +200,8 @@ export interface ZapState {
   native: boolean | null;
   /** Which well-known door port to try next when unpaired. */
   scan: number;
+  /** The well-known port a sweep starts from: the last one that answered. */
+  home: number;
   error: ZapError;
   timer: ReturnType<typeof setTimeout> | null;
   backoff: number;
@@ -224,7 +226,7 @@ export const WELL_KNOWN = [9998, 21000, 21001, 21002, 21003, 21004, 21005, 21006
 export function newZapState(providerId: string): ZapState {
   return {
     connected: false, socket: null, authed: false, since: 0, providerId, caps: [], probedAt: 0,
-    pairing: null, native: null, scan: 0, error: '', timer: null, backoff: BACKOFF_MIN,
+    pairing: null, native: null, scan: 0, home: 0, error: '', timer: null, backoff: BACKOFF_MIN,
   };
 }
 
@@ -235,6 +237,8 @@ export interface ZapOpts {
   caps: string[];
   dispatch: Dispatch;
   log: (m: string) => void;
+  /** Told the well-known port that answered, so a restart starts there. */
+  door?: (port: number) => void;
 }
 
 function send(link: Link, t: number, to: string, payload?: Uint8Array, from = '') {
@@ -424,6 +428,8 @@ function connectDoor(state: ZapState, opts: ZapOpts, pairing: Pairing | null) {
     opened = true;
     if (!pairing) {
       // Admitted on origin: straight to HELLO.
+      state.home = state.scan % WELL_KNOWN.length;
+      opts.door?.(WELL_KNOWN[state.home]);
       state.authed = true;
       send(link, HELLO, '', encodeHello(ROLE_PROVIDER, opts.brand, opts.caps), state.providerId);
       return;
@@ -466,7 +472,7 @@ function connectDoor(state: ZapState, opts: ZapOpts, pairing: Pairing | null) {
       // Nothing of ours on this well-known port: try the next one at once,
       // and back off only after a full sweep.
       state.scan++;
-      if (state.scan % WELL_KNOWN.length !== 0) {
+      if (state.scan % WELL_KNOWN.length !== state.home) {
         drop(state);
         ensureZap(state, opts);
         return;
