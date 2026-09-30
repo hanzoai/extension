@@ -1,21 +1,22 @@
-// The extension's one connection to this machine's ZAP router: a WebSocket to
-// the router's loopback door, proven with the pairing token. No native
-// messaging, no helper binary, no manifest on disk — so it works in snap and
-// Flatpak browsers, which refuse to exec a native host, as in any other.
+// The extension's connection to this machine's ZAP router.
 //
-// The router is not a daemon: it is embedded in every process that speaks ZAP
-// (hanzo-mcp, the dev CLI, the desktop app, the IDE), and one of them holds the
-// door. When that process exits another takes the door over; this socket drops,
-// and the reconciler below reconnects to the same address.
+// Local, the one way: Chrome native messaging. The browser starts `hanzo-zap-host`
+// (registered by every hanzo-mcp as `ai.hanzo.zap`, allowed for this extension's
+// id only), and that helper speaks ZAP to the router over its unix socket
+// (`$XDG_RUNTIME_DIR/zap/zapd.sock`, 0600). No port, no pairing: the socket's
+// owner and Chrome's origin check are the trust. When no Hanzo process holds the
+// router yet, the helper stands for it itself, so the browser alone is enough.
 //
-// Wire (HIP-0069): each WebSocket binary message is one ZAP router envelope,
-// length prefix included —
+// Fallback, for browsers that cannot exec a helper (snap, Flatpak) or a router
+// on another machine: the loopback WebSocket door, proven with a pairing token.
+//
+// Wire (HIP-0069): one ZAP router envelope per message, length prefix included —
 //   u32 len · u8 type · u16 flags · u16 from_len · u16 to_len · u32 payload_len
 //   · from · to · payload            (little-endian)
-// — the same bytes every other node sends on the router's unix socket.
+// — on the native port each envelope rides as base64 in `{z}`; on the door as
+// one binary WebSocket message.
 //
-// Pairing: the code `ws://127.0.0.1:<port>/#<64 hex>` names the door and the
-// token. The fragment never leaves the extension. On connect:
+// Door pairing: `ws://127.0.0.1:<port>/#<64 hex>`. On connect:
 //   extension → AUTH nc                                    (32 random bytes)
 //   router    → AUTH ns ‖ HMAC(token, "zap router" ‖ nc ‖ ns)
 //   extension → AUTH HMAC(token, "zap client" ‖ nc ‖ ns)
@@ -178,12 +179,12 @@ async function verify(key: Bytes, label: string, nc: Uint8Array, ns: Uint8Array,
 export type ZapError = '' | 'no-router' | 'refused' | 'mismatch';
 
 export interface ZapState {
-  /** The router lists us — not merely "a socket is open". */
+  /** The router lists us — not merely "a link is open". */
   connected: boolean;
-  socket: WebSocket | null;
-  /** The router proved the token and we proved it back. */
+  socket: Link | null;
+  /** Native: always. Door: the router proved the token and we proved it back. */
   authed: boolean;
-  /** When the current socket was opened. */
+  /** When the current link was opened. */
   since: number;
   /** Proposed as `browser/<engine>-<id>`; the router's full id
    *  `browser/<host>/<engine>-<id>` once WELCOME names it. */
@@ -193,15 +194,27 @@ export interface ZapState {
   /** When the outstanding registry probe was sent, or 0. */
   probedAt: number;
   pairing: Pairing | null;
+  /** Native messaging host: unknown until tried, then whether it exists. */
+  native: boolean | null;
   error: ZapError;
   timer: ReturnType<typeof setTimeout> | null;
   backoff: number;
 }
 
+/** One open connection to the router, whichever transport carries it. */
+export interface Link {
+  kind: 'native' | 'door';
+  send(frame: Uint8Array): void;
+  close(): void;
+}
+
+/** The native messaging host every hanzo-mcp registers for this extension. */
+export const NATIVE_HOST = 'ai.hanzo.zap';
+
 export function newZapState(providerId: string): ZapState {
   return {
     connected: false, socket: null, authed: false, since: 0, providerId, caps: [], probedAt: 0,
-    pairing: null, error: '', timer: null, backoff: BACKOFF_MIN,
+    pairing: null, native: null, error: '', timer: null, backoff: BACKOFF_MIN,
   };
 }
 
@@ -214,8 +227,8 @@ export interface ZapOpts {
   log: (m: string) => void;
 }
 
-function send(ws: WebSocket, t: number, to: string, payload?: Uint8Array, from = '') {
-  ws.send(encodeFrame(t, from, to, payload));
+function send(link: Link, t: number, to: string, payload?: Uint8Array, from = '') {
+  link.send(encodeFrame(t, from, to, payload));
 }
 
 /** Unregistered: nothing of ours is reachable through the router. */
@@ -224,14 +237,14 @@ function offline(state: ZapState) {
   state.caps = [];
 }
 
-/** Close the socket we hold, if any, and forget it. */
+/** Close the link we hold, if any, and forget it. */
 function drop(state: ZapState) {
-  const ws = state.socket;
+  const link = state.socket;
   state.socket = null;
   state.authed = false;
   state.probedAt = 0;
   offline(state);
-  if (ws) { try { ws.close(); } catch {} }
+  if (link) { try { link.close(); } catch {} }
 }
 
 /** The one clock: every tick reschedules the next, so there is never more than
@@ -242,7 +255,7 @@ function schedule(state: ZapState, opts: ZapOpts, ms: number) {
   state.timer = setTimeout(() => { state.timer = null; ensureZap(state, opts); }, ms);
 }
 
-/** Take a new pairing (or none): drop the old socket and reconcile at once. */
+/** Take a new pairing (or none): drop the old link and reconcile at once. */
 export function setPairing(state: ZapState, pairing: Pairing | null, opts: ZapOpts) {
   state.pairing = pairing;
   state.error = '';
@@ -251,7 +264,127 @@ export function setPairing(state: ZapState, pairing: Pairing | null, opts: ZapOp
   ensureZap(state, opts);
 }
 
-function connect(state: ZapState, opts: ZapOpts, pairing: Pairing) {
+/** A registered link's frames — the same on either transport. */
+function onFrame(state: ZapState, link: Link, f: Frame, opts: ZapOpts) {
+  switch (f.t) {
+    case WELCOME:
+      // WELCOME is addressed to the id the router registered — our proposal
+      // with its host stamped in. Registration is confirmed by the registry.
+      if (f.to) state.providerId = f.to;
+      state.error = '';
+      state.backoff = BACKOFF_MIN;
+      state.probedAt = Date.now();
+      send(link, PROVIDERS_LIST, '');
+      break;
+    case PROVIDERS: {
+      state.probedAt = 0;
+      const mine = decodeProviders(f.payload).find((p) => p.id === state.providerId);
+      if (!!mine !== state.connected) {
+        opts.log(`[Hanzo/ZAP] ${mine ? 'registered' : 'dropped by router'} (${link.kind}): ${state.providerId}`);
+      }
+      state.connected = !!mine;
+      state.caps = mine ? mine.caps : [];
+      break;
+    }
+    case ERROR:
+      opts.log('[Hanzo/ZAP] ' + dec.decode(f.payload));
+      break;
+    case ROUTE:
+      void answer(state, link, f, opts);
+      break;
+    default:
+      break; // presence chatter: a browser ignores it
+  }
+}
+
+/** The link closed under us: forget it and try again on the backoff. */
+function lost(state: ZapState, opts: ZapOpts, why: string) {
+  drop(state);
+  opts.log(`[Hanzo/ZAP] ${why}; retrying in ${state.backoff} ms`);
+  schedule(state, opts, state.backoff);
+  state.backoff = Math.min(state.backoff * 2, BACKOFF_MAX);
+}
+
+function b64(b: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+function unb64(s: string): Uint8Array {
+  const bin = atob(s);
+  const b = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+  return b;
+}
+
+/** The browser's native messaging API, where this build has one. */
+function nativeApi(): ((name: string) => any) | null {
+  const rt = (globalThis as any).chrome?.runtime;
+  return rt && typeof rt.connectNative === 'function' ? rt.connectNative.bind(rt) : null;
+}
+
+/** Join over native messaging. Returns false when this browser has no helper
+ *  to start, so the caller falls back to the door. */
+function connectNative(state: ZapState, opts: ZapOpts): boolean {
+  const open = nativeApi();
+  if (!open) { state.native = false; return false; }
+  let port: any;
+  try {
+    port = open(NATIVE_HOST);
+  } catch (e: any) {
+    state.native = false;
+    opts.log('[Hanzo/ZAP] no native host: ' + (e?.message || e));
+    return false;
+  }
+  const link: Link = {
+    kind: 'native',
+    send: (frame) => port.postMessage({ z: b64(frame) }),
+    close: () => { try { port.disconnect(); } catch {} },
+  };
+  state.socket = link;
+  state.since = Date.now();
+  state.authed = true;
+  state.probedAt = 0;
+  offline(state);
+  let heard = false;
+
+  port.onMessage.addListener((m: any) => {
+    if (state.socket !== link || typeof m?.z !== 'string') return;
+    heard = true;
+    state.native = true;
+    let f: Frame;
+    try {
+      f = decodeFrame(unb64(m.z));
+    } catch {
+      lost(state, opts, 'native host sent a malformed frame');
+      return;
+    }
+    onFrame(state, link, f, opts);
+  });
+
+  port.onDisconnect.addListener(() => {
+    if (state.socket !== link) return;
+    const why = String((globalThis as any).chrome?.runtime?.lastError?.message || '');
+    // Never heard a frame and Chrome says the host is missing or forbidden: this
+    // browser cannot start the helper, so the door is the way in.
+    if (!heard && /not found|forbidden|not allowed|native messaging host/i.test(why)) {
+      state.native = false;
+      state.error = state.pairing ? '' : 'no-router';
+      drop(state);
+      opts.log('[Hanzo/ZAP] native host unavailable (' + why + ')' + (state.pairing ? ' — using the paired door' : ''));
+      ensureZap(state, opts);
+      return;
+    }
+    lost(state, opts, 'native host exited' + (why ? ': ' + why : ''));
+  });
+
+  send(link, HELLO, '', encodeHello(ROLE_PROVIDER, opts.brand, opts.caps), state.providerId);
+  return true;
+}
+
+/** Join over the paired loopback door (sandboxed browsers, another machine). */
+function connectDoor(state: ZapState, opts: ZapOpts, pairing: Pairing) {
   let ws: WebSocket;
   try {
     ws = new WebSocket(pairing.url);
@@ -260,7 +393,12 @@ function connect(state: ZapState, opts: ZapOpts, pairing: Pairing) {
     return;
   }
   ws.binaryType = 'arraybuffer';
-  state.socket = ws;
+  const link: Link = {
+    kind: 'door',
+    send: (frame) => ws.send(frame),
+    close: () => ws.close(),
+  };
+  state.socket = link;
   state.since = Date.now();
   state.authed = false;
   state.probedAt = 0;
@@ -271,11 +409,11 @@ function connect(state: ZapState, opts: ZapOpts, pairing: Pairing) {
 
   ws.onopen = () => {
     opened = true;
-    send(ws, AUTH, '', nc);
+    send(link, AUTH, '', nc);
   };
 
   ws.onmessage = async (ev: MessageEvent) => {
-    if (state.socket !== ws) return;
+    if (state.socket !== link) return;
     let f: Frame;
     try {
       f = decodeFrame(new Uint8Array(ev.data as ArrayBuffer));
@@ -293,59 +431,28 @@ function connect(state: ZapState, opts: ZapOpts, pairing: Pairing) {
         drop(state);
         return;
       }
-      if (state.socket !== ws) return;
+      if (state.socket !== link) return;
       proven = true;
-      send(ws, AUTH, '', await proof(pairing.key, 'zap client', nc, ns));
+      send(link, AUTH, '', await proof(pairing.key, 'zap client', nc, ns));
       state.authed = true;
-      send(ws, HELLO, '', encodeHello(ROLE_PROVIDER, opts.brand, opts.caps), state.providerId);
+      send(link, HELLO, '', encodeHello(ROLE_PROVIDER, opts.brand, opts.caps), state.providerId);
       return;
     }
-    switch (f.t) {
-      case WELCOME:
-        // WELCOME is addressed to the id the router registered — our proposal
-        // with its host stamped in. Registration is confirmed by the registry.
-        if (f.to) state.providerId = f.to;
-        state.error = '';
-        state.backoff = BACKOFF_MIN;
-        state.probedAt = Date.now();
-        send(ws, PROVIDERS_LIST, '');
-        break;
-      case PROVIDERS: {
-        state.probedAt = 0;
-        const mine = decodeProviders(f.payload).find((p) => p.id === state.providerId);
-        if (!!mine !== state.connected) {
-          opts.log(`[Hanzo/ZAP] ${mine ? 'registered' : 'dropped by router'}: ${state.providerId}`);
-        }
-        state.connected = !!mine;
-        state.caps = mine ? mine.caps : [];
-        break;
-      }
-      case ERROR:
-        opts.log('[Hanzo/ZAP] ' + dec.decode(f.payload));
-        break;
-      case ROUTE:
-        void answer(ws, f, opts);
-        break;
-      default:
-        break; // presence chatter: a browser ignores it
-    }
+    onFrame(state, link, f, opts);
   };
 
   ws.onclose = () => {
-    if (state.socket !== ws) return;
+    if (state.socket !== link) return;
     // Never opened: nothing listens there (or the door refused our origin).
     // Opened but closed before the router's proof: the router refused us. A
     // mismatch has already said so above.
     if (!proven && state.error !== 'mismatch') state.error = opened ? 'refused' : 'no-router';
-    drop(state);
-    opts.log(`[Hanzo/ZAP] socket closed; retrying in ${state.backoff} ms`);
-    schedule(state, opts, state.backoff);
-    state.backoff = Math.min(state.backoff * 2, BACKOFF_MAX);
+    lost(state, opts, 'door closed');
   };
 }
 
-/** Run one inbound command and answer it. */
-async function answer(ws: WebSocket, f: Frame, opts: ZapOpts) {
+/** Run one inbound command and answer it on the link it came in on. */
+async function answer(state: ZapState, link: Link, f: Frame, opts: ZapOpts) {
   let out: Uint8Array;
   try {
     const { method, params } = decodeCmd(f.payload);
@@ -355,39 +462,42 @@ async function answer(ws: WebSocket, f: Frame, opts: ZapOpts) {
   } catch (e: any) {
     out = enc.encode('ERR:' + (e?.message || String(e)));
   }
-  if (ws.readyState === WebSocket.OPEN) send(ws, RESPONSE, f.from, out);
+  if (state.socket === link) {
+    try { send(link, RESPONSE, f.from, out); } catch {}
+  }
 }
 
 /** The ONE reconciler. Brings the extension's registration in line with the
- *  router's registry, and is the only thing that opens a socket.
+ *  router's registry, and is the only thing that opens a link.
  *
- *    no pairing              → nothing to connect to
- *    no socket               → connect (the proof and HELLO follow on open)
- *    not proven after 5 s    → the door is silent: drop it and retry
- *    probe unanswered (5 s)  → open but deaf: drop it and retry
- *    proven but unlisted     → re-send HELLO (the router replaces by id)
- *    proven                  → probe the registry, which both refreshes
- *                              `connected` and keeps the worker alive
+ *    no link, native possible → start the native host (no pairing needed)
+ *    no link, no native       → the paired door, if there is a pairing
+ *    door not proven in 5 s   → the door is silent: drop it and retry
+ *    probe unanswered (5 s)   → open but deaf: drop it and retry
+ *    registered or not        → re-HELLO when unlisted, then probe the
+ *                               registry, which refreshes `connected` and
+ *                               keeps the worker alive
  */
 export function ensureZap(state: ZapState, opts: ZapOpts): void {
-  const pairing = state.pairing;
-  if (!pairing) {
+  const link = state.socket;
+  if (!link) {
+    if (state.native !== false && connectNative(state, opts)) {
+      schedule(state, opts, HEARTBEAT_MS);
+      return;
+    }
+    if (state.pairing) {
+      connectDoor(state, opts, state.pairing);
+      schedule(state, opts, HEARTBEAT_MS);
+      return;
+    }
     if (state.timer) { clearTimeout(state.timer); state.timer = null; }
-    drop(state);
-    return;
-  }
-  const ws = state.socket;
-  if (!ws) {
-    connect(state, opts, pairing);
-    schedule(state, opts, HEARTBEAT_MS);
     return;
   }
   const now = Date.now();
   if ((!state.authed && now - state.since > DEAF_MS) || (state.probedAt && now - state.probedAt > DEAF_MS)) {
     opts.log('[Hanzo/ZAP] router is not answering — reconnecting');
     drop(state);
-    connect(state, opts, pairing);
-    schedule(state, opts, HEARTBEAT_MS);
+    ensureZap(state, opts);
     return;
   }
   if (!state.authed) {
@@ -395,9 +505,9 @@ export function ensureZap(state: ZapState, opts: ZapOpts): void {
     return;
   }
   try {
-    if (!state.connected) send(ws, HELLO, '', encodeHello(ROLE_PROVIDER, opts.brand, opts.caps), state.providerId);
+    if (!state.connected) send(link, HELLO, '', encodeHello(ROLE_PROVIDER, opts.brand, opts.caps), state.providerId);
     if (!state.probedAt) state.probedAt = Date.now();
-    send(ws, PROVIDERS_LIST, '');
+    send(link, PROVIDERS_LIST, '');
   } catch {
     drop(state);
   }

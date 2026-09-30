@@ -13,7 +13,8 @@
     "scripting",
     "cookies",
     "debugger",
-    "alarms"
+    "alarms",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "http://localhost/*",

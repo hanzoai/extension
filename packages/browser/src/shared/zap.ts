@@ -29,7 +29,7 @@ export interface Zap {
   handle(action: string, request: any, sendResponse: (r: any) => void): boolean;
 }
 
-export const PAIR_HELP = 'Run `hanzo-mcp pair` (or `zapd pair`) on this computer and paste the code it prints.';
+export const PAIR_HELP = 'Only for a browser that cannot start a native host (snap, Flatpak): run `hanzo-mcp pair` on this computer and paste the code it prints.';
 
 export function startZap(opts: ZapOpts & { engine: string; storage: ZapStorage }): Zap {
   const state = newZapState('');
@@ -61,6 +61,8 @@ export function startZap(opts: ZapOpts & { engine: string; storage: ZapStorage }
             success: true,
             zap: {
               connected: state.connected,
+              transport: state.socket?.kind ?? '',
+              native: state.native,
               paired: !!state.pairing,
               providerId: state.providerId,
               caps: state.caps,
