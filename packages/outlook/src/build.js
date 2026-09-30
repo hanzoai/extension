@@ -40,8 +40,9 @@ async function build() {
   });
   await ctx.rebuild();
 
-  // Copy static HTML (taskpane, commands, auth-callback).
-  for (const f of ['taskpane.html', 'commands.html', 'auth-callback.html']) {
+  // Copy static HTML (index — the install page at the host root — taskpane,
+  // commands, auth-callback).
+  for (const f of ['index.html', 'taskpane.html', 'commands.html', 'auth-callback.html']) {
     fs.copyFileSync(path.join(__dirname, f), path.join(dist, f));
   }
 

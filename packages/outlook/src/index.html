@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hanzo AI for Outlook</title>
+  <style>
+    :root { color-scheme: light dark; --fg:#1a1a1a; --muted:#666; --bg:#fff; --line:#e3e3e3; }
+    @media (prefers-color-scheme: dark) { :root { --fg:#eaeaea; --muted:#9a9a9a; --bg:#1e1e1e; --line:#333; } }
+    body { font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); margin: 0 auto; padding: 32px 16px; max-width: 640px; }
+    header { display: flex; align-items: center; gap: 10px; }
+    header img { width: 32px; height: 32px; }
+    h1 { font-size: 20px; margin: 0; }
+    p, li { color: var(--muted); }
+    code { border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; overflow-wrap: anywhere; }
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+  <header><img src="assets/icon-80.png" alt="" /><h1>Hanzo AI for Outlook</h1></header>
+  <p>Summarize threads, draft replies and pull out action items. Add it with this manifest: <a href="manifest.xml"><code>https://outlook.hanzo.ai/manifest.xml</code></a></p>
+  <ul>
+    <li><b>Outlook on the web:</b> Settings &rarr; Get Add-ins &rarr; My add-ins &rarr; Add a custom add-in &rarr; Add from URL, and paste the manifest link above.</li>
+    <li><b>Your whole organization:</b> Microsoft 365 admin center &rarr; Settings &rarr; Integrated apps &rarr; Upload custom apps &rarr; provide the manifest link above.</li>
+  </ul>
+  <p>Sign in with your Hanzo account. Models run at api.hanzo.ai.</p>
+</body>
+</html>
