@@ -28,17 +28,48 @@ optionals stay runtime requires, each behind a try/catch (the list and why are
 in `scripts/build.js`). `__dirname` in extension code is `dist/`; find shipped
 files through `context.extensionUri`. vsce reads `@types/vscode` from
 package.json and cannot parse `catalog:`, so that one devDependency is pinned
-to the `engines.vscode` floor, 1.90, where the chat participant API went stable.
+to the `engines.vscode` floor, 1.104, where the language model chat provider
+API went stable (the MCP server definition provider did in 1.101). Nothing
+needs `enabledApiProposals`.
 vsce refuses a package.json `files` beside `.vscodeignore`; `.vscodeignore` is
 an allowlist.
 
-The extension speaks MCP to one server, `dist/mcp-server.js`, over the child's
-stdio (`src/mcp/server.ts`, the SDK's `StdioClientTransport`); `activate()`
-returns that client as `{ mcp }`. The child runs on `process.execPath` with
-`ELECTRON_RUN_AS_NODE=1`, VS Code's Electron as Node (Node itself under a remote
-host), so it needs no Node on PATH. It gets `HANZO_WORKSPACE` and `HANZO_CONFIG`
+VS Code makes Hanzo an agent three ways, all registered in `activate()`:
+
+- **MCP server** `hanzo` (`src/lm/mcp.ts`): `hanzo-mcp --transport stdio` in
+  the first workspace folder, for Copilot's agent mode, @hanzo and any
+  extension reading `vscode.lm.tools`. hanzo-mcp keeps its own IAM session;
+  the extension hands it no credential. Its `browser` and `cdp` tools drive
+  the person's own signed-in browser through the Hanzo browser extension, so
+  the VS Code extension has no browser tool of its own and never launches a
+  Chromium.
+- **Models** vendor `hanzo` (`src/lm/models.ts`): the rows of `/v1/models`
+  with `owned_by: hanzo` whose `outputs` (text when absent) include `text`,
+  streamed from `/v1/chat/completions` with tools, bearer from
+  `AuthManager.bearer()`. A row without `context_window`/`max_output_tokens`
+  takes the gateway's floors, 131072 and 32768. `supports_tools` is set only
+  by a live probe (ai `model_routes.go`) and `conf/models.yaml` declares it
+  for no model, so every listed model declares tool calling.
+  `AuthManager.onDidChange` has VS Code list them again after sign-in or
+  sign-out.
+- **@hanzo** (`src/chat/hanzo-chat-participant.ts`): the chat view's model if
+  its vendor is `hanzo`, else `hanzo.llm.hanzo.model`; offers every tool
+  tagged `mcp` (VS Code tags each MCP tool so, and starts MCP servers before it
+  invokes a participant) and loops `vscode.lm.invokeTool` until the model
+  answers without a call.
+
+JetBrains publishes no such API; `packages/jetbrains/LLM.md` has the steps a
+person takes there.
+
+Separately the extension speaks MCP to its bundled server,
+`dist/mcp-server.js`, over the child's stdio (`src/mcp/server.ts`, the SDK's
+`StdioClientTransport`); `activate()` returns that client as `{ mcp }`. The
+child runs on `process.execPath` with `ELECTRON_RUN_AS_NODE=1`, VS Code's
+Electron as Node (Node itself under a remote host), so it needs no Node on
+PATH. It gets `HANZO_WORKSPACE` and `HANZO_CONFIG`
 (the `hanzo.*` settings as JSON), which the build's `vscode` stand-in reads, and
-serves every enabled `MCPTools` tool under the tool's own JSON Schema.
+serves every enabled `MCPTools` tool under the tool's own JSON Schema. It is
+not registered with VS Code: only `{ mcp }` reaches it.
 `xvfb-run -a pnpm --filter hanzo-ide test:electron` runs the extension-host
 suite. Every Hanzo API path is `/v1/…`: `/mcp/v1/proxy` and
 `/platform/v1/<action>` 404, and the platform API is
