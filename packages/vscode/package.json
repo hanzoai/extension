@@ -1,7 +1,7 @@
 {
   "name": "hanzo-ide",
   "displayName": "Hanzo AI",
-  "description": "Hanzo AI for VS Code: the @hanzo chat participant and an MCP server that gives AI tools access to your workspace.",
+  "description": "Hanzo AI for VS Code: Hanzo's MCP server for every agent, and the @hanzo chat participant.",
   "version": "1.9.31",
   "publisher": "hanzo-ai",
   "license": "MIT",
@@ -10,7 +10,7 @@
     "url": "https://github.com/hanzoai/extension.git"
   },
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.104.0"
   },
   "categories": [
     "Other"
@@ -42,6 +42,12 @@
         "name": "Hanzo",
         "description": "Chat with Hanzo AI using your workspace tools",
         "isSticky": true
+      }
+    ],
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "hanzo",
+        "label": "Hanzo"
       }
     ],
     "commands": [
@@ -165,7 +171,7 @@
     "@types/mocha": "catalog:",
     "@types/node": "catalog:",
     "@types/sinon": "catalog:",
-    "@types/vscode": "~1.90.0",
+    "@types/vscode": "~1.104.0",
     "@typescript-eslint/eslint-plugin": "catalog:",
     "@typescript-eslint/parser": "catalog:",
     "@vitest/coverage-v8": "catalog:",

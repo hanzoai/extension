@@ -3,6 +3,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { AuthManager } from './auth/manager';
 import { startServer } from './mcp/server';
 import { HanzoChatParticipant } from './chat/hanzo-chat-participant';
+import { servers } from './lm/mcp';
 
 /** What activate() returns to other extensions: the client connected to the bundled MCP server. */
 export interface Api {
@@ -13,6 +14,8 @@ let mcp: Client | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<Api> {
     const authManager = AuthManager.getInstance(context);
+
+    context.subscriptions.push(vscode.lm.registerMcpServerDefinitionProvider('hanzo', servers));
 
     if (vscode.workspace.getConfiguration('hanzo').get<boolean>('mcp.enabled', true)) {
         try {
