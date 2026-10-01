@@ -1,10 +1,12 @@
 // CDP Bridge for hanzo-mcp Browser Tool Integration
 // Enables Playwright to control browser via Chrome DevTools Protocol
 import { ActionRateLimiter, debugLog, loadDebugFlagFromStorage } from './runtime-guard';
-import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
+import { parseTabId } from './shared/tab-id.js';
 import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 import { detail, shrink } from './shared/shrink.js';
 import { DRIVE, drive } from './shared/drive.js';
+import { codeOf, keyCode, parseKey, text, type Mods } from './shared/keys.js';
+import * as script from './shared/script.js';
 
 /**
  * Coerce the named params from string → number in place.
@@ -25,6 +27,18 @@ function coerceNumericParams(params: any, keys: string[]): void {
     }
   }
 }
+
+/** CDP's Input modifier bitmask. */
+function bits(m: Mods): number {
+  return (m.altKey ? 1 : 0) | (m.ctrlKey ? 2 : 0) | (m.metaKey ? 4 : 0) | (m.shiftKey ? 8 : 0);
+}
+
+/**
+ * chrome.debugger.attach refused the tab. The message carries Chromium's own
+ * reason (lastError): another extension's chrome-extension:// frame inside the
+ * page, a chrome:// URL, a policy block.
+ */
+export class AttachError extends Error {}
 
 interface CDPSession {
   tabId: number;
@@ -89,30 +103,38 @@ export class CDPBridge {
     }
   }
   
-  // Attach debugger to a tab
-  async attach(tabId: number): Promise<boolean> {
-    if (this.sessions.has(tabId)) {
-      return true; // Already attached
-    }
-    
-    return new Promise((resolve) => {
-      const debuggee: chrome.debugger.Debuggee = { tabId };
-      
+  /** Attach the debugger to a tab, or throw AttachError with Chromium's reason. */
+  async attach(tabId: number): Promise<void> {
+    if (this.sessions.has(tabId)) return;
+    const debuggee: chrome.debugger.Debuggee = { tabId };
+    await new Promise<void>((resolve, reject) => {
       chrome.debugger.attach(debuggee, '1.3', () => {
-        if (chrome.runtime.lastError) {
-          console.error(`[CDP] Failed to attach: ${chrome.runtime.lastError.message}`);
-          resolve(false);
-        } else {
-          this.sessions.set(tabId, {
-            tabId,
-            debuggee,
-            connected: true
-          });
-          debugLog(`[CDP] Attached to tab ${tabId}`);
-          resolve(true);
+        const err = chrome.runtime.lastError;
+        if (err) {
+          reject(new AttachError(`Cannot attach to tab ${tabId}: ${err.message}`));
+          return;
         }
+        this.sessions.set(tabId, { tabId, debuggee, connected: true });
+        debugLog(`[CDP] Attached to tab ${tabId}`);
+        resolve();
       });
     });
+  }
+
+  /**
+   * `cdp` over the debugger, or `scripted` through scripting.executeScript
+   * (shared/script.ts) when the debugger cannot attach to the tab. Attach is
+   * decided first, so a CDP failure midway never runs the work twice.
+   */
+  private async either<T>(tabId: number, cdp: () => Promise<T>, scripted: () => Promise<T>): Promise<T> {
+    try {
+      await this.attach(tabId);
+    } catch (e) {
+      if (!(e instanceof AttachError)) throw e;
+      debugLog(`[CDP] ${e.message} — scripting instead`);
+      return scripted();
+    }
+    return cdp();
   }
   
   // Detach from a tab
@@ -130,15 +152,8 @@ export class CDPBridge {
   
   // Send CDP command
   async send(tabId: number, method: string, params?: any): Promise<any> {
-    const session = this.sessions.get(tabId);
-    if (!session) {
-      // Auto-attach if not attached
-      const attached = await this.attach(tabId);
-      if (!attached) {
-        throw new Error(`Cannot attach to tab ${tabId}`);
-      }
-    }
-    
+    await this.attach(tabId);
+
     return new Promise((resolve, reject) => {
       chrome.debugger.sendCommand(
         { tabId },
@@ -279,22 +294,61 @@ export class CDPBridge {
     }
   }
   
-  async evaluate(tabId: number, expression: string): Promise<any> {
-    await this.send(tabId, 'Runtime.enable');
-    // awaitPromise: true makes CDP wait for any async IIFE the caller passed
-    // to resolve before returning. Without this, expressions like
-    //   (async () => fetch('/x').then(r => r.json()))()
-    // serialize to {} (a Promise placeholder) and the caller can't tell
-    // success from failure. unwrapEvaluateResult further normalises every
-    // shape (Chrome / CDP / hanzo-tools) to the bare value.
-    const result = await this.send(tabId, 'Runtime.evaluate', {
-      expression: wrapEvaluable(expression),
-      returnByValue: true,
-      awaitPromise: true,
-    });
-    return unwrapEvaluateResult(result);
+  /**
+   * Runtime.evaluate. The caller's JS is taken under every alias and statement
+   * form pickEvaluable + wrapEvaluable accept — the rule background-firefox.ts
+   * applies, so both browsers accept identical caller JS.
+   *
+   * The caller's bag is NOT spread in. CDP validates Runtime.evaluate strictly
+   * and owns a `timeout` field (a double); a client's own transport timeout —
+   * null by default in the MCP tool schema — reached CDP as `params.timeout:
+   * null` and every evaluate died on "Failed to deserialize params.timeout -
+   * double value expected". The three fields below are the whole contract;
+   * `awaitPromise: true` makes an async IIFE come back resolved instead of {}.
+   *
+   * When the debugger cannot attach, the same JS runs through executeScript,
+   * with the same CDP-shaped result.
+   */
+  async evaluate(tabId: number, params: Record<string, unknown>): Promise<any> {
+    return this.either(tabId, async () => {
+      await this.send(tabId, 'Runtime.enable');
+      return this.send(tabId, 'Runtime.evaluate', {
+        expression: wrapEvaluable(pickEvaluable(params)),
+        returnByValue: true,
+        awaitPromise: true,
+      });
+    }, () => script.evaluate(chrome, tabId, params));
   }
-  
+
+  /**
+   * One key press, `key` a KeyboardEvent.key or chord ("Enter", ",",
+   * "Control+a"), on `selector` (focused first) or the focused element. Over
+   * CDP it is a real keystroke: trusted, so the browser itself inserts text,
+   * submits forms and moves focus — and windowsVirtualKeyCode is set, without
+   * which Chromium reports keyCode 0 and Angular/Material handlers ignore it.
+   * When the debugger cannot attach, the scripted press carries the same
+   * legacy fields.
+   */
+  async press(tabId: number, params: Record<string, unknown>): Promise<any> {
+    const { key, mods } = parseKey(String(params.key ?? ''), params.modifiers);
+    return this.either(tabId, async () => {
+      if (params.selector) {
+        await script.call(chrome, tabId, (s: string) => {
+          const el = document.querySelector(s) as HTMLElement | null;
+          if (!el) return { __hanzo_error: `No element matches ${s}` };
+          el.focus();
+          return true;
+        }, [String(params.selector)]);
+      }
+      const typed = text(key, mods);
+      const vk = keyCode(key);
+      const base = { key, code: codeOf(key), windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers: bits(mods) };
+      await this.send(tabId, 'Input.dispatchKeyEvent', { type: typed ? 'keyDown' : 'rawKeyDown', text: typed, unmodifiedText: typed, ...base });
+      await this.send(tabId, 'Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+      return { delivered: true, key, keyCode: vk };
+    }, () => script.press(chrome, tabId, params));
+  }
+
   async getDocument(tabId: number): Promise<any> {
     await this.send(tabId, 'DOM.enable');
     return this.send(tabId, 'DOM.getDocument');
@@ -390,6 +444,38 @@ export class CDPBridge {
     try {
       let result: any;
 
+      // Tabs are chrome.tabs, named `tab-N`. None of these needs a debugger,
+      // or a tab to act on first: listing tabs must work whatever the
+      // focused window holds and whatever a page refuses to the debugger.
+      switch (method) {
+        case 'Browser.getVersion':
+          return { id, result: { protocolVersion: '1.3', product: 'Hanzo Browser Extension', userAgent: navigator.userAgent } };
+
+        case 'Target.getTargets':
+          return { id, result: await this.getTargets() };
+
+        case 'hanzo.getTabs':
+        case 'hanzo.listTabs': {
+          const tabs = await chrome.tabs.query({});
+          return { id, result: { tabs: tabs.map((t) => ({ id: t.id, url: t.url, title: t.title, active: t.active })) } };
+        }
+
+        case 'Target.createTarget': {
+          const tab = await chrome.tabs.create({ url: params?.url || 'about:blank' });
+          return { id, result: { targetId: `tab-${tab.id}`, tabId: tab.id } };
+        }
+
+        case 'Target.closeTarget':
+        case 'Target.activateTarget': {
+          // Only an explicit id: closing "the active tab" by default closes the user's.
+          const target = parseTabId(params?.tabId ?? params?.targetId);
+          if (target === null) throw new Error(`${method} needs a tab id`);
+          if (method === 'Target.closeTarget') await chrome.tabs.remove(target);
+          else await chrome.tabs.update(target, { active: true });
+          return { id, result: { success: true } };
+        }
+      }
+
       // Resolve target tab. Accept numeric tabId, "tab-NNN" targetId from
       // getTargets, plain numeric string. Without explicit targeting fall
       // back to the active tab in the focused window — which is fragile when
@@ -401,40 +487,6 @@ export class CDPBridge {
       if (DRIVE.has(method)) return { id, result: await drive(chrome, tabId, method, params || {}) };
 
       switch (method) {
-        case 'Browser.getVersion':
-          result = {
-            protocolVersion: '1.3',
-            product: 'Hanzo Browser Extension',
-            userAgent: navigator.userAgent
-          };
-          break;
-
-        case 'Target.getTargets':
-          result = await this.getTargets();
-          break;
-
-        // Tabs are chrome.tabs, named `tab-N` as getTargets names them. Passed
-        // through, the debugger reads CDP target ids and knows none of these.
-        case 'Target.createTarget': {
-          const tab = await chrome.tabs.create({ url: params?.url || 'about:blank' });
-          result = { targetId: `tab-${tab.id}`, tabId: tab.id };
-          break;
-        }
-
-        case 'Target.closeTarget':
-        case 'Target.activateTarget': {
-          // Only an explicit id: closing "the active tab" by default closes the user's.
-          const id = parseTabId(params?.tabId ?? params?.targetId);
-          if (id === null) throw new Error(`${method} needs a tab id`);
-          if (method === 'Target.closeTarget') {
-            await chrome.tabs.remove(id);
-          } else {
-            await chrome.tabs.update(id, { active: true });
-          }
-          result = { success: true };
-          break;
-        }
-
         case 'Page.navigate':
           // Background workers do not have a DOM/window; use a safe default cursor hint.
           this.notifyControlOverlay(tabId, 'ai.control.cursor', { x: 24, y: 24 });
@@ -457,39 +509,31 @@ export class CDPBridge {
           result = {};
           break;
 
-        case 'Input.dispatchKeyEvent':
-          await this.send(tabId, method, params);
-          result = {};
+        case 'hanzo.press':
+          result = await this.press(tabId, params || {});
           break;
+
+        // With a `type`, one raw CDP key event; with none, a press. Scripted
+        // (no debugger), a keyDown is the whole press, so the keyUp a CDP
+        // caller sends after it was already delivered.
+        case 'Input.dispatchKeyEvent': {
+          if (!params?.type) {
+            result = await this.press(tabId, params || {});
+            break;
+          }
+          coerceNumericParams(params, ['windowsVirtualKeyCode', 'nativeVirtualKeyCode', 'modifiers', 'location']);
+          if (params.key && params.windowsVirtualKeyCode === undefined) params.windowsVirtualKeyCode = keyCode(String(params.key));
+          result = await this.either(
+            tabId,
+            async () => { await this.send(tabId, method, params); return {}; },
+            async () => params.type === 'keyUp' ? {} : script.press(chrome, tabId, { ...params, key: params.key ?? params.text }),
+          );
+          break;
+        }
 
         case 'Runtime.evaluate':
         case 'evaluate':
-          // Must enable Runtime domain and set returnByValue for actual
-          // values. `awaitPromise: true` makes CDP wait for async IIFEs
-          // to resolve so callers passing `(async () => {...})()` get
-          // the resolved value instead of an empty {} (the previous bug
-          // — caller saw a serialized Promise placeholder).
-          // pickEvaluable + wrapEvaluable: accept every code-param alias
-          // and let statement bodies (`const b=…; b.click()`) evaluate
-          // instead of tripping SpiderMonkey/V8 expression parsing — the
-          // same rule background-firefox.ts applies, so both browsers
-          // accept identical caller JS.
-          //
-          // The caller's bag is NOT spread in. CDP validates Runtime.evaluate
-          // strictly, and `timeout` is a field it owns (a double). A client
-          // sending its own transport-level `timeout` — null by default in the
-          // MCP tool schema — reached CDP as `params.timeout: null` and every
-          // evaluate died on "Failed to deserialize params.timeout - double
-          // value expected", while the same call succeeded on Firefox, which
-          // consumes timeout as its own wait budget and forwards nothing. The
-          // three fields below are the whole contract, identical to the
-          // evaluate() method above: one rule, both Chrome call sites.
-          await this.send(tabId, 'Runtime.enable');
-          result = await this.send(tabId, 'Runtime.evaluate', {
-            expression: wrapEvaluable(pickEvaluable(params)),
-            returnByValue: true,
-            awaitPromise: true,
-          });
+          result = await this.evaluate(tabId, params || {});
           break;
 
         case 'DOM.getDocument':
@@ -687,21 +731,19 @@ export class CDPBridge {
   }
   
   private async getTargets(): Promise<{ targetInfos: any[] }> {
-    return new Promise((resolve) => {
-      chrome.tabs.query({}, (tabs) => {
-        const targetInfos = tabs.map(tab => ({
-          targetId: `tab-${tab.id}`,
-          type: 'page',
-          title: tab.title,
-          url: tab.url,
-          attached: this.sessions.has(tab.id!),
-          browserContextId: 'default'
-        }));
-        resolve({ targetInfos });
-      });
-    });
+    const tabs = await chrome.tabs.query({});
+    return {
+      targetInfos: tabs.map((tab) => ({
+        targetId: `tab-${tab.id}`,
+        type: 'page',
+        title: tab.title,
+        url: tab.url,
+        attached: this.sessions.has(tab.id!),
+        browserContextId: 'default',
+      })),
+    };
   }
-  
+
   private notifyControlOverlay(tabId: number, action: string, data: any): void {
     const key = `${tabId}:${action}`;
     const signature = JSON.stringify(data || {});

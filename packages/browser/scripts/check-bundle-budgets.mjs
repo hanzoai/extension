@@ -37,7 +37,10 @@ const BUDGETS = {
   // 26.7 — the snapshot → ref engine (shared/snapshot.ts + shared/read.ts):
   // role/name computation, flat-tree walk, covered-click hit test, key default
   // actions, DOM → markdown. Injected on first use per document, not per page load.
-  'page.js': 28,
+  // 28.0 — RAISED from 28: shared/keys.ts, +1.4KB, the virtual-key table every
+  // press now stamps as keyCode/which. Angular and Material switch on keyCode
+  // (a chip commits on 13 or 188), so a press without it reaches them as 0.
+  'page.js': 29,
   // 761.6 — the ceiling is 765, not the 780 it was first raised to. A second
   // copy of @hanzo/event weighs 17.8KB (see newtab.js), and 780 had room for it.
   //

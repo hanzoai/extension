@@ -324,6 +324,26 @@ describe('forms', () => {
     expect(() => act({ op: 'press', key: 'Hyper+x' })).toThrow(/Unknown modifier "Hyper"/);
   });
 
+  it('press carries the legacy keyCode/which Angular and Material switch on', () => {
+    page(`<input id="a">`);
+    const seen: Array<[string, string, number, number, number]> = [];
+    for (const type of ['keydown', 'keypress', 'keyup']) {
+      $('#a').addEventListener(type, (e) => {
+        const k = e as KeyboardEvent;
+        seen.push([type, k.key, k.keyCode, k.which, k.charCode]);
+      });
+    }
+    for (const key of ['Enter', 'Comma', 'Tab']) {
+      $('#a').focus();
+      act({ op: 'press', selector: '#a', key });
+    }
+    expect(seen).toEqual([
+      ['keydown', 'Enter', 13, 13, 0], ['keypress', 'Enter', 13, 13, 13], ['keyup', 'Enter', 13, 13, 0],
+      ['keydown', ',', 188, 188, 0], ['keypress', ',', 44, 44, 44], ['keyup', ',', 188, 188, 0],
+      ['keydown', 'Tab', 9, 9, 0], ['keyup', 'Tab', 9, 9, 0],
+    ]);
+  });
+
   it('press lets the page cancel the default action', () => {
     page(`<form id="f"><input id="a"></form>`);
     const submit = vi.fn((e: Event) => e.preventDefault());

@@ -30,6 +30,7 @@ import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './browser-dispatch';
 import { driveMessage } from './shared/drive.js';
+import { unwrapEvaluateResult } from './shared/tab-id.js';
 import * as auth from './auth';
 import { fetchAllUsage } from './shared/usage.js';
 import { listModels, chatCompletion, ChatMessage } from './chat-client';
@@ -436,8 +437,8 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
     // --- CDP bridge commands ---
     case 'cdp.attach':
       try {
-        const attached = await cdpBridge.attach(request.tabId);
-        sendResponse({ success: attached });
+        await cdpBridge.attach(request.tabId);
+        sendResponse({ success: true });
       } catch (error: any) {
         sendResponse({ success: false, error: error.message });
       }
@@ -499,7 +500,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 
     case 'cdp.evaluate':
       try {
-        const evalResult = await cdpBridge.evaluate(request.tabId, request.expression);
+        const evalResult = unwrapEvaluateResult(await cdpBridge.evaluate(request.tabId, { expression: request.expression }));
         sendResponse({ success: true, result: evalResult });
       } catch (error: any) {
         sendResponse({ success: false, error: error.message });

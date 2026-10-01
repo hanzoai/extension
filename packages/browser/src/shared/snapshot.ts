@@ -16,6 +16,8 @@
  * empty), is refused with a "run snapshot again" error rather than guessed at.
  */
 
+import { codeOf, legacy, parseKey, type Mods } from './keys.js';
+
 export interface SnapshotOptions {
   /** Flat list of interactive elements only. */
   interactive?: boolean;
@@ -822,43 +824,24 @@ function focused(): Element {
   return el ?? document.body;
 }
 
-const KEYS: Record<string, string> = {
-  enter: 'Enter', return: 'Enter', tab: 'Tab', escape: 'Escape', esc: 'Escape', space: ' ',
-  backspace: 'Backspace', delete: 'Delete', del: 'Delete', up: 'ArrowUp', down: 'ArrowDown',
-  left: 'ArrowLeft', right: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown',
-  arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', home: 'Home', end: 'End',
-  pageup: 'PageUp', pagedown: 'PageDown',
-};
-const MODS: Record<string, 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey'> = {
-  control: 'ctrlKey', ctrl: 'ctrlKey', shift: 'shiftKey', alt: 'altKey', option: 'altKey',
-  meta: 'metaKey', cmd: 'metaKey', command: 'metaKey',
-};
-
-function parseKey(combo: string): { key: string; mods: Record<string, boolean> } {
-  const parts = combo.split('+').map((p) => p.trim());
-  if (parts[parts.length - 1] === '' && parts.length > 1) { parts.pop(); parts[parts.length - 1] = '+'; }
-  const mods: Record<string, boolean> = {};
-  for (const p of parts.slice(0, -1)) {
-    const m = MODS[p.toLowerCase()];
-    if (!m) throw new Error(`Unknown modifier ${JSON.stringify(p)} in ${JSON.stringify(combo)}: use Control, Shift, Alt or Meta.`);
-    mods[m] = true;
-  }
-  const last = parts[parts.length - 1];
-  const key = KEYS[last.toLowerCase()] ?? (last.length === 1 ? last : last[0].toUpperCase() + last.slice(1));
-  return { key, mods };
-}
-
-function codeOf(key: string): string {
-  if (/^[a-z]$/i.test(key)) return `Key${key.toUpperCase()}`;
-  if (/^\d$/.test(key)) return `Digit${key}`;
-  return key === ' ' ? 'Space' : key;
-}
-
-function key(el: Element, type: string, k: string, mods: Record<string, boolean>): boolean {
+/**
+ * One KeyboardEvent, with the legacy keyCode / which / charCode a real
+ * keystroke carries. They go in the init dict, which Chromium and Firefox honour
+ * natively, so the page's own (main-world) listeners read them even though this
+ * engine dispatches from the isolated world. An engine that drops them from the
+ * dict gets them as own properties instead: visible in this world only, the best
+ * that engine allows.
+ */
+function key(el: Element, type: string, k: string, mods: Mods): boolean {
   const win = el.ownerDocument.defaultView as any;
-  return el.dispatchEvent(new win.KeyboardEvent(type, {
-    key: k, code: codeOf(k), bubbles: true, cancelable: true, composed: true, ...mods,
-  }));
+  const old = legacy(type, k);
+  const e = new win.KeyboardEvent(type, {
+    key: k, code: codeOf(k), bubbles: true, cancelable: true, composed: true, ...old, ...mods,
+  });
+  for (const f of ['keyCode', 'which', 'charCode'] as const) {
+    if (e[f] !== old[f]) Object.defineProperty(e, f, { get: () => old[f] });
+  }
+  return el.dispatchEvent(e);
 }
 
 function tabbables(doc: Document): HTMLElement[] {

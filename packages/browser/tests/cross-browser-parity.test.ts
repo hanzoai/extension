@@ -24,6 +24,7 @@ function read(p: string): string {
 const chromeBg = read('src/background.ts');
 const firefoxBg = read('src/background-firefox.ts');
 const cdpBridge = read('src/browser-dispatch.ts');
+const sharedScript = read('src/shared/script.ts');
 const browserControl = read('src/browser-control.ts');
 const popupTs = read('src/popup.ts');
 const contentScript = read('src/content-script.ts');
@@ -100,55 +101,55 @@ describe('parseTabId centralization', () => {
 });
 
 describe('awaitPromise propagation', () => {
-  it('browser-dispatch.ts handleBridgeMessage Runtime.evaluate sets awaitPromise: true', () => {
-    // Find the handleBridgeMessage Runtime.evaluate path.
-    const evalSection = cdpBridge.slice(
-      cdpBridge.indexOf("case 'Runtime.evaluate':"),
-      cdpBridge.indexOf("case 'DOM.getDocument':"),
-    );
-    expect(evalSection).toContain('awaitPromise: true');
-  });
-
-  it('browser-dispatch.ts evaluate() helper uses awaitPromise: true', () => {
-    // The local `evaluate(tabId, expression)` method was the one missed
-    // before 1.9.0 — the bridge handler had it but this method didn't.
-    const helperSection = cdpBridge.slice(
+  it('browser-dispatch.ts evaluate() sets awaitPromise: true and is the one Chrome call site', () => {
+    // The handler and the cdp.evaluate message both go through evaluate(); a
+    // second Runtime.evaluate call site is how one of them lost awaitPromise
+    // before 1.9.0.
+    const helper = cdpBridge.slice(
       cdpBridge.indexOf('async evaluate(tabId: number'),
-      cdpBridge.indexOf('async evaluate(tabId: number') + 900,
+      cdpBridge.indexOf('async press(tabId: number'),
     );
-    expect(helperSection).toContain('awaitPromise: true');
-    expect(helperSection).toContain('unwrapEvaluateResult');
+    expect(helper).toContain('awaitPromise: true');
+    expect(cdpBridge.match(/'Runtime\.evaluate', \{/g)).toHaveLength(1);
+    expect(cdpBridge.slice(cdpBridge.indexOf("case 'Runtime.evaluate':"))).toMatch(/^[^]*?this\.evaluate\(tabId/);
   });
 
-  it('both browsers route caller JS through wrapEvaluable (one canonical rule)', () => {
+  it('the cdp.evaluate message hands its caller the bare value', () => {
+    const section = chromeBg.slice(chromeBg.indexOf("case 'cdp.evaluate':"), chromeBg.indexOf("case 'cdp.evaluate':") + 400);
+    expect(section).toContain('unwrapEvaluateResult(');
+  });
+
+  it('every evaluate surface routes caller JS through wrapEvaluable (one canonical rule)', () => {
     // The forgiving-evaluate rule (statement bodies → async IIFE, trailing
-    // value auto-returned) lives ONCE in shared/evaluable.ts. Each engine's
-    // evaluate surface must consume it — a fork here is how the browsers
-    // drift apart on what caller JS they accept.
-    for (const src of [cdpBridge, firefoxBg]) {
-      expect(src).toMatch(/import\s+\{[^}]*wrapEvaluable[^}]*\}\s+from\s+['"]\.\/shared\/evaluable\.js['"]/);
+    // value auto-returned) lives ONCE in shared/evaluable.ts. Each evaluate
+    // surface must consume it — a fork here is how the browsers drift apart
+    // on what caller JS they accept. Firefox and Chrome's no-debugger path
+    // both evaluate through shared/script.ts.
+    for (const src of [cdpBridge, sharedScript]) {
+      expect(src).toMatch(/import\s+\{[^}]*wrapEvaluable[^}]*\}\s+from\s+['"]\.\.?\/(shared\/)?evaluable\.js['"]/);
       expect(src).toContain('wrapEvaluable(pickEvaluable(params))');
     }
+    expect(firefoxBg).toContain('script.evaluate(browser, tabId, params)');
+    expect(cdpBridge).toContain('script.evaluate(chrome, tabId, params)');
   });
 
-  it('Firefox evaluate always resolves promises in-page before serialization', () => {
+  it('scripted evaluate always resolves promises in-page before serialization', () => {
     // executeScript's structured clone cannot transfer a Promise — the
     // in-page body must settle it and hand back the value. Rejections ride
-    // the __hanzo_error channel runInPage throws on.
-    const evalSection = firefoxBg.slice(
-      firefoxBg.indexOf("case 'Runtime.evaluate':"),
-      firefoxBg.indexOf("case 'Page.captureScreenshot':"),
-    );
+    // the __hanzo_error channel execute() throws on.
+    const evalSection = sharedScript.slice(sharedScript.indexOf('export async function evaluate('));
     expect(evalSection).toContain('Promise.resolve(');
     expect(evalSection).toContain('__hanzo_error');
   });
 });
 
 describe('executeScript MV3 contract', () => {
-  it('background-firefox.ts uses scripting.executeScript with world: MAIN', () => {
-    // The Firefox path has used the MV3 scripting API since 1.8.6.
-    expect(firefoxBg).toMatch(/scripting\.executeScript/);
-    expect(firefoxBg).toMatch(/world:\s*['"]MAIN['"]/);
+  it('shared/script.ts runs scripting.executeScript in the MAIN world first', () => {
+    // Firefox since 1.8.6, and Chrome when the debugger cannot attach.
+    expect(sharedScript).toMatch(/scripting\.executeScript/);
+    expect(sharedScript).toMatch(/runIn\('MAIN'\)/);
+    expect(sharedScript).toMatch(/runIn\('ISOLATED'\)/);
+    expect(firefoxBg).not.toMatch(/scripting\.executeScript\(\{\s*target/);
   });
 
   it('browser-control.ts uses scripting.executeScript with world: MAIN', () => {

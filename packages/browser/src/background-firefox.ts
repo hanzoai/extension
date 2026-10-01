@@ -9,7 +9,7 @@
  * - Cannot use ES module exports at top level
  * - Cannot run WebSocket servers, only clients
  * - MV3 109+ uses `browser.scripting.executeScript({world,func,args})`,
- *   NOT the removed MV2 `tabs.executeScript`. See `executeScriptWithTimeout`.
+ *   NOT the removed MV2 `tabs.executeScript`. See shared/script.ts.
  *
  * The webextension-polyfill import is a no-op on Firefox (browser.* is
  * native) but keeping it as the first import here mirrors the Chrome
@@ -20,7 +20,6 @@ import 'webextension-polyfill';
 import type { ControlSession, RagSnippet, RagQueryParams } from './shared/types.js';
 import { startZap } from './shared/zap.js';
 import { fetchAllUsage } from './shared/usage.js';
-import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 import {
   getRagConfig,
   normalizeRagSnippets,
@@ -38,6 +37,7 @@ import {
 import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
 import { detail, shrink } from './shared/shrink.js';
 import { DRIVE, drive, driveMessage } from './shared/drive.js';
+import * as script from './shared/script.js';
 
 // Declare browser API for TypeScript
 declare const browser: typeof chrome;
@@ -50,29 +50,6 @@ interface CDPResponse {
 
 const BROWSER_NAME = 'firefox';
 const VERSION = typeof browser !== 'undefined' ? browser.runtime.getManifest().version : '0';
-
-// URLs the extension can never run scripts in. browser.scripting.executeScript
-// silently returns no frames for these, which used to surface as a mystery
-// `{}` to the caller. We detect upfront and raise an actionable error.
-const PRIVILEGED_URL_PATTERNS: RegExp[] = [
-  /^about:/i,                     // about:debugging, about:addons, about:config…
-  /^moz-extension:/i,             // any extension's own pages
-  /^chrome:/i,                    // chrome://… (Firefox accepts these too)
-  /^view-source:/i,
-  /^resource:/i,
-  /^file:/i,                      // local files unless explicit perm granted
-  /^https?:\/\/addons\.mozilla\.org\b/i, // AMO blocks WebExtensions by policy
-];
-
-function isPrivilegedTab(tab: chrome.tabs.Tab | undefined): boolean {
-  if (!tab) return false;
-  const url = tab.url || (tab as any).pendingUrl || '';
-  if (!url) {
-    // Some Firefox builds redact url for privileged tabs; treat as privileged.
-    return true;
-  }
-  return PRIVILEGED_URL_PATTERNS.some((rx) => rx.test(url));
-}
 
 const controlSession: ControlSession = {
   active: false,
@@ -90,74 +67,6 @@ class HanzoFirefoxExtension {
 
   constructor() {
     console.log('[Hanzo] Firefox extension initializing...');
-  }
-
-  /**
-   * Run JS in a page tab and return its result, with a hard timeout.
-   *
-   * Firefox MV3 removed `browser.tabs.executeScript` (the string-based
-   * MV2 API). The replacement is `browser.scripting.executeScript({...})`
-   * which only accepts a function (or files), not a code string. To keep
-   * the existing call sites that pass dynamic strings working, we inject
-   * a one-line trampoline `(c) => Function(c)()` and forward the user's
-   * code as an argument, executing in the page's MAIN world (so the
-   * page's own CSP applies and `Function` is allowed on most sites).
-   *
-   * Falls back to MV2 `tabs.executeScript` on browsers / runtimes that
-   * still have it (older Firefox, Chrome MV2 which we don't ship but
-   * don't want to break).
-   */
-  private executeScriptWithTimeout(
-    tabId: number,
-    code: string,
-    timeoutMs: number = 10000
-  ): Promise<any[]> {
-    const exec: Promise<any[]> = (async () => {
-      // MV3 path — preferred on every modern build (Chrome 88+, FF 109+).
-      const scripting = (browser as any).scripting;
-      if (scripting?.executeScript) {
-        const runIn = async (world: 'MAIN' | 'ISOLATED'): Promise<any[]> => {
-          const results = await scripting.executeScript({
-            target: { tabId },
-            world,
-            args: [code],
-            func: (codeStr: string) => {
-              try {
-                // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-                return Function(codeStr)();
-              } catch (e: any) {
-                return { __hanzo_error: e?.message || String(e) };
-              }
-            },
-          });
-          // scripting.executeScript returns an array of {result, frameId}.
-          return Array.isArray(results) ? results.map((r: any) => r?.result) : [results];
-        };
-
-        // Try MAIN (page CSP applies — see page-internal vars). If the page
-        // CSP blocks Function() the inner func returns __hanzo_error;
-        // ISOLATED world has its own CSP and almost always allows
-        // Function(), so we silently fall back. This rescues e.g. GitHub,
-        // Google Docs, banking sites with strict 'script-src self'.
-        const main = await runIn('MAIN');
-        const blocked = main.length > 0 && main.every((r) =>
-          r && typeof r === 'object' && r.__hanzo_error &&
-          /CSP|unsafe-eval|Content Security|Function|eval/i.test(String(r.__hanzo_error))
-        );
-        if (!blocked) return main;
-        return runIn('ISOLATED');
-      }
-      // MV2 fallback — only Firefox <109 reaches this branch.
-      const legacy = (browser as any).tabs?.executeScript;
-      if (legacy) return legacy.call(browser.tabs, tabId, { code });
-      throw new Error('No executeScript API available (need MV3 scripting permission)');
-    })();
-    return Promise.race([
-      exec,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('executeScript timeout')), timeoutMs)
-      ),
-    ]);
   }
 
   /**
@@ -187,131 +96,6 @@ class HanzoFirefoxExtension {
     const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (activeTab) return activeTab;
     throw new Error('No active tab');
-  }
-
-  /**
-   * Run JS in the page via executeScript and return the serialized result.
-   * Bumped to throw on empty/missing results so undefined → {} can no
-   * longer hide a privileged-tab or CSP failure (1.9.2).
-   */
-  private async runInPage(tabId: number, code: string, timeoutMs: number = 10000): Promise<any> {
-    // Privileged URLs (about:, moz-extension:, view-source:, …) silently
-    // refuse executeScript. Detect upfront with an actionable error rather
-    // than letting the caller see a mystery `{}` response.
-    let tab: chrome.tabs.Tab | undefined;
-    try { tab = await browser.tabs.get(tabId); } catch { /* best-effort */ }
-    if (tab && isPrivilegedTab(tab)) {
-      throw new Error(
-        `Cannot run JS in privileged tab ${tabId} (${tab.url}). ` +
-        `Activate a regular http(s) tab via tabId/tab_id parameter.`,
-      );
-    }
-
-    // Wrap the user's code in a function body that ALWAYS has a top-level
-    // `return`. Without this `Function(body)()` discards the IIFE result and
-    // hands back undefined → JSON serializes to {} → caller can't tell
-    // success from failure. The trampoline we use is `Function(c)()`, so
-    // `c` itself must `return` whatever the page produced.
-    const wrappedCode = `
-      try {
-        var __r = (function() { ${code} })();
-        return __r === undefined ? null : __r;
-      } catch(__e) {
-        return { __hanzo_error: __e.message || String(__e) };
-      }
-    `;
-    const results = await this.executeScriptWithTimeout(tabId, wrappedCode, timeoutMs);
-    if (!Array.isArray(results) || results.length === 0) {
-      throw new Error(
-        `executeScript returned no frames for tab ${tabId} — page may be ` +
-        `privileged, in a process the extension can't access, or unloaded.`,
-      );
-    }
-    // results is the per-frame mapped array of `r?.result`. With world: MAIN
-    // an `undefined` slot means a frame errored *outside* our try/catch
-    // (typical CSP `script-src 'self'` blocking `Function()`). Surface that
-    // explicitly instead of returning a silent `undefined`.
-    const result = results[0];
-    if (result === undefined) {
-      throw new Error(
-        `executeScript ran but returned no value (frame errored outside the ` +
-        `wrapped try/catch — most often page CSP blocking Function()). Tab ${tabId}.`,
-      );
-    }
-    if (result && typeof result === 'object' && result.__hanzo_error) {
-      throw new Error(result.__hanzo_error);
-    }
-    return result;
-  }
-
-  /**
-   * CSP-safe alternative to runInPage. Passes a real function reference
-   * (and serializable args) to scripting.executeScript. Because no
-   * Function() or eval() is constructed at runtime, page CSP that
-   * blocks 'unsafe-eval' does NOT block this path. Works on .gov, on
-   * sites that ship strict default-src 'self', and on github.com.
-   *
-   * Use this for any DOM read/write the bridge needs to do. The
-   * `fn` argument is a normal JS function — it is serialized by
-   * Firefox/Chrome's scripting API and executed in the MAIN world.
-   *
-   * Added in 1.9.16 alongside the CDP-shaped decomplected surface.
-   */
-  private async runFunc<R = any>(
-    tabId: number,
-    fn: (...args: any[]) => R,
-    args: any[] = [],
-    timeoutMs: number = 10000,
-  ): Promise<R> {
-    let tab: chrome.tabs.Tab | undefined;
-    try { tab = await browser.tabs.get(tabId); } catch { /* best-effort */ }
-    if (tab && isPrivilegedTab(tab)) {
-      throw new Error(
-        `Cannot run JS in privileged tab ${tabId} (${tab.url}).`,
-      );
-    }
-    const scripting = (browser as any).scripting;
-    if (!scripting?.executeScript) {
-      throw new Error('scripting.executeScript not available (need MV3 scripting permission)');
-    }
-    const exec = (async () => {
-      const runIn = async (world: 'MAIN' | 'ISOLATED'): Promise<any[]> => {
-        const results = await scripting.executeScript({
-          target: { tabId },
-          world,
-          args,
-          func: fn,
-        });
-        // Keep the full InjectionResult shape ({result, error, frameId}) so
-        // we can propagate page-side throws (1.9.18). Previously we mapped
-        // to r?.result which silently dropped errors → callers saw null.
-        return Array.isArray(results) ? results : [results];
-      };
-      let out: any[];
-      try {
-        out = await runIn('MAIN');
-      } catch (e) {
-        out = await runIn('ISOLATED');
-      }
-      if (!Array.isArray(out) || out.length === 0) {
-        throw new Error(
-          `runFunc returned no frames for tab ${tabId} — page may be privileged or unloaded.`,
-        );
-      }
-      const first = out[0] || {};
-      if (first.error) {
-        throw new Error(`runFunc page-side error: ${first.error}`);
-      }
-      const result = first.result;
-      if (result && typeof result === 'object' && (result as any).__hanzo_error) {
-        throw new Error((result as any).__hanzo_error);
-      }
-      return result === undefined ? (null as any) : result;
-    })();
-    return Promise.race([
-      exec,
-      new Promise<R>((_, reject) => setTimeout(() => reject(new Error('runFunc timeout')), timeoutMs)),
-    ]);
   }
 
   /**
@@ -497,62 +281,7 @@ class HanzoFirefoxExtension {
       case 'Runtime.evaluate':
       case 'evaluate': {
         if (!tabId) throw new Error('No active tab');
-        // Default 30s — Porkbun-class pages with 1500+ DOM nodes routinely
-        // need more than 10s for first-paint queries. Caller can override.
-        const timeout = (params.timeout as number) || 30000;
-
-        // pickEvaluable accepts every code-param alias (expression / code /
-        // script / function / js); wrapEvaluable is the ONE cross-browser
-        // rule that turns statement bodies (`const b=…; b.click()`) into an
-        // async IIFE with the trailing value auto-returned — the previous
-        // `return (${code})` wrap was a SyntaxError on any multi-statement
-        // body. Always resolve in-page so executeScript's structured-clone
-        // serialization sees the settled value, never a Promise; rejections
-        // ride the __hanzo_error channel runInPage already throws on.
-        const evalCode = `
-          return Promise.resolve(${wrapEvaluable(pickEvaluable(params))}).then(function(__v){
-            if (__v === undefined || __v === null) return null;
-            try { return JSON.parse(JSON.stringify(__v)); } catch(e) { return String(__v); }
-          }, function(__e){
-            return { __hanzo_error: (__e && __e.message) || String(__e) };
-          });
-        `;
-
-        let value: unknown;
-        let evalError: string | null = null;
-        try {
-          value = await this.runInPage(tabId, evalCode, timeout);
-        } catch (e: any) {
-          evalError = e?.message || String(e);
-          value = null;
-        }
-
-        // CDP-shape: { result: { type, value } } plus a top-level `value`
-        // alias for ergonomic callers. Coerce `undefined` → `null` so the
-        // JSON-encoded ZAP frame keeps the keys. If evaluation errored,
-        // surface CDP-style `exceptionDetails` AND a top-level `error` so
-        // both flavors of caller can see what happened.
-        const safeValue = value === undefined ? null : value;
-        const cdpType = safeValue === null
-          ? 'object'
-          : Array.isArray(safeValue)
-            ? 'object'
-            : typeof safeValue;
-        const out: Record<string, unknown> = {
-          result: { type: cdpType, value: safeValue },
-          value: safeValue,
-        };
-        if (evalError !== null) {
-          out.error = evalError;
-          out.result = {
-            type: 'object',
-            value: null,
-            subtype: 'error',
-            description: evalError,
-          };
-          out.exceptionDetails = { text: evalError };
-        }
-        return out;
+        return script.evaluate(browser, tabId, params);
       }
 
       // =====================================================================
@@ -603,7 +332,7 @@ class HanzoFirefoxExtension {
       // =====================================================================
       case 'Accessibility.getFullAXTree': {
         if (!tabId) throw new Error('No active tab');
-        const tree = await this.runInPage(tabId, `
+        const tree = await script.execute(browser, tabId, `
           function buildTree(el, depth) {
             if (depth > 5 || !el) return null;
             var role = el.getAttribute && el.getAttribute('role') || el.tagName?.toLowerCase() || '';
@@ -630,7 +359,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         this.notifyOverlay(tabId, 'ai.control.highlight', { selector: params.selector as string });
         this.notifyOverlay(tabId, 'ai.control.status', { text: `Clicking ${params.selector}` });
-        const result = await this.runFunc<any>(tabId, (selector: string) => {
+        const result = await script.call<any>(browser, tabId, (selector: string) => {
           const el = document.querySelector(selector) as HTMLElement | null;
           if (!el) return { clicked: false, reason: 'not-found' };
           try { el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
@@ -662,7 +391,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const sel = this.escapeSelector(params.selector as string);
         this.notifyOverlay(tabId, 'ai.control.highlight', { selector: params.selector as string });
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) {
             el.dispatchEvent(new MouseEvent('dblclick', {bubbles: true, cancelable: true}));
@@ -675,7 +404,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const sel = this.escapeSelector(params.selector as string);
         this.notifyOverlay(tabId, 'ai.control.highlight', { selector: params.selector as string });
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) {
             el.dispatchEvent(new MouseEvent('mouseenter', {bubbles: true}));
@@ -693,7 +422,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         this.notifyOverlay(tabId, 'ai.control.highlight', { selector: params.selector as string });
         this.notifyOverlay(tabId, 'ai.control.status', { text: `Filling ${params.selector}` });
-        const ok = await this.runFunc<boolean>(tabId, (selector: string, value: string) => {
+        const ok = await script.call<boolean>(browser, tabId, (selector: string, value: string) => {
           const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | HTMLElement | null;
           if (!el) return false;
           try { (el as HTMLElement).scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
@@ -735,7 +464,7 @@ class HanzoFirefoxExtension {
         if (!tabId) throw new Error('No active tab');
         const text = this.escapeValue(params.text as string || '');
         const typeSel = params.selector ? this.escapeSelector(params.selector as string) : null;
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = ${typeSel ? `document.querySelector('${typeSel}')` : 'document.activeElement'};
           if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) {
             el.focus();
@@ -752,7 +481,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.clear': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+        const ok = await script.call<boolean>(browser, tabId, (selector: string) => {
           const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | null;
           if (!el) return false;
           const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
@@ -769,7 +498,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const sel = this.escapeSelector(params.selector as string);
         const optVal = this.escapeValue((params.value as string) || '');
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el && el.tagName === 'SELECT') {
             el.value = '${optVal}';
@@ -781,7 +510,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.check': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+        const ok = await script.call<boolean>(browser, tabId, (selector: string) => {
           const el = document.querySelector(selector) as HTMLInputElement | null;
           if (!el) return false;
           try { el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
@@ -793,7 +522,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.uncheck': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+        const ok = await script.call<boolean>(browser, tabId, (selector: string) => {
           const el = document.querySelector(selector) as HTMLInputElement | null;
           if (!el) return false;
           try { el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch (e) {}
@@ -803,19 +532,12 @@ class HanzoFirefoxExtension {
         return { success: !!ok };
       }
 
+      // A keyDown (or no type) is the whole press; the keyUp a CDP caller
+      // sends after it was already delivered with it.
       case 'Input.dispatchKeyEvent': {
         if (!tabId) throw new Error('No active tab');
-        const key = (params.key as string) || '';
-        const keyType = (params.type as string) || 'keyDown';
-        await this.runInPage(tabId, `
-          var el = document.activeElement || document.body;
-          el.dispatchEvent(new KeyboardEvent('${keyType}', {key: '${this.escapeValue(key)}', bubbles: true}));
-          if ('${keyType}' === 'keyDown') {
-            el.dispatchEvent(new KeyboardEvent('keypress', {key: '${this.escapeValue(key)}', bubbles: true}));
-            el.dispatchEvent(new KeyboardEvent('keyup', {key: '${this.escapeValue(key)}', bubbles: true}));
-          }
-        `);
-        return { success: true };
+        if (params.type === 'keyUp') return {};
+        return script.press(browser, tabId, { ...params, key: params.key ?? params.text });
       }
 
       // =====================================================================
@@ -823,7 +545,7 @@ class HanzoFirefoxExtension {
       // =====================================================================
       case 'hanzo.getText': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const text = await this.runFunc<string | null>(tabId, (selector: string) => {
+        const text = await script.call<string | null>(browser, tabId, (selector: string) => {
           const el = document.querySelector(selector);
           return el ? (el.textContent || '') : null;
         }, [params.selector as string]);
@@ -833,7 +555,7 @@ class HanzoFirefoxExtension {
       case 'hanzo.getHTML': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const outer = params.outer !== false;
-        const html = await this.runFunc<string | null>(tabId, (selector: string, useOuter: boolean) => {
+        const html = await script.call<string | null>(browser, tabId, (selector: string, useOuter: boolean) => {
           const el = document.querySelector(selector);
           if (!el) return null;
           return useOuter ? el.outerHTML : el.innerHTML;
@@ -845,7 +567,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector || !params.attr) throw new Error('Missing params');
         const sel = this.escapeSelector(params.selector as string);
         const attr = this.escapeValue(params.attr as string);
-        const val = await this.runInPage(tabId, `
+        const val = await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           return el ? el.getAttribute('${attr}') : null;
         `);
@@ -855,7 +577,7 @@ class HanzoFirefoxExtension {
       case 'hanzo.getElementInfo': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const sel = this.escapeSelector(params.selector as string);
-        const info = await this.runInPage(tabId, `
+        const info = await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (!el) return null;
           var rect = el.getBoundingClientRect();
@@ -873,7 +595,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.getPageInfo': {
         if (!tabId) throw new Error('No active tab');
-        const pageInfo = await this.runInPage(tabId, `
+        const pageInfo = await script.execute(browser, tabId, `
           return {
             title: document.title,
             url: location.href,
@@ -890,7 +612,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.querySelectorAll': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const elements = await this.runFunc<any[]>(tabId, (selector: string, limit: number) => {
+        const elements = await script.call<any[]>(browser, tabId, (selector: string, limit: number) => {
           const els = document.querySelectorAll(selector);
           const out: any[] = [];
           const n = Math.min(els.length, limit);
@@ -923,14 +645,14 @@ class HanzoFirefoxExtension {
       //   1) Wire transport (JSON over WS/HTTP)
       //   2) CDP-shaped canonical primitives (Page.* DOM.* Input.* ...)
       //   3) hanzo.* ergonomic aliases that compose canonical primitives
-      // Every DOM-touching method goes through runFunc → executeScript with
+      // Every DOM-touching method goes through script.call → executeScript with
       // a direct function reference. NEVER Function() / eval(). That is what
       // makes them CSP-safe on .gov, github.com, and any strict-CSP SPA.
       // ─────────────────────────────────────────────────────────────────
 
       case 'Input.dispatchMouseEvent': {
         if (!tabId) throw new Error('No active tab');
-        const result = await this.runFunc<any>(tabId, (p: any) => {
+        const result = await script.call<any>(browser, tabId, (p: any) => {
           const { type, x, y, button = 0, clickCount = 1, modifiers = 0 } = p;
           const target = document.elementFromPoint(x, y) as HTMLElement | null;
           if (!target) return { delivered: false, reason: 'no element at point' };
@@ -956,7 +678,7 @@ class HanzoFirefoxExtension {
 
       case 'Input.scrollWheel': {
         if (!tabId) throw new Error('No active tab');
-        const result = await this.runFunc<any>(tabId, (p: any) => {
+        const result = await script.call<any>(browser, tabId, (p: any) => {
           const { x = 0, y = 0, deltaX = 0, deltaY = 0 } = p;
           const target = (x || y)
             ? (document.elementFromPoint(x, y) as HTMLElement | null)
@@ -975,7 +697,7 @@ class HanzoFirefoxExtension {
 
       case 'Page.printToPDF': {
         if (!tabId) throw new Error('No active tab');
-        await this.runFunc<boolean>(tabId, () => { window.print(); return true; }, []);
+        await script.call<boolean>(browser, tabId, () => { window.print(); return true; }, []);
         return {
           opened: true,
           note: 'Firefox extension cannot programmatically save PDF. ' +
@@ -986,7 +708,7 @@ class HanzoFirefoxExtension {
 
       case 'DOM.querySelector': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const element = await this.runFunc<any>(tabId, (selector: string) => {
+        const element = await script.call<any>(browser, tabId, (selector: string) => {
           const el = document.querySelector(selector) as HTMLElement | null;
           if (!el) return null;
           const rect = el.getBoundingClientRect();
@@ -1004,7 +726,7 @@ class HanzoFirefoxExtension {
 
       case 'DOM.scrollIntoView': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+        const ok = await script.call<boolean>(browser, tabId, (selector: string) => {
           const el = document.querySelector(selector) as HTMLElement | null;
           if (!el) return false;
           el.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -1015,7 +737,7 @@ class HanzoFirefoxExtension {
 
       case 'DOM.focus': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
-        const ok = await this.runFunc<boolean>(tabId, (selector: string) => {
+        const ok = await script.call<boolean>(browser, tabId, (selector: string) => {
           const el = document.querySelector(selector) as HTMLElement | null;
           if (!el) return false;
           el.focus();
@@ -1026,7 +748,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.clickByText': {
         if (!tabId || !params.text) throw new Error('No active tab or text');
-        const result = await this.runFunc<any>(tabId, (text: string, scope: string) => {
+        const result = await script.call<any>(browser, tabId, (text: string, scope: string) => {
           const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
           const want = norm(text);
           const tags = scope === 'all'
@@ -1048,7 +770,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.fillByLabel': {
         if (!tabId || !params.label) throw new Error('No active tab or label');
-        const result = await this.runFunc<any>(tabId, (labelText: string, value: string) => {
+        const result = await script.call<any>(browser, tabId, (labelText: string, value: string) => {
           const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
           const want = norm(labelText);
           const labels = Array.from(document.querySelectorAll('label')) as HTMLLabelElement[];
@@ -1092,7 +814,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.findByText': {
         if (!tabId || !params.text) throw new Error('Missing text');
-        const result = await this.runFunc<any[]>(tabId, (text: string, scope: string, limit: number) => {
+        const result = await script.call<any[]>(browser, tabId, (text: string, scope: string, limit: number) => {
           const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
           const want = norm(text);
           const tagSel = scope === 'all' ? '*' : 'button, a, label, input, select, textarea, [role=button], [role=radio], [role=checkbox], [role=tab], [role=menuitem], h1, h2, h3, h4, h5, h6, p, span, li, td';
@@ -1122,7 +844,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.listForm': {
         if (!tabId) throw new Error('No active tab');
-        const inputs = await this.runFunc<any[]>(tabId, () => {
+        const inputs = await script.call<any[]>(browser, tabId, () => {
           const all = Array.from(document.querySelectorAll('input, textarea, select, button, label, [role=radio], [role=checkbox], [role=button]')) as HTMLElement[];
           return all.slice(0, 200).map((el, i) => {
             const rect = el.getBoundingClientRect();
@@ -1148,35 +870,13 @@ class HanzoFirefoxExtension {
       }
 
       case 'hanzo.press': {
-        if (!tabId || !params.key) throw new Error('Missing key');
-        const result = await this.runFunc<any>(tabId, (key: string, modifiers: any) => {
-          const el = (document.activeElement || document.body) as HTMLElement;
-          const mods = {
-            altKey: !!modifiers?.alt, ctrlKey: !!modifiers?.ctrl,
-            metaKey: !!modifiers?.meta, shiftKey: !!modifiers?.shift,
-          };
-          const keyCodeMap: Record<string, number> = {
-            Enter: 13, Tab: 9, Escape: 27, Backspace: 8, Delete: 46,
-            ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39,
-            Home: 36, End: 35, PageUp: 33, PageDown: 34, ' ': 32,
-          };
-          const keyCode = keyCodeMap[key] ?? (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
-          const init: any = { key, code: key, keyCode, which: keyCode, bubbles: true, cancelable: true, ...mods };
-          el.dispatchEvent(new KeyboardEvent('keydown', init));
-          if (key.length === 1) el.dispatchEvent(new KeyboardEvent('keypress', init));
-          el.dispatchEvent(new KeyboardEvent('keyup', init));
-          if (key === 'Enter' && el.tagName === 'INPUT') {
-            const form = (el as HTMLInputElement).form;
-            if (form) { try { (form as any).requestSubmit?.() || form.submit?.(); } catch (e) {} }
-          }
-          return { delivered: true, target: el.tagName, keyCode };
-        }, [params.key as string, params.modifiers || {}]);
-        return result;
+        if (!tabId) throw new Error('No active tab');
+        return script.press(browser, tabId, params);
       }
 
       case 'hanzo.scroll': {
         if (!tabId) throw new Error('No active tab');
-        const result = await this.runFunc<any>(tabId, (target: any, amount: any) => {
+        const result = await script.call<any>(browser, tabId, (target: any, amount: any) => {
           if (target === 'top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return { scrolled: 'top' }; }
           if (target === 'bottom') { window.scrollTo({ top: document.body?.scrollHeight || 0, behavior: 'smooth' }); return { scrolled: 'bottom' }; }
           if (typeof target === 'string' && target) {
@@ -1199,7 +899,7 @@ class HanzoFirefoxExtension {
         const interval = (params.interval as number) || 250;
         const start = Date.now();
         while (Date.now() - start < timeoutMs) {
-          const found = await this.runFunc<boolean>(tabId, (text: string) => {
+          const found = await script.call<boolean>(browser, tabId, (text: string) => {
             const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
             return norm(document.body?.innerText || '').includes(norm(text));
           }, [params.text as string]);
@@ -1212,7 +912,7 @@ class HanzoFirefoxExtension {
       case 'hanzo.waitForMutation': {
         if (!tabId || !params.selector) throw new Error('Missing selector');
         const timeoutMs = (params.timeout as number) || 15000;
-        const result = await this.runFunc<any>(tabId, (selector: string, timeout: number) => {
+        const result = await script.call<any>(browser, tabId, (selector: string, timeout: number) => {
           return new Promise((resolve) => {
             const existing = document.querySelector(selector);
             if (existing) { resolve({ found: true, immediate: true }); return; }
@@ -1229,7 +929,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.submitForm': {
         if (!tabId) throw new Error('No active tab');
-        const result = await this.runFunc<any>(tabId, (hint: string | null) => {
+        const result = await script.call<any>(browser, tabId, (hint: string | null) => {
           const norm = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
           const intents = hint ? [hint] : ['submit', 'continue', 'next', 'save', 'send', 'agree', 'accept', 'ok'];
           const wantList = intents.map(norm);
@@ -1263,7 +963,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector || !params.content || !params.name) {
           throw new Error('Need selector, name, content (base64)');
         }
-        const result = await this.runFunc<any>(tabId, (selector: string, name: string, mimeType: string, contentB64: string) => {
+        const result = await script.call<any>(browser, tabId, (selector: string, name: string, mimeType: string, contentB64: string) => {
           const el = document.querySelector(selector) as HTMLInputElement | null;
           if (!el) return { uploaded: false, error: 'selector not found' };
           if (el.tagName !== 'INPUT' || el.type !== 'file') return { uploaded: false, error: 'not a file input' };
@@ -1283,7 +983,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.dialogAccept': {
         if (!tabId) throw new Error('No active tab');
-        await this.runFunc<boolean>(tabId, (acceptText: string) => {
+        await script.call<boolean>(browser, tabId, (acceptText: string) => {
           const W = window as any;
           W.__hanzo_dialogText = acceptText || '';
           W.alert = () => true;
@@ -1296,7 +996,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.observe': {
         if (!tabId || !params.name) throw new Error('Missing name');
-        await this.runFunc<boolean>(tabId, (name: string, selector: string | null, opts: any) => {
+        await script.call<boolean>(browser, tabId, (name: string, selector: string | null, opts: any) => {
           const W = window as any;
           W.__hanzo_obs = W.__hanzo_obs || {};
           if (W.__hanzo_obs[name]?.observer) W.__hanzo_obs[name].observer.disconnect();
@@ -1325,7 +1025,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.observeRead': {
         if (!tabId || !params.name) throw new Error('Missing name');
-        const events = await this.runFunc<any[]>(tabId, (name: string, clear: boolean) => {
+        const events = await script.call<any[]>(browser, tabId, (name: string, clear: boolean) => {
           const W = window as any;
           const entry = W.__hanzo_obs?.[name];
           if (!entry) return [];
@@ -1338,7 +1038,7 @@ class HanzoFirefoxExtension {
 
       case 'hanzo.observeStop': {
         if (!tabId || !params.name) throw new Error('Missing name');
-        await this.runFunc<boolean>(tabId, (name: string) => {
+        await script.call<boolean>(browser, tabId, (name: string) => {
           const W = window as any;
           const entry = W.__hanzo_obs?.[name];
           if (entry?.observer) entry.observer.disconnect();
@@ -1353,7 +1053,7 @@ class HanzoFirefoxExtension {
         const sel = this.escapeSelector(params.selector as string);
         const props = (params.properties as string[]) || ['display', 'visibility', 'opacity', 'position', 'color', 'backgroundColor', 'fontSize'];
         const propsStr = JSON.stringify(props);
-        const styles = await this.runInPage(tabId, `
+        const styles = await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (!el) return null;
           var cs = window.getComputedStyle(el);
@@ -1368,7 +1068,7 @@ class HanzoFirefoxExtension {
       case 'hanzo.getBoundingRects': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const sel = this.escapeSelector(params.selector as string);
-        const rects = await this.runInPage(tabId, `
+        const rects = await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (!el) return null;
           var r = el.getBoundingClientRect();
@@ -1384,7 +1084,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const sel = this.escapeSelector(params.selector as string);
         const txt = this.escapeValue((params.text as string) || '');
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) el.textContent = '${txt}';
         `);
@@ -1396,7 +1096,7 @@ class HanzoFirefoxExtension {
         const sel = this.escapeSelector(params.selector as string);
         const html = this.escapeValue((params.html as string) || '');
         const outer = params.outer === true;
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) ${outer ? `el.outerHTML = '${html}'` : `el.innerHTML = '${html}'`};
         `);
@@ -1408,7 +1108,7 @@ class HanzoFirefoxExtension {
         const sel = this.escapeSelector(params.selector as string);
         const attr = this.escapeValue(params.attr as string);
         const val = this.escapeValue((params.value as string) || '');
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) el.setAttribute('${attr}', '${val}');
         `);
@@ -1419,7 +1119,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector || !params.attr) throw new Error('Missing params');
         const sel = this.escapeSelector(params.selector as string);
         const attr = this.escapeValue(params.attr as string);
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) el.removeAttribute('${attr}');
         `);
@@ -1430,7 +1130,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector || !params.styles) throw new Error('Missing params');
         const sel = this.escapeSelector(params.selector as string);
         const stylesJson = JSON.stringify(params.styles);
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) {
             var styles = ${stylesJson};
@@ -1445,7 +1145,7 @@ class HanzoFirefoxExtension {
         const sel = this.escapeSelector(params.selector as string);
         const classes = Array.isArray(params.classNames) ? params.classNames : [(params.classNames as string)];
         const classesJson = JSON.stringify(classes);
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) el.classList.add.apply(el.classList, ${classesJson});
         `);
@@ -1457,7 +1157,7 @@ class HanzoFirefoxExtension {
         const sel = this.escapeSelector(params.selector as string);
         const classes = Array.isArray(params.classNames) ? params.classNames : [(params.classNames as string)];
         const classesJson = JSON.stringify(classes);
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) el.classList.remove.apply(el.classList, ${classesJson});
         `);
@@ -1469,7 +1169,7 @@ class HanzoFirefoxExtension {
         const sel = this.escapeSelector(params.selector as string);
         const html = this.escapeValue(params.html as string);
         const position = (params.position as string) || 'beforeend';
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) el.insertAdjacentHTML('${position}', '${html}');
         `);
@@ -1479,7 +1179,7 @@ class HanzoFirefoxExtension {
       case 'hanzo.removeElement': {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const sel = this.escapeSelector(params.selector as string);
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var el = document.querySelector('${sel}');
           if (el) el.remove();
         `);
@@ -1493,7 +1193,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const sel = this.escapeSelector(params.selector as string);
         const duration = (params.duration as number) || 3000;
-        const mutations = await this.runInPage(tabId, `
+        const mutations = await script.execute(browser, tabId, `
           return new Promise(function(resolve) {
             var el = document.querySelector('${sel}') || document.body;
             var records = [];
@@ -1522,7 +1222,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.selector) throw new Error('No active tab or selector');
         const sel = this.escapeSelector(params.selector as string);
         const waitTimeout = (params.timeout as number) || 10000;
-        const found = await this.runInPage(tabId, `
+        const found = await script.execute(browser, tabId, `
           return new Promise(function(resolve) {
             var el = document.querySelector('${sel}');
             if (el) { resolve(true); return; }
@@ -1543,7 +1243,7 @@ class HanzoFirefoxExtension {
       case 'hanzo.injectScript': {
         if (!tabId || !params.url) throw new Error('No active tab or url');
         const scriptUrl = this.escapeValue(params.url as string);
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           return new Promise(function(resolve) {
             var s = document.createElement('script');
             s.src = '${scriptUrl}';
@@ -1558,7 +1258,7 @@ class HanzoFirefoxExtension {
       case 'hanzo.injectCSS': {
         if (!tabId || !params.css) throw new Error('No active tab or css');
         const css = this.escapeValue(params.css as string);
-        await this.runInPage(tabId, `
+        await script.execute(browser, tabId, `
           var style = document.createElement('style');
           style.textContent = '${css}';
           document.head.appendChild(style);
@@ -1572,7 +1272,7 @@ class HanzoFirefoxExtension {
       case 'hanzo.getLocalStorage': {
         if (!tabId) throw new Error('No active tab');
         const key = params.key ? this.escapeValue(params.key as string) : null;
-        const storageVal = await this.runInPage(tabId, key
+        const storageVal = await script.execute(browser, tabId, key
           ? `return localStorage.getItem('${key}');`
           : `
             var result = {};
@@ -1590,7 +1290,7 @@ class HanzoFirefoxExtension {
         if (!tabId || !params.key) throw new Error('No active tab or key');
         const key = this.escapeValue(params.key as string);
         const val = this.escapeValue((params.value as string) || '');
-        await this.runInPage(tabId, `localStorage.setItem('${key}', '${val}');`);
+        await script.execute(browser, tabId, `localStorage.setItem('${key}', '${val}');`);
         return { success: true };
       }
 
@@ -1612,7 +1312,7 @@ class HanzoFirefoxExtension {
         const fetchUrl = this.escapeValue(params.url as string);
         const fetchOpts = params.options || {};
         const optsJson = JSON.stringify(fetchOpts);
-        const fetchResult = await this.runInPage(tabId, `
+        const fetchResult = await script.execute(browser, tabId, `
           return fetch('${fetchUrl}', ${optsJson}).then(function(r) {
             return r.text().then(function(body) {
               return { status: r.status, statusText: r.statusText, ok: r.ok, body: body.slice(0, 50000) };
@@ -1668,12 +1368,12 @@ class HanzoFirefoxExtension {
       if (!tabId) return { error: 'No active tab for monitoring' };
       switch (action) {
         case 'monitor.consoleLogs':
-          return this.runInPage(tabId, `
+          return script.execute(browser, tabId, `
             return (window.__hanzo_console_logs || []).slice(-50);
           `).then(logs => ({ logs: logs || [] })).catch(() => ({ logs: [] }));
 
         case 'monitor.consoleErrors':
-          return this.runInPage(tabId, `
+          return script.execute(browser, tabId, `
             return (window.__hanzo_console_errors || []).slice(-50);
           `).then(errors => ({ errors: errors || [] })).catch(() => ({ errors: [] }));
 
@@ -1683,13 +1383,13 @@ class HanzoFirefoxExtension {
           return { logs: [], note: 'Network monitoring requires devtools API (not available in MV3 extensions)' };
 
         case 'monitor.wipeLogs':
-          return this.runInPage(tabId, `
+          return script.execute(browser, tabId, `
             window.__hanzo_console_logs = [];
             window.__hanzo_console_errors = [];
           `).then(() => ({ success: true })).catch(() => ({ success: false }));
 
         case 'monitor.start':
-          return this.runInPage(tabId, `
+          return script.execute(browser, tabId, `
             if (!window.__hanzo_monitor_active) {
               window.__hanzo_console_logs = [];
               window.__hanzo_console_errors = [];
@@ -1717,7 +1417,7 @@ class HanzoFirefoxExtension {
       if (!tabId) return { error: 'No active tab for audit' };
       switch (action) {
         case 'audit.accessibility':
-          return this.runInPage(tabId, `
+          return script.execute(browser, tabId, `
             var issues = [];
             document.querySelectorAll('img').forEach(function(img) { if (!img.alt) issues.push({type:'missing-alt', el:img.tagName, src:img.src?.slice(0,80)}); });
             document.querySelectorAll('a').forEach(function(a) { if (!a.textContent?.trim() && !a.getAttribute('aria-label')) issues.push({type:'empty-link', href:a.href?.slice(0,80)}); });
@@ -1728,7 +1428,7 @@ class HanzoFirefoxExtension {
           `).then(r => ({ audit: r })).catch(e => ({ error: e.message }));
 
         case 'audit.performance':
-          return this.runInPage(tabId, `
+          return script.execute(browser, tabId, `
             var p = performance;
             var nav = p.getEntriesByType('navigation')[0] || {};
             return {
@@ -1740,7 +1440,7 @@ class HanzoFirefoxExtension {
           `).then(r => ({ audit: r })).catch(e => ({ error: e.message }));
 
         case 'audit.seo':
-          return this.runInPage(tabId, `
+          return script.execute(browser, tabId, `
             return {
               title: document.title,
               metaDescription: document.querySelector('meta[name="description"]')?.content || null,

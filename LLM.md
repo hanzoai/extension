@@ -167,7 +167,19 @@ that process exits another takes over and the extension reconnects.
 - `background.ts` (Chrome) — dispatch via `chrome.debugger` (CDP→tab; shows the
   "debugging this browser" banner; WebKit-incompatible). **To be removed** — see WXT plan.
 - `background-firefox.ts` — native `browser.*` dispatch (no banner). The correct model.
-- `browser-dispatch.ts` — `chrome.debugger` actuation (Chrome-only).
+- `browser-dispatch.ts` — `chrome.debugger` actuation (Chrome-only). Chromium
+  refuses the attach on a page holding another extension's `chrome-extension://`
+  frame (a password manager's field icon); the error carries that reason,
+  evaluate and key presses fall back to `shared/script.ts`, and tab listing
+  never attaches.
+- `shared/script.ts` — `scripting.executeScript`, both browsers: `execute`
+  (code string; MAIN, then ISOLATED when CSP refuses `Function`), `call`
+  (function ref, CSP-proof), `evaluate`, `press`. Firefox's only path.
+- `shared/keys.ts` — the one key table: chords, `code`, legacy
+  `keyCode`/`which`/`charCode` (Material chips commit on keyCode 13/188). They
+  go in the KeyboardEvent init dict: Chromium honours it natively, so the page's
+  main-world listeners see them; a `defineProperty` from the isolated world
+  is invisible there.
 - `shared/evaluable.ts` — the ONE evaluate rule: `pickEvaluable` (code-param
   aliases) + `wrapEvaluable` (bare expression passes through; statement bodies
   → async IIFE with the trailing value auto-returned). Both dispatch paths
