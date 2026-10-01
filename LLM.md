@@ -104,6 +104,11 @@ the id the caller names. No surface calls a provider's own API: VS Code goes
 through `packages/vscode/src/api/chat.ts` (bearer: the IAM session, else
 `HANZO_API_KEY` or `hanzo.llm.hanzo.apiKey`), hanzo-mcp through
 `API_URL` with `HANZO_API_KEY`. Ollama and LM Studio stay: they are local.
+In the browser extension Auto, the seed of the sidebar and the page assistant,
+resolves in `runtime-guard.ts` `pickModelForTokenBudget`: `zen5-flash` for a
+prompt under 900 tokens when listed, else `zen5`. The page assistant lists the
+`owned_by: zenlm` chat rows of `chat.listModels` (`zenModels`); a content
+script cannot bundle `@hanzo/ui/models`, which reaches react-native.
 
 ## Office, Outlook and Workspace add-ins
 

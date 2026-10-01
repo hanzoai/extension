@@ -14,6 +14,7 @@ import {
   STORAGE_KEY_INSPECT,
   type Shortcut,
 } from './shared/shortcut.js';
+import { estimateMessageTokens, pickModelForTokenBudget, zenModels } from './runtime-guard';
 
 interface SourceLocation {
   file: string;
@@ -1289,11 +1290,7 @@ class HanzoPageOverlay {
         </div>
         <div class="hanzo-model-row">
           <select data-role="model">
-            <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-            <option value="claude-opus-4-20250514">Claude Opus 4</option>
-            <option value="gpt-4o">GPT-4o</option>
-            <option value="zen-coder-flash">Zen Coder Flash</option>
-            <option value="zen-max">Zen Max</option>
+            <option value="auto">Auto</option>
           </select>
         </div>
         <div class="hanzo-page-messages" data-role="messages">
@@ -1566,26 +1563,19 @@ class HanzoPageOverlay {
     if (this.modelsLoaded || !this.modelEl) return;
 
     try {
+      // The sidebar's list, cut to Zen. Auto stays first and selected, as in
+      // the sidebar.
       const response = await chrome.runtime.sendMessage({ action: 'chat.listModels' });
-      if (!response?.success || !Array.isArray(response.models) || !response.models.length) {
-        return;
-      }
-
-      const previous = this.modelEl.value;
-      this.modelEl.innerHTML = '';
-      for (const model of response.models) {
-        if (!model?.id) continue;
+      if (!response?.success || !Array.isArray(response.models)) return;
+      for (const model of zenModels(response.models)) {
         const option = document.createElement('option');
         option.value = model.id;
         option.textContent = model.name || model.id;
         this.modelEl.appendChild(option);
       }
-      if (previous && Array.from(this.modelEl.options).some((opt) => opt.value === previous)) {
-        this.modelEl.value = previous;
-      }
       this.modelsLoaded = true;
     } catch {
-      // Keep local defaults if model fetch fails.
+      // Auto stands alone: always valid, never fabricated.
     }
   }
 
@@ -1650,7 +1640,6 @@ class HanzoPageOverlay {
     this.appendMessage('user', prompt);
 
     const systemContext = this.buildPageContext();
-    const model = this.modelEl?.value || 'gpt-4o';
     const requestMessages: OverlayChatMessage[] = [
       {
         role: 'system',
@@ -1665,6 +1654,8 @@ class HanzoPageOverlay {
       ...this.messages.slice(-8),
       { role: 'user', content: prompt },
     ];
+    const listed = Array.from(this.modelEl?.options || [], (option) => option.value);
+    const model = pickModelForTokenBudget(this.modelEl?.value || 'auto', listed, estimateMessageTokens(requestMessages));
 
     try {
       const response = await chrome.runtime.sendMessage({

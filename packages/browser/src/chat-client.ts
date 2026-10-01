@@ -22,6 +22,7 @@ export interface ChatModel {
   id: string;
   name?: string;
   description?: string;
+  owned_by?: string;
   context_length?: number;
   pricing?: { prompt: string; completion: string };
 }

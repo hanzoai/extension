@@ -260,6 +260,10 @@ export async function recordUsageDelta(
   }, 1000) as unknown as number;
 }
 
+/**
+ * What Auto sends: zen5, the default on every Hanzo surface, or zen5-flash for
+ * a short prompt when the account lists it. Both are rows of GET /v1/models.
+ */
 export function pickModelForTokenBudget(
   requestedModel: string,
   availableModels: string[],
@@ -268,26 +272,15 @@ export function pickModelForTokenBudget(
   if (requestedModel && requestedModel !== 'auto') {
     return requestedModel;
   }
+  return inputTokens <= 900 && availableModels.includes('zen5-flash') ? 'zen5-flash' : 'zen5';
+}
 
-  const smallModelOrder = [
-    'zen-coder-flash',
-    'gpt-4o-mini',
-    'claude-3-5-haiku-latest',
-    'claude-3-5-haiku',
-    'gemini-2.0-flash',
-  ];
-  const largeModelOrder = [
-    'gpt-4o',
-    'claude-sonnet-4-20250514',
-    'claude-opus-4-20250514',
-    'zen-max',
-  ];
-
-  const pickFirstExisting = (names: string[]) => names.find((name) => availableModels.includes(name));
-
-  if (inputTokens <= 900) {
-    return pickFirstExisting(smallModelOrder) || availableModels[0] || 'gpt-4o-mini';
-  }
-
-  return pickFirstExisting(largeModelOrder) || availableModels[0] || 'gpt-4o';
+/**
+ * The Zen chat models among the rows of GET /v1/models, in the order given. The
+ * gateway reports Zen as `owned_by: zenlm`; the id test is @hanzo/ui
+ * isChatModel's, which a content script cannot bundle (it reaches react-native).
+ */
+const NOT_CHAT = /embed|image|video|music|voice|tts|rerank|guard|foley|moderation|router/;
+export function zenModels<T extends { id: string; owned_by?: string }>(rows: T[]): T[] {
+  return rows.filter((m) => m?.owned_by === 'zenlm' && !NOT_CHAT.test(m.id));
 }

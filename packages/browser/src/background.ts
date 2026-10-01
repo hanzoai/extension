@@ -122,7 +122,7 @@ const DEFAULT_CDP_PORT = CFG_CDP_PORT;
 const DEFAULT_RAG_TOP_K = CFG_RAG_TOP_K;
 const MODEL_CACHE_TTL_MS = CFG_MODEL_CACHE_TTL;
 
-let cachedModels: { at: number; models: Array<{ id: string; name?: string; description?: string }> } = {
+let cachedModels: { at: number; models: Array<{ id: string; name?: string; description?: string; owned_by?: string }> } = {
   at: 0,
   models: [],
 };
@@ -164,7 +164,7 @@ function isSenderGenerationCurrent(key: string, generation: number): boolean {
   return senderRequestGeneration.get(key) === generation;
 }
 
-async function listModelsCached(token?: string): Promise<Array<{ id: string; name?: string; description?: string }>> {
+async function listModelsCached(token?: string): Promise<Array<{ id: string; name?: string; description?: string; owned_by?: string }>> {
   if (Date.now() - cachedModels.at < MODEL_CACHE_TTL_MS && cachedModels.models.length) {
     return cachedModels.models;
   }
@@ -178,6 +178,7 @@ async function listModelsCached(token?: string): Promise<Array<{ id: string; nam
         id: String(model.id),
         name: model.name ? String(model.name) : undefined,
         description: model.description ? String(model.description) : undefined,
+        owned_by: model.owned_by ? String(model.owned_by) : undefined,
       })),
   };
   return cachedModels.models;

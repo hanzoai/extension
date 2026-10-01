@@ -59,12 +59,10 @@ describe('runtime-guard', () => {
     expect(runs).toBe(1);
   });
 
-  it('routes auto model to smaller model for small prompts', () => {
-    const model = pickModelForTokenBudget(
-      'auto',
-      ['gpt-4o', 'zen-coder-flash', 'zen-max'],
-      200,
-    );
-    expect(model).toBe('zen-coder-flash');
+  it('routes auto to zen5-flash for a short prompt and zen5 otherwise', () => {
+    expect(pickModelForTokenBudget('auto', ['zen5', 'zen5-flash'], 200)).toBe('zen5-flash');
+    expect(pickModelForTokenBudget('auto', ['zen5', 'zen5-flash'], 5000)).toBe('zen5');
+    expect(pickModelForTokenBudget('auto', [], 200)).toBe('zen5');
+    expect(pickModelForTokenBudget('zen6', ['zen5'], 200)).toBe('zen6');
   });
 });
