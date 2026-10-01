@@ -211,13 +211,14 @@ jobs:
 
       # Ask the registry, because the registry is the only thing that knows.
       # Without this a tolerated publish failure reads exactly like a success,
-      # which is the one way this job can lie.
+      # which is the one way this job can lie. npm lists a version a while
+      # after the publish returns (1.9.67: 95 s), so it is asked for 5 minutes.
       - name: npm serves what the tree declares
         if: steps.ahead.outputs.yes == 'true' && env.NPM_TOKEN != ''
         run: |
           VERSION=$(node -p "require('./packages/browser/package.json').version")
           n=0
-          while [ "$n" -lt 10 ]; do
+          while [ "$n" -lt 50 ]; do
             if curl -fsS "https://registry.npmjs.org/@hanzo%2fbrowser-extension/$VERSION" >/dev/null 2>&1; then
               echo "npm serves @hanzo/browser-extension@$VERSION"
               exit 0
