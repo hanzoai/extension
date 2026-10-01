@@ -77,7 +77,9 @@ async function trampoline(api: any, tabId: number, code: string): Promise<any[]>
         // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
         f = Function(codeStr) as () => unknown;
       } catch (e: any) {
-        return { __hanzo_error: `The page's Content Security Policy refuses evaluating a string (${e?.message || e}). Verbs that inject a function still work: press, click, fill, snapshot.` };
+        // EvalError is the CSP refusal; a SyntaxError is the caller's own code.
+        if (e?.name !== 'EvalError') return { __hanzo_error: e?.message || String(e) };
+        return { __hanzo_error: `The page's Content Security Policy refuses evaluating a string (${e.message}). Verbs that inject a function still work: press, click, fill, snapshot.` };
       }
       try {
         return f();
@@ -254,10 +256,9 @@ export function focus(selector: string) {
   el.focus();
   let active: any = document.activeElement;
   while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
-  if (active !== el && !el.contains(active) && !el.shadowRoot?.contains(active)) {
-    return { __hanzo_error: `${selector} did not take focus, so keys would land elsewhere` };
-  }
-  return true;
+  // Up from the focused node, across shadow roots, to the element or the top.
+  for (let n: any = active; n; n = n.parentNode ?? n.host) if (n === el) return true;
+  return { __hanzo_error: `${selector} did not take focus, so keys would land elsewhere` };
 }
 
 /**

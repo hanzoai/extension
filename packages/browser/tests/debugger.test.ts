@@ -118,6 +118,13 @@ describe('attach refused', () => {
     expect(injected).toEqual([{ world: 'MAIN' }]);
   });
 
+  it('a syntax error is the syntax error', async () => {
+    const b = await bridge();
+    const out = await b.dispatchMethod('Runtime.evaluate', { tabId: 7, expression: 'const a = ;' });
+    expect(out.exceptionDetails.text).toMatch(/Unexpected token/);
+    expect(out.exceptionDetails.text).not.toMatch(/Content Security/);
+  });
+
   it('a CSP that refuses the string says so, once, in the MAIN world', async () => {
     const b = await bridge();
     const real = globalThis.Function;
@@ -215,5 +222,19 @@ describe('attach allowed', () => {
     await expect(b.dispatchMethod('hanzo.press', { tabId: 7, key: 'Enter', selector: '[' })).rejects.toThrow(/Bad selector/);
     await expect(b.dispatchMethod('hanzo.press', { tabId: 7, key: 'Enter', selector: '#plain' })).rejects.toThrow(/did not take focus/);
     expect(sent.filter((c) => c.method === 'Input.dispatchKeyEvent')).toEqual([]);
+  });
+
+  it('focus that lands two shadow roots down counts as taken', async () => {
+    attachable = true;
+    document.body.innerHTML = '<div id="host"></div>';
+    const outer = (document.getElementById('host') as HTMLElement).attachShadow({ mode: 'open' });
+    outer.innerHTML = '<div id="mid"></div>';
+    const inner = (outer.getElementById('mid') as HTMLElement).attachShadow({ mode: 'open' });
+    inner.innerHTML = '<input id="deep">';
+    const deep = inner.getElementById('deep') as HTMLInputElement;
+    (document.getElementById('host') as HTMLElement).focus = () => deep.focus();
+    const b = await bridge();
+    await b.dispatchMethod('hanzo.press', { tabId: 7, key: 'Enter', selector: '#host' });
+    expect(sent.filter((c) => c.method === 'Input.dispatchKeyEvent')).toHaveLength(2);
   });
 });
