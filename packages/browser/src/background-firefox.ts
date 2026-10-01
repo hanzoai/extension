@@ -532,11 +532,11 @@ class HanzoFirefoxExtension {
         return { success: !!ok };
       }
 
-      // A keyDown (or no type) is the whole press; the keyUp a CDP caller
-      // sends after it was already delivered with it.
+      // A keyDown (or no type) is the whole press; the char and keyUp a CDP
+      // caller sends after it were already delivered with it.
       case 'Input.dispatchKeyEvent': {
         if (!tabId) throw new Error('No active tab');
-        if (params.type === 'keyUp') return {};
+        if (params.type && !/^(rawKeyDown|keyDown)$/.test(String(params.type))) return {};
         return script.press(browser, tabId, { ...params, key: params.key ?? params.text });
       }
 

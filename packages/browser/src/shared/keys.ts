@@ -51,8 +51,8 @@ const PHYSICAL = table({
 
 /**
  * "Control+Shift+a" → key "a" with ctrlKey and shiftKey; "Control++" is the
- * plus key. `modifiers` ({ctrl, shift, alt, meta}), when an object, adds to
- * the chord.
+ * plus key. `modifiers` adds to the chord: CDP's bitmask (Alt 1, Ctrl 2,
+ * Meta 4, Shift 8) or {ctrl, shift, alt, meta}.
  */
 export function parseKey(combo: string, modifiers?: unknown): { key: string; mods: Mods } {
   const parts = combo.split('+').map((p) => p.trim());
@@ -63,11 +63,13 @@ export function parseKey(combo: string, modifiers?: unknown): { key: string; mod
     if (!m) throw new Error(`Unknown modifier ${JSON.stringify(p)} in ${JSON.stringify(combo)}: use Control, Shift, Alt or Meta.`);
     mods[m] = true;
   }
+  // CDP's bitmask (a number, or its decimal string off the ZAP wire), or {ctrl, shift, alt, meta}.
+  const n = typeof modifiers === 'number' || (typeof modifiers === 'string' && /^\d+$/.test(modifiers)) ? Number(modifiers) : 0;
   const extra: any = modifiers && typeof modifiers === 'object' ? modifiers : {};
-  if (extra.ctrl) mods.ctrlKey = true;
-  if (extra.shift) mods.shiftKey = true;
-  if (extra.alt) mods.altKey = true;
-  if (extra.meta) mods.metaKey = true;
+  if (n & 1 || extra.alt) mods.altKey = true;
+  if (n & 2 || extra.ctrl) mods.ctrlKey = true;
+  if (n & 4 || extra.meta) mods.metaKey = true;
+  if (n & 8 || extra.shift) mods.shiftKey = true;
   const last = parts[parts.length - 1];
   if (!last) throw new Error('key required: Enter, Tab, Escape, ArrowDown, Control+a …');
   const key = NAMES.get(last.toLowerCase()) ?? (last.length === 1 ? last : last[0].toUpperCase() + last.slice(1));
@@ -88,6 +90,11 @@ export function keyCode(key: string): number {
   if (/^[a-z0-9]$/i.test(key)) return key.toUpperCase().charCodeAt(0);
   const f = /^F([1-9]|1\d|2[0-4])$/.exec(key);
   return f ? 111 + Number(f[1]) : 0;
+}
+
+/** CDP's Input modifier bitmask: Alt 1, Ctrl 2, Meta 4, Shift 8. */
+export function bits(m: Mods): number {
+  return (m.altKey ? 1 : 0) | (m.ctrlKey ? 2 : 0) | (m.metaKey ? 4 : 0) | (m.shiftKey ? 8 : 0);
 }
 
 /** The text a key types, which is also whether it fires keypress: Enter types "\r"; a chord types nothing. */

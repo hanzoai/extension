@@ -110,6 +110,28 @@ describe('attach refused', () => {
     expect(bad.exceptionDetails.text).toMatch(/nope/);
   });
 
+  it("a throw in the caller's code is that throw, not a CSP diagnosis", async () => {
+    const b = await bridge();
+    const out = await b.dispatchMethod('Runtime.evaluate', { tabId: 7, expression: '({}).track()' });
+    expect(out.exceptionDetails.text).toMatch(/track is not a function/);
+    expect(out.exceptionDetails.text).not.toMatch(/Content Security/);
+    expect(injected).toEqual([{ world: 'MAIN' }]);
+  });
+
+  it('a CSP that refuses the string says so, once, in the MAIN world', async () => {
+    const b = await bridge();
+    const real = globalThis.Function;
+    globalThis.Function = (() => { throw new EvalError("Refused to evaluate a string as JavaScript because 'unsafe-eval' is not allowed"); }) as any;
+    let out: any;
+    try {
+      out = await b.dispatchMethod('Runtime.evaluate', { tabId: 7, expression: 'document.title' });
+    } finally {
+      globalThis.Function = real;
+    }
+    expect(out.exceptionDetails.text).toMatch(/Content Security Policy refuses evaluating a string.*unsafe-eval/);
+    expect(injected).toEqual([{ world: 'MAIN' }]);
+  });
+
   it('press Enter dispatches keydown with keyCode 13, and the chip input takes it', async () => {
     const page = chipInput();
     const b = await bridge();
@@ -129,6 +151,22 @@ describe('attach refused', () => {
     await b.dispatchMethod('Input.dispatchKeyEvent', { tabId: 7, key: ',' });
     expect(page.seen[0]).toMatchObject({ type: 'keydown', key: ',', keyCode: 188, which: 188 });
     expect(page.chips).toEqual(['ops@hanzo.ai']);
+  });
+
+  it('a raw keyDown, char, keyUp sequence is one press, and a CDP modifiers bitmask holds', async () => {
+    document.body.innerHTML = '<form id="f"><input id="q"></form>';
+    const downs: boolean[] = [];
+    let submitted = 0;
+    const q = document.getElementById('q') as HTMLInputElement;
+    q.addEventListener('keydown', (e) => downs.push((e as KeyboardEvent).ctrlKey));
+    (document.getElementById('f') as HTMLFormElement).addEventListener('submit', (e) => { submitted++; e.preventDefault(); });
+    q.focus();
+    const b = await bridge();
+    for (const type of ['keyDown', 'char', 'keyUp']) {
+      await b.dispatchMethod('Input.dispatchKeyEvent', { tabId: 7, type, key: 'Enter', text: '\r', modifiers: '2' });
+    }
+    expect(downs).toEqual([true]);
+    expect(submitted).toBe(1);
   });
 
   it('an uncancelled Enter fires keypress with charCode 13 and submits the form', async () => {
@@ -166,5 +204,16 @@ describe('attach allowed', () => {
       expect.objectContaining({ type: 'keyUp', key: 'Enter', windowsVirtualKeyCode: 13 }),
     ]);
     expect(injected).toEqual([]);
+  });
+
+  it('a press on a selector that cannot take focus fails instead of typing elsewhere', async () => {
+    attachable = true;
+    document.body.innerHTML = '<input id="other"><div id="plain">x</div>';
+    (document.getElementById('other') as HTMLInputElement).focus();
+    const b = await bridge();
+    await expect(b.dispatchMethod('hanzo.press', { tabId: 7, key: 'Enter', selector: '#missing' })).rejects.toThrow(/No element matches #missing/);
+    await expect(b.dispatchMethod('hanzo.press', { tabId: 7, key: 'Enter', selector: '[' })).rejects.toThrow(/Bad selector/);
+    await expect(b.dispatchMethod('hanzo.press', { tabId: 7, key: 'Enter', selector: '#plain' })).rejects.toThrow(/did not take focus/);
+    expect(sent.filter((c) => c.method === 'Input.dispatchKeyEvent')).toEqual([]);
   });
 });

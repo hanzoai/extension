@@ -9,7 +9,7 @@
  * makes Chromium refuse the attach outright. Each function takes the API
  * namespace (`chrome` / `browser`), as drive.ts does.
  *
- *   execute  a code string, through a `Function(code)()` trampoline
+ *   execute  a code string, through a `Function(code)()` trampoline (MAIN world)
  *   call     a real function reference plus serializable args (no eval: CSP-proof)
  *   evaluate Runtime.evaluate semantics, CDP-shaped result
  *   press    one key press, with the legacy keyCode/which a real keystroke carries
@@ -28,16 +28,20 @@ const PRIVILEGED = [
   /^view-source:/i,
   /^resource:/i,
   /^file:/i,                      // local files unless explicit perm granted
-  /^https?:\/\/addons\.mozilla\.org\b/i,              // AMO blocks WebExtensions by policy
-  /^https?:\/\/(chromewebstore\.google\.com|chrome\.google\.com\/webstore)\b/i, // so does the Web Store
 ];
+
+// Each browser's own extension store blocks extensions by policy; the other
+// browser's store is an ordinary site.
+const AMO = /^https?:\/\/addons\.mozilla\.org\b/i;
+const WEBSTORE = /^https?:\/\/(chromewebstore\.google\.com|chrome\.google\.com\/webstore)\b/i;
 
 async function refusePrivileged(api: any, tabId: number): Promise<void> {
   let tab: any;
   try { tab = await api.tabs.get(tabId); } catch { return; }
   // Some Firefox builds redact url for privileged tabs; an empty one is one.
   const url = tab?.url || tab?.pendingUrl || '';
-  if (!url || PRIVILEGED.some((rx) => rx.test(url))) {
+  const store = String(api.runtime?.getURL?.('') ?? '').startsWith('moz-extension:') ? AMO : WEBSTORE;
+  if (!url || store.test(url) || PRIVILEGED.some((rx) => rx.test(url))) {
     throw new Error(
       `Cannot run JS in privileged tab ${tabId} (${url || 'url hidden'}). ` +
       `Activate a regular http(s) tab via tabId/tab_id parameter.`,
@@ -54,36 +58,35 @@ function deadline<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
 }
 
 /**
- * The raw per-frame results of running a code string. The trampoline runs in
- * the MAIN world first, where page globals are visible; when the page's CSP
- * refuses `Function()` there, it runs again in the ISOLATED world, whose CSP is
- * the extension's own.
+ * The raw per-frame results of running a code string, in the MAIN world, where
+ * page globals are visible. Building the function and calling it fail
+ * separately: a page CSP without 'unsafe-eval' refuses the build, and that is
+ * reported as such — never a throw from the caller's own code. No ISOLATED
+ * retry: MV3 refuses `Function()` there in Chromium and Firefox alike, so
+ * strings cannot run on such a page at all; `call` (a function reference) can.
  */
-function trampoline(api: any, tabId: number, code: string): Promise<any[]> {
-  const runIn = async (world: 'MAIN' | 'ISOLATED'): Promise<any[]> => {
-    const results = await api.scripting.executeScript({
-      target: { tabId },
-      world,
-      args: [code],
-      func: (codeStr: string) => {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-          return Function(codeStr)();
-        } catch (e: any) {
-          return { __hanzo_error: e?.message || String(e) };
-        }
-      },
-    });
-    return Array.isArray(results) ? results.map((r: any) => r?.result) : [results];
-  };
-  return (async () => {
-    if (!api.scripting?.executeScript) throw new Error('scripting.executeScript not available (need MV3 scripting permission)');
-    const main = await runIn('MAIN');
-    const blocked = main.length > 0 && main.every((r) =>
-      r && typeof r === 'object' && r.__hanzo_error &&
-      /CSP|unsafe-eval|Content Security|Trusted Type|Function|eval/i.test(String(r.__hanzo_error)));
-    return blocked ? runIn('ISOLATED') : main;
-  })();
+async function trampoline(api: any, tabId: number, code: string): Promise<any[]> {
+  if (!api.scripting?.executeScript) throw new Error('scripting.executeScript not available (need MV3 scripting permission)');
+  const results = await api.scripting.executeScript({
+    target: { tabId },
+    world: 'MAIN',
+    args: [code],
+    func: (codeStr: string) => {
+      let f: () => unknown;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+        f = Function(codeStr) as () => unknown;
+      } catch (e: any) {
+        return { __hanzo_error: `The page's Content Security Policy refuses evaluating a string (${e?.message || e}). Verbs that inject a function still work: press, click, fill, snapshot.` };
+      }
+      try {
+        return f();
+      } catch (e: any) {
+        return { __hanzo_error: e?.message || String(e) };
+      }
+    },
+  });
+  return Array.isArray(results) ? results.map((r: any) => r?.result) : [results];
 }
 
 /**
@@ -207,7 +210,12 @@ export async function evaluate(api: any, tabId: number, params: Record<string, u
  * cancelled the press: a chip input that takes Enter must not also submit.
  */
 function strike(selector: string | null, down: any, typed: any, up: any) {
-  let el: any = selector ? document.querySelector(selector) : document.activeElement;
+  let el: any;
+  try {
+    el = selector ? document.querySelector(selector) : document.activeElement;
+  } catch (e: any) {
+    return { __hanzo_error: `Bad selector ${selector}: ${e?.message || e}` };
+  }
   if (!el && selector) return { __hanzo_error: `No element matches ${selector}` };
   el = el || document.body;
   if (selector) el.focus();
@@ -228,6 +236,28 @@ function strike(selector: string | null, down: any, typed: any, up: any) {
   }
   fire('keyup', up);
   return { delivered: true, target: el.tagName, key: down.key, keyCode: down.keyCode, prevented: !go };
+}
+
+/**
+ * Focus `selector` so real keystrokes land on it. Self-contained, like strike.
+ * Errors come back as values: Chromium hands a page-side throw back as a null
+ * result with no error, which would read as success.
+ */
+export function focus(selector: string) {
+  let el: any;
+  try {
+    el = document.querySelector(selector);
+  } catch (e: any) {
+    return { __hanzo_error: `Bad selector ${selector}: ${e?.message || e}` };
+  }
+  if (!el) return { __hanzo_error: `No element matches ${selector}` };
+  el.focus();
+  let active: any = document.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  if (active !== el && !el.contains(active) && !el.shadowRoot?.contains(active)) {
+    return { __hanzo_error: `${selector} did not take focus, so keys would land elsewhere` };
+  }
+  return true;
 }
 
 /**

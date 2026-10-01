@@ -5,7 +5,7 @@ import { parseTabId } from './shared/tab-id.js';
 import { pickEvaluable, wrapEvaluable } from './shared/evaluable.js';
 import { detail, shrink } from './shared/shrink.js';
 import { DRIVE, drive } from './shared/drive.js';
-import { codeOf, keyCode, parseKey, text, type Mods } from './shared/keys.js';
+import { bits, codeOf, keyCode, parseKey, text } from './shared/keys.js';
 import * as script from './shared/script.js';
 
 /**
@@ -26,11 +26,6 @@ function coerceNumericParams(params: any, keys: string[]): void {
       params[k] = Number(v);
     }
   }
-}
-
-/** CDP's Input modifier bitmask. */
-function bits(m: Mods): number {
-  return (m.altKey ? 1 : 0) | (m.ctrlKey ? 2 : 0) | (m.metaKey ? 4 : 0) | (m.shiftKey ? 8 : 0);
 }
 
 /**
@@ -332,14 +327,7 @@ export class CDPBridge {
   async press(tabId: number, params: Record<string, unknown>): Promise<any> {
     const { key, mods } = parseKey(String(params.key ?? ''), params.modifiers);
     return this.either(tabId, async () => {
-      if (params.selector) {
-        await script.call(chrome, tabId, (s: string) => {
-          const el = document.querySelector(s) as HTMLElement | null;
-          if (!el) return { __hanzo_error: `No element matches ${s}` };
-          el.focus();
-          return true;
-        }, [String(params.selector)]);
-      }
+      if (params.selector) await script.call(chrome, tabId, script.focus, [String(params.selector)]);
       const typed = text(key, mods);
       const vk = keyCode(key);
       const base = { key, code: codeOf(key), windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers: bits(mods) };
@@ -514,8 +502,8 @@ export class CDPBridge {
           break;
 
         // With a `type`, one raw CDP key event; with none, a press. Scripted
-        // (no debugger), a keyDown is the whole press, so the keyUp a CDP
-        // caller sends after it was already delivered.
+        // (no debugger), a keyDown is the whole press, so the char and keyUp a
+        // CDP caller sends after it were already delivered.
         case 'Input.dispatchKeyEvent': {
           if (!params?.type) {
             result = await this.press(tabId, params || {});
@@ -526,7 +514,7 @@ export class CDPBridge {
           result = await this.either(
             tabId,
             async () => { await this.send(tabId, method, params); return {}; },
-            async () => params.type === 'keyUp' ? {} : script.press(chrome, tabId, { ...params, key: params.key ?? params.text }),
+            async () => /^(rawKeyDown|keyDown)$/.test(params.type) ? script.press(chrome, tabId, { ...params, key: params.key ?? params.text }) : {},
           );
           break;
         }
