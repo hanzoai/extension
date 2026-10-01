@@ -1,12 +1,13 @@
 # Native store-publish — Hanzo Git act_runner (label linux-amd64).
 # This is the SYSTEM OF RECORD for publishing the browser extension to the
-# Chrome Web Store + Firefox AMO, and for the npm package. GitHub only mirrors.
+# Chrome Web Store + Firefox AMO, hanzo-ide to the VS Code Marketplace + Open
+# VSX, and for the npm package. GitHub only mirrors.
 #
 # Secrets model — KMS ONLY. The single bootstrap credential is the KMS machine
 # identity (KMS_CLIENT_ID / KMS_CLIENT_SECRET, a git.hanzo.ai Actions secret).
 # Every store credential is pulled from KMS at publish time
 # (org `hanzo`, env `prod`, path `/extension-publish` — see
-# deploy/kms/extension-publish-kms-sync.yaml). No CWS/AMO/npm secret is ever
+# deploy/kms/extension-publish-kms-sync.yaml). No store or npm secret is ever
 # stored in GitHub or Gitea Actions secrets.
 #
 # amd64/Linux only. Safari (macOS) + Windows desktop stay on GitHub-hosted
@@ -72,17 +73,44 @@ jobs:
             echo "yes=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # The same question for hanzo-ide, asked of each store's public API: the
+      # Marketplace gallery query and the Open VSX registry. Each refuses a
+      # version it already has, so each ships only when it lacks this one.
+      - name: Is hanzo-ide already on the VS Code stores
+        id: ide
+        run: |
+          NEW=$(node -p "require('./packages/vscode/package.json').version")
+          MARKETPLACE=$(curl -sf -X POST "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery" \
+                  -H 'Content-Type: application/json' -H 'Accept: application/json;api-version=3.0-preview.1' \
+                  -d '{"filters":[{"criteria":[{"filterType":7,"value":"hanzo-ai.hanzo-ide"}]}],"flags":1}' \
+                  | jq -r '.results[0].extensions[0].versions[]?.version' 2>/dev/null | sort -V | tail -1)
+          OPENVSX=$(curl -sf "https://open-vsx.org/api/hanzo-ai/hanzo-ide" | jq -r '.version // empty' 2>/dev/null || true)
+          yes=false
+          for pair in "marketplace:${MARKETPLACE:-0.0.0}" "openvsx:${OPENVSX:-0.0.0}"; do
+            store=${pair%%:*}; OLD=${pair#*:}
+            NEWEST=$(printf '%s\n%s\n' "$OLD" "$NEW" | sort -V | tail -1)
+            if [ "$OLD" = "$NEW" ] || [ "$NEWEST" != "$NEW" ]; then
+              echo "$store serves $OLD; tree is $NEW — nothing to ship."
+              echo "$store=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "$store serves $OLD; tree is $NEW — shipping."
+              echo "$store=true" >> "$GITHUB_OUTPUT"
+              yes=true
+            fi
+          done
+          echo "yes=$yes" >> "$GITHUB_OUTPUT"
+
       # What ships is what was checked: `make check` is the CI gate (hanzo.yml),
       # and the build it makes is the one the stores and npm get. Before the
       # credential read, so a release that fails here asks KMS for nothing and
       # uploads nothing.
       - name: Build and check the release
         id: check
-        if: steps.ahead.outputs.yes == 'true'
+        if: steps.ahead.outputs.yes == 'true' || steps.ide.outputs.yes == 'true'
         run: make check
 
       - name: Load publish credentials from KMS
-        if: steps.ahead.outputs.yes == 'true'
+        if: steps.ahead.outputs.yes == 'true' || steps.ide.outputs.yes == 'true'
         env:
           KMS_CLIENT_ID: ${{ secrets.KMS_CLIENT_ID }}
           KMS_CLIENT_SECRET: ${{ secrets.KMS_CLIENT_SECRET }}
@@ -115,6 +143,7 @@ jobs:
           for spec in "$KMS_STORE_PATH:CHROME_EXTENSION_ID" "$KMS_STORE_PATH:CHROME_CLIENT_ID" \
                       "$KMS_STORE_PATH:CHROME_CLIENT_SECRET" "$KMS_STORE_PATH:CHROME_REFRESH_TOKEN" \
                       "$KMS_STORE_PATH:AMO_API_KEY" "$KMS_STORE_PATH:AMO_API_SECRET" \
+                      "$KMS_STORE_PATH:VSCE_PAT" "$KMS_STORE_PATH:OVSX_PAT" \
                       "$KMS_NPM_PATH:NPM_TOKEN"; do
             KEYPATH=${spec%:*}; KEY=${spec##*:}
             # No -f: a 404 must report WHICH key was empty, not just exit 22.
@@ -154,6 +183,19 @@ jobs:
             --api-key "$AMO_API_KEY" --api-secret "$AMO_API_SECRET" \
             --channel listed --id "hanzo-ai@hanzo.ai"
 
+      # The .vsix `make check` built: packages/vscode's `build` is
+      # `vsce package --no-dependencies`, so both stores get that one package.
+      # vsce reads VSCE_PAT and ovsx reads OVSX_PAT from the environment.
+      - name: Publish hanzo-ide to the VS Code Marketplace
+        if: steps.ide.outputs.marketplace == 'true' && env.VSCE_PAT != ''
+        working-directory: packages/vscode
+        run: pnpm exec vsce publish --packagePath dist/hanzo-ide.vsix
+
+      - name: Publish hanzo-ide to Open VSX
+        if: steps.ide.outputs.openvsx == 'true' && env.OVSX_PAT != ''
+        working-directory: packages/vscode
+        run: npx --yes ovsx@1.2.0 publish dist/hanzo-ide.vsix
+
       # npm — the canonical and only home for these packages. Every package was
       # built by `make check` above. pnpm publish skips a version already on the
       # registry, so re-running is idempotent. A single package the registry
@@ -190,13 +232,27 @@ jobs:
       # credential so partial provisioning ships exactly what KMS has; this step
       # names which targets that was, so a skipped store is legible rather than
       # silent, and fails the job if a release published nowhere at all.
+      # The VS Code stores wait on their owner (packages/vscode/LLM.md), so one
+      # without its token is a notice, never a failure.
       - name: Publish summary
-        if: always() && steps.ahead.outputs.yes == 'true'
+        if: always() && (steps.ahead.outputs.yes == 'true' || steps.ide.outputs.yes == 'true')
         run: |
           if [ "${{ steps.check.outcome }}" != "success" ]; then
             echo "::error::the release checks failed, so nothing was uploaded"
             exit 1
           fi
+          for spec in "VSCE_PAT:VS Code Marketplace:${{ steps.ide.outputs.marketplace }}" \
+                      "OVSX_PAT:Open VSX:${{ steps.ide.outputs.openvsx }}"; do
+            key=${spec%%:*}; rest=${spec#*:}; label=${rest%:*}
+            [ "${rest##*:}" = "true" ] || continue
+            eval "val=\$$key"
+            if [ -n "$val" ]; then
+              echo "published -> $label"
+            else
+              echo "::notice::SKIPPED $label: no $key in KMS at hanzo:/extension-publish (owner steps in packages/vscode/LLM.md)"
+            fi
+          done
+          [ "${{ steps.ahead.outputs.yes }}" = "true" ] || exit 0
           shipped=0
           for pair in "CHROME_EXTENSION_ID:Chrome Web Store" "AMO_API_KEY:Firefox Add-ons" "NPM_TOKEN:npm"; do
             key=${pair%%:*}; label=${pair#*:}

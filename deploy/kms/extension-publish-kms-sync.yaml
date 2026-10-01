@@ -7,18 +7,22 @@
 #
 # ── Operator steps (the VALUES are the store-account owner's; not in git) ──
 #   1. KMS (kms.hanzo.ai) → org `hanzo`, env `prod`, project path `/extension-publish`.
-#      Add the keys below. These are the Chrome Web Store + Firefox AMO
-#      credentials — the store-account owner drops the real values here:
+#      Add the keys below. These are the Chrome Web Store, Firefox AMO, VS Code
+#      Marketplace and Open VSX credentials — the store-account owner drops the
+#      real values here:
 #        CHROME_EXTENSION_ID     Chrome Web Store item id
 #        CHROME_CLIENT_ID        Google OAuth client id (CWS API)
 #        CHROME_CLIENT_SECRET    Google OAuth client secret
 #        CHROME_REFRESH_TOKEN    Google OAuth refresh token
 #        AMO_API_KEY             addons.mozilla.org JWT issuer
 #        AMO_API_SECRET          addons.mozilla.org JWT secret
+#        VSCE_PAT                Azure DevOps PAT, Marketplace (Manage), publisher hanzo-ai
+#        OVSX_PAT                open-vsx.org access token, namespace hanzo-ai
 #      Optional (same path, if these stores are moved off GitHub too):
-#        VSCE_PAT  OVSX_PAT  JETBRAINS_TOKEN  NPM_TOKEN
-#         kms secret set --project hanzo --env prod --path /extension-publish \
-#           CHROME_EXTENSION_ID "<value>"     # …repeat per key
+#        JETBRAINS_TOKEN  NPM_TOKEN
+#         hanzo --as hanzo kms secrets create --env prod --path /extension-publish \
+#           --name CHROME_EXTENSION_ID --value '<value>'     # …repeat per key
+#      packages/vscode/LLM.md has the owner's steps for VSCE_PAT and OVSX_PAT.
 #   2. Grant the extension repo's KMS machine identity (the KMS_CLIENT_ID it
 #      already uses) READ on project `hanzo`, path `/extension-publish`.
 #   3. Re-provision KMS_CLIENT_ID / KMS_CLIENT_SECRET as git.hanzo.ai Actions
@@ -61,6 +65,8 @@ spec:
           - CHROME_REFRESH_TOKEN
           - AMO_API_KEY
           - AMO_API_SECRET
+          - VSCE_PAT
+          - OVSX_PAT
   managedSecretReference:
     secretName: extension-publish-secrets
     secretNamespace: hanzo

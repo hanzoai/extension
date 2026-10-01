@@ -236,9 +236,12 @@ empty. `@hanzo/ui` and `@hanzo/logo` read the flat form too; it is the one way.
 
 Where each credential lives:
 - `NPM_TOKEN` — org `hanzo`, env `prod`, **root path** (`KMS_NPM_PATH` empty).
-- Chrome Web Store + Firefox AMO — `hanzo:/extension-publish`, env `prod`
+- Chrome Web Store, Firefox AMO, VS Code Marketplace (`VSCE_PAT`) and Open
+  VSX (`OVSX_PAT`) — `hanzo:/extension-publish`, env `prod`
   (`KMS_STORE_PATH`). CR: `deploy/kms/extension-publish-kms-sync.yaml`.
-  **Not seeded yet**, so those two steps skip and `Publish summary` says so.
+  **Not seeded yet**, so those steps skip and `Publish summary` says so; a VS
+  Code store without its token is a notice, not a failure. The owner's steps
+  are in `packages/vscode/LLM.md`.
 
 ⚠️ **A tag is not a release — verify against the REGISTRY.** Every publish step
 gates on `env.<CRED> != ''`, so a credential that reads back empty skips its

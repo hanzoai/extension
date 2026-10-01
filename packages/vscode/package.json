@@ -138,8 +138,7 @@
     "test:electron": "npm run build && tsc -p tsconfig.test.json && node ./out/test/runTest.js",
     "test:coverage": "c8 npm test",
     "test:vitest:coverage": "vitest --coverage",
-    "test:vitest:run": "vitest run --coverage",
-    "publish": "vsce publish --packagePath dist/hanzo-ide.vsix && npx ovsx publish dist/hanzo-ide.vsix"
+    "test:vitest:run": "vitest run --coverage"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",
