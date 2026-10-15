@@ -389,6 +389,25 @@ describe('native messaging', () => {
     expect(FakeSocket.all.at(-1)!.url).toBe('ws://127.0.0.1:9998/');
   });
 
+  it('asks for the host again after the door finds no router, so one installed since joins', () => {
+    const s = newZapState('browser/chrome-3fa2');
+    ensureZap(s, opts());
+    const first = FakePort.last!;
+    first.gone('Specified native messaging host not found.');
+    expect(s.native).toBe(false);
+    for (let i = 0; i < 9; i++) FakeSocket.all.at(-1)!.close(); // nothing on any well-known port
+    expect(FakeSocket.all).toHaveLength(9);
+    expect(s.error).toBe('no-router');
+    vi.advanceTimersByTime(250);
+    const next = FakePort.last!;
+    expect(next).not.toBe(first);
+    expect(FakeSocket.all).toHaveLength(9);
+    next.recv(WELCOME, 'zapd', ID);
+    next.recv(PROVIDERS, 'zapd', ID, providers([ID]));
+    expect(s.connected).toBe(true);
+    expect(s.socket?.kind).toBe('native');
+  });
+
   it('retries the host when it exits after it was working', () => {
     const s = newZapState('browser/chrome-3fa2');
     ensureZap(s, opts());

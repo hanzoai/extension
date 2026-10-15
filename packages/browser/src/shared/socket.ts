@@ -196,7 +196,8 @@ export interface ZapState {
   /** When the outstanding registry probe was sent, or 0. */
   probedAt: number;
   pairing: Pairing | null;
-  /** Native messaging host: unknown until tried, then whether it exists. */
+  /** Native messaging host: unknown until tried, then whether it answered.
+   *  A retry on the backoff asks again. */
   native: boolean | null;
   /** Which well-known door port to try next when unpaired. */
   scan: number;
@@ -311,9 +312,11 @@ function onFrame(state: ZapState, link: Link, f: Frame, opts: ZapOpts) {
   }
 }
 
-/** The link closed under us: forget it and try again on the backoff. */
+/** The link closed under us: forget it and try again on the backoff, the
+ *  native host first again, so one registered since the last try is found. */
 function lost(state: ZapState, opts: ZapOpts, why: string) {
   drop(state);
+  if (state.native === false) state.native = null;
   opts.log(`[Hanzo/ZAP] ${why}; retrying in ${state.backoff} ms`);
   schedule(state, opts, state.backoff);
   state.backoff = Math.min(state.backoff * 2, BACKOFF_MAX);
