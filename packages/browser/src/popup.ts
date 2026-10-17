@@ -138,17 +138,160 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // --- Embedded search (feature: query → Hanzo answer engine) ---
+  // --- Active Tab Context & Inline Ask/Search ---
+  let activeTabInfo: { id?: number; title?: string; url?: string } | null = null;
+  let pageContextActive = true;
+  const tabContextTitle = document.getElementById('tab-context-title');
+  const toggleContextBtn = document.getElementById('toggle-context-btn');
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs[0];
+    if (tab) {
+      activeTabInfo = { id: tab.id, title: tab.title, url: tab.url };
+      if (tabContextTitle) {
+        tabContextTitle.textContent = tab.title || tab.url || 'Active Tab';
+      }
+    }
+  });
+
+  toggleContextBtn?.addEventListener('click', () => {
+    pageContextActive = !pageContextActive;
+    toggleContextBtn.textContent = pageContextActive ? 'Active' : 'Off';
+    toggleContextBtn.style.opacity = pageContextActive ? '1' : '0.5';
+    const chip = document.getElementById('tab-context-chip');
+    if (chip) chip.style.opacity = pageContextActive ? '1' : '0.6';
+  });
+
   const searchForm = document.getElementById('search-form') as HTMLFormElement | null;
-  const searchInput = document.getElementById('search-input') as HTMLInputElement | null;
-  searchForm?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const q = searchInput?.value.trim();
-    const target = q
-      ? chrome.runtime.getURL('newtab.html') + '?q=' + encodeURIComponent(q)
+  const searchInput = document.getElementById('search-input') as HTMLTextAreaElement | HTMLInputElement | null;
+  const searchWebBtn = document.getElementById('search-web-btn');
+  const inlineAnswer = document.getElementById('inline-answer');
+  const inlineAnswerContent = document.getElementById('inline-answer-content');
+  const copyInlineBtn = document.getElementById('copy-inline-btn');
+  const continueChatBtn = document.getElementById('continue-chat-btn');
+  const answerHeaderText = document.getElementById('answer-header-text');
+
+  function openSearch(query: string) {
+    const target = query
+      ? chrome.runtime.getURL('newtab.html') + '?q=' + encodeURIComponent(query)
       : chrome.runtime.getURL('newtab.html');
     chrome.tabs.create({ url: target });
     window.close();
+  }
+
+  searchWebBtn?.addEventListener('click', () => {
+    const q = searchInput?.value.trim() || '';
+    openSearch(q);
+  });
+
+  async function handleAskAi(prompt: string) {
+    if (!prompt.trim()) return;
+    if (inlineAnswer) inlineAnswer.classList.remove('hidden');
+    if (inlineAnswerContent) inlineAnswerContent.textContent = 'Thinking…';
+    if (answerHeaderText) answerHeaderText.textContent = 'Generating answer…';
+
+    let fullPrompt = prompt;
+    if (pageContextActive && activeTabInfo?.url) {
+      fullPrompt = `[Page Context: "${activeTabInfo.title || ''}" (${activeTabInfo.url})]\n${prompt}`;
+    }
+
+    try {
+      chrome.runtime.sendMessage(
+        {
+          action: 'chat.complete',
+          model: 'zen4',
+          messages: [{ role: 'user', content: fullPrompt }],
+        },
+        (response) => {
+          if (chrome.runtime.lastError || !response?.success) {
+            const err = response?.error || chrome.runtime.lastError?.message || '';
+            if (err.includes('Not authenticated')) {
+              if (inlineAnswerContent) {
+                inlineAnswerContent.innerHTML = 'Sign in for cloud intelligence, or <a href="#" id="fallback-search-btn" style="color:var(--text-primary);text-decoration:underline;">Search Answer Engine →</a>';
+                document.getElementById('fallback-search-btn')?.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  openSearch(prompt);
+                });
+              }
+              if (loginSection) loginSection.classList.remove('hidden');
+            } else {
+              if (inlineAnswerContent) {
+                inlineAnswerContent.textContent = response?.message?.content || response?.content || `Opening Answer Engine for "${prompt}"…`;
+                setTimeout(() => openSearch(prompt), 800);
+              }
+            }
+            if (answerHeaderText) answerHeaderText.textContent = 'Hanzo Response';
+            return;
+          }
+
+          const content = response.message?.content || response.content || 'Completed.';
+          if (inlineAnswerContent) inlineAnswerContent.textContent = content;
+          if (answerHeaderText) answerHeaderText.textContent = 'Hanzo Response';
+        }
+      );
+    } catch (err: any) {
+      if (inlineAnswerContent) inlineAnswerContent.textContent = `Error: ${err.message}`;
+    }
+  }
+
+  searchForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const prompt = searchInput?.value.trim();
+    if (prompt) handleAskAi(prompt);
+  });
+
+  searchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const prompt = searchInput.value.trim();
+      if (prompt) handleAskAi(prompt);
+    }
+  });
+
+  // Quick Action Pills
+  document.querySelectorAll('.quick-pill').forEach((pill) => {
+    pill.addEventListener('click', () => {
+      const p = pill.getAttribute('data-prompt');
+      if (p) {
+        if (searchInput) searchInput.value = p;
+        handleAskAi(p);
+      }
+    });
+  });
+
+  // Copy Answer
+  copyInlineBtn?.addEventListener('click', () => {
+    if (inlineAnswerContent?.textContent) {
+      navigator.clipboard.writeText(inlineAnswerContent.textContent).then(() => {
+        const span = copyInlineBtn.querySelector('span');
+        if (span) {
+          const prev = span.textContent;
+          span.textContent = 'Copied!';
+          setTimeout(() => { span.textContent = prev; }, 1500);
+        }
+      });
+    }
+  });
+
+  // Continue in Full Chat
+  continueChatBtn?.addEventListener('click', () => {
+    openSidebarTab();
+  });
+
+  // Open in New Tab
+  document.getElementById('open-newtab-btn')?.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') });
+    window.close();
+  });
+
+  // Settings Drawer Toggle
+  openSettings?.addEventListener('click', () => {
+    settingsSection?.classList.remove('hidden');
+    mainSection?.classList.add('hidden');
+  });
+  backBtn?.addEventListener('click', () => {
+    settingsSection?.classList.add('hidden');
+    mainSection?.classList.remove('hidden');
   });
 
   // --- Open chat ---
