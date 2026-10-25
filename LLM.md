@@ -150,7 +150,9 @@ that process exits another takes over and the extension reconnects.
   the first free port in 21000-21007 (zapd `pair::WELL_KNOWN`).
   Our Blink origin (`chrome-extension://biingenefmanpecedoafkfajbnlgdmbl`, fixed by
   the manifest `key`) is admitted without a proof (zapd ≥1.1.4) and says HELLO
-  at once; the extension sweeps those ports, then backs off. Only
+  at once; the extension sweeps those ports, then backs off, and every retry
+  after a backoff asks for the native host again, so a host registered since
+  joins without a reload. Only
   random-origin browsers (Firefox, Safari) pair: `hanzo-mcp pair` prints
   `ws://127.0.0.1:<port>/#<64 hex>`, kept in `storage.local`, and the connect
   runs the mutual HMAC (router first). A browser node may answer calls but
@@ -241,7 +243,11 @@ Where each credential lives:
   (`KMS_STORE_PATH`). CR: `deploy/kms/extension-publish-kms-sync.yaml`.
   **Not seeded yet**, so those steps skip and `Publish summary` says so; a VS
   Code store without its token is a notice, not a failure. The owner's steps
-  are in `packages/vscode/LLM.md`.
+  are in `packages/vscode/LLM.md`. As of 2026-10-15 none of the four stores
+  lists us: Chrome's update check answers `error-unknownApplication` for
+  `biingenefmanpecedoafkfajbnlgdmbl`, and Open VSX, the Marketplace
+  (`hanzo-ai.hanzo-ide`) and AMO (`hanzo-ai@hanzo.ai`) return not found. Each
+  needs a first upload from an owner account before CI can update it.
 
 ⚠️ **A tag is not a release — verify against the REGISTRY.** Every publish step
 gates on `env.<CRED> != ''`, so a credential that reads back empty skips its

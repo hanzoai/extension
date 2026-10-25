@@ -19,7 +19,7 @@ import { iamUrl } from '@hanzo/iam/paths';
 // IAM API through the unified gateway, api.hanzo.ai. Both carry /v1/iam.
 // @hanzo/iam's BRAND_SERVER_URLS names a brand's IAM origin, not the gateway,
 // so the API host is stated here.
-export const IAM_LOGIN_URL = 'https://hanzo.id';
+export const IAM_LOGIN_URL = 'https://hanzo.ai';
 export const IAM_API_URL = 'https://api.hanzo.ai';
 export const DEFAULT_SCOPES = 'openid profile email offline_access';
 

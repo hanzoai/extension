@@ -23,8 +23,8 @@ import {
 // ---------------------------------------------------------------------------
 
 describe('IAM constants', () => {
-  it('IAM_LOGIN_URL is hanzo.id', () => {
-    expect(IAM_LOGIN_URL).toBe('https://hanzo.id');
+  it('IAM_LOGIN_URL is hanzo.ai', () => {
+    expect(IAM_LOGIN_URL).toBe('https://hanzo.ai');
   });
 
   it('IAM_API_URL is api.hanzo.ai', () => {
@@ -154,5 +154,21 @@ describe('loadRuntimeConfig', () => {
 
     const config = await loadRuntimeConfig(mockStorage as any);
     expect(config.iamLoginUrl).toBe(IAM_LOGIN_URL);
+  });
+
+  it('migrates obsolete app-hanzo and hanzo.id overrides', async () => {
+    const mockStorage = {
+      get: vi.fn(async (_keys: string[]) => ({
+        hanzo_config_client_id: 'app-hanzo',
+        hanzo_config_iam_login_url: 'https://hanzo.id',
+      })),
+      set: vi.fn(async () => {}),
+    };
+
+    const config = await loadRuntimeConfig(mockStorage as any);
+    expect(config.clientId).toBe(DEFAULT_CLIENT_ID);
+    expect(config.iamLoginUrl).toBe(IAM_LOGIN_URL);
+    expect(mockStorage.set).toHaveBeenCalledWith({ hanzo_config_client_id: DEFAULT_CLIENT_ID });
+    expect(mockStorage.set).toHaveBeenCalledWith({ hanzo_config_iam_login_url: IAM_LOGIN_URL });
   });
 });

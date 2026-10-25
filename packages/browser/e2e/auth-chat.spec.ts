@@ -42,7 +42,7 @@ descFn('Auth + Chat', () => {
     await expect(chat).toContainText('Sign in to Hanzo AI');
 
     // Click "Sign in" — this sends auth.login to the background,
-    // which opens a new tab to hanzo.id/oauth/authorize
+    // which opens a new tab to hanzo.ai/v1/iam/oauth/authorize
     const [authPage] = await Promise.all([
       context.waitForEvent('page'),
       chat.getByRole('button', { name: 'Sign in' }).click(),
@@ -51,7 +51,7 @@ descFn('Auth + Chat', () => {
     // Wait for the Hanzo IAM login page to load
     await authPage.waitForLoadState('networkidle');
     const authUrl = authPage.url();
-    expect(authUrl).toContain('hanzo.id');
+    expect(authUrl).toMatch(/hanzo\.(ai|id)/);
 
     // Fill in credentials on the Hanzo IAM login page
     // IAM uses a form with username + password inputs

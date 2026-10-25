@@ -10,8 +10,8 @@
 
 // ── IAM / Auth ─────────────────────────────────────────────────────────
 
-/** Login UI domain (Hanzo ID) */
-export const IAM_LOGIN_URL = 'https://hanzo.id';
+/** Login UI domain (Hanzo AI) */
+export const IAM_LOGIN_URL = 'https://hanzo.ai';
 
 /** IAM API — the unified gateway serves /v1/iam. iam.hanzo.ai serves only the
  *  IAM web app, so a POST there answers HTML, never a token. */
@@ -129,8 +129,8 @@ export const BRAND_URLS = {
   billing: 'https://billing.hanzo.ai',
   docs: 'https://docs.hanzo.ai',
   homepage: 'https://hanzo.ai',
-  register: 'https://hanzo.id/register',
-  forgotPassword: 'https://hanzo.id/forgot',
+  register: 'https://hanzo.ai/signup',
+  forgotPassword: 'https://hanzo.ai/forget',
 } as const;
 
 // ── Runtime Config Loader ──────────────────────────────────────────────
@@ -171,6 +171,24 @@ export async function loadRuntimeConfig(
 
   // Use Promise-based API (works with BrowserStorage adapter AND MV3 chrome.storage.local)
   const result: Record<string, any> = await (storage as any).get(keys);
+
+  // Migrate obsolete/misconfigured values from earlier builds or stale storage
+  if (result.hanzo_config_client_id === 'app-hanzo') {
+    result.hanzo_config_client_id = DEFAULT_CLIENT_ID;
+    if (storage && typeof (storage as any).set === 'function') {
+      try {
+        await (storage as any).set({ hanzo_config_client_id: DEFAULT_CLIENT_ID });
+      } catch {}
+    }
+  }
+  if (result.hanzo_config_iam_login_url === 'https://hanzo.id') {
+    result.hanzo_config_iam_login_url = IAM_LOGIN_URL;
+    if (storage && typeof (storage as any).set === 'function') {
+      try {
+        await (storage as any).set({ hanzo_config_iam_login_url: IAM_LOGIN_URL });
+      } catch {}
+    }
+  }
 
   const config = {} as RuntimeConfig;
   for (const [field, { key, fallback }] of Object.entries(CONFIG_STORAGE_MAP)) {
