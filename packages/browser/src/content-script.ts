@@ -2051,18 +2051,53 @@ new HanzoContentScript();
 // Heartbeats every 10s prevent Firefox's 4-minute idle-port disconnect.
 // =============================================================================
 try {
-  const port = (browser as any)?.runtime?.connect?.({ name: 'zap-keepalive' })
-    || (chrome as any)?.runtime?.connect?.({ name: 'zap-keepalive' });
-  if (port) {
-    const tick = setInterval(() => {
-      try { port.postMessage({ type: 'ping', t: Date.now() }); }
-      catch { clearInterval(tick); }
-    }, 10_000);
-    // A page entering the back/forward cache closes its port; reading
-    // lastError marks that expected close as handled.
-    port.onDisconnect?.addListener?.(() => {
-      void ((chrome as any)?.runtime?.lastError);
-      clearInterval(tick);
-    });
+  let port: any = null;
+  let tick: any = null;
+
+  function connectKeepAlive() {
+    if (port) return;
+    try {
+      port = (browser as any)?.runtime?.connect?.({ name: 'zap-keepalive' })
+        || (chrome as any)?.runtime?.connect?.({ name: 'zap-keepalive' });
+      if (port) {
+        tick = setInterval(() => {
+          try { port?.postMessage({ type: 'ping', t: Date.now() }); }
+          catch { disconnectKeepAlive(); }
+        }, 10_000);
+        // A page entering the back/forward cache closes its port; reading
+        // lastError and port.error marks that expected close as handled.
+        port.onDisconnect?.addListener?.((p: any) => {
+          void ((chrome as any)?.runtime?.lastError);
+          void ((browser as any)?.runtime?.lastError);
+          void p?.error;
+          void port?.error;
+          disconnectKeepAlive();
+        });
+      }
+    } catch {
+      port = null;
+    }
   }
+
+  function disconnectKeepAlive() {
+    if (tick) { clearInterval(tick); tick = null; }
+    if (port) {
+      try { port.disconnect(); } catch {}
+      port = null;
+    }
+  }
+
+  connectKeepAlive();
+
+  // Cleanly disconnect before the page is frozen in the back/forward cache
+  window.addEventListener('pagehide', () => {
+    disconnectKeepAlive();
+  });
+
+  // Re-establish the keep-alive port if the page is restored from back/forward cache
+  window.addEventListener('pageshow', (ev) => {
+    if (ev.persisted) {
+      connectKeepAlive();
+    }
+  });
 } catch { /* not all pages let content scripts open ports — best effort */ }

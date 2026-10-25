@@ -1790,7 +1790,11 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener(() => { /* receipt is the keep-alive */ });
   // A tab entering the back/forward cache closes its port and Chrome reports
   // that close here, on this end; reading lastError marks it as expected.
-  port.onDisconnect.addListener(() => { void chrome.runtime.lastError; });
+  port.onDisconnect.addListener((p) => {
+    void chrome.runtime.lastError;
+    void p?.error;
+    void (port as any)?.error;
+  });
 });
 
 // Keep-alive — Layer 2: Alarms. While the socket is up its 20 s heartbeat keeps
