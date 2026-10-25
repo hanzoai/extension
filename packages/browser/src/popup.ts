@@ -487,6 +487,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Support deep-link URL params (?pair=<code> and/or ?reload=1) so CLI/MCP tools
+  // can pair or reload the unpacked extension without manual clicks.
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const pairParam = params.get('pair');
+    const reloadParam = params.get('reload');
+    if (pairParam !== null) {
+      chrome.runtime.sendMessage({ action: 'zap.pair', code: pairParam }, () => {
+        void chrome.runtime.lastError;
+        if (reloadParam === '1') {
+          setTimeout(() => chrome.runtime.reload(), 150);
+        } else {
+          setTimeout(refreshStatus, 800);
+        }
+      });
+    } else if (reloadParam === '1') {
+      chrome.storage?.local?.remove?.(['zapPairing'], () => {
+        void chrome.runtime.lastError;
+        chrome.runtime.reload();
+      });
+    }
+  } catch { /* ignore URL param errors */ }
+
   function refreshStatus() {
     // ZAP Bridge
     chrome.runtime.sendMessage({ action: 'zap.status' }, (response) => {
