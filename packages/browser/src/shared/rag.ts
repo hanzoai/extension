@@ -5,6 +5,7 @@
 import type { RagSnippet, RagQueryParams } from './types.js';
 
 const DEFAULT_RAG_TOP_K = 5;
+export const DEFAULT_HANZO_SEARCH_ENDPOINT = 'https://api.hanzo.ai/v1/search';
 
 /** Load RAG config from extension storage */
 export async function getRagConfig(storage: typeof chrome.storage.local): Promise<{
@@ -24,9 +25,9 @@ export async function getRagConfig(storage: typeof chrome.storage.local): Promis
     ], (result: any) => {
       const parsedTopK = Number.parseInt(String(result.hanzo_rag_top_k ?? DEFAULT_RAG_TOP_K), 10);
       resolve({
-        endpoint: String(result.hanzo_rag_endpoint || '').trim(),
+        endpoint: String(result.hanzo_rag_endpoint || DEFAULT_HANZO_SEARCH_ENDPOINT).trim(),
         apiKey: String(result.hanzo_rag_api_key || '').trim(),
-        knowledgeBase: String(result.hanzo_rag_kb || '').trim(),
+        knowledgeBase: String(result.hanzo_rag_kb || 'hanzo-cloud').trim(),
         topK: Number.isFinite(parsedTopK) ? Math.max(1, Math.min(parsedTopK, 20)) : DEFAULT_RAG_TOP_K,
         includeTabContext: result.hanzo_rag_include_tab_context !== false,
       });
@@ -76,37 +77,56 @@ export function normalizeRagSnippets(raw: any): RagSnippet[] {
   return snippets.slice(0, 20);
 }
 
-/** Query RAG from HTTP endpoint */
+/** Query RAG from HTTP endpoint (Hanzo Cloud or local) */
 export async function queryRagFromEndpoint(params: RagQueryParams): Promise<RagSnippet[]> {
-  if (!params.endpoint) return [];
+  const snippets: RagSnippet[] = [];
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (params.apiKey) {
-    headers.Authorization = `Bearer ${params.apiKey}`;
+  // 1. Tab & page context augmentation
+  if (params.includeTabContext && params.pageContext?.url) {
+    snippets.push({
+      title: params.pageContext.title || 'Current Tab',
+      content: `Current Page Context:\nURL: ${params.pageContext.url}\nTitle: ${params.pageContext.title || 'Untitled'}`,
+      source: 'tab-context',
+      url: params.pageContext.url,
+      score: 1.0,
+    });
   }
 
-  const response = await fetch(params.endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      query: params.query,
-      top_k: params.topK,
-      knowledge_base: params.knowledgeBase || undefined,
-      page_context: params.includeTabContext ? params.pageContext : undefined,
-      source: 'hanzo-browser-extension',
-    }),
-  });
+  // 2. Query Hanzo Cloud search / retrieval
+  const endpoint = params.endpoint || DEFAULT_HANZO_SEARCH_ENDPOINT;
+  if (params.query) {
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (params.apiKey) {
+        headers.Authorization = `Bearer ${params.apiKey}`;
+      }
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`RAG endpoint error ${response.status}: ${text || 'Unknown error'}`);
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          query: params.query,
+          top_k: params.topK,
+          knowledge_base: params.knowledgeBase || 'hanzo-cloud',
+          page_context: params.includeTabContext ? params.pageContext : undefined,
+          source: 'hanzo-browser-extension',
+        }),
+      });
+
+      if (response.ok) {
+        const raw = await response.json();
+        const cloudSnippets = normalizeRagSnippets(raw).map((snippet) => ({
+          ...snippet,
+          source: snippet.source || 'hanzo-cloud',
+        }));
+        snippets.push(...cloudSnippets);
+      }
+    } catch (err) {
+      console.warn('[Hanzo Cloud RAG] Search retrieval notice:', err);
+    }
   }
 
-  const raw = await response.json();
-  return normalizeRagSnippets(raw).map((snippet) => ({
-    ...snippet,
-    source: snippet.source || 'rag-endpoint',
-  }));
+  return snippets;
 }

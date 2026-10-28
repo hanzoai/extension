@@ -1622,15 +1622,16 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
         try {
           const config = await getRagConfig(browser.storage.local);
           const topKInput = Number.parseInt(String(request.topK ?? config.topK), 10);
+          const token = await auth.getValidAccessToken().catch(() => '');
           const params: RagQueryParams = {
             query: String(request.query || '').trim(),
             topK: Number.isFinite(topKInput) ? Math.max(1, Math.min(topKInput, 20)) : 5,
-            knowledgeBase: String(request.knowledgeBase ?? config.knowledgeBase ?? '').trim(),
+            knowledgeBase: String(request.knowledgeBase ?? config.knowledgeBase ?? 'hanzo-cloud').trim(),
             includeTabContext: request.includeTabContext !== undefined
               ? !!request.includeTabContext
               : config.includeTabContext,
-            endpoint: String(request.endpoint ?? config.endpoint ?? '').trim(),
-            apiKey: String(request.apiKey ?? config.apiKey ?? '').trim(),
+            endpoint: String(request.endpoint || config.endpoint || 'https://api.hanzo.ai/v1/search').trim(),
+            apiKey: String(token || request.apiKey || config.apiKey || '').trim(),
             pageContext: request.pageContext && typeof request.pageContext === 'object'
               ? {
                   url: request.pageContext.url ? String(request.pageContext.url) : undefined,
@@ -1644,8 +1645,8 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
             break;
           }
 
-          const snippets = params.endpoint ? await queryRagFromEndpoint(params) : [];
-          const source = snippets.length ? 'rag-endpoint' : 'none';
+          const snippets = await queryRagFromEndpoint(params);
+          const source = snippets.length ? (snippets.some(s => s.source === 'hanzo-cloud') ? 'hanzo-cloud' : 'tab-context') : 'none';
 
           sendResponse({
             success: true,

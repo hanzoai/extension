@@ -700,8 +700,8 @@ class HanzoSidebar {
         query,
         topK,
         includeTabContext: this.tabContext,
-        knowledgeBase: this.el.ragKb?.value || '',
-        endpoint: this.el.ragEndpoint?.value || '',
+        knowledgeBase: this.el.ragKb?.value || 'hanzo-cloud',
+        endpoint: this.el.ragEndpoint?.value || 'https://api.hanzo.ai/v1/search',
         apiKey: this.el.ragApiKey?.value || '',
         pageContext: pageContext || undefined,
       });

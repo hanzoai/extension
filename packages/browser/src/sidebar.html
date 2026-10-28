@@ -305,29 +305,27 @@
           </label>
         </div>
 
-        <!-- RAG Settings -->
+        <!-- Hanzo Cloud Search & Retrieval -->
         <div class="panel">
-          <h3>RAG Integration</h3>
+          <h3>Hanzo Cloud Search & Retrieval</h3>
+          <div class="status-row" style="margin-bottom: 8px;">
+            <span style="font-size: 12px; color: var(--text-muted, #888);">Backend</span>
+            <span class="status-value mono" style="color: var(--primary, #3b82f6); font-weight: 500;">api.hanzo.ai</span>
+          </div>
           <label class="setting-item">
-            <span>Include Tab Context</span>
+            <span>Include Tab & Page Context</span>
             <input type="checkbox" id="rag-include-tab-context" checked>
           </label>
           <label class="setting-item">
-            <span>Top K</span>
+            <span>Context Depth (Top K)</span>
             <input type="number" id="rag-top-k" value="5" min="1" max="20">
           </label>
-          <label class="setting-item setting-item-column">
-            <span>Knowledge Base</span>
-            <input type="text" id="rag-kb" placeholder="e.g. engineering-docs">
-          </label>
-          <label class="setting-item setting-item-column">
-            <span>RAG Endpoint</span>
-            <input type="text" id="rag-endpoint" placeholder="https://your-rag.company.com/query">
-          </label>
-          <label class="setting-item setting-item-column">
-            <span>RAG API Key</span>
-            <input type="password" id="rag-api-key" placeholder="Optional bearer token">
-          </label>
+          <!-- Hidden legacy inputs for test & schema backward compatibility -->
+          <div style="display: none;">
+            <input type="text" id="rag-kb" value="hanzo-cloud">
+            <input type="text" id="rag-endpoint" value="https://api.hanzo.ai/v1/search">
+            <input type="password" id="rag-api-key" value="">
+          </div>
         </div>
 
         <button id="save-settings" class="primary-btn">Save Settings</button>
