@@ -33,6 +33,8 @@ import { driveMessage } from './shared/drive.js';
 import { unwrapEvaluateResult } from './shared/tab-id.js';
 import * as auth from './auth';
 import { fetchAllUsage } from './shared/usage.js';
+import { getChatGptSession, getChatGptUsage, executeInvisibleChatGpt } from './shared/chatgpt-web.js';
+import { discoverLocalNodes } from './shared/local-discovery.js';
 import { listModels, chatCompletion, ChatMessage } from './chat-client';
 import { PageMonitor } from './page-monitor';
 import {
@@ -169,17 +171,45 @@ async function listModelsCached(token?: string): Promise<Array<{ id: string; nam
     return cachedModels.models;
   }
 
-  const models = await listModels(token);
-  cachedModels = {
-    at: Date.now(),
-    models: (models || [])
+  let models: Array<{ id: string; name?: string; description?: string; owned_by?: string }> = [];
+  try {
+    const raw = await listModels(token);
+    models = (raw || [])
       .filter((model) => model && typeof model.id === 'string')
       .map((model) => ({
         id: String(model.id),
         name: model.name ? String(model.name) : undefined,
         description: model.description ? String(model.description) : undefined,
         owned_by: model.owned_by ? String(model.owned_by) : undefined,
-      })),
+      }));
+  } catch {
+    models = [
+      { id: 'zen5', name: 'Zen5 (Default)', description: 'Unified flagship reasoning & coding', owned_by: 'zenlm' },
+      { id: 'zen5-flash', name: 'Zen5 Flash', description: 'Ultra-fast low-latency reasoning', owned_by: 'zenlm' },
+      { id: 'zen5-coder', name: 'Zen5 Coder', description: 'Agentic coding & system development', owned_by: 'zenlm' },
+      { id: 'enso-auto', name: 'Enso Auto', description: 'Autonomous decision & tool router', owned_by: 'hanzo' },
+    ];
+  }
+
+  // Ensure default Zen5 & Enso are present
+  const ids = new Set(models.map((m) => m.id));
+  if (!ids.has('zen5')) models.unshift({ id: 'zen5', name: 'Zen5 (Default)', description: 'Unified flagship reasoning', owned_by: 'zenlm' });
+  if (!ids.has('zen5-flash')) models.push({ id: 'zen5-flash', name: 'Zen5 Flash', description: 'Ultra-fast reasoning', owned_by: 'zenlm' });
+  if (!ids.has('zen5-coder')) models.push({ id: 'zen5-coder', name: 'Zen5 Coder', description: 'Agentic coding', owned_by: 'zenlm' });
+  if (!ids.has('enso-auto')) models.push({ id: 'enso-auto', name: 'Enso Auto', description: 'Autonomous router', owned_by: 'hanzo' });
+
+  // Add connected subscription web models & local private AI
+  models.push(
+    { id: 'chatgpt-web', name: 'ChatGPT Web (Plus)', description: 'Connected ChatGPT Plus browser session (Invisible)', owned_by: 'openai' },
+    { id: 'claude-web', name: 'Claude Web', description: 'Connected Claude session for reasoning', owned_by: 'anthropic' },
+    { id: 'hanzo-spark', name: 'Hanzo Spark (Local GPU)', description: 'GB10 CUDA node at 10.0.0.19:1235', owned_by: 'local' },
+    { id: 'hanzo-evo', name: 'Hanzo Evo (Local GPU)', description: 'Strix Halo ROCm node at 10.0.0.21:1234', owned_by: 'local' },
+    { id: 'webgpu', name: 'WebGPU (In-Browser)', description: 'Private in-browser AI running on WebGPU', owned_by: 'local' }
+  );
+
+  cachedModels = {
+    at: Date.now(),
+    models,
   };
   return cachedModels.models;
 }
@@ -706,12 +736,6 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
 
     case 'chat.complete':
       try {
-        const token = await auth.getValidAccessToken();
-        if (!token) {
-          sendResponse({ success: false, error: 'Not authenticated' });
-          break;
-        }
-
         const senderKey = getSenderKey(sender);
         const requestedModel = String(request.model || 'auto');
         const messagesInput = Array.isArray(request.messages) ? request.messages : [];
@@ -732,9 +756,83 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
           break;
         }
 
+        // 1. ChatGPT Web (Invisible Temporary Chat using active Plus session)
+        if (requestedModel === 'chatgpt-web' || requestedModel.startsWith('chatgpt')) {
+          const prompt = budgeted.messages[budgeted.messages.length - 1]?.content || '';
+          const content = await executeInvisibleChatGpt(prompt, budgeted.messages);
+          await recordUsageDelta({
+            chatRequests: 1,
+            inputTokens: budgeted.inputTokens,
+            outputTokens: estimateTextTokens(content),
+          });
+          sendResponse({
+            success: true,
+            content,
+            model: 'chatgpt-web',
+            budget: { inputTokens: budgeted.inputTokens, droppedMessages: 0 },
+          });
+          break;
+        }
+
+        // 2. WebGPU in-browser private model
+        if (requestedModel === 'webgpu') {
+          const prompt = budgeted.messages[budgeted.messages.length - 1]?.content || '';
+          const res = await webgpuAI.generate(prompt);
+          await recordUsageDelta({
+            chatRequests: 1,
+            inputTokens: budgeted.inputTokens,
+            outputTokens: estimateTextTokens(res.text),
+          });
+          sendResponse({
+            success: true,
+            content: res.text,
+            model: 'webgpu',
+            budget: { inputTokens: budgeted.inputTokens, droppedMessages: 0 },
+          });
+          break;
+        }
+
+        // 3. Local GPU pool (Spark / Evo)
+        if (requestedModel === 'hanzo-spark' || requestedModel === 'hanzo-evo') {
+          const url = requestedModel === 'hanzo-spark' ? 'http://10.0.0.19:1235/v1' : 'http://10.0.0.21:1234/v1';
+          const localRes = await fetch(`${url}/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: requestedModel === 'hanzo-spark' ? 'zen5-spark' : 'zen5-evo',
+              messages: budgeted.messages,
+              temperature: typeof request.temperature === 'number' ? request.temperature : undefined,
+              max_tokens: typeof request.max_tokens === 'number' ? request.max_tokens : undefined,
+            }),
+          });
+          if (localRes.ok) {
+            const data = await localRes.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            await recordUsageDelta({
+              chatRequests: 1,
+              inputTokens: budgeted.inputTokens,
+              outputTokens: estimateTextTokens(content),
+            });
+            sendResponse({
+              success: true,
+              content,
+              model: requestedModel,
+              budget: { inputTokens: budgeted.inputTokens, droppedMessages: 0 },
+            });
+            break;
+          }
+        }
+
+        // 4. Hanzo Cloud models (require valid IAM session)
+        const token = await auth.getValidAccessToken();
+        if (!token) {
+          sendResponse({ success: false, error: 'Not authenticated with Hanzo IAM' });
+          break;
+        }
+
         let availableModelIds = getCachedModelIds();
         if (!availableModelIds.length) {
-          availableModelIds = (await listModelsCached(token)).map((model) => model.id);
+          availableModelIds = (await listModelsCached(token)).map((m) => m.id);
         }
         const model = pickModelForTokenBudget(requestedModel, availableModelIds, budgeted.inputTokens);
         const temperature = typeof request.temperature === 'number' ? request.temperature : undefined;
@@ -1275,6 +1373,31 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
         providers.push({ name: 'hanzo-node', url: hnDefaults.url, available: false });
       }
 
+      // Hanzo GPU Pool (Spark & Evo)
+      try {
+        const sparkResp = await fetch('http://10.0.0.19:1235/v1/models', { signal: AbortSignal.timeout(1500) });
+        if (sparkResp.ok) {
+          const sparkData = await sparkResp.json().catch(() => ({}));
+          providers.push({ name: 'hanzo-spark', url: 'http://10.0.0.19:1235', available: true, models: (sparkData.data || []).map((m: any) => m.id) });
+        } else {
+          providers.push({ name: 'hanzo-spark', url: 'http://10.0.0.19:1235', available: false });
+        }
+      } catch {
+        providers.push({ name: 'hanzo-spark', url: 'http://10.0.0.19:1235', available: false });
+      }
+
+      try {
+        const evoResp = await fetch('http://10.0.0.21:1234/v1/models', { signal: AbortSignal.timeout(1500) });
+        if (evoResp.ok) {
+          const evoData = await evoResp.json().catch(() => ({}));
+          providers.push({ name: 'hanzo-evo', url: 'http://10.0.0.21:1234', available: true, models: (evoData.data || []).map((m: any) => m.id) });
+        } else {
+          providers.push({ name: 'hanzo-evo', url: 'http://10.0.0.21:1234', available: false });
+        }
+      } catch {
+        providers.push({ name: 'hanzo-evo', url: 'http://10.0.0.21:1234', available: false });
+      }
+
       // Check for custom endpoints saved in storage
       const stored = await chrome.storage.local.get(['customLLMEndpoints']);
       const customs: { name: string; url: string; apiKey?: string }[] = stored.customLLMEndpoints || [];
@@ -1746,6 +1869,31 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       break;
     }
 
+    // --- ChatGPT Web session & usage ---
+    case 'chatgpt.session': {
+      (async () => {
+        try {
+          const session = await getChatGptSession();
+          sendResponse({ success: true, session });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
+    case 'chatgpt.usage': {
+      (async () => {
+        try {
+          const usage = await getChatGptUsage();
+          sendResponse({ success: true, usage });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      break;
+    }
+
   }
 }
 
@@ -1771,7 +1919,17 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 //    and register as a browser node. Inbound ROUTE commands dispatch to the
 //    browser. Exactly one transport (shared/socket.ts); the router is embedded
 //    in hanzo-mcp and the other Hanzo processes, so there is nothing to install.
-const BROWSER_CAPS = ['browser.tabs', 'browser.navigate', 'browser.dom', 'browser.screenshot', 'browser.input'];
+const BROWSER_CAPS = [
+  'browser.tabs',
+  'browser.navigate',
+  'browser.dom',
+  'browser.screenshot',
+  'browser.input',
+  'inference.chat',
+  'chatgpt.complete',
+  'chatgpt.session',
+  'usage.fetchAll',
+];
 const browserDispatch = (method: string, params: any) => cdpBridge.dispatchMethod(method, params);
 const zap = startZap({
   brand: 'hanzo',

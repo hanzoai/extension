@@ -38,6 +38,23 @@ async function* converse(
   model: string,
   signal: AbortSignal,
 ): AsyncGenerator<SearchEvent> {
+  if (model === 'chatgpt-web' || model === 'webgpu' || model.startsWith('hanzo-')) {
+    const runtime: typeof chrome = (globalThis as any).browser ?? (globalThis as any).chrome;
+    const resp: any = await runtime.runtime.sendMessage({
+      action: 'chat.complete',
+      model,
+      messages: [{ role: 'user', content: question }],
+    });
+    if (!resp?.success) {
+      yield { type: 'error', error: resp?.error || 'Inference failed' };
+      return;
+    }
+    const answer = resp.message?.content || resp.content || '';
+    yield { type: 'text', delta: answer };
+    yield { type: 'done', answer, sources: [] };
+    return;
+  }
+
   const stream = await client.chat.completions.create(
     { model, messages: [{ role: 'user', content: question }], stream: true },
     { signal },
@@ -169,13 +186,14 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
       //
       // The fallback is not a Hanzo call: no token, no proxy, no telemetry. The
       // query goes from this browser straight to the engine the user chose.
+      const isSpecial = model === 'chatgpt-web' || model === 'webgpu' || model.startsWith('hanzo-');
       let identified = false;
       try {
         identified = Boolean(await getToken());
       } catch {
         identified = false;
       }
-      if (!identified) {
+      if (!identified && !isSpecial) {
         const url = fallbackUrl(providerId, question);
         if (url) {
           void capture('answer_search_fallback', { provider: providerId, mode });
@@ -186,7 +204,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
 
       setSubmitted(question);
       setPhase('running');
-      setStep({ name: mode === 'chat' ? 'Thinking' : 'Searching the web' });
+      setStep({ name: mode === 'chat' || isSpecial ? 'Thinking' : 'Searching the web' });
       setAnswer('');
       setAnswerSources([]);
       setFollowUps([]);
@@ -196,7 +214,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
       let fullAnswer = '';
 
       const stream =
-        mode === 'chat'
+        mode === 'chat' || isSpecial
           ? converse(client, question, model, ctrl.signal)
           : (client.search(question, {
               mode,

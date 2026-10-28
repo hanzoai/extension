@@ -464,7 +464,10 @@ class HanzoSidebar {
   async sendMessage(draft: string) {
     const text = (draft || '').trim();
     if (!text) return;
-    if (!this.authenticated) {
+    const selectedModel = this.model || 'auto';
+    const isSpecialModel = selectedModel === 'chatgpt-web' || selectedModel === 'webgpu' || selectedModel.startsWith('hanzo-');
+
+    if (!this.authenticated && !isSpecialModel) {
       // Double-check auth status in case it was set externally
       try {
         const status = await chrome.runtime.sendMessage({ action: 'auth.status' });
@@ -484,14 +487,17 @@ class HanzoSidebar {
     const requestId = ++this.requestEpoch;
 
     // Get token
-    const tokenResp = await chrome.runtime.sendMessage({ action: 'auth.getToken' });
-    if (!tokenResp?.success || !tokenResp.token) {
-      this.showError('Please sign in again');
-      return;
+    let token = '';
+    if (!isSpecialModel) {
+      const tokenResp = await chrome.runtime.sendMessage({ action: 'auth.getToken' });
+      if (!tokenResp?.success || !tokenResp.token) {
+        this.showError('Please sign in again');
+        return;
+      }
+      token = tokenResp.token;
     }
 
     const userMessage = identify({ role: 'user', content: text });
-    const selectedModel = this.model || 'auto';
     let requestMessages = [...this.messages, userMessage];
 
     this.ragContext = null;
@@ -563,12 +569,29 @@ class HanzoSidebar {
     let fullContent = '';
 
     try {
+      if (isSpecialModel) {
+        const resp: any = await chrome.runtime.sendMessage({
+          action: 'chat.complete',
+          model: resolvedModel,
+          messages: budgeted.messages,
+        });
+        if (!resp?.success) {
+          throw new Error(resp?.error || 'Execution failed');
+        }
+        fullContent = resp.message?.content || resp.content || '';
+        assistant.content = fullContent;
+        this.paint();
+        this.streaming = false;
+        this.streamController = null;
+        return;
+      }
+
       // Stream via direct fetch (sidebar has access via CSP)
       const response = await fetch(`${HANZO_API_BASE}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenResp.token}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           model: resolvedModel,

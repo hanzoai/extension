@@ -37,6 +37,96 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch { /* manifest unavailable in some contexts */ }
   }
 
+  // Model Picker Dropdown
+  const modelSelectBtn = document.getElementById('model-select-btn');
+  const modelBadge = document.getElementById('model-badge');
+  const modelDropdown = document.getElementById('model-dropdown');
+
+  const MODEL_LABELS: Record<string, string> = {
+    'auto': 'Auto',
+    'zen5': 'Zen5',
+    'zen5-flash': 'Zen5 Flash',
+    'zen5-coder': 'Zen5 Coder',
+    'enso': 'Enso',
+    'chatgpt-web': 'ChatGPT Plus',
+    'claude-web': 'Claude Web',
+    'hanzo-spark': 'Spark GB10',
+    'hanzo-evo': 'Evo Halo',
+    'hanzo-desktop': 'Desktop',
+    'webgpu': 'WebGPU',
+  };
+
+  function updateSelectedModel(modelId: string) {
+    chrome.storage.local.set({ hanzo_selected_model: modelId });
+    if (modelBadge) {
+      modelBadge.textContent = MODEL_LABELS[modelId] || modelId;
+    }
+    document.querySelectorAll('.model-item').forEach((item) => {
+      const active = item.getAttribute('data-model') === modelId;
+      item.classList.toggle('active', active);
+    });
+  }
+
+  chrome.storage.local.get(['hanzo_selected_model'], (res) => {
+    const m = res.hanzo_selected_model || 'auto';
+    updateSelectedModel(m);
+  });
+
+  modelSelectBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = modelDropdown?.classList.contains('hidden');
+    if (isHidden) {
+      modelDropdown?.classList.remove('hidden');
+      modelSelectBtn.classList.add('open');
+    } else {
+      modelDropdown?.classList.add('hidden');
+      modelSelectBtn.classList.remove('open');
+    }
+  });
+
+  document.querySelectorAll('.model-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const m = item.getAttribute('data-model');
+      if (m) {
+        updateSelectedModel(m);
+        modelDropdown?.classList.add('hidden');
+        modelSelectBtn?.classList.remove('open');
+      }
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!modelSelectBtn?.contains(e.target as Node) && !modelDropdown?.contains(e.target as Node)) {
+      modelDropdown?.classList.add('hidden');
+      modelSelectBtn?.classList.remove('open');
+    }
+  });
+
+  // Top Nav Tabs
+  const navTabs = document.querySelectorAll('.nav-tab-btn');
+  const tabPanes = document.querySelectorAll('.tab-pane');
+
+  navTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const targetId = tab.getAttribute('data-tab');
+      navTabs.forEach((t) => t.classList.remove('active'));
+      tabPanes.forEach((p) => p.classList.add('hidden'));
+
+      tab.classList.add('active');
+      const targetPane = document.getElementById(targetId || '');
+      if (targetPane) {
+        targetPane.classList.remove('hidden');
+      }
+
+      if (targetId === 'tab-accounts') {
+        loadUsage();
+        refreshConnectedAccounts();
+      } else if (targetId === 'tab-bridges') {
+        refreshStatus();
+      }
+    });
+  });
+
   // Auth
   const loginBtn = document.getElementById('login-btn');
   const logoutBtn = document.getElementById('logout-btn');
@@ -196,10 +286,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
+      const selectedModel = await new Promise<string>((resolve) => {
+        chrome.storage.local.get(['hanzo_selected_model'], (res) => {
+          resolve(res.hanzo_selected_model || 'auto');
+        });
+      });
+
       chrome.runtime.sendMessage(
         {
           action: 'chat.complete',
-          model: 'zen4',
+          model: selectedModel,
           messages: [{ role: 'user', content: fullPrompt }],
         },
         (response) => {
@@ -980,8 +1076,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  usageRefresh?.addEventListener('click', loadUsage);
+  function refreshConnectedAccounts() {
+    // 1. ChatGPT Web session
+    chrome.runtime.sendMessage({ action: 'chatgpt.session' }, (resp) => {
+      if (chrome.runtime.lastError) return;
+      const label = document.getElementById('chatgpt-user-label');
+      const badge = document.getElementById('chatgpt-plan-badge');
+      if (resp?.success && resp.session?.authenticated) {
+        const user = resp.session.user?.name || resp.session.user?.email || 'Logged in';
+        const plan = (resp.session.plan_type || 'plus').toUpperCase();
+        if (label) label.textContent = `${user} · Active Web Session`;
+        if (badge) badge.textContent = plan;
+      } else {
+        if (label) label.textContent = 'Not logged in (open chatgpt.com)';
+        if (badge) badge.textContent = 'OFFLINE';
+      }
+    });
+
+    // 2. Discover local nodes
+    chrome.runtime.sendMessage({ action: 'local.discover' }, (resp) => {
+      if (chrome.runtime.lastError) return;
+      if (resp?.success && resp.instances) {
+        const spark = resp.instances.find((i: any) => i.id === 'hanzo-spark' || i.url?.includes('10.0.0.19'));
+        const evo = resp.instances.find((i: any) => i.id === 'hanzo-evo' || i.url?.includes('10.0.0.21'));
+        const desktop = resp.instances.find((i: any) => i.id === 'desktop' || i.url?.includes('11435'));
+
+        const sparkDot = document.querySelector('#node-spark .node-dot');
+        const evoDot = document.querySelector('#node-evo .node-dot');
+        const deskDot = document.querySelector('#node-desktop .node-dot');
+
+        if (sparkDot) sparkDot.classList.toggle('live', spark?.status === 'online');
+        if (evoDot) evoDot.classList.toggle('live', evo?.status === 'online');
+        if (deskDot) deskDot.classList.toggle('live', desktop?.status === 'online');
+      }
+    });
+  }
+
+  usageRefresh?.addEventListener('click', () => {
+    loadUsage();
+    refreshConnectedAccounts();
+  });
   loadUsage();
+  refreshConnectedAccounts();
 
   // Init
   checkAuth();

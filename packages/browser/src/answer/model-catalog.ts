@@ -86,5 +86,50 @@ export async function fetchCatalog(signal?: AbortSignal): Promise<ModelCatalogEn
       });
     }
   }
-  return models;
+  const CONNECTED_MODELS: ModelCatalogEntry[] = [
+    {
+      id: 'chatgpt-web',
+      label: 'ChatGPT Web (Plus)',
+      family: 'Connected Accounts',
+      description: 'Uses active ChatGPT Plus session (temporary chats)',
+      modality: 'chat',
+    },
+    {
+      id: 'claude-web',
+      label: 'Claude Web',
+      family: 'Connected Accounts',
+      description: 'Uses active Claude session',
+      modality: 'chat',
+    },
+    {
+      id: 'hanzo-spark',
+      label: 'Hanzo Spark (GB10 CUDA)',
+      family: 'Local Compute',
+      description: 'Spark GB10 node (10.0.0.19:1235)',
+      modality: 'chat',
+    },
+    {
+      id: 'hanzo-evo',
+      label: 'Hanzo Evo (Strix Halo ROCm)',
+      family: 'Local Compute',
+      description: 'Evo Strix Halo node (10.0.0.21:1234)',
+      modality: 'chat',
+    },
+    {
+      id: 'hanzo-desktop',
+      label: 'Hanzo Desktop',
+      family: 'Local Compute',
+      description: 'Local Hanzo Desktop (:11435)',
+      modality: 'chat',
+    },
+    {
+      id: 'webgpu',
+      label: 'WebGPU AI (Local)',
+      family: 'Local Compute',
+      description: 'Runs on-device in browser GPU',
+      modality: 'chat',
+    },
+  ];
+
+  return [...models, ...CONNECTED_MODELS];
 }

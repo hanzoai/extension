@@ -7,6 +7,8 @@ import { detail, shrink } from './shared/shrink.js';
 import { DRIVE, drive } from './shared/drive.js';
 import { bits, codeOf, keyCode, parseKey, text } from './shared/keys.js';
 import * as script from './shared/script.js';
+import { getChatGptSession, executeInvisibleChatGpt } from './shared/chatgpt-web.js';
+import { fetchAllUsage } from './shared/usage.js';
 
 /**
  * Coerce the named params from string → number in place.
@@ -462,6 +464,20 @@ export class CDPBridge {
           else await chrome.tabs.update(target, { active: true });
           return { id, result: { success: true } };
         }
+
+        case 'chatgpt.session':
+          return { id, result: await getChatGptSession() };
+
+        case 'chatgpt.complete':
+        case 'inference.chat': {
+          const prompt = String(params?.prompt || params?.message || params?.content || '');
+          const messages = Array.isArray(params?.messages) ? params.messages : [];
+          const text = await executeInvisibleChatGpt(prompt, messages);
+          return { id, result: { success: true, content: text, model: 'chatgpt-web' } };
+        }
+
+        case 'usage.fetchAll':
+          return { id, result: { success: true, providers: await fetchAllUsage() } };
       }
 
       // Resolve target tab. Accept numeric tabId, "tab-NNN" targetId from

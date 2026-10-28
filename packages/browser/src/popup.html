@@ -20,7 +20,95 @@
         </svg>
         <div class="brand-meta">
           <span class="brand-title">Hanzo AI</span>
-          <span class="brand-badge" id="model-badge">Zen4 · Flash</span>
+          <!-- Dynamic Model Badge Button with Dropdown -->
+          <div class="model-picker-wrapper">
+            <button id="model-select-btn" class="brand-badge-btn" type="button" title="Select AI Model">
+              <span id="model-badge">Auto</span>
+              <svg class="chevron" viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div id="model-dropdown" class="model-dropdown hidden">
+              <div class="model-dropdown-group">
+                <span class="model-group-title">Hanzo Cloud</span>
+                <button type="button" class="model-item" data-model="auto">
+                  <div class="model-item-text">
+                    <span class="model-name">Auto</span>
+                    <span class="model-desc">Routes to best model</span>
+                  </div>
+                </button>
+                <button type="button" class="model-item" data-model="zen5">
+                  <div class="model-item-text">
+                    <span class="model-name">Zen5</span>
+                    <span class="model-desc">Flagship reasoning</span>
+                  </div>
+                </button>
+                <button type="button" class="model-item" data-model="zen5-flash">
+                  <div class="model-item-text">
+                    <span class="model-name">Zen5 Flash</span>
+                    <span class="model-desc">Ultra-fast responses</span>
+                  </div>
+                </button>
+                <button type="button" class="model-item" data-model="zen5-coder">
+                  <div class="model-item-text">
+                    <span class="model-name">Zen5 Coder</span>
+                    <span class="model-desc">Code generation & reasoning</span>
+                  </div>
+                </button>
+                <button type="button" class="model-item" data-model="enso">
+                  <div class="model-item-text">
+                    <span class="model-name">Enso</span>
+                    <span class="model-desc">Agentic planner</span>
+                  </div>
+                </button>
+              </div>
+
+              <div class="model-dropdown-group">
+                <span class="model-group-title">Connected Subscriptions</span>
+                <button type="button" class="model-item" data-model="chatgpt-web">
+                  <div class="model-item-text">
+                    <span class="model-name">ChatGPT Web (Plus)</span>
+                    <span class="model-desc">Zero-footprint temporary chats</span>
+                  </div>
+                  <span class="model-tag plus">Plus</span>
+                </button>
+                <button type="button" class="model-item" data-model="claude-web">
+                  <div class="model-item-text">
+                    <span class="model-name">Claude Web</span>
+                    <span class="model-desc">Active Claude session</span>
+                  </div>
+                </button>
+              </div>
+
+              <div class="model-dropdown-group">
+                <span class="model-group-title">Local &amp; Private AI</span>
+                <button type="button" class="model-item" data-model="hanzo-spark">
+                  <div class="model-item-text">
+                    <span class="model-name">Hanzo Spark</span>
+                    <span class="model-desc">GB10 CUDA (10.0.0.19:1235)</span>
+                  </div>
+                </button>
+                <button type="button" class="model-item" data-model="hanzo-evo">
+                  <div class="model-item-text">
+                    <span class="model-name">Hanzo Evo</span>
+                    <span class="model-desc">Strix Halo ROCm (10.0.0.21:1234)</span>
+                  </div>
+                </button>
+                <button type="button" class="model-item" data-model="hanzo-desktop">
+                  <div class="model-item-text">
+                    <span class="model-name">Hanzo Desktop</span>
+                    <span class="model-desc">Local instance (:11435)</span>
+                  </div>
+                </button>
+                <button type="button" class="model-item" data-model="webgpu">
+                  <div class="model-item-text">
+                    <span class="model-name">WebGPU AI</span>
+                    <span class="model-desc">On-device in-browser</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -50,92 +138,316 @@
       </div>
     </header>
 
-    <!-- Main Chat & Search View -->
+    <!-- Navigation Tabs -->
+    <nav class="popup-nav-tabs">
+      <button type="button" class="nav-tab-btn active" data-tab="tab-chat">Chat &amp; Search</button>
+      <button type="button" class="nav-tab-btn" data-tab="tab-accounts">Accounts &amp; Usage</button>
+      <button type="button" class="nav-tab-btn" data-tab="tab-bridges">Bridges &amp; Tools</button>
+    </nav>
+
+    <!-- Main Container Body -->
     <div id="main-section" class="section main-view">
-      <!-- Active Tab Context Chip -->
-      <div id="tab-context-chip" class="context-chip" title="Active page context included">
-        <span class="context-dot"></span>
-        <span class="context-tag">Page</span>
-        <span id="tab-context-title" class="context-title">Detecting active page…</span>
-        <button id="toggle-context-btn" class="context-toggle" title="Toggle page context" type="button">Active</button>
+
+      <!-- Tab 1: Chat & Search View -->
+      <div id="tab-chat" class="tab-pane active">
+        <!-- Active Tab Context Chip -->
+        <div id="tab-context-chip" class="context-chip" title="Active page context included">
+          <span class="context-dot"></span>
+          <span class="context-tag">Page</span>
+          <span id="tab-context-title" class="context-title">Detecting active page…</span>
+          <button id="toggle-context-btn" class="context-toggle" title="Toggle page context" type="button">Active</button>
+        </div>
+
+        <!-- Omnibox Form (Chat & Search) -->
+        <form id="search-form" class="composer-box">
+          <textarea
+            id="search-input"
+            class="composer-input"
+            placeholder="Ask Hanzo anything, or search…"
+            rows="3"
+            autocomplete="off"
+            spellcheck="false"
+          ></textarea>
+
+          <div class="composer-bottom">
+            <div class="composer-actions">
+              <button type="submit" id="ask-btn" class="action-submit primary" title="Ask Hanzo AI">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M8 12V4M4 8l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Ask AI</span>
+              </button>
+              <button type="button" id="search-web-btn" class="action-submit secondary" title="Search Answer Engine">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="7" cy="7" r="4.5"/><path d="M11 11l3.5 3.5" stroke-linecap="round"/>
+                </svg>
+                <span>Search</span>
+              </button>
+            </div>
+            <div class="composer-shortcut">
+              <kbd>Enter</kbd> ask · <kbd>Shift+↵</kbd> line
+            </div>
+          </div>
+        </form>
+
+        <!-- Quick Action Pills -->
+        <div class="quick-pills">
+          <button type="button" class="quick-pill" data-prompt="Summarize this page in 3 clear bullets">
+            ⚡ Summarize page
+          </button>
+          <button type="button" class="quick-pill" data-prompt="Extract the key takeaways and conclusions">
+            💡 Key takeaways
+          </button>
+          <button type="button" class="quick-pill" data-prompt="Explain this simply with examples">
+            📖 Explain simply
+          </button>
+        </div>
+
+        <!-- Inline Answer Area (renders fast answers inside popup) -->
+        <div id="inline-answer" class="inline-answer hidden">
+          <div class="answer-card-header">
+            <div class="answer-model">
+              <span class="live-dot-pulse"></span>
+              <span id="answer-header-text">Hanzo AI Response</span>
+            </div>
+            <div class="answer-btn-group">
+              <button id="copy-inline-btn" class="pill-btn" type="button" title="Copy answer">
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="5" y="5" width="8" height="8" rx="1.5"/>
+                  <path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2"/>
+                </svg>
+                <span>Copy</span>
+              </button>
+              <button id="continue-chat-btn" class="pill-btn highlight" type="button" title="Open full chat">
+                <span>Full Chat →</span>
+              </button>
+            </div>
+          </div>
+          <div id="inline-answer-content" class="answer-card-body"></div>
+        </div>
+
+        <!-- User Info (compact) -->
+        <div id="user-info-section" class="user-strip hidden">
+          <div class="user-strip-inner">
+            <img id="user-avatar" class="avatar-sm" src="" alt="">
+            <span id="user-name" class="user-label"></span>
+            <span id="user-email" class="user-sub"></span>
+          </div>
+          <button id="logout-btn" class="signout-link" type="button">Sign out</button>
+        </div>
       </div>
 
-      <!-- Omnibox Form (Chat & Search) -->
-      <form id="search-form" class="composer-box">
-        <textarea
-          id="search-input"
-          class="composer-input"
-          placeholder="Ask Hanzo anything, or search…"
-          rows="3"
-          autocomplete="off"
-          spellcheck="false"
-        ></textarea>
+      <!-- Tab 2: Connected Accounts & Usage -->
+      <div id="tab-accounts" class="tab-pane hidden">
+        <div class="pane-header">
+          <span class="pane-title">Connected Accounts &amp; Usage</span>
+          <button id="usage-refresh" class="pane-action-btn" type="button" title="Refresh Usage">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c2 0 3.7.9 4.8 2.4M13.5 2v3h-3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Refresh</span>
+          </button>
+        </div>
 
-        <div class="composer-bottom">
-          <div class="composer-actions">
-            <button type="submit" id="ask-btn" class="action-submit primary" title="Ask Hanzo AI">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M8 12V4M4 8l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- ChatGPT Plus Web Account Card -->
+        <div class="account-card" id="chatgpt-account-card">
+          <div class="account-card-header">
+            <div class="account-icon chatgpt-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M22.28 9.87c-.14-.99-.57-1.92-1.24-2.67-.67-.74-1.54-1.26-2.5-1.5-.2-.79-.6-1.51-1.16-2.11-.56-.6-1.26-1.03-2.04-1.26-.78-.23-1.61-.23-2.39 0-.78.23-1.48.66-2.04 1.26-.56.6-.96 1.32-1.16 2.11-.96.24-1.83.76-2.5 1.5-.67.75-1.1 1.68-1.24 2.67-.8.36-1.46.94-1.91 1.67-.45.73-.67 1.58-.64 2.44.03.86.32 1.69.83 2.39.51.7 1.22 1.21 2.04 1.48.14.99.57 1.92 1.24 2.67.67.75 1.54 1.26 2.5 1.5.2.79.6 1.51 1.16 2.11.56.6 1.26 1.03 2.04 1.26.78.23 1.61.23 2.39 0 .78-.23 1.48-.66 2.04-1.26.56-.6.96-1.32 1.16-2.11.96-.24 1.83-.76 2.5-1.5.67-.75 1.1-1.68 1.24-2.67.8-.36 1.46-.94 1.91-1.67.45-.73.67-1.58.64-2.44-.03-.86-.32-1.69-.83-2.39-.51-.7-1.22-1.21-2.04-1.48z"/>
               </svg>
-              <span>Ask AI</span>
-            </button>
-            <button type="button" id="search-web-btn" class="action-submit secondary" title="Search Answer Engine">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="7" cy="7" r="4.5"/><path d="M11 11l3.5 3.5" stroke-linecap="round"/>
-              </svg>
-              <span>Search</span>
-            </button>
+            </div>
+            <div class="account-info">
+              <div class="account-name-row">
+                <span class="account-name">ChatGPT Web</span>
+                <span class="badge-pill plus" id="chatgpt-plan-badge">Plus</span>
+                <span class="badge-pill bridge">Exposed to Dev &amp; ZAP</span>
+              </div>
+              <span class="account-sub" id="chatgpt-user-label">Checking session…</span>
+            </div>
           </div>
-          <div class="composer-shortcut">
-            <kbd>Enter</kbd> ask · <kbd>Shift+↵</kbd> line
+          <div class="account-details" id="chatgpt-details">
+            <div class="detail-row">
+              <span class="detail-label">Mode</span>
+              <span class="detail-val">Temporary Chats (Zero Trace)</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Inference Relay</span>
+              <span class="detail-val live">Ready for hanzo/dev &amp; bots</span>
+            </div>
           </div>
         </div>
-      </form>
 
-      <!-- Quick Action Pills -->
-      <div class="quick-pills">
-        <button type="button" class="quick-pill" data-prompt="Summarize this page in 3 clear bullets">
-          ⚡ Summarize page
-        </button>
-        <button type="button" class="quick-pill" data-prompt="Extract the key takeaways and conclusions">
-          💡 Key takeaways
-        </button>
-        <button type="button" class="quick-pill" data-prompt="Explain this simply with examples">
-          📖 Explain simply
-        </button>
+        <!-- Usage List (Claude & Codex via @hanzo/usage) -->
+        <div id="usage-list" class="usage-container">
+          <div class="loading-state">Loading usage data…</div>
+        </div>
+
+        <!-- Local Compute Nodes Card -->
+        <div class="account-card">
+          <div class="account-card-header">
+            <div class="account-icon local-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+                <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+              </svg>
+            </div>
+            <div class="account-info">
+              <span class="account-name">Private &amp; Local Hardware</span>
+              <span class="account-sub">Zero cloud egress · Local private models</span>
+            </div>
+          </div>
+          <div class="node-grid">
+            <div class="node-item" id="node-spark">
+              <span class="node-dot live"></span>
+              <div class="node-meta">
+                <span class="node-title">Hanzo Spark (GB10 CUDA)</span>
+                <span class="node-addr">10.0.0.19:1235</span>
+              </div>
+            </div>
+            <div class="node-item" id="node-evo">
+              <span class="node-dot live"></span>
+              <div class="node-meta">
+                <span class="node-title">Hanzo Evo (Strix Halo ROCm)</span>
+                <span class="node-addr">10.0.0.21:1234</span>
+              </div>
+            </div>
+            <div class="node-item" id="node-desktop">
+              <span class="node-dot"></span>
+              <div class="node-meta">
+                <span class="node-title">Hanzo Desktop</span>
+                <span class="node-addr">localhost:11435</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Inline Answer Area (renders fast answers inside popup) -->
-      <div id="inline-answer" class="inline-answer hidden">
-        <div class="answer-card-header">
-          <div class="answer-model">
-            <span class="live-dot-pulse"></span>
-            <span id="answer-header-text">Hanzo AI Response</span>
-          </div>
-          <div class="answer-btn-group">
-            <button id="copy-inline-btn" class="pill-btn" type="button" title="Copy answer">
-              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8">
-                <rect x="5" y="5" width="8" height="8" rx="1.5"/>
-                <path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2"/>
-              </svg>
-              <span>Copy</span>
-            </button>
-            <button id="continue-chat-btn" class="pill-btn highlight" type="button" title="Open full chat">
-              <span>Full Chat →</span>
-            </button>
-          </div>
+      <!-- Tab 3: Bridges & Tools View -->
+      <div id="tab-bridges" class="tab-pane hidden">
+        <div class="pane-header">
+          <span class="pane-title">Bridge Runtime Status</span>
+          <button id="test-connection" class="pane-action-btn" type="button">Test</button>
         </div>
-        <div id="inline-answer-content" class="answer-card-body"></div>
-      </div>
 
-      <!-- User Info (compact) -->
-      <div id="user-info-section" class="user-strip hidden">
-        <div class="user-strip-inner">
-          <img id="user-avatar" class="avatar-sm" src="" alt="">
-          <span id="user-name" class="user-label"></span>
-          <span id="user-email" class="user-sub"></span>
+        <!-- Bridges Status Grid -->
+        <div class="bridge-grid">
+          <div class="bridge-card">
+            <div class="bridge-card-top">
+              <span class="status-dot disconnected" id="zap-status"></span>
+              <strong class="bridge-title">ZAP Router</strong>
+            </div>
+            <span class="bridge-detail" id="zap-detail">Checking…</span>
+          </div>
+
+          <div class="bridge-card">
+            <div class="bridge-card-top">
+              <span class="status-dot disconnected" id="cdp-status"></span>
+              <strong class="bridge-title">CDP Bridge</strong>
+            </div>
+            <span class="bridge-detail" id="cdp-detail">Checking…</span>
+          </div>
+
+          <div class="bridge-card">
+            <div class="bridge-card-top">
+              <span class="status-dot disconnected" id="mcp-status"></span>
+              <strong class="bridge-title">MCP Bridge</strong>
+            </div>
+            <span class="bridge-detail" id="mcp-port">:9224</span>
+          </div>
+
+          <div class="bridge-card">
+            <div class="bridge-card-top">
+              <span class="status-dot disconnected" id="gpu-status"></span>
+              <strong class="bridge-title">WebGPU AI</strong>
+            </div>
+            <span class="bridge-detail" id="gpu-detail">Checking…</span>
+          </div>
         </div>
-        <button id="logout-btn" class="signout-link" type="button">Sign out</button>
+
+        <!-- ZAP Pairing Box -->
+        <div id="zap-pair" class="pair-card" hidden>
+          <label for="zap-code" class="pair-label">Pair with computer: run <code>hanzo-mcp pair</code></label>
+          <div class="pair-input-group">
+            <input type="text" id="zap-code" placeholder="ws://127.0.0.1:…/#…" autocomplete="off" spellcheck="false">
+            <button id="zap-pair-btn" class="action-submit primary" type="button">Pair</button>
+          </div>
+          <span id="zap-pair-error" class="status-detail error-text"></span>
+        </div>
+
+        <!-- Developer Quick Tools -->
+        <div class="tools-section">
+          <span class="setting-title">Developer Quick Tools</span>
+          <div class="tools-btn-grid">
+            <button type="button" class="tool-btn" id="tool-picker" title="Inspect element on page">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M3 3l4 10 2-4 4-2L3 3z"/>
+              </svg>
+              <span>Pick Element</span>
+            </button>
+            <button type="button" class="tool-btn" id="tool-screenshot" title="Capture active tab">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="8" cy="8" r="2.5"/>
+              </svg>
+              <span>Screenshot</span>
+            </button>
+            <button type="button" class="tool-btn" id="tool-pageinfo" title="Copy page metadata">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11"/><line x1="8" y1="5" x2="8.01" y2="5"/>
+              </svg>
+              <span>Page Info</span>
+            </button>
+            <button type="button" class="tool-btn" id="tool-accessibility" title="Run accessibility audit">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="8" cy="4" r="2"/><path d="M4 7h8M8 7v7M5 14l3-3 3 3"/>
+              </svg>
+              <span>A11y Audit</span>
+            </button>
+            <button type="button" class="tool-btn" id="tool-performance" title="Run performance audit">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M8 2v4l3 2"/><circle cx="8" cy="8" r="6"/>
+              </svg>
+              <span>Performance</span>
+            </button>
+            <button type="button" class="tool-btn" id="tool-console" title="Open JS eval prompt">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8">
+                <polyline points="4 6 8 10 4 14"/><line x1="10" y1="14" x2="14" y2="14"/>
+              </svg>
+              <span>Console</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Feature Capabilities -->
+        <div class="features-section">
+          <span class="setting-title">Agentic Capabilities</span>
+          <label class="toggle-row">
+            <span>Browser Control (agent action loop)</span>
+            <input type="checkbox" id="browser-control" checked>
+          </label>
+          <label class="toggle-row">
+            <span>Tab Filesystem (exposes DOM &amp; resources)</span>
+            <input type="checkbox" id="tab-filesystem" checked>
+          </label>
+          <label class="toggle-row">
+            <span>WebGPU AI Acceleration</span>
+            <input type="checkbox" id="webgpu-ai" checked>
+          </label>
+          <label class="toggle-row">
+            <span>Source Maps Inspection</span>
+            <input type="checkbox" id="source-maps" checked>
+          </label>
+        </div>
+
+        <!-- Shortcut Recorder -->
+        <div class="setting-group">
+          <span class="setting-title">Inspect Modifier</span>
+          <div class="shortcut-recorder-row">
+            <span class="shortcut-label">Click element to jump to code:</span>
+            <kbd id="inspect-shortcut-display" class="kbd">Ctrl</kbd>
+            <button type="button" id="record-inspect-shortcut" class="pill-btn">Record</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -196,11 +508,57 @@
         </div>
 
         <div class="setting-group">
-          <span class="setting-title">Shortcuts</span>
-          <div class="shortcut-row">
-            <span>Toggle Hanzo Assistant</span>
-            <kbd class="kbd">Ctrl+Shift+H</kbd>
+          <span class="setting-title">Browser Backend</span>
+          <select id="browser-backend" class="form-select">
+            <option value="auto">Auto (ZAP Native / CDP)</option>
+            <option value="zap">ZAP Native Router</option>
+            <option value="cdp">CDP Direct</option>
+            <option value="mcp">MCP Port</option>
+          </select>
+          <div class="backend-status-line">
+            <span class="status-dot disconnected" id="bridge-status"></span>
+            <span class="status-detail" id="bridge-detail">Not connected</span>
           </div>
+        </div>
+
+        <div class="setting-group">
+          <span class="setting-title">Ports &amp; Endpoints</span>
+          <div class="port-input-row">
+            <label for="mcp-port-setting">MCP Port</label>
+            <input type="number" id="mcp-port-setting" value="9224" min="1024" max="65535">
+          </div>
+          <div class="port-input-row">
+            <label for="cdp-port-setting">CDP Port</label>
+            <input type="number" id="cdp-port-setting" value="9223" min="1024" max="65535">
+          </div>
+          <button id="save-settings" class="action-submit primary" type="button" style="margin-top:6px;">Save Settings</button>
+        </div>
+
+        <div class="setting-group">
+          <span class="setting-title">Inspect Shortcut</span>
+          <div class="shortcut-recorder-row">
+            <kbd id="inspect-shortcut-current" class="kbd">Ctrl</kbd>
+            <button id="inspect-shortcut-record" type="button" class="pill-btn">Record</button>
+            <button id="inspect-shortcut-reset" type="button" class="pill-btn">Reset</button>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <span class="setting-title">Privacy &amp; Data</span>
+          <label class="toggle-row">
+            <div>
+              <span>Usage insights</span>
+              <small style="display:block;color:var(--text-muted);font-size:10px;">Anonymous, never query text</small>
+            </div>
+            <input type="checkbox" id="insights-enabled" checked>
+          </label>
+          <label class="toggle-row">
+            <div>
+              <span>Contribute to training</span>
+              <small style="display:block;color:var(--text-muted);font-size:10px;">Opt-in to share searches &amp; answers</small>
+            </div>
+            <input type="checkbox" id="share-training">
+          </label>
         </div>
       </div>
     </div>
@@ -214,7 +572,7 @@
       <div class="footer-links">
         <a href="https://hanzo.ai" target="_blank" rel="noreferrer">hanzo.ai</a>
         <a href="https://docs.hanzo.ai" target="_blank" rel="noreferrer">Docs</a>
-        <span id="footer-version" class="version-label">v1.9.66</span>
+        <span id="footer-version" class="version-label">v1.9.69</span>
       </div>
     </footer>
   </div>
