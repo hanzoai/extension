@@ -188,37 +188,35 @@ export async function executeInvisibleChatGpt(
     });
 
     // Small delay for React mounting
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 1500));
 
     // Execute input and submission inside the tab
     const sendResult = await chrome.scripting.executeScript({
       target: { tabId },
       func: (textToSend: string) => {
-        // Find input textarea or contenteditable
-        const el = document.querySelector('p[data-placeholder="Ask ChatGPT"]') ||
+        // Find ProseMirror contenteditable or prompt textarea
+        const el = (document.querySelector('div.ProseMirror[aria-label="Ask ChatGPT"]') ||
+          document.querySelector('div.ProseMirror') ||
           document.querySelector('#prompt-textarea') ||
-          document.querySelector('div[contenteditable="true"]');
+          document.querySelector('div[contenteditable="true"]')) as HTMLElement | null;
         if (!el) return { success: false, error: 'Could not find prompt input on ChatGPT' };
 
-        // Focus and set text
-        el.textContent = textToSend;
-        el.dispatchEvent(new Event('input', { bubbles: true }));
+        // Focus and insert text using document.execCommand for ProseMirror state
+        el.focus();
+        document.execCommand('insertText', false, textToSend);
 
-        // Trigger Enter key
-        el.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Enter',
-          code: 'Enter',
-          keyCode: 13,
-          which: 13,
-          bubbles: true,
-          cancelable: true,
-        }));
+        // Dispatch input event to update React/ProseMirror state and enable Send button
+        el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
 
-        // Also attempt to click send button if available
+        // Click Send button
         setTimeout(() => {
-          const sendBtn = document.querySelector('button[data-testid="send-button"]') as HTMLButtonElement;
-          if (sendBtn && !sendBtn.disabled) sendBtn.click();
-        }, 150);
+          const sendBtn = (document.querySelector('button[aria-label="Send"]') ||
+            document.querySelector('button[data-testid="send-button"]')) as HTMLButtonElement | null;
+          if (sendBtn) {
+            sendBtn.removeAttribute('disabled');
+            sendBtn.click();
+          }
+        }, 200);
 
         return { success: true };
       },
@@ -239,19 +237,31 @@ export async function executeInvisibleChatGpt(
       const pollResult = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
-          // Look for assistant response elements
-          const articles = document.querySelectorAll('article');
-          if (articles.length >= 2) {
-            const assistantArticle = articles[articles.length - 1];
-            // Check if generation is still streaming (stop button visible vs copy button visible)
-            const stopBtn = document.querySelector('button[data-testid="stop-button"]');
-            const copyBtn = assistantArticle.querySelector('button[aria-label="Copy"]');
-            const text = assistantArticle.innerText || assistantArticle.textContent || '';
+          // Check if still generating
+          const stopBtn = document.querySelector('button[aria-label="Stop generating"]') ||
+            document.querySelector('button[data-testid="stop-button"]');
 
-            if (text.trim() && (!stopBtn || copyBtn)) {
-              return { done: true, text: text.trim() };
+          // Look for assistant message elements
+          const assistantMsgs = document.querySelectorAll('[data-markdown-text-style="assistant-message"]');
+          if (assistantMsgs.length > 0) {
+            const lastMsg = assistantMsgs[assistantMsgs.length - 1] as HTMLElement;
+            const text = (lastMsg.innerText || lastMsg.textContent || '').trim();
+            if (text && !stopBtn) {
+              return { done: true, text };
             }
           }
+
+          // Fallback: article check
+          const articles = document.querySelectorAll('article');
+          if (articles.length >= 2) {
+            const assistantArticle = articles[articles.length - 1] as HTMLElement;
+            const copyBtn = assistantArticle.querySelector('button[aria-label="Copy"]');
+            const text = (assistantArticle.innerText || assistantArticle.textContent || '').trim();
+            if (text && (!stopBtn || copyBtn)) {
+              return { done: true, text };
+            }
+          }
+
           return { done: false };
         },
       });
