@@ -3,132 +3,203 @@
  * Hanzo Browser Extension CLI Bridge
  * 
  * Exposes an OpenAI-compatible HTTP endpoint at http://127.0.0.1:3695/v1
- * that dynamically routes inference through whatever model is currently active
- * in the Hanzo Browser Extension (ChatGPT Plus, Claude Web, Spark, Evo, Zen5).
+ * that communicates with the Hanzo browser extension over ZAP (/run/user/1000/zap/zapd.sock)
+ * to run inference on your active ChatGPT Plus plan or other connected sessions.
  * 
  * Usage:
  *   node packages/browser/src/cli-bridge.mjs
- *   dev --ext
+ *   dev --ext "your prompt"
  */
 
 import http from 'http';
-import WebSocket from 'ws';
+import net from 'net';
 
 const PORT = 3695;
-const CDP_HTTP = 'http://127.0.0.1:9222';
-const EXT_ID = 'biingenefmanpecedoafkfajbnlgdmbl';
+const ZAP_SOCK = process.env.XDG_RUNTIME_DIR
+  ? `${process.env.XDG_RUNTIME_DIR}/zap/zapd.sock`
+  : `/run/user/${process.getuid?.() ?? 1000}/zap/zapd.sock`;
 
-// Helper to query CDP endpoints
-async function getCdpTargets() {
-  try {
-    const res = await fetch(`${CDP_HTTP}/json`);
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function putU16(a, n) { a.push(n & 0xff, (n >> 8) & 0xff); }
+function putStr(a, s) {
+  const b = enc.encode(s);
+  putU16(a, b.length);
+  for (let i = 0; i < b.length; i++) a.push(b[i]);
 }
 
-// Helper to execute code in extension background or tab via CDP
-async function evalInTarget(targetWsUrl, expression) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(targetWsUrl);
-    const id = Math.floor(Math.random() * 100000);
-    const timeout = setTimeout(() => {
-      ws.close();
-      reject(new Error('CDP evaluation timed out'));
-    }, 120000);
+function encodeFrame(t, from, to, payload = new Uint8Array(0)) {
+  const f = enc.encode(from), d = enc.encode(to);
+  const len = 11 + f.length + d.length + payload.length;
+  const b = new Uint8Array(4 + len);
+  const v = new DataView(b.buffer);
+  v.setUint32(0, len, true);
+  v.setUint8(4, t);
+  v.setUint16(5, 0, true);
+  v.setUint16(7, f.length, true);
+  v.setUint16(9, d.length, true);
+  v.setUint32(11, payload.length, true);
+  b.set(f, 15);
+  b.set(d, 15 + f.length);
+  b.set(payload, 15 + f.length + d.length);
+  return b;
+}
 
-    ws.on('open', () => {
-      ws.send(JSON.stringify({
-        id,
-        method: 'Runtime.evaluate',
-        params: {
-          expression,
-          awaitPromise: true,
-          returnByValue: true
-        }
-      }));
-    });
+function decodeFrame(b) {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const fl = v.getUint16(7, true), tl = v.getUint16(9, true);
+  return {
+    t: v.getUint8(4),
+    from: dec.decode(b.subarray(15, 15 + fl)),
+    to: dec.decode(b.subarray(15 + fl, 15 + fl + tl)),
+    payload: b.slice(15 + fl + tl)
+  };
+}
 
-    ws.on('message', (data) => {
-      try {
-        const msg = JSON.parse(data.toString());
-        if (msg.id === id) {
-          clearTimeout(timeout);
-          ws.close();
-          if (msg.error) {
-            reject(new Error(msg.error.message));
-          } else if (msg.result?.exceptionDetails) {
-            reject(new Error(msg.result.exceptionDetails.text || 'CDP exception'));
-          } else {
-            resolve(msg.result?.result?.value);
+function encodeHello(role, brand, caps) {
+  const a = [role];
+  putStr(a, brand);
+  putU16(a, caps.length);
+  for (const c of caps) putStr(a, c);
+  putU16(a, 0);
+  return new Uint8Array(a);
+}
+
+function encodeCmd(method, params = {}) {
+  const a = [];
+  putStr(a, method);
+  const entries = Object.entries(params);
+  putU16(a, entries.length);
+  for (const [k, v] of entries) {
+    putStr(a, k);
+    const vb = enc.encode(typeof v === 'string' ? v : JSON.stringify(v));
+    a.push(vb.length & 0xff, (vb.length >> 8) & 0xff, (vb.length >> 16) & 0xff, (vb.length >> 24) & 0xff);
+    for (let i = 0; i < vb.length; i++) a.push(vb[i]);
+  }
+  return new Uint8Array(a);
+}
+
+function decodeProviders(p) {
+  const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
+  let o = 0;
+  const str = () => {
+    const n = dv.getUint16(o, true); o += 2;
+    const s = dec.decode(p.subarray(o, o + n)); o += n;
+    return s;
+  };
+  const n = dv.getUint16(o, true); o += 2;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const id = str();
+    const role = dv.getUint8(o); o += 1;
+    const brand = str();
+    const nc = dv.getUint16(o, true); o += 2;
+    const caps = [];
+    for (let c = 0; c < nc; c++) caps.push(str());
+    const na = dv.getUint16(o, true); o += 2;
+    const attrs = {};
+    for (let j = 0; j < na; j++) { const k = str(); attrs[k] = str(); }
+    out.push({ id, role, brand, caps, attrs });
+  }
+  return out;
+}
+
+// ZAP Client to interact with browser extension
+class ZapClient {
+  constructor() {
+    this.socket = null;
+    this.myId = 'cli/dev-bridge';
+    this.connected = false;
+    this.pendingRequests = new Map(); // requestId -> { resolve, reject }
+    this.browserNodeId = null;
+  }
+
+  async connect() {
+    return new Promise((resolve, reject) => {
+      this.socket = net.connect(ZAP_SOCK);
+
+      this.socket.on('connect', () => {
+        // Send HELLO
+        this.socket.write(encodeFrame(1, this.myId, '', encodeHello(0, 'hanzo', [])));
+      });
+
+      this.socket.on('data', (data) => {
+        const frame = decodeFrame(new Uint8Array(data));
+        if (frame.t === 2) { // WELCOME
+          this.myId = frame.to;
+          this.connected = true;
+          // Discover browser node
+          this.socket.write(encodeFrame(3, this.myId, ''));
+          resolve();
+        } else if (frame.t === 4) { // PROVIDERS
+          const list = decodeProviders(frame.payload);
+          const browserNode = list.find(p => p.id.startsWith('browser/'));
+          if (browserNode) {
+            this.browserNodeId = browserNode.id;
+            console.log(`[Bridge] Discovered browser node: ${this.browserNodeId}`);
+          }
+        } else if (frame.t === 17) { // RESPONSE
+          const text = dec.decode(frame.payload);
+          const pending = this.pendingRequests.get('current');
+          if (pending) {
+            this.pendingRequests.delete('current');
+            pending.resolve(text);
+          }
+        } else if (frame.t === 7) { // ERROR
+          const errText = dec.decode(frame.payload);
+          const pending = this.pendingRequests.get('current');
+          if (pending) {
+            this.pendingRequests.delete('current');
+            pending.reject(new Error(errText));
           }
         }
-      } catch (err) {
-        clearTimeout(timeout);
-        ws.close();
+      });
+
+      this.socket.on('error', (err) => {
+        this.connected = false;
         reject(err);
-      }
+      });
+
+      this.socket.on('close', () => {
+        this.connected = false;
+      });
     });
+  }
 
-    ws.on('error', (err) => {
-      clearTimeout(timeout);
-      reject(err);
+  async sendBrowserCommand(method, params = {}, timeoutMs = 60000) {
+    if (!this.connected) {
+      await this.connect();
+    }
+
+    if (!this.browserNodeId) {
+      // Query providers again
+      this.socket.write(encodeFrame(3, this.myId, ''));
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    const targetNode = this.browserNodeId || 'browser/dgx/chrome-c71c';
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete('current');
+        reject(new Error(`ZAP command '${method}' timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.pendingRequests.set('current', {
+        resolve: (val) => { clearTimeout(timer); resolve(val); },
+        reject: (err) => { clearTimeout(timer); reject(err); }
+      });
+
+      // Send ROUTE frame (type 16)
+      this.socket.write(encodeFrame(16, this.myId, targetNode, encodeCmd(method, params)));
     });
-  });
-}
-
-// Get the active model from extension storage
-async function getActiveExtensionModel() {
-  const targets = await getCdpTargets();
-  const bgTarget = targets.find(t => 
-    (t.url && t.url.includes(EXT_ID)) || 
-    (t.title && t.title.includes('Hanzo'))
-  );
-
-  if (!bgTarget || !bgTarget.webSocketDebuggerUrl) {
-    return 'chatgpt-web'; // default fallback
-  }
-
-  try {
-    const model = await evalInTarget(
-      bgTarget.webSocketDebuggerUrl,
-      `chrome.storage.local.get('hanzo_selected_model').then(r => r.hanzo_selected_model || 'chatgpt-web')`
-    );
-    return model || 'chatgpt-web';
-  } catch {
-    return 'chatgpt-web';
   }
 }
 
-// Execute invisible prompt via extension temporary chat
-async function completeViaExtension(prompt, messages = []) {
-  const targets = await getCdpTargets();
-  const bgTarget = targets.find(t => 
-    (t.url && t.url.includes(EXT_ID)) || 
-    (t.title && t.title.includes('Hanzo'))
-  );
-
-  if (!bgTarget || !bgTarget.webSocketDebuggerUrl) {
-    throw new Error('Hanzo extension is not reachable via CDP on port 9222');
-  }
-
-  const encodedPrompt = JSON.stringify(prompt);
-  const encodedMessages = JSON.stringify(messages);
-
-  const code = `
-    (async () => {
-      const { executeInvisibleChatGpt } = await import(chrome.runtime.getURL('shared/chatgpt-web.js'));
-      return await executeInvisibleChatGpt(${encodedPrompt}, ${encodedMessages});
-    })()
-  `;
-
-  return await evalInTarget(bgTarget.webSocketDebuggerUrl, code);
-}
+const zap = new ZapClient();
 
 const server = http.createServer(async (req, res) => {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -140,37 +211,190 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
-  // Health / status check
+  // Status check
   if (url.pathname === '/' || url.pathname === '/status') {
-    const activeModel = await getActiveExtensionModel();
+    let session = null;
+    try {
+      const rawSession = await zap.sendBrowserCommand('chatgpt.session', {}, 3000);
+      session = JSON.parse(rawSession);
+    } catch {}
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       status: 'ok',
       service: 'hanzo-extension-bridge',
-      active_model: activeModel,
-      endpoint: `http://127.0.0.1:${PORT}/v1`
+      active_model: 'chatgpt-web',
+      zap_connected: zap.connected,
+      browser_node: zap.browserNodeId,
+      session
     }));
   }
 
   // Model list
   if (url.pathname === '/v1/models') {
-    const activeModel = await getActiveExtensionModel();
     res.writeHead(200, { 'Content-Type': 'application/json' });
+    const modelsList = [
+      {
+        slug: 'chatgpt-web',
+        display_name: 'ChatGPT Web (Plus)',
+        description: 'Connected ChatGPT Plus browser session',
+        supported_reasoning_levels: [],
+        shell_type: 'standard',
+        visibility: 'list',
+        supported_in_api: true,
+        priority: 1,
+        support_verbosity: false
+      },
+      {
+        slug: 'ext',
+        display_name: 'Extension Active Model',
+        description: 'Active session in Hanzo extension',
+        supported_reasoning_levels: [],
+        shell_type: 'standard',
+        visibility: 'list',
+        supported_in_api: true,
+        priority: 2,
+        support_verbosity: false
+      },
+      {
+        slug: 'enso-auto',
+        display_name: 'Enso Auto (Extension)',
+        description: 'Enso Auto routed via extension',
+        supported_reasoning_levels: [],
+        shell_type: 'standard',
+        visibility: 'list',
+        supported_in_api: true,
+        priority: 3,
+        support_verbosity: false
+      }
+    ];
     return res.end(JSON.stringify({
       object: 'list',
-      data: [
-        { id: 'active', object: 'model', owned_by: 'hanzo-extension', active_model: activeModel },
-        { id: 'ext', object: 'model', owned_by: 'hanzo-extension' },
-        { id: 'chatgpt-web', object: 'model', owned_by: 'openai' },
-        { id: 'claude-web', object: 'model', owned_by: 'anthropic' },
-        { id: 'hanzo-spark', object: 'model', owned_by: 'hanzo' },
-        { id: 'hanzo-evo', object: 'model', owned_by: 'hanzo' },
-        { id: 'zen5-coder', object: 'model', owned_by: 'hanzo' }
-      ]
+      data: modelsList.map(m => ({ id: m.slug, object: 'model', owned_by: 'hanzo-extension' })),
+      models: modelsList
     }));
   }
 
-  // Chat completions
+  // Responses API endpoint (for dev / codex-core wire_api = "responses")
+  if (url.pathname === '/v1/responses') {
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: { message: 'Method not allowed' } }));
+    }
+
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+
+        // Extract prompt and history from payload.input or payload.messages
+        let prompt = '';
+        const messages = [];
+
+        if (Array.isArray(payload.input)) {
+          for (const item of payload.input) {
+            if (item.type === 'message') {
+              let text = '';
+              if (typeof item.content === 'string') {
+                text = item.content;
+              } else if (Array.isArray(item.content)) {
+                text = item.content
+                  .map(c => (typeof c === 'string' ? c : c.text || c.input_text || ''))
+                  .filter(Boolean)
+                  .join('\n');
+              }
+              if (text) {
+                messages.push({ role: item.role || 'user', content: text });
+                if (item.role === 'user') prompt = text;
+              }
+            } else if (item.type === 'function_call_output') {
+              messages.push({ role: 'tool', content: String(item.output || '') });
+            }
+          }
+        } else if (Array.isArray(payload.messages)) {
+          for (const m of payload.messages) {
+            messages.push(m);
+            if (m.role === 'user') prompt = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+          }
+        }
+
+        if (!prompt && messages.length > 0) {
+          prompt = messages[messages.length - 1].content;
+        }
+
+        console.log(`[Bridge /v1/responses] Prompt received (${prompt.length} chars). Dispatching to ChatGPT Plus in Chrome...`);
+
+        const rawResponse = await zap.sendBrowserCommand('chatgpt.complete', {
+          prompt,
+          messages: JSON.stringify(messages)
+        }, 90000);
+
+        let resultText = '';
+        try {
+          const parsed = JSON.parse(rawResponse);
+          resultText = parsed.content || parsed.result?.content || parsed.message || rawResponse;
+        } catch {
+          resultText = rawResponse;
+        }
+
+        console.log(`[Bridge /v1/responses] ChatGPT completed response (${resultText.length} chars)`);
+
+        const respId = `resp-${Date.now()}`;
+        const msgId = `msg-${Date.now()}`;
+
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        });
+
+        // 1. response.created
+        res.write(`event: response.created\ndata: ${JSON.stringify({
+          type: 'response.created',
+          response: { id: respId, model: 'chatgpt-web' }
+        })}\n\n`);
+
+        // 2. response.output_item.done
+        res.write(`event: response.output_item.done\ndata: ${JSON.stringify({
+          type: 'response.output_item.done',
+          item: {
+            type: 'message',
+            role: 'assistant',
+            id: msgId,
+            content: [{ type: 'output_text', text: resultText }]
+          }
+        })}\n\n`);
+
+        // 3. response.completed
+        res.write(`event: response.completed\ndata: ${JSON.stringify({
+          type: 'response.completed',
+          response: {
+            id: respId,
+            usage: {
+              input_tokens: Math.ceil(prompt.length / 4),
+              output_tokens: Math.ceil(resultText.length / 4),
+              total_tokens: Math.ceil((prompt.length + resultText.length) / 4)
+            }
+          }
+        })}\n\n`);
+
+        res.end();
+      } catch (err) {
+        console.error('[Bridge /v1/responses] Error handling responses request:', err.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({
+          error: {
+            message: err.message || 'Bridge error',
+            type: 'bridge_error'
+          }
+        }));
+      }
+    });
+    return;
+  }
+
+  // Chat completions endpoint
   if (url.pathname === '/v1/chat/completions') {
     if (req.method !== 'POST') {
       res.writeHead(405, { 'Content-Type': 'application/json' });
@@ -189,10 +413,22 @@ const server = http.createServer(async (req, res) => {
         const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
         const prompt = lastUserMsg ? (typeof lastUserMsg.content === 'string' ? lastUserMsg.content : JSON.stringify(lastUserMsg.content)) : '';
 
-        const activeModel = await getActiveExtensionModel();
-        console.log(`[Bridge] Dispatching prompt to active extension model: ${activeModel}`);
+        console.log(`[Bridge] Prompt received (${prompt.length} chars). Dispatching to ChatGPT Plus in Chrome...`);
 
-        const resultText = await completeViaExtension(prompt, messages);
+        const rawResponse = await zap.sendBrowserCommand('chatgpt.complete', {
+          prompt,
+          messages: JSON.stringify(messages)
+        }, 90000);
+
+        let resultText = '';
+        try {
+          const parsed = JSON.parse(rawResponse);
+          resultText = parsed.content || parsed.result?.content || parsed.message || rawResponse;
+        } catch {
+          resultText = rawResponse;
+        }
+
+        console.log(`[Bridge] ChatGPT completed response (${resultText.length} chars)`);
 
         const completionId = `chatcmpl-ext-${Date.now()}`;
         const created = Math.floor(Date.now() / 1000);
@@ -209,7 +445,7 @@ const server = http.createServer(async (req, res) => {
             id: completionId,
             object: 'chat.completion.chunk',
             created,
-            model: activeModel,
+            model: 'chatgpt-web',
             choices: [
               {
                 index: 0,
@@ -220,12 +456,12 @@ const server = http.createServer(async (req, res) => {
           };
           res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 
-          // Send finish reason
+          // Send finish stop
           const finishChunk = {
             id: completionId,
             object: 'chat.completion.chunk',
             created,
-            model: activeModel,
+            model: 'chatgpt-web',
             choices: [
               {
                 index: 0,
@@ -243,7 +479,7 @@ const server = http.createServer(async (req, res) => {
             id: completionId,
             object: 'chat.completion',
             created,
-            model: activeModel,
+            model: 'chatgpt-web',
             choices: [
               {
                 index: 0,
@@ -262,11 +498,11 @@ const server = http.createServer(async (req, res) => {
           }));
         }
       } catch (err) {
-        console.error('[Bridge] Error handling chat completion:', err);
+        console.error('[Bridge] Error handling completion:', err.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({
           error: {
-            message: err.message || 'Internal bridge error',
+            message: err.message || 'Bridge error',
             type: 'bridge_error'
           }
         }));
@@ -279,7 +515,13 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: { message: 'Not found' } }));
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Hanzo Bridge] Running at http://127.0.0.1:${PORT}/v1`);
-  console.log(`[Hanzo Bridge] Ready for 'dev --ext' or 'hanzo dev --ext'`);
+// Start listening and connect to ZAP
+server.listen(PORT, '127.0.0.1', async () => {
+  console.log(`[Hanzo Bridge] Listening on http://127.0.0.1:${PORT}/v1`);
+  try {
+    await zap.connect();
+    console.log(`[Hanzo Bridge] Connected to ZAP router on ${ZAP_SOCK}`);
+  } catch (e) {
+    console.warn(`[Hanzo Bridge] ZAP connect warning:`, e.message);
+  }
 });

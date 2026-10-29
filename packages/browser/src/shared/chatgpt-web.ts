@@ -193,12 +193,20 @@ export async function executeInvisibleChatGpt(
     // Execute input and submission inside the tab
     const sendResult = await chrome.scripting.executeScript({
       target: { tabId },
-      func: (textToSend: string) => {
+      func: async (textToSend: string) => {
         // Find ProseMirror contenteditable or prompt textarea
-        const el = (document.querySelector('div.ProseMirror[aria-label="Ask ChatGPT"]') ||
-          document.querySelector('div.ProseMirror') ||
-          document.querySelector('#prompt-textarea') ||
-          document.querySelector('div[contenteditable="true"]')) as HTMLElement | null;
+        const findInput = () => {
+          return (document.querySelector('div.ProseMirror[aria-label="Ask ChatGPT"]') ||
+            document.querySelector('div.ProseMirror') ||
+            document.querySelector('#prompt-textarea') ||
+            document.querySelector('div[contenteditable="true"]')) as HTMLElement | null;
+        };
+
+        let el = findInput();
+        for (let i = 0; i < 20 && !el; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          el = findInput();
+        }
         if (!el) return { success: false, error: 'Could not find prompt input on ChatGPT' };
 
         // Focus and insert text using document.execCommand for ProseMirror state
@@ -208,15 +216,26 @@ export async function executeInvisibleChatGpt(
         // Dispatch input event to update React/ProseMirror state and enable Send button
         el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
 
-        // Click Send button
-        setTimeout(() => {
+        // Wait up to 3s for send button to become enabled, then click
+        let clicked = false;
+        for (let j = 0; j < 15; j++) {
+          await new Promise((r) => setTimeout(r, 200));
+          const sendBtn = (document.querySelector('button[aria-label="Send"]') ||
+            document.querySelector('button[data-testid="send-button"]')) as HTMLButtonElement | null;
+          if (sendBtn && !sendBtn.disabled) {
+            sendBtn.click();
+            clicked = true;
+            break;
+          }
+        }
+        if (!clicked) {
           const sendBtn = (document.querySelector('button[aria-label="Send"]') ||
             document.querySelector('button[data-testid="send-button"]')) as HTMLButtonElement | null;
           if (sendBtn) {
             sendBtn.removeAttribute('disabled');
             sendBtn.click();
           }
-        }, 200);
+        }
 
         return { success: true };
       },
