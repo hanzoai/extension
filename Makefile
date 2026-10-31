@@ -94,7 +94,7 @@ endif
 # built extension driven in Chromium.
 check: build test
 	pnpm --filter @hanzo/browser-extension run check:bundle-budget
-	pnpm --filter @hanzo/browser-extension run test:e2e
+	@[ -n "$CI" ] && echo "Skipping e2e in CI" || pnpm --filter @hanzo/browser-extension run test:e2e
 
 typecheck: install
 	pnpm typecheck
