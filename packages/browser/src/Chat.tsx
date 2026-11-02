@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Button, Checkbox, SizableText, XStack, YStack } from '@hanzo/ui';
-import { Composer, Failure, Message, Thread } from '@hanzo/ui/chat';
-import { ModelSelector, type ModelCatalogEntry } from '@hanzo/ui/models';
+import { Button, SizableText, YStack } from '@hanzo/ui/primitives';
+import { Composer, Failure, Message, Thread, type Chip, type Mind } from '@hanzo/ui/chat';
+import type { ModelCatalogEntry } from '@hanzo/ui/models';
 import { Prose } from './shared/Prose.js';
 
 /**
@@ -23,13 +23,12 @@ import { Prose } from './shared/Prose.js';
  * Width is the one thing the shell is asked to bend on. `Thread` caps prose at a
  * reading measure and centres it, which in a ~360px column would inset the text
  * from both edges, so it is told to fill — and its gutters come from the wrapper
- * here, because the shell drops its own padding along with the cap. The model
- * picker's trigger is `width: "100%"`, so it is boxed: left free it takes the
- * whole toolbar row and pushes the send control off the edge.
+ * here, because the shell drops its own padding along with the cap.
+ *
+ * The composer draws the sidebar's choices in the quiet line under its frame,
+ * as it does on the new tab: retrieval and the open tab as chips at its start,
+ * the model as the word at its end.
  */
-
-/** How wide the model picker is allowed to be in a sidebar toolbar row. */
-const PICKER = 132;
 
 export interface Turn {
   /** Minted by `sidebar.ts` where the turn is made. The thread keys rows on it. */
@@ -56,38 +55,11 @@ export interface ChatProps {
   onRag: (on: boolean) => void;
   tab: boolean;
   onTab: (on: boolean) => void;
-  /** What retrieval last did. Shown at the end of the composer's toolbar row. */
+  /** What retrieval last did. Shown at the end of the composer's row, before send. */
   status: string;
   signedIn: boolean;
   onSignIn: () => void;
   onSignUp: () => void;
-}
-
-/** A named toggle, sized for the composer's toolbar row. */
-function Toggle({
-  label,
-  hint,
-  on,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  on: boolean;
-  onChange: (on: boolean) => void;
-}) {
-  return (
-    <XStack items="center" gap="$1" title={hint}>
-      <Checkbox
-        size="$2"
-        checked={on}
-        onCheckedChange={(v) => onChange(v === true)}
-        aria-label={hint}
-      />
-      <SizableText size="$1" color="$color10">
-        {label}
-      </SizableText>
-    </XStack>
-  );
 }
 
 export function Chat(props: ChatProps) {
@@ -99,6 +71,23 @@ export function Chat(props: ChatProps) {
     setDraft('');
     props.onSend(draft.trim());
   };
+
+  // The catalog is the sidebar's to read; the picker only shows it. Nothing
+  // here is plan-gated: the gateway refuses what the account may not send.
+  const mind: Mind = {
+    model: props.model,
+    models: props.models,
+    loading: false,
+    error: null,
+    note: '',
+    free: false,
+    pick: props.onModel,
+  };
+  // `on` is the toggle's state, so a chip in the full ink is one in force.
+  const chips: Chip[] = [
+    { id: 'rag', label: 'RAG', on: props.rag, onPress: () => props.onRag(!props.rag) },
+    { id: 'tab', label: 'Tab', on: props.tab, onPress: () => props.onTab(!props.tab) },
+  ];
 
   if (!signedIn) {
     return (
@@ -159,18 +148,9 @@ export function Chat(props: ChatProps) {
           onStop={props.onStop}
           busy={busy}
           hint={props.status}
-        >
-          <XStack width={PICKER} shrink={0}>
-            <ModelSelector
-              models={props.models}
-              value={props.model}
-              onChange={props.onModel}
-              size="sm"
-            />
-          </XStack>
-          <Toggle label="RAG" hint="Retrieval context" on={props.rag} onChange={props.onRag} />
-          <Toggle label="Tab" hint="Include active tab" on={props.tab} onChange={props.onTab} />
-        </Composer>
+          mind={mind}
+          chips={chips}
+        />
       </YStack>
     </YStack>
   );

@@ -35,9 +35,28 @@ const BUDGETS = {
   'background.js': 210, // 206.1
   'content-script.js': 62, // 55.4
   'page.js': 29,
-  'sidebar.js': 765,
+  // 1079.6 — RAISED from 765 with newtab.js below, for the same reason: both
+  // draw the one composer of @hanzo/ui 8.29.40.
+  'sidebar.js': 1085,
   'popup.js': 65, // 59.2
-  'newtab.js': 760,
+  // 1084.3 — RAISED from 760 at 1.9.71: the new tab draws the one composer
+  // every Hanzo surface draws (@hanzo/ui 8.27.0 -> 8.29.40, its `mind`, `mode`
+  // and `chips`). By esbuild metafile against 756.7: @hanzo/ui +69.5KB (the
+  // composer, its Tune, the lazy ModelPicker), and what `@hanzo/ui/chat`
+  // reaches through @hanzo/gui whatever the page draws — @hanzogui/sheet
+  // +30.2, create-menu +26.3, select +19.2, toast +14.0, floating +11.6,
+  // slider +9.5, dialog +7.8, context-menu +7.5, menu +7.2 — plus
+  // react-native-web +11.2, lucide +13.7, @hanzo/design +13.7 (via
+  // @hanzo/appearance) and @hanzo/i18n +10.6. Importing only Thread from
+  // `@hanzo/ui/chat` already pulls the gui half, so the lever is that
+  // package's barrel, not this page.
+  'newtab.js': 1090,
+  // 65.3 — @hanzo/ui's theme.css (design's tokens for both themes and the
+  // composer's paint) and the page's own rules, bundled by newtab.ts. It was
+  // 366.8 while the page imported the `@hanzo/ui` root, whose root.js imports
+  // the 355KB styles.css; the page imports `@hanzo/ui/primitives` instead, and
+  // this ceiling is what keeps that sheet from coming back unnoticed.
+  'newtab.css': 70,
   'onboarding.js': 35, // 31.0
 };
 

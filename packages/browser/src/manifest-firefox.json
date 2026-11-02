@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Hanzo AI",
-  "version": "1.9.34",
+  "version": "1.9.71",
   "description": "AI answer engine, search, and dev assistant — Hanzo AI in a new tab, address-bar search, source-cited answers, realtime news, WebGPU AI, and MCP.",
   "permissions": [
     "activeTab",

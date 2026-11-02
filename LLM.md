@@ -110,6 +110,19 @@ prompt under 900 tokens when listed, else `zen5`. The page assistant lists the
 `owned_by: zenlm` chat rows of `chat.listModels` (`zenModels`); a content
 script cannot bundle `@hanzo/ui/models`, which reaches react-native.
 
+The new tab (`src/answer/`) and the sidebar's chat draw `@hanzo/ui/chat`'s
+`Composer`, the one hanzo.ai draws, and hand it data, never children: the
+model as `mind`, the mode as `mode` (`answer/modes.ts`), the sources (the
+sidebar's RAG and Tab) as `chips`, drawn as words under the frame. Its paint
+is CSS in @hanzo/ui's theme.css: `newtab.ts` imports it and `newtab.css`, and
+esbuild writes the one `newtab.css` beside `newtab.js`, budgeted like the
+scripts. Pages import gui parts from `@hanzo/ui/primitives`, never the
+`@hanzo/ui` root, whose `root.js` imports the 355KB `styles.css` into the
+bundle. `newtab.css` names @hanzo/design tokens and declares none of theirs;
+the theme follows the device through @hanzo/appearance (`t_light`/`t_dark` on
+`<html>`). The picker reads catalog.hanzo.ai's gateway-shaped rows with
+`fetchModelCatalog` and starts on `defaultModel` (Enso).
+
 ## Office, Outlook and Workspace add-ins
 
 - `packages/office` (Word/Excel/PowerPoint) and `packages/outlook` are served

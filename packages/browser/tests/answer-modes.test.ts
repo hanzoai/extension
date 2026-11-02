@@ -1,9 +1,11 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GuiProvider } from '@hanzo/gui';
 import guiConfig from '@hanzo/ui/gui-config';
-import { Toolbar, MODES, SOURCES, type Mode } from '../src/answer/Toolbar.js';
+import { AnswerEngine } from '../src/answer/AnswerEngine.js';
+import { MODES, SOURCES } from '../src/answer/modes.js';
 
 /**
  * The answer surface offers FOUR modes: Chat, Search, News, Research.
@@ -14,63 +16,53 @@ import { Toolbar, MODES, SOURCES, type Mode } from '../src/answer/Toolbar.js';
  * hid a 2x price behind an adjective. Cloud collapsed the two into one research
  * mode (hanzoai/cloud apps/answer/mode.go); this is the client half of that.
  *
- * Rendered, not read: the tabs and the source pills are what a user actually
- * gets, so the assertions run against the markup they emit. They are what is
- * left local now that `@hanzo/ui/chat` owns the composer — the field, the Enter
- * rule and the send control are the shell's and are asserted there.
- *
- * Selected by `data-mode` / `data-source` / `data-on`, not by class name: the
- * controls are `@hanzo/ui` buttons whose classes belong to the design system and
- * change with it, while these attributes are this file's own contract.
+ * The composer draws them: the sources as chips and the mode and the model as
+ * words, all in the one line UNDER its frame, and nothing of this surface's
+ * inside it. Rendered, not read, and selected by the composer's own `data-slot`
+ * contract, never by class names, which belong to the design system.
  */
 
-const props = (mode: Mode) => ({
-  mode,
-  setMode: () => {},
-  sources: new Set<string>(),
-  toggleSource: () => {},
-});
-
-// The toolbar renders REAL @hanzo/ui, so it mounts the way every consumer must:
-// under GuiProvider — outside it, a gui component throws on first paint.
-const draw = (mode: Mode) =>
+const draw = () =>
   renderToStaticMarkup(
     React.createElement(
       GuiProvider,
       { config: guiConfig, defaultTheme: 'dark' },
-      React.createElement(Toolbar, props(mode)),
+      React.createElement(AnswerEngine, { apiBase: 'https://api.hanzo.ai', getToken: async () => null, signIn: () => {} }),
     ),
   );
 
-/** The value of `attr` on every element carrying it, in document order. */
-const attrs = (html: string, attr: string) =>
-  [...html.matchAll(new RegExp(`${attr}="([^"]+)"`, 'g'))].map((m) => m[1]);
-
-/** The value of `attr` on the elements that are also marked `data-on`. */
-const on = (html: string, attr: string) =>
-  [...html.matchAll(new RegExp(`<[^>]*${attr}="([^"]+)"[^>]*data-on="true"`, 'g'))].map((m) => m[1]);
+/** The markup between the first element carrying `data-slot="<name>"` and its close. */
+function part(html: string, name: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.querySelector(`[data-slot="${name}"]`)?.outerHTML ?? '';
+}
 
 describe('answer modes', () => {
-  it('names four, in escalating effort, with no Deep', () => {
+  it('names four, in escalating effort, each with the line its list shows', () => {
     expect(MODES.map((m) => m.id)).toEqual(['chat', 'search', 'news', 'research']);
-    expect(attrs(draw('search'), 'data-mode')).toEqual(['chat', 'search', 'news', 'research']);
-  });
-
-  it('marks exactly the selected tab, for every mode it offers', () => {
-    for (const m of MODES) {
-      expect(on(draw(m.id), 'data-mode'), m.id).toEqual([m.id]);
-    }
-  });
-
-  it('offers the six sources to ground a web answer, and none to Chat', () => {
-    expect(attrs(draw('search'), 'data-source')).toEqual(SOURCES);
-    // Chat goes straight to the model, so there is nothing to source from —
-    // the row itself stays (dropping it would slide the toolbar left).
-    expect(attrs(draw('chat'), 'data-source')).toEqual([]);
-    expect(draw('chat')).toContain('data-slot="sources"');
+    for (const m of MODES) expect(m.note, m.id).not.toBe('');
   });
 
   it('leaves no path back to the retired mode', () => {
     expect(JSON.stringify(MODES)).not.toMatch(/deep/i);
+  });
+
+  it('draws the sources, the model and the mode under the frame, and none of them in it', () => {
+    const html = draw();
+    const frame = part(html, 'composer');
+    const foot = part(html, 'composer-foot');
+    expect(frame).not.toBe('');
+    expect(foot).not.toBe('');
+
+    // Search is the default, so the six sources are offered, as words.
+    const chips = [...foot.matchAll(/data-slot="composer-chip"[^>]*>([\s\S]*?)<\/button>/g)].map((m) =>
+      m[1].replace(/<[^>]+>/g, ''),
+    );
+    expect(chips).toEqual(SOURCES.map((s) => `@${s}`));
+    expect(foot).toContain('data-slot="mode"');
+    expect(foot).toContain('data-slot="model-picker"');
+    expect(foot).toMatch(/data-slot="mode"[\s\S]*Search/);
+
+    for (const slot of ['composer-chip', 'mode', 'model-picker']) expect(frame, slot).not.toContain(`data-slot="${slot}"`);
   });
 });

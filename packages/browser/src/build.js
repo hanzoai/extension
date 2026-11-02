@@ -152,7 +152,9 @@ async function build() {
 
   // Answer engine (new-tab landing + omnibox/address-bar search target).
   // React surface consuming the @hanzo/ai `search` primitive, drawn with
-  // @hanzo/ui/chat.
+  // @hanzo/ui/chat. newtab.ts imports @hanzo/ui's theme.css and the page's own
+  // newtab.css, so this also writes ONE newtab.css beside newtab.js: the
+  // composer's paint and design's tokens arrive with the page or not at all.
   await esbuild.build({
     ...WEB,
     entryPoints: ['src/newtab.ts'],
@@ -255,7 +257,7 @@ async function build() {
     }
 
     // Copy popup + sidebar + answer-engine HTML/CSS
-    for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'newtab.html', 'newtab.css', 'onboarding.html', 'onboarding.css', 'callback.html', 'ai-worker.js']) {
+    for (const f of ['popup.html', 'popup.css', 'sidebar.html', 'sidebar.css', 'newtab.html', 'onboarding.html', 'onboarding.css', 'callback.html', 'ai-worker.js']) {
       const src = path.join('src', f);
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(dir, f));
@@ -266,6 +268,7 @@ async function build() {
     fs.copyFileSync(out('popup.js'), path.join(dir, 'popup.js'));
     fs.copyFileSync(out('sidebar.js'), path.join(dir, 'sidebar.js'));
     fs.copyFileSync(out('newtab.js'), path.join(dir, 'newtab.js'));
+    fs.copyFileSync(out('newtab.css'), path.join(dir, 'newtab.css'));
     fs.copyFileSync(out('onboarding.js'), path.join(dir, 'onboarding.js'));
 
     // Copy icons into each browser directory

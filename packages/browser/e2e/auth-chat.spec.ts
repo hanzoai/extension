@@ -157,9 +157,11 @@ descFn('Auth + Chat', () => {
     await expect(field).toBeVisible({ timeout: 5000 });
 
     // Pick a Zen model if the account's catalog offers one.
-    const picker = sidebar.getByRole('combobox');
+    // The composer's picker loads its list when first pointed at.
+    const picker = sidebar.locator('[data-slot="model-picker"]');
+    await picker.hover();
     await picker.click();
-    const zen = sidebar.locator('[data-slot="command-item"]', { hasText: /zen/i }).first();
+    const zen = sidebar.locator('[data-slot="model-picker-option"]', { hasText: /zen/i }).first();
     if (await zen.isVisible().catch(() => false)) await zen.click();
     else await sidebar.keyboard.press('Escape');
 

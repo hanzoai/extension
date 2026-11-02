@@ -67,7 +67,7 @@ describe('the sidebar composer is singular', () => {
   });
 
   it('offers no model the catalog did not supply — Auto is written in one place', () => {
-    // Neither picker is markup: the chat one is ModelSelector, the Settings one
+    // Neither picker is markup: the chat one is the composer's, the Settings one
     // is filled by setModels(). A hand-written <option> here would be a model
     // offered without the account having been asked for it.
     expect(document.querySelectorAll('select option')).toHaveLength(0);

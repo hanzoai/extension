@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/browser-extension",
-  "version": "1.9.70",
+  "version": "1.9.71",
   "description": "Hanzo AI Browser Extension",
   "scripts": {
     "build": "node src/build.js",
@@ -27,7 +27,11 @@
     "webextension-polyfill": "catalog:",
     "ws": "catalog:",
     "@hanzo/logo": "catalog:",
-    "react-hook-form": "catalog:"
+    "react-hook-form": "catalog:",
+    "@hanzo/composer": "catalog:",
+    "@hanzo/i18n": "catalog:",
+    "@hanzo/voice": "catalog:",
+    "@hanzo/appearance": "catalog:"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

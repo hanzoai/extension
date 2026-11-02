@@ -1,5 +1,5 @@
 import React from 'react';
-import { YStack } from '@hanzo/ui';
+import { YStack } from '@hanzo/ui/primitives';
 import { Code } from '@hanzo/ui/chat';
 import { blocks } from './markdown.js';
 

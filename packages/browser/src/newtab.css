@@ -1,23 +1,15 @@
-/* Hanzo Answer Engine — strict monochrome (brand primaryColor #FFFFFF).
-   Shared tokens mirror popup.css / sidebar.css. */
+/* Hanzo Answer Engine — the page's own rules, over @hanzo/ui's theme.css.
+
+   newtab.ts imports theme.css first and this sheet after it, and esbuild writes
+   the two as one newtab.css. Every colour here is a @hanzo/design token, so the
+   page follows the theme gui writes on <html> (`t_dark` / `t_light`), and the
+   composer and the stories, which are gui, read the same values.
+
+   Nothing here may declare a design token's name: theme.css owns `--border`,
+   `--surface-2`, `--glass`, `--radius*`, and the composer's own edge and gui's
+   `$hover` read them. This sheet declared all of those once, for its dark-only
+   palette, and in the same cascade it would have repainted the shared ones. */
 :root {
-  /* hanzo.chat dark palette — the exact gray scale from chat/client/src/style.css
-     (.dark). One brand, one set of tokens; the extension is no longer its own look. */
-  --bg: #000000; /* surface-primary  / gray-975 */
-  --surface: #050505; /* surface-secondary / gray-950 — source & hero cards */
-  --surface-2: #0d0d0d; /* surface-primary-contrast / gray-900 — hover fills */
-  --surface-3: #171717; /* surface-tertiary / gray-850 — number pills, selected mode */
-  --surface-active: #2f2f2f; /* surface-active / gray-700 — selected chip (NOT a white lozenge) */
-  --text: #ececec; /* text-primary / gray-100 */
-  --text-2: #cdcdcd; /* text-secondary / gray-300 */
-  --text-3: #999696; /* text-secondary-alt / gray-400 */
-  --border: #171717; /* border-light / gray-850 */
-  --border-2: #212121; /* border-medium / gray-800 */
-  --glass: rgba(255, 255, 255, 0.03);
-  --glass-2: rgba(255, 255, 255, 0.06);
-  --radius: 12px;
-  --radius-sm: 8px;
-  --radius-xs: 6px;
   --sidebar-w: 232px;
   /* The icon-rail width is @hanzo/ui primitives/sidebar's SIDEBAR_WIDTH_ICON
      (3rem). Kept as that value, not a local guess, so the rail here and the
@@ -25,24 +17,10 @@
   --rail-w: 3rem;
 }
 
-* {
-  box-sizing: border-box;
-}
-
 html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family:
-    "Zen",
-    -apple-system,
-    BlinkMacSystemFont,
-    "SF Pro Text",
-    "Segoe UI",
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -85,7 +63,7 @@ a {
   gap: 6px;
   padding: 14px 12px;
   border-right: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--card);
   min-width: 0;
 }
 .ae-side-top {
@@ -99,7 +77,7 @@ a {
   gap: 9px;
   background: none;
   border: none;
-  color: var(--text);
+  color: var(--text-primary);
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -120,13 +98,13 @@ a {
 .ae-collapse {
   background: none;
   border: none;
-  color: var(--text-3);
+  color: var(--text-tertiary);
   padding: 4px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   display: flex;
 }
 .ae-collapse:hover {
-  color: var(--text);
+  color: var(--text-primary);
   background: var(--glass);
 }
 .ae-new {
@@ -135,18 +113,18 @@ a {
   gap: 8px;
   margin-top: 8px;
   padding: 9px 12px;
-  background: var(--surface-3);
-  color: var(--text);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius-sm);
+  background: var(--secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
 }
 .ae-new:hover {
-  background: var(--surface-hover, #212121);
-  border-color: var(--border-2);
+  background: var(--secondary-hover);
+  border-color: var(--border-strong);
 }
 .ae-nav {
   display: flex;
@@ -156,14 +134,14 @@ a {
 }
 .ae-nav a {
   padding: 8px 10px;
-  border-radius: var(--radius-xs);
-  color: var(--text-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
   font-size: 13px;
   white-space: nowrap;
 }
 .ae-nav a:hover {
   background: var(--glass);
-  color: var(--text);
+  color: var(--text-primary);
 }
 .ae-side-bottom {
   margin-top: auto;
@@ -171,18 +149,18 @@ a {
 .ae-signin {
   width: 100%;
   padding: 9px 12px;
-  background: var(--glass-2);
+  background: var(--muted);
   border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
   font-size: 12.5px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
 }
 .ae-signin:hover {
-  border-color: var(--border-2);
-  background: var(--surface-2);
+  border-color: var(--border-strong);
+  background: var(--muted);
 }
 .ae-signin.big {
   width: auto;
@@ -219,50 +197,6 @@ a {
   flex-direction: column;
 }
 
-/* Hero (empty state) */
-.ae-hero {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 26px;
-  padding: 24px;
-  overflow-y: auto;
-}
-.ae-news {
-  width: 100%;
-  max-width: 720px;
-}
-.ae-news-head,
-.ae-news-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.ae-news-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 11px 13px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-.ae-news-item:hover {
-  border-color: var(--border-2);
-  background: var(--surface-2);
-}
-.ae-news-title {
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.35;
-}
-.ae-news-meta {
-  font-size: 11px;
-  color: var(--text-3);
-}
-
 /* ── Answer prose ────────────────────────────────────────────
    The turn is `@hanzo/ui/chat` Message; markdown is this surface's own
    pipeline, so this is its stylesheet and the only CSS left for an answer. */
@@ -270,7 +204,7 @@ a {
 .markdown {
   font-size: 15px;
   line-height: 1.65;
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 .markdown > *:last-child {
@@ -305,20 +239,20 @@ a {
   margin: 4px 0;
 }
 .markdown a {
-  color: var(--text);
+  color: var(--text-primary);
   text-decoration: underline;
-  text-decoration-color: var(--text-3);
+  text-decoration-color: var(--text-tertiary);
   text-underline-offset: 2px;
 }
 .markdown a:hover {
-  text-decoration-color: var(--text);
+  text-decoration-color: var(--text-primary);
 }
 .markdown code {
-  background: var(--surface-2);
+  background: var(--muted);
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 0.9em;
-  font-family: "Zen Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 /* ── Spinner ─────────────────────────────────────────────── */
@@ -354,15 +288,6 @@ a {
     z-index: 60;
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
   }
-  .ae-news-grid {
-    grid-template-columns: 1fr;
-  }
-  .ae-hero {
-    gap: 20px;
-    padding: 20px 16px;
-    justify-content: flex-start;
-    padding-top: 48px;
-  }
 }
 
 /* ── Generative result widgets ───────────────────────────── */
@@ -379,21 +304,21 @@ a {
 }
 .ae-widget {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  border-radius: var(--radius-lg);
+  background: var(--card);
   padding: 16px 18px;
 }
 .ae-widget-title {
   margin: 0 0 10px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-primary);
   letter-spacing: -0.01em;
 }
 .ae-widget-subtitle {
   margin: -6px 0 12px;
   font-size: 13px;
-  color: var(--text-3);
+  color: var(--text-tertiary);
 }
 
 /* A wide table scrolls INSIDE its own box; the page never scrolls sideways. */
@@ -413,16 +338,16 @@ a {
   vertical-align: top;
 }
 .ae-widget-table thead th {
-  color: var(--text-3);
+  color: var(--text-tertiary);
   font-weight: 500;
   white-space: nowrap;
 }
 .ae-widget-table tbody th {
-  color: var(--text);
+  color: var(--text-primary);
   font-weight: 500;
 }
 .ae-widget-table td {
-  color: var(--text-2);
+  color: var(--text-secondary);
 }
 .ae-widget-table tr:last-child th,
 .ae-widget-table tr:last-child td {
@@ -439,10 +364,10 @@ a {
 .ae-widget-steplist li {
   font-size: 13.5px;
   line-height: 1.5;
-  color: var(--text-2);
+  color: var(--text-secondary);
 }
 .ae-widget-steplist li::marker {
-  color: var(--text-3);
+  color: var(--text-tertiary);
 }
 
 .ae-widget-statgrid {
@@ -458,13 +383,13 @@ a {
 .ae-widget-statvalue {
   font-size: 20px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
 .ae-widget-statlabel {
   font-size: 12px;
-  color: var(--text-3);
+  color: var(--text-tertiary);
 }
 
 .ae-widget-events {
@@ -482,12 +407,12 @@ a {
 }
 .ae-widget-when {
   font-size: 12.5px;
-  color: var(--text-3);
+  color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
 .ae-widget-what {
   font-size: 13.5px;
-  color: var(--text-2);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -499,29 +424,29 @@ a {
 }
 .ae-widget-facts dt {
   font-size: 12.5px;
-  color: var(--text-3);
+  color: var(--text-tertiary);
 }
 .ae-widget-facts dd {
   margin: 0;
   font-size: 13.5px;
-  color: var(--text-2);
+  color: var(--text-secondary);
 }
 
 .ae-widget-meaning {
   margin: 0;
   font-size: 14px;
   line-height: 1.55;
-  color: var(--text-2);
+  color: var(--text-secondary);
 }
 .ae-widget-example {
   margin: 12px 0 0;
   padding: 10px 12px;
   overflow-x: auto;
-  background: var(--bg);
+  background: var(--background);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-size: 12.5px;
-  color: var(--text-2);
+  color: var(--text-secondary);
   white-space: pre-wrap;
 }
 

@@ -6,7 +6,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { GuiProvider } from '@hanzo/gui';
 import guiConfig from '@hanzo/ui/gui-config';
-import type { ModelCatalogEntry } from '@hanzo/ui/models';
+import { parseModels, type ModelCatalogEntry } from '@hanzo/ui/models';
 import {
   CHAT_BUDGETS,
   debugLog,
@@ -39,13 +39,14 @@ import { Chat } from './Chat.js';
 let minted = 0;
 const identify = (turn) => ({ ...turn, id: `t${++minted}` });
 
-/** The router entry, always valid, so the picker is never empty or fabricated. */
+/** The router entry, always valid, so the picker is never empty or fabricated.
+ *  The picker groups a model by its Hanzo family or by who serves it, so this
+ *  one stands under Router. */
 const AUTO: ModelCatalogEntry = {
   id: 'auto',
-  label: 'Auto',
-  family: 'Router',
+  name: 'Auto',
+  owned_by: 'router',
   description: 'Routes to the best model',
-  modality: 'chat',
 };
 
 class HanzoSidebar {
@@ -394,14 +395,8 @@ class HanzoSidebar {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'chat.listModels' });
       if (response?.success && response.models?.length) {
-        this.setModels(response.models.map((m) => ({
-          id: m.id,
-          label: m.name || m.id,
-          // Stated, not inferred: the account's own chat list. The picker's id
-          // heuristic would otherwise drop a name that merely reads like an
-          // embedding model.
-          modality: 'chat',
-        })));
+        // The gateway's own rows, read field by field by the picker's reader.
+        this.setModels(parseModels(response.models));
       }
     } catch (error) {
       debugLog('Failed to load models:', error);
@@ -425,7 +420,7 @@ class HanzoSidebar {
       for (const m of this.models) {
         const opt = document.createElement('option');
         opt.value = m.id;
-        opt.textContent = m.label || m.id;
+        opt.textContent = m.name || m.id;
         this.el.defaultModel.appendChild(opt);
       }
       if (this.models.some((m) => m.id === chosen)) this.el.defaultModel.value = chosen;
@@ -1324,13 +1319,13 @@ class HanzoSidebar {
 
   /**
    * Fold the model hub's findings into the one catalog the picker reads.
-   * Family is what groups the picker, so "Cloud" and "Local" stay the sections
-   * they were as optgroups.
+   * The picker groups a model with no Hanzo family by who serves it, so "Cloud"
+   * and "Local" stay the sections they were as optgroups.
    */
   updateModelSelect(cloud: any[], local: any[]) {
     this.setModels([
-      ...cloud.slice(0, 20).map((m) => ({ id: m.id, label: m.name || m.id, family: 'Cloud', modality: 'chat' })),
-      ...local.map((m) => ({ id: m.id, label: m.name || m.id, family: 'Local', modality: 'chat' })),
+      ...cloud.slice(0, 20).map((m) => ({ id: m.id, name: m.name || m.id, owned_by: 'cloud' })),
+      ...local.map((m) => ({ id: m.id, name: m.name || m.id, owned_by: 'local' })),
     ]);
   }
 

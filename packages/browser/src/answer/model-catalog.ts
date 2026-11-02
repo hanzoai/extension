@@ -1,135 +1,82 @@
 /**
  * Hanzo model catalog for the answer-engine model picker. Reads the REAL
- * catalog and keeps the text/chat families — never a hardcoded or fabricated
- * list. Switching the picker actually changes the `model` passed to the
- * @hanzo/ai search primitive.
+ * catalog and keeps what can chat — never a hardcoded or fabricated list.
+ * Switching the picker actually changes the `model` passed to the @hanzo/ai
+ * search primitive.
  *
  * It reads catalog.hanzo.ai, not the API base. This is the PUBLIC catalog: a
- * read-only, edge-cached, tokenless list with `families` on it, and
- * catalog.hanzo.ai is the host that serves it. api.hanzo.ai/v1/models is the
- * authenticated OpenAI-compatible model list and answers 401 without a token —
- * it only looked public here because the ingress used to hand that path to the
- * catalog worker, which is exactly the two-implementations-of-one-address defect
- * that carve was deleted for (hanzoai/universe fd18448).
+ * read-only, edge-cached, tokenless list, and catalog.hanzo.ai is the host that
+ * serves it. api.hanzo.ai/v1/models is the authenticated OpenAI-compatible model
+ * list and answers 401 without a token — it only looked public here because the
+ * ingress used to hand that path to the catalog worker, which is exactly the
+ * two-implementations-of-one-address defect that carve was deleted for
+ * (hanzoai/universe fd18448).
  *
- * The rows come back as `ModelCatalogEntry`, the shape `@hanzo/ui/models` reads,
- * so the picker is the shared `ModelSelector` and this file is only the fetch.
- * `@hanzo/ui/models` ships its own `fetchModelCatalog` and it is NOT usable
- * here: it reads `${baseUrl}/models`, the authenticated endpoint, which is the
- * 401 this surface must not hit while signed out.
+ * The catalog answers the gateway's own rows (`family`, `owned_by`, `class`,
+ * `outputs`), so `@hanzo/ui/models` reads it: `fetchModelCatalog` with the
+ * catalog's base, `can(m, 'chat')` for what a question can go to. The picker
+ * is the composer's own (`ModelPicker`, as its `mind`) and groups them the way
+ * every Hanzo surface does — Enso, Zen, Kai, Zoo, then each maker.
  */
 
-import type { ModelCatalogEntry } from '@hanzo/ui/models';
+import { can, fetchModelCatalog, type ModelCatalogEntry } from '@hanzo/ui/models';
 import { CATALOG_BASE_URL } from '../shared/config.js';
-
-interface ModelRow {
-  id: string;
-  name?: string;
-  fullName?: string;
-  description?: string;
-  tier?: string;
-  context?: number | null;
-}
-interface FamilyRow {
-  id: string;
-  name?: string;
-  description?: string;
-  models?: string[];
-}
-interface ModelsResponse {
-  data?: ModelRow[];
-  families?: FamilyRow[];
-}
-
-/** Text/chat families to surface in the picker (embedding/image/audio excluded). */
-const CHAT_FAMILIES = ['enso', 'zen5', 'zen3'];
 
 /** The "let the router pick" option: no model is pinned and the cloud chooses.
  *  Always valid, so it is the seed and the fallback when the fetch is slow or
  *  fails — a dead selection is never shown. */
 export const AUTO = 'auto';
 
+/** The picker groups a model with no Hanzo family by who serves it (`owned_by`),
+ *  so these rows keep the sections they had: Router, Connected Accounts, Local
+ *  Compute. */
 const AUTO_MODEL: ModelCatalogEntry = {
   id: AUTO,
-  label: 'Auto',
-  family: 'Router',
+  name: 'Auto',
+  owned_by: 'router',
   description: 'Routes to the best model',
-  modality: 'chat',
 };
 
-export async function fetchCatalog(signal?: AbortSignal): Promise<ModelCatalogEntry[]> {
-  const res = await fetch(`${CATALOG_BASE_URL}/v1/models`, signal ? { signal } : {});
-  if (!res.ok) throw new Error(`models ${res.status}`);
-  const body = (await res.json()) as ModelsResponse;
+const CONNECTED_MODELS: ModelCatalogEntry[] = [
+  {
+    id: 'chatgpt-web',
+    name: 'ChatGPT Web (Plus)',
+    owned_by: 'connected-accounts',
+    description: 'Uses active ChatGPT Plus session (temporary chats)',
+  },
+  {
+    id: 'claude-web',
+    name: 'Claude Web',
+    owned_by: 'connected-accounts',
+    description: 'Uses active Claude session',
+  },
+  {
+    id: 'hanzo-spark',
+    name: 'Hanzo Spark (GB10 CUDA)',
+    owned_by: 'local-compute',
+    description: 'Spark GB10 node (10.0.0.19:1235)',
+  },
+  {
+    id: 'hanzo-evo',
+    name: 'Hanzo Evo (Strix Halo ROCm)',
+    owned_by: 'local-compute',
+    description: 'Evo Strix Halo node (10.0.0.21:1234)',
+  },
+  {
+    id: 'hanzo-desktop',
+    name: 'Hanzo Desktop',
+    owned_by: 'local-compute',
+    description: 'Local Hanzo Desktop (:11435)',
+  },
+  {
+    id: 'webgpu',
+    name: 'WebGPU AI (Local)',
+    owned_by: 'local-compute',
+    description: 'Runs on-device in browser GPU',
+  },
+];
 
-  const byId = new Map<string, ModelRow>();
-  for (const row of body.data ?? []) byId.set(row.id, row);
-
-  const models: ModelCatalogEntry[] = [AUTO_MODEL];
-  for (const fam of body.families ?? []) {
-    if (!CHAT_FAMILIES.includes(fam.id)) continue;
-    for (const id of fam.models ?? []) {
-      const row = byId.get(id);
-      models.push({
-        id,
-        label: row?.name || row?.fullName || id,
-        // The catalog's own family label, so the picker groups the way the
-        // catalog does rather than by an owner heuristic.
-        family: fam.name || fam.id,
-        description: row?.description || '',
-        premium: Boolean(row?.tier),
-        // Stated, not inferred: these families ARE the chat families, and
-        // ModelSelector's default id heuristic would otherwise drop a name that
-        // merely reads like an embedding model.
-        modality: 'chat',
-        ...(row?.context ? { context_window: row.context } : null),
-      });
-    }
-  }
-  const CONNECTED_MODELS: ModelCatalogEntry[] = [
-    {
-      id: 'chatgpt-web',
-      label: 'ChatGPT Web (Plus)',
-      family: 'Connected Accounts',
-      description: 'Uses active ChatGPT Plus session (temporary chats)',
-      modality: 'chat',
-    },
-    {
-      id: 'claude-web',
-      label: 'Claude Web',
-      family: 'Connected Accounts',
-      description: 'Uses active Claude session',
-      modality: 'chat',
-    },
-    {
-      id: 'hanzo-spark',
-      label: 'Hanzo Spark (GB10 CUDA)',
-      family: 'Local Compute',
-      description: 'Spark GB10 node (10.0.0.19:1235)',
-      modality: 'chat',
-    },
-    {
-      id: 'hanzo-evo',
-      label: 'Hanzo Evo (Strix Halo ROCm)',
-      family: 'Local Compute',
-      description: 'Evo Strix Halo node (10.0.0.21:1234)',
-      modality: 'chat',
-    },
-    {
-      id: 'hanzo-desktop',
-      label: 'Hanzo Desktop',
-      family: 'Local Compute',
-      description: 'Local Hanzo Desktop (:11435)',
-      modality: 'chat',
-    },
-    {
-      id: 'webgpu',
-      label: 'WebGPU AI (Local)',
-      family: 'Local Compute',
-      description: 'Runs on-device in browser GPU',
-      modality: 'chat',
-    },
-  ];
-
-  return [...models, ...CONNECTED_MODELS];
+export async function fetchCatalog(): Promise<ModelCatalogEntry[]> {
+  const served = await fetchModelCatalog(`${CATALOG_BASE_URL}/v1`);
+  return [AUTO_MODEL, ...served.filter((m) => can(m, 'chat')), ...CONNECTED_MODELS];
 }

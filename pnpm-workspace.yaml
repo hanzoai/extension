@@ -77,13 +77,17 @@ catalog:
   '@google/genai': '^2.19.0'
   '@googleworkspace/meet-addons': '^1.2.0'
   '@hanzo/ai': '0.6.7'
+  '@hanzo/appearance': '0.2.13'
+  '@hanzo/composer': '0.2.0'
   '@hanzo/data': '1.2.4'
   '@hanzo/event': '0.3.41'
   '@hanzo/gui': '8.3.5'
+  '@hanzo/i18n': '0.5.4'
   '@hanzo/iam': '0.21.17'
   '@hanzo/logo': '1.0.24'
-  '@hanzo/ui': '8.27.0'
+  '@hanzo/ui': '8.29.40'
   '@hanzo/usage': '0.1.7'
+  '@hanzo/voice': '0.1.19'
   '@hanzogui/config': '8.3.5'
   '@hanzogui/lucide-icons-2': '8.3.5'
   '@hediet/node-reload': '^0.10.0'
@@ -409,6 +413,11 @@ catalog:
   'yazl': '^3.3.1'
   'zod': '^4.5.2'
   'zod-to-json-schema': '^3.25.2'
+
+minimumReleaseAgeExclude:
+  - '@hanzo/appearance@0.2.13'
+  - '@hanzo/design@0.5.38'
+  - '@hanzo/ui@8.29.40'
 
 overrides:
   '@noble/hashes': '1.8.0'

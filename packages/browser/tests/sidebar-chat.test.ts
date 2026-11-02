@@ -25,7 +25,7 @@ const sidebar = (over: Partial<ChatProps> = {}): ChatProps => ({
   onStop: () => {},
   onRetry: () => {},
   busy: false,
-  models: [{ id: 'auto', label: 'Auto', family: 'Router', description: 'Routes to the best model', modality: 'chat' }],
+  models: [{ id: 'auto', name: 'Auto', owned_by: 'router', description: 'Routes to the best model' }],
   model: 'auto',
   onModel: () => {},
   rag: true,

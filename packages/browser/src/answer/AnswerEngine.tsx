@@ -1,13 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createAiClient, type AiClient, type SearchEvent, type SearchSource } from '@hanzo/ai';
-import { Button, SizableText, XStack, YStack } from '@hanzo/ui';
-import { Composer, Failure, Message, Sources, Step, Thread, type Source } from '@hanzo/ui/chat';
-import { ModelSelector, type ModelCatalogEntry } from '@hanzo/ui/models';
+import { Button, SizableText, XStack, YStack } from '@hanzo/ui/primitives';
+import {
+  Composer,
+  Failure,
+  Message,
+  Sources,
+  Step,
+  Thread,
+  type Chip,
+  type Mind,
+  type Modes,
+  type Source,
+} from '@hanzo/ui/chat';
+import { defaultModel, type ModelCatalogEntry } from '@hanzo/ui/models';
 import { fetchNews, type NewsItem } from './news.js';
 import { AUTO, fetchCatalog } from './model-catalog.js';
 import { Prose } from '../shared/Prose.js';
 import { capture, contributeTrainingSample } from '../shared/consent.js';
-import { Toolbar, type Mode } from './Toolbar.js';
+import { MODES, SOURCES, type Mode } from './modes.js';
 import { Rail } from './Rail.js';
 import { Stories } from './Stories.js';
 import { Widgets } from './WidgetView.js';
@@ -20,11 +31,12 @@ import { DEFAULT_PROVIDER_ID, fallbackUrl, loadProviderId, providerById } from '
  * through @hanzo/ai: `search` for the grounded modes, `chat.completions` for
  * Chat (each capability defined in exactly one place).
  *
- * It draws with `@hanzo/ui/chat` — Thread, Message, Sources, Composer — and
- * `@hanzo/ui/models` for the picker. This file is the state and the wire; the
- * presentation is the shell every Hanzo chat surface shares. What is left local
- * is only what is true HERE: the modes and sources in the composer's toolbar
- * slot, the widgets the answer can emit, and the news rail.
+ * It draws with `@hanzo/ui/chat` — Thread, Message, Sources, Composer — the
+ * shell every Hanzo chat surface shares. This file is the state and the wire.
+ * The composer is handed this surface's lists and draws them as the quiet line
+ * under its frame: the sources as chips, the model (`mind`) and the mode as
+ * words that open their choices. What is left local is only what is true HERE:
+ * the widgets the answer can emit, the stories and the rail.
  */
 
 /**
@@ -77,9 +89,6 @@ const STAGE: Record<string, string> = {
   writing: 'Writing the answer',
 };
 
-/** How wide the model picker is allowed to be in the composer's toolbar row. */
-const PICKER = 176;
-
 /** A cited source in the shell's vocabulary. The favicon is the mark; the host
  *  initial stands in when a site serves none, so a citation always renders. */
 function cite(s: SearchSource): Source {
@@ -110,6 +119,8 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
   const [mode, setMode] = useState<Mode>('search');
   const [sources, setSources] = useState<Set<string>>(new Set());
   const [models, setModels] = useState<ModelCatalogEntry[]>([]);
+  /** Whether the catalog has answered: still reading, read, or a sentence why not. */
+  const [catalog, setCatalog] = useState<'reading' | 'read' | string>('reading');
   const [model, setModel] = useState<string>(AUTO);
   const [news, setNews] = useState<NewsItem[]>([]);
   // True once the user picks a model themselves, so the catalog's default-to-Enso
@@ -136,7 +147,8 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
 
   // Load real model catalog + live news (both public — work signed out).
   //
-  // Enso is the default, selected once the catalog lands. It cannot be the
+  // Enso is the default (`defaultModel`, the one every Hanzo surface starts a
+  // conversation on), selected once the catalog lands. It cannot be the
   // useState seed: the catalog is fetched at runtime, so naming a model before
   // it arrives would hardcode an id the server may not serve — the whole point
   // of model-catalog.ts is that the list is never fabricated. Auto is the seed
@@ -147,11 +159,12 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
     fetchCatalog()
       .then((entries) => {
         setModels(entries);
+        setCatalog('read');
         if (picked.current) return;
-        const enso = entries.find((m) => /enso/i.test(m.family ?? ''));
-        if (enso) setModel(enso.id);
+        const first = defaultModel(entries);
+        if (first) setModel(first);
       })
-      .catch(() => {});
+      .catch(() => setCatalog('The model list could not be read.'));
     fetchNews().then(setNews).catch(() => {});
     loadProviderId().then(setProviderId).catch(() => {});
   }, [apiBase]);
@@ -303,15 +316,43 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
   }, []);
 
   const busy = phase === 'running';
+
+  // The model answering. Nothing on this surface is plan-gated (`free: false`):
+  // the gateway refuses what the account may not send, and the answer says so.
+  const mind = useMemo<Mind>(
+    () => ({
+      model,
+      models,
+      loading: catalog === 'reading',
+      error: catalog === 'reading' || catalog === 'read' ? null : catalog,
+      note: '',
+      free: false,
+      pick: chooseModel,
+    }),
+    [model, models, catalog, chooseModel],
+  );
+  const modes = useMemo<Modes<Mode>>(() => ({ value: mode, set: setMode, items: MODES }), [mode]);
+  // Chat is ungrounded, so it offers nothing to source from.
+  const chips = useMemo<Chip[] | undefined>(
+    () =>
+      mode === 'chat'
+        ? undefined
+        : SOURCES.map((s) => ({ id: s, label: `@${s}`, on: sources.has(s), onPress: () => toggleSource(s) })),
+    [mode, sources, toggleSource],
+  );
+
   const composer = (
-    <Composer value={query} onChange={setQuery} onSend={submit} onStop={stop} busy={busy}>
-      <Toolbar mode={mode} setMode={setMode} sources={sources} toggleSource={toggleSource} />
-      {/* Boxed: the picker's trigger is `width: "100%"`, so left free in the
-          toolbar row it takes everything and pushes the send control out. */}
-      <XStack width={PICKER} shrink={0}>
-        <ModelSelector models={models} value={model} onChange={chooseModel} size="sm" />
-      </XStack>
-    </Composer>
+    <Composer
+      value={query}
+      onChange={setQuery}
+      onSend={submit}
+      onStop={stop}
+      busy={busy}
+      mind={mind}
+      mode={modes}
+      chips={chips}
+      column
+    />
   );
 
   const { prose, widgets } = extractWidgets(answer);
@@ -327,10 +368,8 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
 
       <main className="ae-main">
         {phase === 'idle' ? (
-          <YStack flex={1} justify="center" items="center" gap="$6" px="$4" py="$6">
-            <YStack width="100%" maxW={768}>
-              {composer}
-            </YStack>
+          <YStack flex={1} justify="center" gap="$6" py="$6">
+            {composer}
             <Stories items={news} />
           </YStack>
         ) : (
@@ -417,7 +456,7 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
               )}
             </Thread>
 
-            <YStack width="100%" maxW={768} self="center" px="$3" pb="$4">
+            <YStack width="100%" pb="$4">
               {composer}
             </YStack>
           </>
