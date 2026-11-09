@@ -1,0 +1,359 @@
+# Attach the built browser, editor and host artifacts to the GitHub release of
+# every v* tag. hanzo.ai/download resolves the newest public release's assets by
+# name (hanzo-inc/app scripts/sync-releases.mjs: surfaces browser, editor, host),
+# so the names below are a contract: hanzo-ai-<surface>-v<version>.<ext>, and
+# hanzo_jupyter-<version>-py3-none-any.whl. This file is independent of
+# publish.yml, which ships to the stores and npm.
+#
+#   build (one job per artifact, Linux) ──► release ──► safari (macOS)
+#
+# release attaches the Linux assets to a DRAFT, checks each one landed, and only
+# then publishes it, so `releases/latest` never names a release with no assets.
+# safari is a job of its own on a macOS runner and runs after release: a host
+# that is missing or busy never holds back the Linux assets, and it attaches its
+# zip to the same release, replacing one of that name.
+#
+# A pull request that touches this file is the dry run: the same jobs run, the
+# release is a draft named dry-run-pr<N>-<run id> that is never published, and
+# it is deleted when the run ends. Safari does not run there.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths: ['.github/workflows/release.yml']
+
+# A tag's release is built once at a time and never cancelled midway; a newer
+# push to a pull request replaces the run before it.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: ${{ matrix.id }}
+    # Pull requests from forks get no write token and no cluster runner.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    # Runners are ephemeral cluster pods with no sudo and no zip binary: tools
+    # land in the workspace or $RUNNER_TEMP, and archives are written with
+    # python's zipfile (zipdir below).
+    runs-on: [linux-amd64]
+    # jetbrains resolves the IntelliJ platform (4.4 GB) and takes 6 to 8 minutes.
+    timeout-minutes: 15
+    env:
+      OUT: ${{ github.workspace }}/out
+    strategy:
+      fail-fast: false
+      # install: the pnpm filter that fetches only what the build reads; empty
+      # when the build is not pnpm's. assets: the exact set the job must leave in
+      # out/, @ standing for the version. pack: how it is built and named.
+      matrix:
+        include:
+          - id: browser
+            install: '--filter "{./packages/browser}..."'
+            assets: hanzo-ai-chrome-v@.zip hanzo-ai-firefox-v@.zip hanzo-ai-edge-v@.zip
+            pack: |
+              make build target=chrome
+              zipdir dist/chrome "$OUT/hanzo-ai-chrome-v$VERSION.zip"
+              zipdir dist/firefox "$OUT/hanzo-ai-firefox-v$VERSION.zip"
+              # Edge loads the Chrome build.
+              cp "$OUT/hanzo-ai-chrome-v$VERSION.zip" "$OUT/hanzo-ai-edge-v$VERSION.zip"
+
+          # One .vsix, named for each editor that installs it.
+          - id: vscode
+            install: '--filter "{./packages/vscode}..."'
+            assets: hanzo-ai-vscode-v@.vsix hanzo-ai-cursor-v@.vsix hanzo-ai-windsurf-v@.vsix hanzo-ai-antigravity-v@.vsix
+            pack: |
+              make build target=vscode
+              for editor in vscode cursor windsurf antigravity; do
+                cp packages/vscode/dist/hanzo-ide.vsix "$OUT/hanzo-ai-$editor-v$VERSION.vsix"
+              done
+
+          # dxt bundles mcp's CLI, so mcp's dependencies are installed with it.
+          - id: claude
+            install: '--filter "{./packages/dxt}..." --filter "{./packages/mcp}..."'
+            assets: hanzo-ai-claude-v@.dxt
+            pack: |
+              make build target=dxt
+              cp packages/dxt/dist/hanzo-ai.dxt "$OUT/hanzo-ai-claude-v$VERSION.dxt"
+
+          - id: jetbrains
+            install: ''
+            assets: hanzo-ai-jetbrains-v@.zip
+            pack: |
+              make build target=jetbrains
+              set -- packages/jetbrains/build/distributions/*.zip
+              [ $# -eq 1 ] || { echo "::error::expected one plugin zip, found $#: $*"; exit 1; }
+              cp "$1" "$OUT/hanzo-ai-jetbrains-v$VERSION.zip"
+
+          # office-localhost is the same add-in stamped for https://localhost:3000,
+          # the sideload kit for a developer's machine.
+          - id: office
+            install: '--filter "{./packages/office}..."'
+            assets: hanzo-ai-office-v@.zip hanzo-ai-office-localhost-v@.zip
+            pack: |
+              make build target=office
+              zipdir packages/office/dist "$OUT/hanzo-ai-office-v$VERSION.zip"
+              HANZO_OFFICE_BASE=https://localhost:3000 make build target=office
+              zipdir packages/office/dist "$OUT/hanzo-ai-office-localhost-v$VERSION.zip"
+
+          - id: outlook
+            install: '--filter "{./packages/outlook}..."'
+            assets: hanzo-ai-outlook-v@.zip
+            pack: |
+              make build target=outlook
+              zipdir packages/outlook/dist "$OUT/hanzo-ai-outlook-v$VERSION.zip"
+
+          - id: figma
+            install: '--filter "{./packages/figma}..."'
+            assets: hanzo-ai-figma-v@.zip
+            pack: |
+              make build target=figma
+              zipdir packages/figma/dist "$OUT/hanzo-ai-figma-v$VERSION.zip"
+
+          # dist/ holds the "Hanzo AI.sketchplugin" bundle.
+          - id: sketch
+            install: '--filter "{./packages/sketch}..."'
+            assets: hanzo-ai-sketch-v@.zip
+            pack: |
+              make build target=sketch
+              zipdir packages/sketch/dist "$OUT/hanzo-ai-sketch-v$VERSION.zip"
+
+          # The manifest builder wants a bot app id. The nil GUID is what a
+          # sideloader replaces with their own Azure Bot registration.
+          - id: teams
+            install: '--filter "{./packages/teams}..."'
+            assets: hanzo-ai-teams-v@.zip
+            pack: |
+              make build target=teams
+              MICROSOFT_APP_ID=00000000-0000-0000-0000-000000000000 pnpm --filter @hanzo/teams run package
+              cp packages/teams/dist/hanzo-teams.zip "$OUT/hanzo-ai-teams-v$VERSION.zip"
+
+          - id: zendesk
+            install: '--filter "{./packages/zendesk}..."'
+            assets: hanzo-ai-zendesk-v@.zip
+            pack: |
+              make build target=zendesk
+              zipdir packages/zendesk/dist "$OUT/hanzo-ai-zendesk-v$VERSION.zip"
+
+          # The wheel is stamped with the release version, so its file name and
+          # its metadata agree and pip will install it. The labextension is built
+          # first: the wheel's build hook skips its own pnpm build when it exists.
+          - id: jupyter
+            install: '--filter "{./packages/jupyter}..."'
+            assets: hanzo_jupyter-@-py3-none-any.whl
+            pack: |
+              pnpm --filter @hanzo/jupyter run build:prod
+              sed -i "s/^version = \".*\"/version = \"$VERSION\"/" packages/jupyter/pyproject.toml
+              uv build --wheel --out-dir "$OUT" packages/jupyter
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The tag names the release; a pull request borrows the browser package's
+      # version. The browser package stamps its manifests, so a tag that
+      # disagrees with it would ship a zip named for one version and carrying
+      # another.
+      - name: Version
+        run: |
+          VERSION=$(node -p "require('./packages/browser/package.json').version")
+          [[ $VERSION =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "::error::version $VERSION is not digits and dots, so no asset name would match"; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            [ "$GITHUB_REF_NAME" = "v$VERSION" ] || { echo "::error::tag $GITHUB_REF_NAME, but packages/browser is $VERSION"; exit 1; }
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          mkdir -p "$OUT"
+
+      - name: Tools
+        run: |
+          corepack enable
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/zipdir" <<'EOF'
+          #!/usr/bin/env python3
+          # zipdir DIR FILE.zip: the contents of DIR at the root of the archive.
+          import shutil, sys
+          shutil.make_archive(sys.argv[2].removesuffix('.zip'), 'zip', sys.argv[1])
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/zipdir"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          # jupyter builds through uv.
+          if [ "${{ matrix.id }}" = jupyter ] && ! command -v uv >/dev/null 2>&1; then
+            curl -fsSL https://astral.sh/uv/install.sh | sh
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Install
+        if: matrix.install != ''
+        run: pnpm install --frozen-lockfile ${{ matrix.install }}
+
+      - name: Build and name
+        run: ${{ matrix.pack }}
+
+      # Exactly the names this job promised: a stray file would be attached to
+      # the release, and a missing one would be found by a reader.
+      - name: Check the names
+        run: |
+          want=$(printf '%s\n' ${{ matrix.assets }} | sed "s/@/$VERSION/" | sort)
+          have=$(ls "$OUT" | sort)
+          [ "$want" = "$have" ] || { echo "::error::wanted:"; echo "$want"; echo "::error::built:"; echo "$have"; exit 1; }
+          ls -l "$OUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: asset-${{ matrix.id }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: [linux-amd64]
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: asset-*
+          merge-multiple: true
+          path: out
+
+      - name: Name the release
+        env:
+          PR: ${{ github.event.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            echo "TAG=dry-run-pr$PR-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+            echo "SHA=$HEAD_SHA" >> "$GITHUB_ENV"
+          else
+            echo "TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
+            echo "SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+          fi
+
+      # Create or find the release, attach every asset, replacing one of the
+      # same name, and check each landed at its size. A release found already
+      # published is left as it is; one still a draft is published below.
+      - name: Attach the assets
+        run: |
+          api() {
+            local out status
+            out=$(curl -sS -X "$1" -w '\n%{http_code}' -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "${@:3}" "$2")
+            status=${out##*$'\n'}
+            case $status in 2*) printf '%s' "${out%$'\n'*}"; return 0 ;; esac
+            printf 'refused: %s %s %s\n%s\n' "$status" "$1" "$2" "$(printf '%s' "${out%$'\n'*}" | head -c 400)" >&2
+            return 1
+          }
+          R="https://api.github.com/repos/$GITHUB_REPOSITORY/releases"
+          U="https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases"
+
+          ID=$(api GET "$R/tags/$TAG" 2>/dev/null | jq -r .id || true)
+          [ -n "$ID" ] || ID=$(api GET "$R?per_page=100" | jq -r --arg t "$TAG" '[.[] | select(.tag_name == $t and .draft)][0].id // empty')
+          [ -n "$ID" ] || ID=$(api POST "$R" -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg t "$TAG" --arg c "$SHA" '{tag_name: $t, target_commitish: $c, name: $t, draft: true, generate_release_notes: true}')" | jq -r .id)
+          echo "ID=$ID" >> "$GITHUB_ENV"
+          echo "DRAFT=$(api GET "$R/$ID" | jq -r .draft)" >> "$GITHUB_ENV"
+
+          have=$(api GET "$R/$ID/assets?per_page=100")
+          for f in out/*; do
+            n=$(basename "$f")
+            for old in $(jq -r --arg n "$n" '.[] | select(.name == $n) | .id' <<<"$have"); do
+              api DELETE "$R/assets/$old" >/dev/null
+            done
+            api POST "$U/$ID/assets?name=$n" -H 'Content-Type: application/octet-stream' --data-binary @"$f" >/dev/null
+          done
+
+          api GET "$R/$ID/assets?per_page=100" | jq -r '.[] | "\(.size)\t\(.name)"' | sort -k2 | tee landed
+          for f in out/*; do
+            grep -qxF "$(printf '%s\t%s' "$(stat -c %s "$f")" "$(basename "$f")")" landed || { echo "::error::$(basename "$f") did not land at its size"; exit 1; }
+          done
+
+      # Latest is the highest version among the repo's tags, not the last one
+      # built: re-running an old tag must not take the label. The dry run makes
+      # the same call and keeps the draft a draft.
+      - name: Publish
+        if: env.DRAFT == 'true'
+        run: |
+          newest=$(git ls-remote --tags --refs "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY" 'v*' \
+            | sed 's|.*refs/tags/||' | grep -E '^v[0-9]+(\.[0-9]+)*$' | sort -V | tail -1)
+          latest=false
+          [ "$newest" = "$TAG" ] && latest=true
+          draft=false
+          [ "$GITHUB_EVENT_NAME" = pull_request ] && draft=true
+          echo "newest tag $newest; $TAG: make_latest=$latest draft=$draft"
+          curl -fsS -X PATCH -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' \
+            -H 'Content-Type: application/json' -d "{\"draft\":$draft,\"make_latest\":\"$latest\"}" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$ID" | jq -r '"\(.html_url) draft=\(.draft)"'
+
+      # The dry run leaves nothing behind, whatever happened above.
+      - name: Delete the dry-run draft
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          R="https://api.github.com/repos/$GITHUB_REPOSITORY"
+          call() { curl -sS -o /dev/null -w '%{http_code}' -X "$1" -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' "$R/$2"; }
+          # A draft whose tag was never pushed is renamed untagged-<hash> once it is
+          # edited, so it is found by its name as well as its tag.
+          match='.[] | select(.tag_name == $t or .name == $t) | .id'
+          for id in $(curl -fsS -H "Authorization: Bearer $GITHUB_TOKEN" "$R/releases?per_page=100" | jq -r --arg t "$TAG" "$match"); do
+            echo "release $id: DELETE $(call DELETE "releases/$id")"
+          done
+          echo "tag $TAG: DELETE $(call DELETE "git/refs/tags/$TAG") (404 or 422 when the draft never made one)"
+          left=$(curl -fsS -H "Authorization: Bearer $GITHUB_TOKEN" "$R/releases?per_page=100" | jq -r --arg t "$TAG" "[$match] | length")
+          echo "releases named $TAG remaining: $left"
+          [ "$left" = 0 ]
+
+  # The Safari project needs Xcode, so it is built on a macOS host. The zip is
+  # the Xcode project safari-web-extension-converter writes from the Chrome
+  # build: the unsigned source a developer opens to build, sign and install.
+  # --copy-resources puts the extension inside the project; without it the
+  # project points at ../../../chrome and builds nowhere but where it was made.
+  # (packages/browser/src/build.js runs the converter without the flag, for the
+  # tree it was run in.)
+  safari:
+    needs: release
+    if: github.event_name == 'push'
+    runs-on: [macos-arm64]
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the project
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --filter "{./packages/browser}..."
+          make build target=chrome
+          xcrun safari-web-extension-converter dist/chrome --project-location "$RUNNER_TEMP/safari" \
+            --app-name "Hanzo AI" --bundle-identifier ai.hanzo.browser-extension \
+            --copy-resources --no-prompt --no-open --force
+      - name: Zip and attach
+        run: |
+          NAME="hanzo-ai-safari-v${GITHUB_REF_NAME#v}.zip"
+          (cd "$RUNNER_TEMP/safari" && zip -qry -X "$RUNNER_TEMP/$NAME" "Hanzo AI")
+          R="https://api.github.com/repos/$GITHUB_REPOSITORY/releases"
+          h=(-H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json')
+          ID=$(curl -fsS "${h[@]}" "$R/tags/$GITHUB_REF_NAME" | jq -r .id)
+          for old in $(curl -fsS "${h[@]}" "$R/$ID/assets?per_page=100" | jq -r --arg n "$NAME" '.[] | select(.name == $n) | .id'); do
+            curl -fsS -X DELETE "${h[@]}" "$R/assets/$old"
+          done
+          curl -fsS "${h[@]}" -H 'Content-Type: application/octet-stream' --data-binary @"$RUNNER_TEMP/$NAME" \
+            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$ID/assets?name=$NAME" | jq -r '"attached \(.name) (\(.size) bytes)"'

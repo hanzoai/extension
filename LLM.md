@@ -234,6 +234,43 @@ stamps it into every manifest (chrome/firefox/safari).
   sudo, so nothing asks for `playwright install --with-deps` (its image carries
   chromium's libraries). jupyter's uvx needs uv: the reusable installs it for
   any repo with a `pyproject.toml`, and publish.yml installs it itself.
+- **Release assets.** `release.yml` (push of a `v*` tag) attaches the browser,
+  editor and host builds to that tag's GitHub release, independent of
+  `publish.yml`. hanzo.ai/download picks the newest public release's assets by
+  name (hanzo-inc/app `scripts/sync-releases.mjs`, surfaces browser, editor,
+  host), so the names are a contract: `hanzo-ai-{chrome,firefox,safari,edge,
+  office,outlook,figma,sketch,teams,zendesk,jetbrains}-v<version>.zip`,
+  `hanzo-ai-{vscode,cursor,windsurf,antigravity}-v<version>.vsix`,
+  `hanzo-ai-claude-v<version>.dxt`, `hanzo_jupyter-<version>-py3-none-any.whl`,
+  and `hanzo-ai-office-localhost-v<version>.zip`, the sideload kit the page
+  ignores. The tag must equal `packages/browser`'s version, which stamps the
+  manifests the zips carry; the job refuses a tag that does not.
+  - `build` is a matrix, one job per artifact on `linux-amd64`; each entry's
+    `assets` is the exact set it leaves in `out/`, so a stray or missing file
+    fails the job. `release` needs all of them, attaches them to a DRAFT
+    (replacing an asset of the same name, so a re-run converges), checks each
+    landed at its size, and only then publishes, so `releases/latest` never
+    names a release with no assets. `latest` goes to the highest `vN.N.N` tag,
+    never to a re-run of an older one.
+  - A runner has no `zip` and no `gh`: archives are written with python's
+    `shutil.make_archive` (`zipdir`), the release is made with curl. The jupyter
+    wheel is stamped with the release version before `uv build`, because
+    pyproject's `0.1.0` under a renamed file is a wheel pip refuses.
+  - `safari` runs last, on `macos-arm64`, and attaches its zip to the release
+    `release` made, so a missing macOS host never holds back the Linux assets
+    (it holds the run open instead). The zip is the Xcode project from
+    `safari-web-extension-converter --copy-resources`; build.js's own converter
+    run omits that flag and points the project at `../../../chrome`, which
+    builds nowhere else. Unsigned; unzipped, it builds with
+    `xcodebuild ... CODE_SIGNING_REQUIRED=NO`.
+  - A pull request touching `release.yml` is the dry run: every job runs, the
+    release is a draft named `dry-run-pr<N>-<run id>` that is never published,
+    and an `if: always()` step deletes it. GitHub renames a draft whose tag was
+    never pushed to `untagged-<hash>` once edited, so cleanup matches the name.
+  - Job times (cluster pods): most 1 to 3 minutes. `jetbrains` takes 6 to 8:
+    Gradle resolves the IntelliJ platform at configuration time, 4.4 GB under
+    `~/.gradle`, and a pod keeps no cache. `GRADLE_USER_HOME` on `/dev/shm` was
+    slower, not faster.
 - Secrets are **KMS only**. The pipeline logs in with the KMS machine identity
   (`KMS_CLIENT_ID`/`KMS_CLIENT_SECRET`, org-level Actions secrets on
   git.hanzo.ai, inherited by every `hanzoai` repo) and reads each credential at
