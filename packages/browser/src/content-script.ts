@@ -42,6 +42,66 @@ class HanzoContentScript {
     this.setupClickHandler();
     this.injectHelpers();
     this.setupMessageHandlers();
+    this.syncHanzoWebAuth();
+  }
+
+  private syncHanzoWebAuth() {
+    try {
+      const host = location.hostname.toLowerCase();
+      const isHanzoOrigin =
+        host === 'hanzo.ai' ||
+        host.endsWith('.hanzo.ai') ||
+        host === 'hanzo.app' ||
+        host.endsWith('.hanzo.app') ||
+        host === 'hanzo.chat';
+      if (!isHanzoOrigin) return;
+
+      // If this tab landed on /callback during an extension OAuth or magic-link flow:
+      if (location.pathname === '/callback') {
+        const searchParams = new URLSearchParams(location.search);
+        if (searchParams.has('code') || searchParams.has('access_token') || searchParams.has('error')) {
+          chrome.runtime.sendMessage({ action: 'auth.callback', url: location.href }).catch(() => {});
+          return;
+        }
+        const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''));
+        if (hashParams.get('email') && hashParams.get('code')) {
+          location.replace(`/auth/callback${location.search}${location.hash}`);
+          return;
+        }
+      }
+
+      const pushTokens = (force = false) => {
+        try {
+          const accessToken = localStorage.getItem('hanzo_iam_access_token');
+          if (!accessToken) return;
+          let user = null;
+          try {
+            const rawUser = localStorage.getItem('hanzo_iam_user');
+            if (rawUser) user = JSON.parse(rawUser);
+          } catch {}
+          chrome.runtime.sendMessage({
+            action: 'auth.syncWebSession',
+            force,
+            tokens: {
+              accessToken,
+              refreshToken: localStorage.getItem('hanzo_iam_refresh_token'),
+              idToken: localStorage.getItem('hanzo_iam_id_token'),
+              expiresAt: localStorage.getItem('hanzo_iam_expires_at'),
+              user,
+            },
+          }).catch(() => {});
+        } catch {}
+      };
+
+      pushTokens(false);
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'hanzo_iam_access_token' && e.newValue) {
+          pushTokens(true);
+        }
+      });
+    } catch {
+      /* ignore */
+    }
   }
 
   private async loadShortcut() {

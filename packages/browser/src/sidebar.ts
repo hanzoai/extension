@@ -248,6 +248,15 @@ class HanzoSidebar {
 
     chrome.tabs.onUpdated.addListener(() => this.refreshTabFilesystemDebounced());
     chrome.tabs.onRemoved.addListener(() => this.refreshTabFilesystemDebounced());
+
+    try {
+      chrome.storage?.onChanged?.addListener((changes, area) => {
+        if (area && area !== 'local') return;
+        if ('hanzo_iam_access_token' in changes || 'hanzo_iam_user' in changes) {
+          void this.checkAuth();
+        }
+      });
+    } catch {}
   }
 
   // ===========================================================================

@@ -228,6 +228,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  try {
+    chrome.storage?.onChanged?.addListener((changes, area) => {
+      if (area && area !== 'local') return;
+      if ('hanzo_iam_access_token' in changes || 'hanzo_iam_user' in changes) {
+        checkAuth();
+      }
+    });
+  } catch {}
+
   // --- Active Tab Context & Inline Ask/Search ---
   let activeTabInfo: { id?: number; title?: string; url?: string } | null = null;
   let pageContextActive = true;

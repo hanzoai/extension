@@ -19,7 +19,7 @@ import { AUTO, fetchCatalog } from './model-catalog.js';
 import { Prose } from '../shared/Prose.js';
 import { capture, contributeTrainingSample } from '../shared/consent.js';
 import { MODES, SOURCES, type Mode } from './modes.js';
-import { Rail } from './Rail.js';
+import { Rail, type RailUser } from './Rail.js';
 import { Stories } from './Stories.js';
 import { Widgets } from './WidgetView.js';
 import { extractWidgets } from './widget.js';
@@ -106,11 +106,15 @@ export interface AnswerEngineProps {
   getToken: () => Promise<string | null>;
   /** Kicks off IAM sign-in (opens the OAuth tab). */
   signIn: () => void;
+  /** Signs out of the current IAM session. */
+  signOut?: () => void;
+  /** Current signed-in user profile, or null when signed out. */
+  user?: RailUser | null;
   /** Optional initial query (from the omnibox / address bar `?q=`). */
   initialQuery?: string;
 }
 
-export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: AnswerEngineProps) {
+export function AnswerEngine({ apiBase, getToken, signIn, signOut, user, initialQuery }: AnswerEngineProps) {
   // Rail hidden by default — the answer surface should read like hanzo.chat:
   // a single centered column. Its own header control brings it back.
   const [collapsed, setCollapsed] = useState(true);
@@ -364,6 +368,8 @@ export function AnswerEngine({ apiBase, getToken, signIn, initialQuery }: Answer
         toggle={() => setCollapsed((v) => !v)}
         newThread={newThread}
         signIn={signIn}
+        signOut={signOut}
+        user={user}
       />
 
       <main className="ae-main">

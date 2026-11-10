@@ -65,4 +65,22 @@ describe('the answer rail', () => {
     expect(open).toContain('aria-expanded="true"');
     expect(open).toContain('aria-label="Collapse sidebar"');
   });
+
+  it('shows the signed-in user badge when authenticated, and Sign in when signed out', () => {
+    const signedOut = markup(React.createElement(Rail, { ...railProps, collapsed: true, user: null }));
+    expect(signedOut).toContain('Sign in — free to start');
+    expect(signedOut).not.toContain('ae-user-badge');
+
+    const signedIn = markup(
+      React.createElement(Rail, {
+        ...railProps,
+        collapsed: true,
+        user: { name: 'Antje Worring', email: 'antje@hanzo.ai' },
+        signOut: () => {},
+      }),
+    );
+    expect(signedIn).toContain('ae-user-badge');
+    expect(signedIn).toContain('Antje Worring');
+    expect(signedIn).toContain('Signed in as Antje Worring');
+  });
 });

@@ -123,4 +123,67 @@ test.describe('answer surface', () => {
     expect(problems).toEqual([]);
     await page.screenshot({ path: 'test-results/answer-surface.png', fullPage: true });
   });
+
+  test('completes OAuth sign-in from newtab and updates the rail to signed-in state', async ({
+    context,
+    extensionId,
+  }) => {
+    await context.route('https://catalog.hanzo.ai/v1/models', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CATALOG) }),
+    );
+    await context.route('https://api.hanzo.ai/v1/iam/oauth/token', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: 'e2e_access_token_123',
+          refresh_token: 'e2e_refresh_token_123',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
+      }),
+    );
+    await context.route('https://api.hanzo.ai/v1/iam/oauth/userinfo', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          sub: 'u_e2e',
+          name: 'Antje Worring',
+          email: 'antje@hanzo.ai',
+        }),
+      }),
+    );
+    await context.route('https://hanzo.ai/v1/iam/oauth/authorize**', async (route) => {
+      const reqUrl = new URL(route.request().url());
+      const state = reqUrl.searchParams.get('state') || '';
+      const redirectUri = reqUrl.searchParams.get('redirect_uri') || 'https://hanzo.ai/callback';
+      await route.fulfill({
+        status: 302,
+        headers: {
+          Location: `${redirectUri}?code=e2e_auth_code&state=${encodeURIComponent(state)}`,
+        },
+      });
+    });
+    await context.route('https://hanzo.ai/callback**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<!doctype html><html><body>Signing in...</body></html>',
+      }),
+    );
+
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/newtab.html`);
+
+    const signInBtn = page.locator('aside.ae-sidebar button.ae-signin');
+    await expect(signInBtn).toBeVisible();
+    await expect(signInBtn).toHaveAttribute('title', 'Sign in');
+
+    await signInBtn.click();
+
+    // After OAuth redirect + token exchange, newtab rail updates to show the signed-in user badge
+    await expect(page.locator('aside.ae-sidebar .ae-user-badge')).toHaveText('A', { timeout: 10_000 });
+    await expect(signInBtn).toHaveAttribute('title', /Signed in as Antje Worring/);
+  });
 });

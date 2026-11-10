@@ -31,6 +31,9 @@ import {
   logout as sharedLogout,
   getValidAccessToken as sharedGetValidAccessToken,
   getAuthStatus as sharedGetAuthStatus,
+  completePendingAuthCallback as sharedCompletePendingAuthCallback,
+  syncWebSession as sharedSyncWebSession,
+  LOGGED_OUT_KEY,
   firefoxAdapter,
   type BrowserAdapter,
 } from './shared/auth.js';
@@ -1596,6 +1599,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
 
       case 'auth.logout':
         await sharedLogout(ffAdapter.storage);
+        await ffAdapter.storage.set({ [LOGGED_OUT_KEY]: true }).catch(() => {});
         sendResponse({ success: true });
         break;
 
@@ -1610,8 +1614,32 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
       }
 
       case 'auth.getToken': {
-        const r = await browser.storage.local.get([STORAGE_KEYS.accessToken]);
-        sendResponse({ success: !!r[STORAGE_KEYS.accessToken], token: r[STORAGE_KEYS.accessToken] || null });
+        const token = await getValidAccessToken();
+        sendResponse({ success: !!token, token });
+        break;
+      }
+
+      case 'auth.callback': {
+        try {
+          const user = await sharedCompletePendingAuthCallback(
+            ffAdapter,
+            String(request.url || ''),
+            typeof request.tabId === 'number' ? request.tabId : sender.tab?.id,
+          );
+          sendResponse({ success: !!user, user });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'auth.syncWebSession': {
+        try {
+          const user = await sharedSyncWebSession(ffAdapter.storage, request.tokens || {}, { force: !!request.force });
+          sendResponse({ success: !!user, user });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
         break;
       }
 

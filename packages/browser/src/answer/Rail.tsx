@@ -17,14 +17,29 @@ import { Mark } from "./Mark.js";
  * hidden, so hover was the ONLY way back: an affordance you cannot see. Collapsed,
  * the mark IS the expand control. Presentational: every action is injected.
  */
+export interface RailUser {
+  sub?: string;
+  name?: string;
+  email?: string;
+  picture?: string;
+  [key: string]: unknown;
+}
+
 export interface RailProps {
   collapsed: boolean;
   toggle: () => void;
   newThread: () => void;
   signIn: () => void;
+  user?: RailUser | null;
+  signOut?: () => void;
 }
 
-export function Rail({ collapsed, toggle, newThread, signIn }: RailProps) {
+export function Rail({ collapsed, toggle, newThread, signIn, user, signOut }: RailProps) {
+  const displayName = user
+    ? String(user.name || user.email || user.sub || "Signed in").trim()
+    : "";
+  const initial = displayName ? displayName[0]!.toUpperCase() : "H";
+
   return (
     <aside className="ae-sidebar">
       <div className="ae-side-top">
@@ -78,17 +93,37 @@ export function Rail({ collapsed, toggle, newThread, signIn }: RailProps) {
         </a>
       </nav>
       <div className="ae-side-bottom">
-        <button className="ae-signin" onClick={signIn} title="Sign in">
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-            <path
-              d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-            />
-          </svg>
-          <span className="ae-signin-label">Sign in — free to start</span>
-        </button>
+        {user ? (
+          <button
+            className="ae-signin ae-user"
+            onClick={collapsed ? toggle : (signOut ?? toggle)}
+            title={
+              collapsed
+                ? `Signed in as ${displayName}`
+                : signOut
+                  ? `${displayName} — Sign out`
+                  : `Signed in as ${displayName}`
+            }
+            aria-label={`Signed in as ${displayName}`}
+          >
+            <span className="ae-user-badge" aria-hidden="true">
+              {initial}
+            </span>
+            <span className="ae-signin-label">{displayName}</span>
+          </button>
+        ) : (
+          <button className="ae-signin" onClick={signIn} title="Sign in">
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path
+                d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
+            </svg>
+            <span className="ae-signin-label">Sign in — free to start</span>
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -111,6 +111,15 @@ chrome.webNavigation.onCommitted.addListener((details) => {
   }
 });
 
+// Intercept OAuth callback navigations even if the MV3 service worker went idle
+// while the user was completing login on hanzo.ai.
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  const candidateUrl = changeInfo.url || tab?.url || (tab as any)?.pendingUrl;
+  if (candidateUrl) {
+    void auth.completePendingAuthCallback(candidateUrl, tabId).catch(() => {});
+  }
+});
+
 const controlSession: ControlSession = {
   active: false,
   tabId: null,
@@ -670,6 +679,27 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       try {
         const token = await auth.getValidAccessToken();
         sendResponse({ success: !!token, token });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'auth.callback':
+      try {
+        const user = await auth.completePendingAuthCallback(
+          String(request.url || ''),
+          typeof request.tabId === 'number' ? request.tabId : sender.tab?.id,
+        );
+        sendResponse({ success: !!user, user });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'auth.syncWebSession':
+      try {
+        const user = await auth.syncWebSession(request.tokens || {}, { force: !!request.force });
+        sendResponse({ success: !!user, user });
       } catch (error: any) {
         sendResponse({ success: false, error: error.message });
       }
