@@ -9,6 +9,7 @@ import { bits, codeOf, keyCode, parseKey, text } from './shared/keys.js';
 import * as script from './shared/script.js';
 import { getChatGptSession, executeInvisibleChatGpt } from './shared/chatgpt-web.js';
 import { fetchAllUsage } from './shared/usage.js';
+import { getSocialSessions, syncSocialAccounts, executeSocialPost } from './shared/social-web.js';
 
 /**
  * Coerce the named params from string → number in place.
@@ -478,6 +479,23 @@ export class CDPBridge {
 
         case 'usage.fetchAll':
           return { id, result: { success: true, providers: await fetchAllUsage() } };
+
+        case 'social.sessions':
+          return { id, result: { success: true, sessions: await getSocialSessions() } };
+
+        case 'social.sync':
+          return { id, result: { success: true, ...(await syncSocialAccounts(params)) } };
+
+        case 'social.post':
+          return {
+            id,
+            result: await executeSocialPost({
+              provider: String(params?.provider || 'x'),
+              content: String(params?.content || params?.text || ''),
+              title: params?.title ? String(params.title) : undefined,
+              dryRun: Boolean(params?.dryRun),
+            }),
+          };
       }
 
       // Resolve target tab. Accept numeric tabId, "tab-NNN" targetId from

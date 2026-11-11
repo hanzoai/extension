@@ -32,7 +32,10 @@ const ENGINES = ['chrome', 'firefox', 'safari'];
 // So each ceiling is back to just above its measured size, and the ratchet
 // works again.
 const BUDGETS = {
-  'background.js': 210, // 206.1
+  // 217.7 — RAISED from 210 (206.1) for IAM tab session sync + ZAP social/app
+  // session discovery (social.sessions / social.sync / social.post + 27 social &
+  // business app cookie descriptors in shared/social-web.ts).
+  'background.js': 222,
   'content-script.js': 62, // 55.4
   'page.js': 29,
   // 1079.6 — RAISED from 765 with newtab.js below, for the same reason: both
