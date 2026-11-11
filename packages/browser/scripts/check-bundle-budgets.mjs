@@ -32,12 +32,16 @@ const ENGINES = ['chrome', 'firefox', 'safari'];
 // So each ceiling is back to just above its measured size, and the ratchet
 // works again.
 const BUDGETS = {
-  // 217.7 — RAISED from 210 (206.1) for IAM tab session sync + ZAP social/app
-  // session discovery (social.sessions / social.sync / social.post + 27 social &
-  // business app cookie descriptors in shared/social-web.ts).
-  'background.js': 222,
-  'content-script.js': 62, // 55.4
-  'page.js': 29,
+  // 262.9 — RAISED from 222 (217.7) for sovereign KMS vault autofill & egress
+  // (shared/vault.ts + shared/kms.ts), LastPass vault/icon automation
+  // (shared/lastpass.ts), WebMCP discovery, delta caps, detached jobs &
+  // provenance boundaries (shared/webmcp.ts), and MAIN-world React input sync.
+  'background.js': 266,
+  'content-script.js': 62, // 57.0
+  // 29.7 — RAISED from 29 (28.1) for closed Shadow-DOM `>>>` selector piercing
+  // (`deepQuerySelector`), ShadowRoot/SVG hit-testing (`sameHitTarget`), and
+  // password-masked MAIN-world input sync tokens.
+  'page.js': 31,
   // 1079.6 — RAISED from 765 with newtab.js below, for the same reason: both
   // draw the one composer of @hanzo/ui 8.29.40.
   'sidebar.js': 1085,

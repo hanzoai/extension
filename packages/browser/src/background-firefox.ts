@@ -40,6 +40,25 @@ import {
 import { parseTabId, unwrapEvaluateResult } from './shared/tab-id.js';
 import { detail, shrink } from './shared/shrink.js';
 import { DRIVE, drive, driveMessage } from './shared/drive.js';
+import { LASTPASS_METHODS, handleLastPass } from './shared/lastpass.js';
+import {
+  WEBMCP_METHODS,
+  defaultWebMCPTracker,
+  injectWebMCPOnCommitted,
+  webMcpList,
+  webMcpInvoke,
+  webMcpResult,
+  webMcpCancel,
+} from './shared/webmcp.js';
+import {
+  VAULT_METHODS,
+  getVaultStatus,
+  autofillWithVault,
+  fillFieldFromKms,
+  captureFieldToKms,
+  vaultEgressFetch,
+  setupHanzoPost,
+} from './shared/vault.js';
 import * as script from './shared/script.js';
 
 // Declare browser API for TypeScript
@@ -129,6 +148,57 @@ class HanzoFirefoxExtension {
       tab = null as any;
     }
     const tabId: number | undefined = tab?.id ?? undefined;
+
+    // LastPass native vault & icon automation (zero secret over ZAP).
+    if (LASTPASS_METHODS.has(method)) {
+      return handleLastPass(browser, method, params || {});
+    }
+
+    if (method === 'vault.egressFetch') {
+      const token = params?.token ? String(params.token) : await sharedGetValidAccessToken(firefoxAdapter).catch(() => '');
+      return vaultEgressFetch(token || '', params as any);
+    }
+
+    if (method === 'vault.status') {
+      return getVaultStatus(browser, {
+        tabId: tabId ?? null,
+        getToken: () => sharedGetValidAccessToken(firefoxAdapter).catch(() => null),
+        org: params?.org ? String(params.org) : undefined,
+      });
+    }
+
+    if (method === 'post.setup') {
+      const token = params?.token ? String(params.token) : await sharedGetValidAccessToken(firefoxAdapter).catch(() => null);
+      return setupHanzoPost(browser, {
+        tabId: tabId ?? null,
+        token,
+        org: params?.org ? String(params.org) : undefined,
+        apiEndpoint: params?.apiEndpoint ? String(params.apiEndpoint) : undefined,
+      });
+    }
+
+    if (WEBMCP_METHODS.has(method)) {
+      if (!tabId) throw new Error('No active tab');
+      if (method.endsWith('.list')) return webMcpList(browser, tabId, params as any) as any;
+      if (method.endsWith('.invoke') || method.endsWith('.call')) return webMcpInvoke(browser, tabId, params as any);
+      if (method.endsWith('.result')) return webMcpResult(browser, tabId, params as any);
+      if (method.endsWith('.cancel')) return webMcpCancel(browser, tabId, params as any);
+    }
+
+    if (VAULT_METHODS.has(method)) {
+      if (!tabId) throw new Error('No active tab');
+      if (method === 'vault.autofill' || method === 'vault.syncAutofill') {
+        return autofillWithVault(browser, tabId, params as any);
+      }
+      if (method === 'vault.fillFromKms') {
+        const token = params?.token ? String(params.token) : await sharedGetValidAccessToken(firefoxAdapter).catch(() => '');
+        return fillFieldFromKms(browser, tabId, token || '', params as any);
+      }
+      if (method === 'vault.captureToKms') {
+        const token = params?.token ? String(params.token) : await sharedGetValidAccessToken(firefoxAdapter).catch(() => '');
+        return captureFieldToKms(browser, tabId, token || '', params as any);
+      }
+    }
 
     // The snapshot → ref engine: the same code Chrome runs (shared/drive.ts).
     if (DRIVE.has(method)) {
@@ -2687,10 +2757,17 @@ try {
 
 // End active session when the controlled tab closes.
 browser.tabs.onRemoved.addListener((tabId) => {
+  defaultWebMCPTracker.clearTab(tabId);
   if (controlSession.active && controlSession.tabId === tabId) {
     void hanzoExtension.stopControlSession();
   }
 });
+
+if (browser.webNavigation?.onCommitted) {
+  browser.webNavigation.onCommitted.addListener((details) => {
+    void injectWebMCPOnCommitted(browser, details.tabId, details.frameId);
+  });
+}
 
 // ── Omnibox → Hanzo answer engine ────────────────────────────────────────
 // Firefox's address bar can't be silently hijacked (a security boundary), so

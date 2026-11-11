@@ -16,6 +16,9 @@
     "alarms",
     "nativeMessaging"
   ],
+  "optional_permissions": [
+    "management"
+  ],
   "host_permissions": [
     "http://localhost/*",
     "https://localhost/*",

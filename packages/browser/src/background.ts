@@ -30,6 +30,8 @@ import { BrowserControl } from './browser-control';
 import { WebGPUAI } from './webgpu-ai';
 import { getCDPBridge, CDPBridge } from './browser-dispatch';
 import { driveMessage } from './shared/drive.js';
+import { LASTPASS_METHODS, handleLastPass } from './shared/lastpass.js';
+import { defaultWebMCPTracker, injectWebMCPOnCommitted } from './shared/webmcp.js';
 import { unwrapEvaluateResult } from './shared/tab-id.js';
 import * as auth from './auth';
 import { fetchAllUsage } from './shared/usage.js';
@@ -99,13 +101,15 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
 
 // Clean up monitoring on tab close
 chrome.tabs.onRemoved.addListener((tabId) => {
+  defaultWebMCPTracker.clearTab(tabId);
   if (pageMonitor.isMonitoring(tabId)) {
     pageMonitor.stopMonitoring(tabId);
   }
 });
 
-// Wipe logs on navigation (like browser-tools-mcp)
+// Wipe logs on navigation (like browser-tools-mcp) and install WebMCP hook
 chrome.webNavigation.onCommitted.addListener((details) => {
+  void injectWebMCPOnCommitted(chrome, details.tabId, details.frameId);
   if (details.frameId === 0 && pageMonitor.isMonitoring(details.tabId)) {
     pageMonitor.wipeLogs(details.tabId);
   }
@@ -393,11 +397,31 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
   // --- ZAP: status and pairing (shared/zap.ts) ---
   if (typeof request.action === 'string' && zap.handle(request.action, request, sendResponse as (r: any) => void)) return;
 
+  if (typeof request.action === 'string' && LASTPASS_METHODS.has(request.action)) {
+    try {
+      const result = await handleLastPass(chrome, request.action, request);
+      sendResponse({ success: true, ...result });
+    } catch (error: any) {
+      sendResponse({ success: false, error: error.message });
+    }
+    return;
+  }
+
   switch (request.action) {
 
     // --- Snapshot → ref engine, for the extension's own pages ---
     case 'drive':
       sendResponse(await driveMessage(chrome, sender, request, (m, p) => cdpBridge.dispatchMethod(m, p)));
+      break;
+
+    case 'hanzo.webmcp.list':
+    case 'hanzo.webmcp.call':
+      try {
+        const result = await cdpBridge.dispatchMethod(request.action, request);
+        sendResponse({ success: true, ...result });
+      } catch (error: any) {
+        sendResponse({ success: false, error: error.message });
+      }
       break;
 
     // --- Local AI ---
@@ -1956,6 +1980,10 @@ const BROWSER_CAPS = [
   'browser.dom',
   'browser.screenshot',
   'browser.input',
+  'browser.webmcp',
+  'browser.lastpass',
+  'browser.1password',
+  'browser.vault',
   'inference.chat',
   'chatgpt.complete',
   'chatgpt.session',

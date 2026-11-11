@@ -1,30 +1,15 @@
 /**
  * KMS (Key Management / Secrets) client — shared across all browser targets.
  *
- * Lightweight fetch-based client for Hanzo KMS. Uses IAM bearer tokens for
- * auth — no separate KMS credentials needed.
+ * Lightweight fetch-based client for Hanzo Cloud's embedded KMS (`/v1/kms`).
+ * Uses IAM bearer tokens for auth — the tenant org is bound from the validated
+ * token claim (`principal.Acting`), with optional `X-Hanzo-Org` header when
+ * acting across orgs as superadmin.
  *
- * Every path is `/v1/kms/...`, which is the Hanzo `/v1/<service>/<endpoint>`
- * convention and, more importantly, what the server actually serves:
- *
- *   GET    /v1/kms/orgs/{org}/secrets?path=&env=        → list names
- *   GET    /v1/kms/orgs/{org}/secrets/{path}/{name}?env= → read one value
- *   POST   /v1/kms/orgs/{org}/secrets                    → create or replace
- *   DELETE /v1/kms/orgs/{org}/secrets/{path}/{name}?env= → delete
- *
- * This file used to speak Infisical's shape under an `/api/v3` prefix, with a
- * header comment reporting that `/v1/kms/...` had been *verified* to return SPA
- * HTML while `/api/v3/secrets/raw` returned JSON — so `/api/v3` was pinned as
- * the working path and a rewrite was awaited. The observation was real and the
- * conclusion was backwards: the KMS binary embedded a console SPA under a root
- * catch-all, so it answered EVERY unmatched path with 200 text/html. The HTML
- * was the 404. luxfi/kms 1.12.8 removed the catch-all, and the same probe now
- * reads the other way round — `/v1/kms/...` answers JSON, `/api/v3/...` is a
- * JSON 404. There is no gateway rewrite to wait for.
- *
- * Create and update are ONE call because the server has one upsert, not two
- * endpoints. Listing arrived in luxfi/kms 1.12.9; before that the HTTP surface
- * had no list at all, which is what made the Infisical prefix look necessary.
+ *   GET    /v1/kms/secrets?path=&env=        → list names & metadata
+ *   GET    /v1/kms/secrets/{path}/{name}?env= → read one value ({ value })
+ *   POST   /v1/kms/secrets                    → create or replace (upsert)
+ *   DELETE /v1/kms/secrets/{path}/{name}?env= → delete
  */
 
 import { KMS_API_URL } from './config.js';
@@ -33,11 +18,11 @@ import { KMS_API_URL } from './config.js';
 
 /** Where a secret lives. `path` groups secrets; `name` identifies one. */
 export interface KmsRef {
-  /** Org scope — also the scope of the bearer token that reads it. */
-  org: string;
-  /** Environment slug (`dev` / `test` / `main`). Defaults to `default`. */
+  /** Org scope (sent as X-Hanzo-Org when present; token claim is authoritative). */
+  org?: string;
+  /** Environment slug (`default` / `dev` / `production` / `main`). Defaults to `default`. */
   env?: string;
-  /** Grouping path, e.g. `gateway`. Omit to address the org root. */
+  /** Grouping path, e.g. `social` or `gateway`. Omit to address the org root. */
   path?: string;
 }
 
@@ -46,29 +31,38 @@ export interface KmsSecretRef extends KmsRef {
   name: string;
 }
 
+export interface KmsSecretMeta {
+  name: string;
+  path?: string;
+  env?: string;
+  scheme?: string;
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-function kmsHeaders(token: string): Record<string, string> {
-  return {
+function kmsHeaders(token: string, org?: string): Record<string, string> {
+  const headers: Record<string, string> = {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
   };
+  if (org) headers['X-Hanzo-Org'] = org;
+  return headers;
 }
 
 function kmsUrl(path: string, baseUrl?: string): string {
-  return `${baseUrl || KMS_API_URL}${path}`;
+  return `${(baseUrl || KMS_API_URL).replace(/\/+$/, '')}${path}`;
 }
 
-/** The collection URL for an org, with `path`/`env` as query. */
+/** The collection URL for the caller's org, with `path`/`env` as query. */
 function collectionUrl(ref: KmsRef, baseUrl?: string): string {
   const q = new URLSearchParams();
   if (ref.path) q.set('path', ref.path);
   q.set('env', ref.env || 'default');
-  return kmsUrl(`/v1/kms/orgs/${encodeURIComponent(ref.org)}/secrets?${q}`, baseUrl);
+  return kmsUrl(`/v1/kms/secrets?${q}`, baseUrl);
 }
 
 /**
- * The URL of one secret. The server splits the trailing `{rest...}` at its LAST
+ * The URL of one secret. The server splits the trailing `{+1}` at its LAST
  * slash into (path, name), so each segment is escaped on its own — escaping the
  * joined string would encode the separators and the server would read one long
  * name.
@@ -79,7 +73,7 @@ function secretUrl(ref: KmsSecretRef, baseUrl?: string): string {
     .map(encodeURIComponent)
     .join('/');
   const q = new URLSearchParams({ env: ref.env || 'default' });
-  return kmsUrl(`/v1/kms/orgs/${encodeURIComponent(ref.org)}/secrets/${segs}?${q}`, baseUrl);
+  return kmsUrl(`/v1/kms/secrets/${segs}?${q}`, baseUrl);
 }
 
 async function fail(op: string, resp: Response): Promise<never> {
@@ -91,25 +85,26 @@ async function fail(op: string, resp: Response): Promise<never> {
 /** List the names of the secrets under a path. */
 export async function kmsListSecrets(
   token: string,
-  ref: KmsRef,
+  ref: KmsRef = {},
   baseUrl?: string,
 ): Promise<string[]> {
-  const resp = await fetch(collectionUrl(ref, baseUrl), { headers: kmsHeaders(token) });
+  const resp = await fetch(collectionUrl(ref, baseUrl), { headers: kmsHeaders(token, ref.org) });
   if (!resp.ok) return fail('list', resp);
   const data = await resp.json();
+  if (Array.isArray(data)) return data.map((s) => (typeof s === 'string' ? s : String(s?.name ?? s?.secretKey ?? ''))).filter(Boolean);
   return data.names ?? [];
 }
 
-/** Read one secret's value. */
+/** Read one secret's value (only for internal worker egress/injection — never return to LLM). */
 export async function kmsGetSecret(
   token: string,
   ref: KmsSecretRef,
   baseUrl?: string,
 ): Promise<string> {
-  const resp = await fetch(secretUrl(ref, baseUrl), { headers: kmsHeaders(token) });
+  const resp = await fetch(secretUrl(ref, baseUrl), { headers: kmsHeaders(token, ref.org) });
   if (!resp.ok) return fail('get', resp);
   const data = await resp.json();
-  return data.secret?.value ?? '';
+  return data.value ?? data.secret?.value ?? '';
 }
 
 /**
@@ -123,10 +118,10 @@ export async function kmsPutSecret(
   baseUrl?: string,
 ): Promise<void> {
   const resp = await fetch(
-    kmsUrl(`/v1/kms/orgs/${encodeURIComponent(ref.org)}/secrets`, baseUrl),
+    kmsUrl('/v1/kms/secrets', baseUrl),
     {
       method: 'POST',
-      headers: kmsHeaders(token),
+      headers: kmsHeaders(token, ref.org),
       body: JSON.stringify({
         path: ref.path ?? '',
         name: ref.name,
@@ -146,7 +141,7 @@ export async function kmsDeleteSecret(
 ): Promise<void> {
   const resp = await fetch(secretUrl(ref, baseUrl), {
     method: 'DELETE',
-    headers: kmsHeaders(token),
+    headers: kmsHeaders(token, ref.org),
   });
   if (!resp.ok) return fail('delete', resp);
 }

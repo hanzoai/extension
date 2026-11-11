@@ -2,6 +2,7 @@ packages:
   - 'packages/aci'
   - 'packages/auth'
   - 'packages/browser'
+  - 'packages/hanzo-browser'
   - 'packages/canva'
   - 'packages/canvas-lms'
   - 'packages/cards'

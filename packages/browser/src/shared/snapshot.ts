@@ -136,7 +136,9 @@ export function resolve(target: string | undefined): Element {
   }
   let el: Element | null;
   try {
-    el = document.querySelector(t);
+    el = t.includes('>>>')
+      ? deepQuerySelector(document, t)
+      : (document.querySelector(t) ?? deepQuerySelector(document, t));
   } catch {
     throw new Error(`Invalid selector ${JSON.stringify(t)}: pass a snapshot ref (@e2) or a CSS selector.`);
   }
@@ -150,16 +152,66 @@ export function style(el: Element): CSSStyleDeclaration {
   return el.ownerDocument.defaultView!.getComputedStyle(el);
 }
 
-function shadowOf(el: Element): ShadowRoot | null {
+export function shadowOf(el: Element): ShadowRoot | null {
   const e = el as any;
   try {
     if (typeof e.openOrClosedShadowRoot === 'function') return e.openOrClosedShadowRoot() ?? null; // Firefox
     const dom = (globalThis as any).chrome?.dom;
-    if (dom?.openOrClosedShadowRoot && el instanceof el.ownerDocument.defaultView!.HTMLElement) {
-      return dom.openOrClosedShadowRoot(el) ?? null; // Chrome
-    }
+    if (dom?.openOrClosedShadowRoot) return dom.openOrClosedShadowRoot(el) ?? null; // Chrome
   } catch { /* not a shadow host */ }
   return el.shadowRoot;
+}
+
+function queryAllDeep(root: ParentNode, part: string): Element[] {
+  const out: Element[] = [];
+  const seen = new Set<Element>();
+  const scan = (scope: ParentNode) => {
+    for (const m of Array.from(scope.querySelectorAll(part))) {
+      if (!seen.has(m)) { seen.add(m); out.push(m); }
+    }
+    for (const host of Array.from(scope.querySelectorAll('*'))) {
+      const sr = shadowOf(host);
+      if (sr) scan(sr);
+    }
+  };
+  scan(root);
+  return out;
+}
+
+/** Query across open and closed shadow roots; supports `host >>> inner` combinators. */
+export function deepQuerySelector(root: ParentNode, selector: string): Element | null {
+  if (selector.includes('>>>')) {
+    const parts = selector.split('>>>').map((s) => s.trim());
+    if (parts.some((p) => !p)) throw new SyntaxError(selector);
+    const probe = (root instanceof Document ? root : root.ownerDocument ?? document).createDocumentFragment();
+    for (const p of parts) probe.querySelector(p);
+    let scopes: ParentNode[] = [root];
+    for (let i = 0; i < parts.length; i++) {
+      const matches: Element[] = [];
+      for (const s of scopes) {
+        for (const m of queryAllDeep(s, parts[i])) {
+          if (!matches.includes(m)) matches.push(m);
+        }
+      }
+      if (!matches.length) return null;
+      if (i === parts.length - 1) return matches[0];
+      scopes = matches.map((m) => shadowOf(m) ?? m);
+    }
+    return null;
+  }
+  const direct = root.querySelector(selector);
+  if (direct) return direct;
+  const searchShadow = (scope: ParentNode): Element | null => {
+    for (const host of Array.from(scope.querySelectorAll('*'))) {
+      const sr = shadowOf(host);
+      if (sr) {
+        const found = sr.querySelector(selector) ?? searchShadow(sr);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return searchShadow(root);
 }
 
 /** Children in rendered (flat-tree) order: shadow content first, slots filled. */
@@ -645,6 +697,31 @@ function coveredError(el: Element, cover: Element | null, x: number, y: number):
   );
 }
 
+function sameHitTarget(el: Element, hit: Element): boolean {
+  if (contains(el, hit)) return true;
+  const control = hit.closest('label') as HTMLLabelElement | null;
+  if (control?.control === el) return true;
+  const er = el.getRootNode();
+  if ((er.nodeType === 11 || (typeof ShadowRoot !== 'undefined' && er instanceof ShadowRoot)) && hit.getRootNode() === er) {
+    return true;
+  }
+  if (el.localName === 'svg' || !!el.closest('svg')) {
+    for (let n: Element | null = up(el); n; n = up(n)) {
+      const tag = n.localName;
+      const role = (n.getAttribute('role') || '').trim().toLowerCase();
+      if (
+        tag === 'button' || tag === 'a' || tag === 'label' || tag === 'summary' ||
+        INTERACTIVE.has(role) || n.hasAttribute('onclick') ||
+        (n.hasAttribute('tabindex') && (n as HTMLElement).tabIndex >= 0) ||
+        style(n).cursor === 'pointer' || shadowOf(n) !== null
+      ) {
+        return contains(n, hit);
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * The point a click lands on, after proving it lands on `el`: scrolled into
  * view, inside the viewport, and not under another element — in its own
@@ -665,8 +742,7 @@ function aim(el: Element): { x: number; y: number; hit: Element } {
   const x = (left + right) / 2;
   const y = (top + bottom) / 2;
   const hit = deepHit(el.ownerDocument, x, y);
-  const control = hit?.closest('label') as HTMLLabelElement | null;
-  if (!hit || !(contains(el, hit) || control?.control === el)) throw coveredError(el, hit, x, y);
+  if (!hit || !sameHitTarget(el, hit)) throw coveredError(el, hit, x, y);
   let doc = el.ownerDocument;
   let fx = x;
   let fy = y;
@@ -930,10 +1006,21 @@ function check(el: Element, want: boolean) {
 }
 
 function textValue(el: Element): string {
-  if (el.localName === 'input' || el.localName === 'textarea') return (el as HTMLInputElement).value;
+  if (el.localName === 'input' || el.localName === 'textarea') {
+    const i = el as HTMLInputElement;
+    if (i.type === 'password') return formValue(el) ?? '';
+    return i.value;
+  }
   if (el.localName === 'select') return formValue(el) ?? '';
   const inner = (el as HTMLElement).innerText;
   return (typeof inner === 'string' ? inner : el.textContent || '').trim();
+}
+
+function stampMainWorldSync(el: Element): string | undefined {
+  if (el.localName !== 'input' && el.localName !== 'textarea') return undefined;
+  const token = `hz-${Math.random().toString(36).slice(2, 10)}`;
+  el.setAttribute('data-hanzo-sync', token);
+  return token;
 }
 
 /** Perform one action on a ref or CSS selector. Throws with a message an agent can act on. */
@@ -952,6 +1039,7 @@ export function act(req: ActRequest): Record<string, unknown> {
       const kind = writable(el);
       const text = req.text ?? '';
       (el as HTMLElement).focus({ preventScroll: true });
+      let _sync: string | undefined;
       if (kind === 'rich') {
         el.textContent = text;
         input(el, 'insertText', text);
@@ -959,8 +1047,13 @@ export function act(req: ActRequest): Record<string, unknown> {
         setValue(el as HTMLInputElement, text);
         input(el, 'insertText', text);
         emit(el, 'change');
+        _sync = stampMainWorldSync(el);
       }
-      return { filled: describe(el), value: kind === 'rich' ? text : (el as HTMLInputElement).value };
+      return {
+        filled: describe(el),
+        value: kind === 'rich' ? text : textValue(el),
+        ...(_sync ? { _sync } : {}),
+      };
     }
     case 'type': {
       const el = req.selector ? resolve(req.selector) : focused();
@@ -972,7 +1065,12 @@ export function act(req: ActRequest): Record<string, unknown> {
         insert(el, ch);
         key(el, 'keyup', ch, {});
       }
-      return { typed: describe(el), value: textValue(el) };
+      const _sync = stampMainWorldSync(el);
+      return {
+        typed: describe(el),
+        value: textValue(el),
+        ...(_sync ? { _sync } : {}),
+      };
     }
     case 'press': {
       if (!req.key) throw new Error('key required: Enter, Tab, Escape, ArrowDown, Control+a …');

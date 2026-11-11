@@ -39,37 +39,32 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Path shape — the regression that actually happened
+// Path shape — flat /v1/kms/secrets contract (cloud/apps/kms/use.go)
 // ---------------------------------------------------------------------------
 
 describe('KMS paths', () => {
-  it('never emits an /api/ prefix', async () => {
-    // This client used to speak /api/v3/secrets/raw, because the KMS binary
-    // embedded a console SPA under a root catch-all and answered every
-    // unmatched path with 200 text/html — so the wrong path looked alive and
-    // the right one looked broken. Nothing may drift back to it.
+  it('never emits an /api/ or /orgs/ path prefix', async () => {
     mockFetch.mockResolvedValue(mockResponse({ names: [] }));
     await kmsListSecrets(TOKEN, REF);
-    mockFetch.mockResolvedValue(mockResponse({ secret: { value: 'v' } }));
+    mockFetch.mockResolvedValue(mockResponse({ value: 'v' }));
     await kmsGetSecret(TOKEN, SECRET);
-    mockFetch.mockResolvedValue(mockResponse({}));
+    mockFetch.mockResolvedValue(mockResponse({ stored: true }));
     await kmsPutSecret(TOKEN, SECRET, 'v');
-    mockFetch.mockResolvedValue(mockResponse({}));
+    mockFetch.mockResolvedValue(mockResponse({ deleted: true }));
     await kmsDeleteSecret(TOKEN, SECRET);
 
     expect(mockFetch.mock.calls).toHaveLength(4);
     for (const [url] of mockFetch.mock.calls) {
       expect(url).not.toContain('/api/');
-      expect(url).toContain('/v1/kms/');
+      expect(url).not.toContain('/orgs/');
+      expect(url).toContain('/v1/kms/secrets');
     }
   });
 
   it('escapes path segments individually so separators survive', async () => {
-    // The server splits {rest...} at its LAST slash into (path, name). Escaping
-    // the joined string would encode the separators into one long name.
-    mockFetch.mockResolvedValue(mockResponse({ secret: { value: 'v' } }));
+    mockFetch.mockResolvedValue(mockResponse({ value: 'v' }));
     await kmsGetSecret(TOKEN, { org: 'hanzo', env: 'main', path: 'a/b', name: 'C D' });
-    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets/a/b/C%20D');
+    expect(calledUrl()).toContain('/v1/kms/secrets/a/b/C%20D');
   });
 });
 
@@ -83,13 +78,14 @@ describe('kmsListSecrets', () => {
     await expect(kmsListSecrets(TOKEN, REF)).resolves.toEqual(['API_KEY', 'DB_URL']);
   });
 
-  it('addresses the collection with path and env as query, and sends the bearer', async () => {
+  it('addresses the collection with path and env as query, and sends the bearer + X-Hanzo-Org', async () => {
     mockFetch.mockResolvedValue(mockResponse({ names: [] }));
     await kmsListSecrets(TOKEN, REF);
-    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets?');
+    expect(calledUrl()).toContain('/v1/kms/secrets?');
     expect(calledUrl()).toContain('path=app');
     expect(calledUrl()).toContain('env=production');
     expect(calledInit().headers.Authorization).toBe(`Bearer ${TOKEN}`);
+    expect(calledInit().headers['X-Hanzo-Org']).toBe('hanzo');
   });
 
   it('defaults env when the ref omits it', async () => {
@@ -106,7 +102,7 @@ describe('kmsListSecrets', () => {
   it('uses a custom baseUrl when provided', async () => {
     mockFetch.mockResolvedValue(mockResponse({ names: [] }));
     await kmsListSecrets(TOKEN, REF, 'https://custom-kms.example.com');
-    expect(calledUrl()).toContain('custom-kms.example.com/v1/kms/orgs/hanzo/secrets');
+    expect(calledUrl()).toContain('custom-kms.example.com/v1/kms/secrets');
   });
 
   it('throws with the status on failure', async () => {
@@ -120,15 +116,19 @@ describe('kmsListSecrets', () => {
 // ---------------------------------------------------------------------------
 
 describe('kmsGetSecret', () => {
-  it('unwraps secret.value', async () => {
-    mockFetch.mockResolvedValue(mockResponse({ secret: { value: 'postgres://...' } }));
+  it('unwraps top-level value and falls back to secret.value', async () => {
+    mockFetch.mockResolvedValue(mockResponse({ value: 'postgres://...' }));
     await expect(kmsGetSecret(TOKEN, SECRET)).resolves.toBe('postgres://...');
+
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue(mockResponse({ secret: { value: 'legacy-shape' } }));
+    await expect(kmsGetSecret(TOKEN, SECRET)).resolves.toBe('legacy-shape');
   });
 
   it('addresses the secret and carries env', async () => {
-    mockFetch.mockResolvedValue(mockResponse({ secret: { value: 'v' } }));
+    mockFetch.mockResolvedValue(mockResponse({ value: 'v' }));
     await kmsGetSecret(TOKEN, SECRET);
-    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets/app/API_KEY');
+    expect(calledUrl()).toContain('/v1/kms/secrets/app/API_KEY');
     expect(calledUrl()).toContain('env=production');
   });
 
@@ -139,16 +139,16 @@ describe('kmsGetSecret', () => {
 });
 
 // ---------------------------------------------------------------------------
-// kmsPutSecret — create and replace are one call, because the server has one
+// kmsPutSecret
 // ---------------------------------------------------------------------------
 
 describe('kmsPutSecret', () => {
   it('POSTs to the collection with the flat body the server takes', async () => {
-    mockFetch.mockResolvedValue(mockResponse({}));
+    mockFetch.mockResolvedValue(mockResponse({ stored: true }));
     await kmsPutSecret(TOKEN, SECRET, 'sk-live-123');
 
-    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets');
-    expect(calledUrl()).not.toContain('API_KEY'); // name is in the body, not the URL
+    expect(calledUrl()).toContain('/v1/kms/secrets');
+    expect(calledUrl()).not.toContain('API_KEY');
     expect(calledInit().method).toBe('POST');
     expect(JSON.parse(calledInit().body)).toEqual({
       path: 'app',
@@ -170,10 +170,10 @@ describe('kmsPutSecret', () => {
 
 describe('kmsDeleteSecret', () => {
   it('DELETEs the secret URL', async () => {
-    mockFetch.mockResolvedValue(mockResponse({}));
+    mockFetch.mockResolvedValue(mockResponse({ deleted: true }));
     await kmsDeleteSecret(TOKEN, SECRET);
     expect(calledInit().method).toBe('DELETE');
-    expect(calledUrl()).toContain('/v1/kms/orgs/hanzo/secrets/app/API_KEY');
+    expect(calledUrl()).toContain('/v1/kms/secrets/app/API_KEY');
     expect(calledUrl()).toContain('env=production');
   });
 

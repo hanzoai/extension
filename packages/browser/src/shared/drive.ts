@@ -16,8 +16,18 @@
  */
 
 import { detail, shrink, toBase64, toBlob } from './shrink.js';
+import { discoverTabWebMCP, webmcpCall, webmcpList } from './webmcp.js';
 
-export const DRIVE = new Set(['hanzo.navigate', 'hanzo.snapshot', 'hanzo.act', 'hanzo.read', 'hanzo.wait', 'hanzo.annotate']);
+export const DRIVE = new Set([
+  'hanzo.navigate',
+  'hanzo.snapshot',
+  'hanzo.act',
+  'hanzo.read',
+  'hanzo.wait',
+  'hanzo.annotate',
+  'hanzo.webmcp.list',
+  'hanzo.webmcp.call',
+]);
 
 type Params = Record<string, unknown>;
 type Result = Record<string, any>;
@@ -40,27 +50,40 @@ const last = new Map<number, number>();
 
 export async function drive(api: any, tabId: number, method: string, p: Params): Promise<Result> {
   switch (method) {
-    case 'hanzo.navigate':
-      return navigate(api, tabId, str(p.url));
+    case 'hanzo.navigate': {
+      const out = await navigate(api, tabId, str(p.url));
+      const webmcp = await discoverTabWebMCP(api, tabId);
+      return webmcp ? { ...out, webmcp } : out;
+    }
     case 'hanzo.snapshot': {
       const { last: n, ...out } = await page(api, tabId, {
         op: 'snapshot', interactive: flag(p.interactive), compact: flag(p.compact),
         depth: num(p.depth), selector: str(p.selector), urls: flag(p.urls), base: last.get(tabId),
       });
       last.set(tabId, n);
-      return out;
+      const webmcp = await discoverTabWebMCP(api, tabId);
+      return webmcp ? { ...out, webmcp } : out;
     }
-    case 'hanzo.act':
-      return page(api, tabId, {
+    case 'hanzo.act': {
+      const { _sync, ...out } = await page(api, tabId, {
         op: str(p.op), selector: str(p.selector), text: p.text === undefined ? undefined : String(p.text),
         key: str(p.key), value: str(p.value), attribute: str(p.attribute), dx: num(p.dx), dy: num(p.dy),
       });
+      if (typeof _sync === 'string' && _sync) {
+        await syncMainWorldInput(api, tabId, _sync);
+      }
+      return out;
+    }
     case 'hanzo.read':
       return page(api, tabId, { op: 'read', outline: flag(p.outline), filter: str(p.filter) });
     case 'hanzo.wait':
       return wait(api, tabId, p);
     case 'hanzo.annotate':
       return annotate(api, tabId, p);
+    case 'hanzo.webmcp.list':
+      return webmcpList(api, tabId, p);
+    case 'hanzo.webmcp.call':
+      return webmcpCall(api, tabId, p);
   }
   throw new Error(`drive: unknown method ${method}`);
 }
@@ -69,6 +92,50 @@ export async function drive(api: any, tabId: number, method: string, p: Params):
 async function settle(api: any, tabId: number, ms = 5000): Promise<void> {
   const end = Date.now() + ms;
   while ((await api.tabs.get(tabId)).status !== 'complete' && Date.now() < end) await sleep(100);
+}
+
+/**
+ * Synchronize MAIN-world framework state (React's `_valueTracker`, Vue, etc.) after
+ * `page.js` (ISOLATED world) sets an input's DOM value. Uses a CSP-safe function
+ * reference (`world: 'MAIN'`, no eval) and never returns the field value.
+ */
+async function syncMainWorldInput(api: any, tabId: number, token: string): Promise<void> {
+  try {
+    await api.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      args: [token],
+      func: (syncToken: string) => {
+        const findStamped = (root: Document | ShadowRoot): HTMLInputElement | HTMLTextAreaElement | null => {
+          const direct = root.querySelector(`[data-hanzo-sync="${syncToken}"]`) as HTMLInputElement | HTMLTextAreaElement | null;
+          if (direct) return direct;
+          for (const host of Array.from(root.querySelectorAll('*'))) {
+            if (host.shadowRoot) {
+              const found = findStamped(host.shadowRoot);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        const el = findStamped(document);
+        if (!el) return null;
+        el.removeAttribute('data-hanzo-sync');
+        const val = el.value;
+        const tracker = (el as any)._valueTracker;
+        if (tracker && typeof tracker.setValue === 'function') {
+          tracker.setValue(`__hanzo_prev_${val.length}__`);
+        }
+        const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        if (setter) setter.call(el, val);
+        el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertReplacementText' }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return { synced: true };
+      },
+    });
+  } catch {
+    // Best-effort MAIN world sync (e.g. non-MAIN fake harness in unit tests)
+  }
 }
 
 async function inject(api: any, tabId: number, req: Params): Promise<Result | null> {

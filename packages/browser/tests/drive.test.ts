@@ -106,7 +106,16 @@ describe('drive', () => {
   });
 
   it('lists exactly the methods it answers', () => {
-    expect([...DRIVE].sort()).toEqual(['hanzo.act', 'hanzo.annotate', 'hanzo.navigate', 'hanzo.read', 'hanzo.snapshot', 'hanzo.wait']);
+    expect([...DRIVE].sort()).toEqual([
+      'hanzo.act',
+      'hanzo.annotate',
+      'hanzo.navigate',
+      'hanzo.read',
+      'hanzo.snapshot',
+      'hanzo.wait',
+      'hanzo.webmcp.call',
+      'hanzo.webmcp.list',
+    ]);
   });
 });
 

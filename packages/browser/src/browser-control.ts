@@ -1,6 +1,8 @@
 // Browser Control API for AI agents
 // Full native browser control: click, type, fill, navigate, screenshot, scroll,
 // select, hover, wait, evaluate, keyboard events, drag, tab filesystem, and AI workers.
+import { handleLastPass } from './shared/lastpass.js';
+import { webmcpCall, webmcpList } from './shared/webmcp.js';
 
 interface TabFileSystem {
   path: string;
@@ -1351,6 +1353,21 @@ export class BrowserControl {
           break;
         case 'browser.getCookies':
           sendResponse({ success: true, cookies: await this.getCookies(tabId) });
+          break;
+        case 'browser.webmcp.list':
+          sendResponse({ success: true, ...(await webmcpList(chrome, tabId, request)) });
+          break;
+        case 'browser.webmcp.call':
+          sendResponse({ success: true, ...(await webmcpCall(chrome, tabId, request)) });
+          break;
+        case 'browser.lastpass.status':
+        case 'browser.lastpass.openIcon':
+        case 'browser.lastpass.accounts':
+        case 'browser.lastpass.fill':
+          sendResponse({
+            success: true,
+            ...(await handleLastPass(chrome, request.action.replace(/^browser\./, ''), request)),
+          });
           break;
         default:
           sendResponse({ success: false, error: `Unknown action: ${request.action}` });

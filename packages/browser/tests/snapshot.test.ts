@@ -430,6 +430,78 @@ describe('frames and shadow roots', () => {
     expect(clicked).toHaveBeenCalledOnce();
     delete (root as any).elementFromPoint;
   });
+
+  it('clicks an <svg> inside a closed ShadowRoot (LastPass icon) when a sibling <rect> is topmost', () => {
+    page(`<div data-lastpass-icon-root="true" id="lp-host"></div>`);
+    const host = $('#lp-host');
+    const closedRoot = host.attachShadow({ mode: 'closed' });
+    closedRoot.innerHTML = `
+      <div id="lp-wrap" role="button" aria-label="Open LastPass Vault" style="cursor:pointer">
+        <svg id="lp-svg" width="16" height="16"></svg>
+        <rect id="lp-rect" width="16" height="16"></rect>
+      </div>
+    `;
+    const prevChrome = (globalThis as any).chrome;
+    (globalThis as any).chrome = {
+      dom: {
+        openOrClosedShadowRoot: (el: Element) => (el === host ? closedRoot : el.shadowRoot),
+      },
+    };
+    try {
+      const svg = closedRoot.getElementById('lp-svg')!;
+      const rect = closedRoot.getElementById('lp-rect')!;
+      const wrap = closedRoot.getElementById('lp-wrap')!;
+      layout([[host, { x: 766, y: 590, w: 16, h: 16 }]]);
+      // Sibling <rect> sits on top of <svg> inside the closed ShadowRoot at (774, 598)
+      layout([
+        [wrap, { x: 766, y: 590, w: 16, h: 16 }],
+        [svg, { x: 766, y: 590, w: 16, h: 16 }],
+        [rect, { x: 766, y: 590, w: 16, h: 16 }],
+      ], closedRoot);
+
+      const clickedTargets: string[] = [];
+      wrap.addEventListener('click', (e) => clickedTargets.push((e.target as Element).id));
+
+      // Clicking via >>> piercing selector resolves into closed ShadowRoot and succeeds without "covered by <rect>"
+      const res = act({ op: 'click', selector: '[data-lastpass-icon-root] >>> svg' });
+      expect(res.clicked).toContain('svg');
+      expect(clickedTargets).toEqual(['lp-rect']);
+
+      // Bare selector fallback also resolves inside closed ShadowRoot when absent from light DOM
+      expect(act({ op: 'click', selector: '#lp-svg' }).clicked).toContain('svg');
+      expect(clickedTargets).toEqual(['lp-rect', 'lp-rect']);
+
+      // An unrelated modal covering the shadow host in the outer document is still rejected
+      const modal = document.createElement('div');
+      modal.id = 'login-modal-veil';
+      document.body.appendChild(modal);
+      layout([
+        [host, { x: 766, y: 590, w: 16, h: 16 }],
+        [modal, { x: 0, y: 0, w: 1000, h: 800 }],
+      ]);
+      expect(() => act({ op: 'click', selector: '[data-lastpass-icon-root] >>> svg' }))
+        .toThrow(/covered by <div#login-modal-veil>/);
+    } finally {
+      (globalThis as any).chrome = prevChrome;
+      delete (closedRoot as any).elementFromPoint;
+    }
+  });
+
+  it('clicks an <svg> when hit-test lands on a sibling badge inside the same interactive parent', () => {
+    page(`<button id="icon-btn" aria-label="Launch"><svg id="ic"></svg><span id="hit-overlay"></span></button>`);
+    const btn = $('#icon-btn');
+    const ic = $('#ic');
+    const overlay = $('#hit-overlay');
+    layout([
+      [btn, { x: 20, y: 20, w: 32, h: 32 }],
+      [ic, { x: 24, y: 24, w: 24, h: 24 }],
+      [overlay, { x: 20, y: 20, w: 32, h: 32 }],
+    ]);
+    const clicked = vi.fn();
+    btn.addEventListener('click', clicked);
+    act({ op: 'click', selector: '#ic' });
+    expect(clicked).toHaveBeenCalledOnce();
+  });
 });
 
 describe('probe and boxes', () => {

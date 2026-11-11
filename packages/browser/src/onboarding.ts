@@ -7,6 +7,10 @@ import { setConsent, markOnboarded, capture } from './shared/consent.js';
 
 const runtime: typeof chrome = (globalThis as any).browser ?? (globalThis as any).chrome;
 
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('reload') === '1') {
+  runtime.runtime.reload();
+}
+
 const insights = document.getElementById('ob-insights') as HTMLInputElement | null;
 const training = document.getElementById('ob-training') as HTMLInputElement | null;
 const cta = document.getElementById('ob-continue') as HTMLButtonElement | null;

@@ -10,6 +10,25 @@ import * as script from './shared/script.js';
 import { getChatGptSession, executeInvisibleChatGpt } from './shared/chatgpt-web.js';
 import { fetchAllUsage } from './shared/usage.js';
 import { getSocialSessions, syncSocialAccounts, executeSocialPost } from './shared/social-web.js';
+import * as auth from './auth';
+import {
+  WEBMCP_METHODS,
+  observeWebMcpDelta,
+  webMcpList,
+  webMcpInvoke,
+  webMcpResult,
+  webMcpCancel,
+} from './shared/webmcp.js';
+import {
+  VAULT_METHODS,
+  getVaultStatus,
+  autofillWithVault,
+  fillFieldFromKms,
+  captureFieldToKms,
+  vaultEgressFetch,
+  setupHanzoPost,
+} from './shared/vault.js';
+import { LASTPASS_METHODS, handleLastPass } from './shared/lastpass.js';
 
 /**
  * Coerce the named params from string → number in place.
@@ -171,7 +190,11 @@ export class CDPBridge {
   // High-level browser control methods for hanzo-mcp integration
   
   async navigate(tabId: number, url: string): Promise<void> {
-    await this.send(tabId, 'Page.navigate', { url });
+    await this.either(
+      tabId,
+      async () => { await this.send(tabId, 'Page.navigate', { url }); },
+      async () => { await chrome.tabs.update(tabId, { url }); },
+    );
   }
   
   async screenshot(tabId: number, options?: {
@@ -363,49 +386,87 @@ export class CDPBridge {
   }
   
   async clickSelector(tabId: number, selector: string): Promise<boolean> {
-    const nodeId = await this.querySelector(tabId, selector);
-    if (!nodeId) {
-      return false;
-    }
-    
-    const box = await this.getBoxModel(tabId, nodeId);
-    if (!box?.model?.content) {
-      return false;
-    }
-    
-    // Get center of element
-    const quad = box.model.content;
-    const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4;
-    const y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4;
-    
-    await this.click(tabId, x, y);
-    return true;
+    return this.either(
+      tabId,
+      async () => {
+        const nodeId = await this.querySelector(tabId, selector);
+        if (!nodeId) return false;
+        const box = await this.getBoxModel(tabId, nodeId);
+        if (!box?.model?.content) return false;
+        const quad = box.model.content;
+        const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4;
+        const y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4;
+        await this.click(tabId, x, y);
+        return true;
+      },
+      async () => {
+        const clicked = await script.call<boolean>(chrome, tabId, (sel: string) => {
+          const el = document.querySelector(sel) as HTMLElement | null;
+          if (!el) return false;
+          try { el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch {}
+          try { el.focus({ preventScroll: true }); } catch {}
+          el.click();
+          return true;
+        }, [selector]);
+        return Boolean(clicked);
+      },
+    );
   }
-  
+
   async fillSelector(tabId: number, selector: string, value: string): Promise<boolean> {
-    // Focus the element
-    const nodeId = await this.querySelector(tabId, selector);
-    if (!nodeId) {
-      return false;
-    }
-    
-    await this.send(tabId, 'DOM.focus', { nodeId });
-    
-    // Clear existing content
-    await this.send(tabId, 'Input.dispatchKeyEvent', {
-      type: 'keyDown',
-      key: 'a',
-      modifiers: 2 // Ctrl/Cmd
-    });
-    await this.send(tabId, 'Input.dispatchKeyEvent', {
-      type: 'keyUp',
-      key: 'a',
-      modifiers: 2
-    });
-    
-    // Type new value
-    await this.type(tabId, value);
-    return true;
+    return this.either(
+      tabId,
+      async () => {
+        const nodeId = await this.querySelector(tabId, selector);
+        if (!nodeId) return false;
+        await this.send(tabId, 'DOM.focus', { nodeId });
+        await this.send(tabId, 'Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          key: 'a',
+          modifiers: 2, // Ctrl/Cmd
+        });
+        await this.send(tabId, 'Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          key: 'a',
+          modifiers: 2,
+        });
+        await this.type(tabId, value);
+        return true;
+      },
+      async () => {
+        const filled = await script.call<boolean>(chrome, tabId, (sel: string, val: string) => {
+          const el = document.querySelector(sel) as HTMLInputElement | HTMLTextAreaElement | HTMLElement | null;
+          if (!el) return false;
+          try { el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }); } catch {}
+          try { el.focus({ preventScroll: true }); } catch {}
+          const tag = el.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+            const tracker = (el as any)._valueTracker;
+            if (tracker && typeof tracker.setValue === 'function') {
+              tracker.setValue('__hanzo_fill_prev__');
+            }
+            const proto = tag === 'TEXTAREA'
+              ? HTMLTextAreaElement.prototype
+              : tag === 'SELECT'
+                ? HTMLSelectElement.prototype
+                : HTMLInputElement.prototype;
+            const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+            if (setter) setter.call(el, val);
+            else (el as HTMLInputElement).value = val;
+            el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertReplacementText' }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+          if (el.isContentEditable) {
+            el.textContent = val;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            return true;
+          }
+          return false;
+        }, [selector, String(value ?? '')]);
+        return Boolean(filled);
+      },
+    );
   }
   
   // The extension reaches the ZAP router over shared/socket.ts; dispatchMethod()
@@ -498,12 +559,77 @@ export class CDPBridge {
           };
       }
 
+      if (LASTPASS_METHODS.has(method)) {
+        return { id, result: await handleLastPass(chrome, method, params || {}) };
+      }
+
+      if (method === 'hanzo.reload') {
+        setTimeout(() => chrome.runtime.reload(), 50);
+        return { id, result: { reloading: true } };
+      }
+
+      if (method === 'vault.egressFetch') {
+        const token = params?.token ? String(params.token) : await auth.getValidAccessToken().catch(() => '');
+        return { id, result: await vaultEgressFetch(token || '', params || {}) };
+      }
+
+      if (method === 'vault.status') {
+        const maybeTabId = parseTabId(params?.tabId ?? params?.targetId)
+          ?? (await this.getActiveTabId().catch(() => null));
+        return {
+          id,
+          result: await getVaultStatus(chrome, {
+            tabId: maybeTabId,
+            getToken: () => auth.getValidAccessToken().catch(() => null),
+            org: params?.org ? String(params.org) : undefined,
+          }),
+        };
+      }
+
+      if (method === 'post.setup') {
+        const maybeTabId = parseTabId(params?.tabId ?? params?.targetId)
+          ?? (await this.getActiveTabId().catch(() => null));
+        const token = params?.token ? String(params.token) : await auth.getValidAccessToken().catch(() => null);
+        return {
+          id,
+          result: await setupHanzoPost(chrome, {
+            tabId: maybeTabId,
+            token,
+            org: params?.org ? String(params.org) : undefined,
+            apiEndpoint: params?.apiEndpoint ? String(params.apiEndpoint) : undefined,
+          }),
+        };
+      }
+
       // Resolve target tab. Accept numeric tabId, "tab-NNN" targetId from
       // getTargets, plain numeric string. Without explicit targeting fall
       // back to the active tab in the focused window — which is fragile when
       // the user has many windows open. Always prefer explicit ids.
       const tabId = parseTabId(params?.tabId ?? params?.targetId)
                     ?? await this.getActiveTabId();
+
+      if (WEBMCP_METHODS.has(method)) {
+        if (method.endsWith('.list')) return { id, result: await webMcpList(chrome, tabId, params || {}) };
+        if (method.endsWith('.invoke') || method.endsWith('.call')) {
+          return { id, result: await webMcpInvoke(chrome, tabId, params || {}) };
+        }
+        if (method.endsWith('.result')) return { id, result: await webMcpResult(chrome, tabId, params || {}) };
+        if (method.endsWith('.cancel')) return { id, result: await webMcpCancel(chrome, tabId, params || {}) };
+      }
+
+      if (VAULT_METHODS.has(method)) {
+        if (method === 'vault.autofill' || method === 'vault.syncAutofill') {
+          return { id, result: await autofillWithVault(chrome, tabId, params || {}) };
+        }
+        if (method === 'vault.fillFromKms') {
+          const token = params?.token ? String(params.token) : await auth.getValidAccessToken().catch(() => '');
+          return { id, result: await fillFieldFromKms(chrome, tabId, token || '', params || {}) };
+        }
+        if (method === 'vault.captureToKms') {
+          const token = params?.token ? String(params.token) : await auth.getValidAccessToken().catch(() => '');
+          return { id, result: await captureFieldToKms(chrome, tabId, token || '', params || {}) };
+        }
+      }
 
       // The snapshot → ref engine: portable, no debugger attach (shared/drive.ts).
       if (DRIVE.has(method)) return { id, result: await drive(chrome, tabId, method, params || {}) };
@@ -730,7 +856,18 @@ export class CDPBridge {
           // Pass through to Chrome debugger
           result = await this.send(tabId, method, params);
       }
-      
+
+      if (
+        result &&
+        typeof result === 'object' &&
+        !Array.isArray(result) &&
+        (method === 'Page.navigate' || method === 'hanzo.click' || method === 'hanzo.fill')
+      ) {
+        const optOut = params?.noWebmcp === true || params?.noWebmcp === 'true' || params?.noWebmcp === '1';
+        const webmcp = await observeWebMcpDelta(chrome, tabId, { noWebmcp: optOut });
+        if (webmcp) result.webmcp = webmcp;
+      }
+
       return { id, result };
     } catch (error: any) {
       return {
