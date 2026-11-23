@@ -190,7 +190,6 @@ async function listModelsCached(token?: string): Promise<Array<{ id: string; nam
 
   // Add connected subscription web models & local private AI
   models.push(
-    { id: 'chatgpt-web', name: 'ChatGPT Web (Plus)', description: 'Connected ChatGPT Plus browser session (Invisible)', owned_by: 'openai' },
     { id: 'claude-web', name: 'Claude Web', description: 'Connected Claude session for reasoning', owned_by: 'anthropic' },
     { id: 'hanzo-spark', name: 'Hanzo Spark (Local GPU)', description: 'GB10 CUDA node at 10.0.0.19:1235', owned_by: 'local' },
     { id: 'hanzo-evo', name: 'Hanzo Evo (Local GPU)', description: 'Strix Halo ROCm node at 10.0.0.21:1234', owned_by: 'local' },
@@ -1770,10 +1769,6 @@ const BROWSER_CAPS = [
   'browser.lastpass',
   'browser.1password',
   'browser.vault',
-  'inference.chat',
-  'chatgpt.complete',
-  'chatgpt.session',
-  'usage.fetchAll',
   ...SOURCE_CAPS,
 ];
 // provider.accounts and usage.report (HIP-1350): state and metadata only.

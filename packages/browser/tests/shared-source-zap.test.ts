@@ -139,3 +139,25 @@ describe('ZAP wiring', () => {
     }
   });
 });
+
+describe('no consumer AI page is driven over ZAP (HIP-1350)', () => {
+  const REMOVED = ['chatgpt.complete', 'chatgpt.session', 'inference.chat', 'usage.fetchAll'];
+
+  it('neither background advertises or dispatches the ChatGPT or usage-fetch methods', () => {
+    for (const f of ['background.ts', 'background-firefox.ts']) {
+      const src = readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');
+      const caps = /const BROWSER_CAPS = \[([^\]]*)\]/.exec(src)?.[1] ?? '';
+      expect(caps).toContain('browser.tabs');
+      for (const m of REMOVED) expect(caps, `${f} still advertises ${m}`).not.toContain(`'${m}'`);
+    }
+    // The ZAP dispatcher (the popup's own messages live elsewhere).
+    const dispatch = readFileSync(new URL('../src/browser-dispatch.ts', import.meta.url), 'utf8');
+    for (const m of REMOVED) expect(dispatch, `browser-dispatch.ts still answers ${m}`).not.toContain(`'${m}'`);
+  });
+
+  it('keeps no prompt-submission path into chatgpt.com', () => {
+    const src = readFileSync(new URL('../src/shared/chatgpt-web.ts', import.meta.url), 'utf8');
+    expect(src).not.toContain('executeInvisibleChatGpt');
+    expect(src).not.toContain('temporary-chat');
+  });
+});
