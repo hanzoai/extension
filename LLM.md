@@ -181,6 +181,13 @@ that process exits another takes over and the extension reconnects.
   this install's node name (`<engine>-<4 hex>`, minted once), answers
   `zap.status` / `zap.pair` / `zap.unpair`. `state.caps` is what the router's
   registry says this browser serves; the sidebar's tool count is its length.
+- `shared/source-zap.ts` — what both builds tell Hanzo Dev about AI accounts
+  (HIP-1350 Browser sources), advertised as caps and answered before the
+  dispatcher: `provider.accounts` → `{accounts: [{provider, plan?, state:
+  ready|needs_login}]}` from whether a product's session cookie exists (never
+  its value), and `usage.report` → `{snapshots: [ProviderSnapshot]}`, the last
+  reading the person's own usage panel made, at level metadata (plan, windows,
+  a short error code; no account). A ZAP call never contacts a provider.
 - Safari runs the same code (the converter builds it from `dist/chrome`): WebKit
   opens `ws://127.0.0.1` from an extension's secure context, so there is no
   Swift bridge.

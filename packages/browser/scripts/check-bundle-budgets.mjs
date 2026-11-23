@@ -42,7 +42,9 @@ const BUDGETS = {
   // schemas, the system prompt and the loop that lets the chat act in the page.
   // 283.6 — RAISED from 277 for the linked source (shared/source.ts): device
   // key, signed heartbeat, provider detection, and the usage outbox.
-  'background.js': 278,
+  // 279.0 — RAISED from 278 for provider.accounts and usage.report over ZAP
+  // (shared/source-zap.ts).
+  'background.js': 280,
   'content-script.js': 62, // 57.0
   // 29.7 — RAISED from 29 (28.1) for closed Shadow-DOM `>>>` selector piercing
   // (`deepQuerySelector`), ShadowRoot/SVG hit-testing (`sameHitTarget`), and

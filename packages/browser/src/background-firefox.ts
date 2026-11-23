@@ -20,8 +20,9 @@ import 'webextension-polyfill';
 import type { ControlSession } from './shared/types.js';
 import { startZap } from './shared/zap.js';
 import { startAgent } from './shared/agent.js';
-import { startSource } from './shared/source.js';
+import { cookieChecker, startSource } from './shared/source.js';
 import { fetchAllUsage } from './shared/usage.js';
+import { SOURCE_CAPS, rememberUsage, withSourceMethods } from './shared/source-zap.js';
 import {
   login as sharedLogin,
   signup as sharedSignup,
@@ -2600,6 +2601,7 @@ browser.runtime.onMessage.addListener((request: any, sender: any, sendResponse: 
       case 'usage.fetch': {
         try {
           const providers = await fetchAllUsage();
+          await rememberUsage(browser.storage.local, providers).catch(() => {});
           sendResponse({ success: true, providers });
         } catch (e: any) {
           sendResponse({ success: false, error: e.message });
@@ -2624,9 +2626,12 @@ const hanzoExtension = new HanzoFirefoxExtension();
 // Join this machine's ZAP router over its loopback WebSocket, once paired, and
 // register Firefox as a browser node — the SAME transport Chrome uses. Inbound
 // ROUTE commands dispatch to Firefox's native browser.* dispatcher.
-const BROWSER_CAPS = ['browser.tabs', 'browser.navigate', 'browser.dom', 'browser.screenshot', 'browser.input'];
-const browserDispatch = (method: string, params: any) =>
-  hanzoExtension.dispatchMethod(method, (params || {}) as Record<string, unknown>);
+const BROWSER_CAPS = ['browser.tabs', 'browser.navigate', 'browser.dom', 'browser.screenshot', 'browser.input', ...SOURCE_CAPS];
+// provider.accounts and usage.report (HIP-1350): state and metadata only.
+const browserDispatch = withSourceMethods(
+  { has: cookieChecker(browser), storage: browser.storage.local },
+  (method: string, params: any) => hanzoExtension.dispatchMethod(method, (params || {}) as Record<string, unknown>),
+);
 const zap = startZap({
   brand: 'hanzo',
   caps: BROWSER_CAPS,

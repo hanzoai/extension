@@ -10,7 +10,7 @@ import 'webextension-polyfill';
 import type { ControlSession } from './shared/types.js';
 import { startZap } from './shared/zap.js';
 import { startAgent } from './shared/agent.js';
-import { startSource } from './shared/source.js';
+import { cookieChecker, startSource } from './shared/source.js';
 import {
   IAM_API_URL, IAM_LOGIN_URL, IAM_API_PATH, API_BASE_URL,
   DEFAULT_MCP_PORT as CFG_MCP_PORT,
@@ -32,6 +32,7 @@ import { defaultWebMCPTracker, injectWebMCPOnCommitted } from './shared/webmcp.j
 import { unwrapEvaluateResult } from './shared/tab-id.js';
 import * as auth from './auth';
 import { fetchAllUsage } from './shared/usage.js';
+import { SOURCE_CAPS, rememberUsage, withSourceMethods } from './shared/source-zap.js';
 import { getChatGptSession, getChatGptUsage } from './shared/chatgpt-web.js';
 import { discoverLocalNodes } from './shared/local-discovery.js';
 import { listModels } from './chat-client';
@@ -1700,6 +1701,7 @@ async function handleMessage(request: any, sender: chrome.runtime.MessageSender,
       (async () => {
         try {
           const providers = await fetchAllUsage();
+          await rememberUsage(chrome.storage.local, providers).catch(() => {});
           sendResponse({ success: true, providers });
         } catch (e: any) {
           sendResponse({ success: false, error: e.message });
@@ -1772,8 +1774,13 @@ const BROWSER_CAPS = [
   'chatgpt.complete',
   'chatgpt.session',
   'usage.fetchAll',
+  ...SOURCE_CAPS,
 ];
-const browserDispatch = (method: string, params: any) => cdpBridge.dispatchMethod(method, params);
+// provider.accounts and usage.report (HIP-1350): state and metadata only.
+const browserDispatch = withSourceMethods(
+  { has: cookieChecker(chrome), storage: chrome.storage.local },
+  (method: string, params: any) => cdpBridge.dispatchMethod(method, params),
+);
 const zap = startZap({
   brand: 'hanzo',
   caps: BROWSER_CAPS,
