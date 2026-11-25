@@ -25,8 +25,9 @@ describe('the npm package', () => {
   });
 
   it('ships Chrome and Firefox, each manifest at the version the tree declares', () => {
+    const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     const [packed] = JSON.parse(
-      execFileSync('npm', ['pack', '--dry-run', '--json', published], { encoding: 'utf8' }),
+      execFileSync(npmBin, ['pack', '--dry-run', '--json', `"${published}"`], { encoding: 'utf8', shell: true }),
     );
     expect(packed.version).toBe(pkg.version);
     const manifests = packed.files

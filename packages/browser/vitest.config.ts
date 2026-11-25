@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -11,7 +12,7 @@ export default defineConfig({
   css: { postcss: { plugins: [] } },
   resolve: {
     alias: [
-      { find: /^react-native-svg(\/.*)?$/, replacement: new URL('./tests/react-native-svg.stub.ts', import.meta.url).pathname },
+      { find: /^react-native-svg(\/.*)?$/, replacement: fileURLToPath(new URL('./tests/react-native-svg.stub.ts', import.meta.url)).replace(/\\/g, '/') },
       { find: /^react-native$/, replacement: 'react-native-web' },
     ],
   },

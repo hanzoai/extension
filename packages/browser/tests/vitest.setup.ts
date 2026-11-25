@@ -5,7 +5,7 @@
  * responsive behaviour.
  */
 if (typeof window !== 'undefined' && !window.matchMedia)
-  window.matchMedia = ((query: string) => ({
+  (window as any).matchMedia = (query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -14,4 +14,4 @@ if (typeof window !== 'undefined' && !window.matchMedia)
     addEventListener: () => {},
     removeEventListener: () => {},
     dispatchEvent: () => false,
-  })) as typeof window.matchMedia;
+  });

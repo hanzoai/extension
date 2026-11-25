@@ -13,8 +13,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
-const BROWSER = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const BROWSER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.resolve(BROWSER, '..', '..', 'dist');
 const ENGINES = ['chrome', 'firefox', 'safari'];
 
@@ -83,7 +84,7 @@ const kb = (bytes) => (bytes / 1024).toFixed(1);
 
 if (!fs.existsSync(path.join(DIST, 'chrome'))) {
   console.log('No build found; building once...');
-  execFileSync('node', ['src/build.js'], { cwd: BROWSER, stdio: 'inherit' });
+  execFileSync(process.execPath, ['src/build.js'], { cwd: BROWSER, stdio: 'inherit' });
 }
 
 let over = 0;
