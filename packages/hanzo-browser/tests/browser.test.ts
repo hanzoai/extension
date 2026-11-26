@@ -12,6 +12,7 @@ import {
   buildEngineArgs,
   buildWebMcpSummary,
   createBrowser,
+  defaultZapSocketPath,
   delimitUntrusted,
   encodeZapFrame,
   getSessionsViaZap,
@@ -151,9 +152,43 @@ describe('@hanzo/browser WebMCP, Shadow-DOM SVG, ZAP router & headless native CD
     expect(parsed.flags.json).toBe(true);
   });
 
+  it('resolves platform-appropriate ZAP socket or named pipe paths and respects env overrides', () => {
+    const saved = { ...process.env };
+    try {
+      delete process.env.ZAP_SOCK;
+      delete process.env.HANZO_ZAP_SOCK;
+      delete process.env.ZAP_PIPE;
+      delete process.env.HANZO_ZAP_PIPE;
+
+      const p = defaultZapSocketPath();
+      if (process.platform === 'win32') {
+        expect(p).toMatch(/^\\\\\.\\pipe\\zapd/);
+      } else {
+        expect(p).toContain('zapd.sock');
+      }
+
+      process.env.ZAP_SOCK = '/custom/test.sock';
+      expect(defaultZapSocketPath()).toBe('/custom/test.sock');
+
+      delete process.env.ZAP_SOCK;
+      process.env.HANZO_ZAP_SOCK = '/custom/hanzo.sock';
+      expect(defaultZapSocketPath()).toBe('/custom/hanzo.sock');
+
+      if (process.platform === 'win32') {
+        delete process.env.HANZO_ZAP_SOCK;
+        process.env.ZAP_PIPE = '\\\\.\\pipe\\custom-zap';
+        expect(defaultZapSocketPath()).toBe('\\\\.\\pipe\\custom-zap');
+      }
+    } finally {
+      process.env = { ...saved };
+    }
+  });
+
   it('speaks HIP-0069 ZAP router wire protocol and falls back to hanzo.getCookies without leaking values', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hanzo-zap-test-'));
-    const sockPath = path.join(tmpDir, 'zapd.sock');
+    const sockPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\hanzo-zap-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      : path.join(tmpDir, 'zapd.sock');
     const seenMethods: string[] = [];
 
     const encStr16 = (s: string) => {

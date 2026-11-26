@@ -36,6 +36,19 @@ export interface ZapBrowserEntry {
 export function defaultZapSocketPath(): string {
   if (process.env.ZAP_SOCK) return process.env.ZAP_SOCK;
   if (process.env.HANZO_ZAP_SOCK) return process.env.HANZO_ZAP_SOCK;
+  if (process.platform === 'win32') {
+    if (process.env.ZAP_PIPE) return process.env.ZAP_PIPE;
+    if (process.env.HANZO_ZAP_PIPE) return process.env.HANZO_ZAP_PIPE;
+    let username = process.env.USERNAME || process.env.USER || '';
+    if (!username) {
+      try {
+        username = os.userInfo().username;
+      } catch {
+        username = '';
+      }
+    }
+    return username ? `\\\\.\\pipe\\zapd-${username}` : '\\\\.\\pipe\\zapd';
+  }
   const uid = typeof process.getuid === 'function' ? process.getuid() : 1000;
   const xdg = process.env.XDG_RUNTIME_DIR || `/run/user/${uid}`;
   const runSock = path.join(xdg, 'zap', 'zapd.sock');
@@ -140,11 +153,14 @@ export class ZapTransport {
   }
 
   isSocketPresent(): boolean {
+    if (process.platform === 'win32' && (this.socketPath.startsWith('\\\\.\\pipe\\') || this.socketPath.startsWith('//./pipe/'))) {
+      return true;
+    }
     return fs.existsSync(this.socketPath);
   }
 
   async listBrowsers(timeoutMs = 5000): Promise<ZapBrowserEntry[]> {
-    if (!fs.existsSync(this.socketPath)) {
+    if (!this.isSocketPresent()) {
       throw new Error(`ZAP socket not found at ${this.socketPath}`);
     }
     return new Promise((resolve, reject) => {
