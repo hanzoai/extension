@@ -153,28 +153,50 @@ export class ZapTransport {
   }
 
   isSocketPresent(): boolean {
-    if (process.platform === 'win32' && (this.socketPath.startsWith('\\\\.\\pipe\\') || this.socketPath.startsWith('//./pipe/'))) {
-      return true;
+    try {
+      const p = process.platform === 'win32' && this.socketPath.startsWith('//./pipe/')
+        ? `\\\\.\\pipe\\${this.socketPath.slice(10)}`
+        : this.socketPath;
+      return fs.existsSync(p);
+    } catch {
+      return false;
     }
-    return fs.existsSync(this.socketPath);
   }
 
   async listBrowsers(timeoutMs = 5000): Promise<ZapBrowserEntry[]> {
-    if (!this.isSocketPresent()) {
-      throw new Error(`ZAP socket not found at ${this.socketPath}`);
-    }
     return new Promise((resolve, reject) => {
       const sock = net.createConnection(this.socketPath);
       let buf = Buffer.alloc(0);
       let myId = `agent/hanzo-${Math.random().toString(16).slice(2, 8)}`;
-      const timer = setTimeout(() => {
+      let settled = false;
+
+      const cleanup = () => {
+        settled = true;
+        clearTimeout(timer);
         sock.destroy();
+      };
+
+      const timer = setTimeout(() => {
+        cleanup();
         reject(new Error(`ZAP listBrowsers timeout (${timeoutMs}ms)`));
       }, timeoutMs);
 
-      sock.once('error', (err) => {
-        clearTimeout(timer);
-        reject(err);
+      sock.once('error', (err: NodeJS.ErrnoException) => {
+        if (!settled) {
+          cleanup();
+          if (err.code === 'ENOENT' || err.code === 'ECONNREFUSED') {
+            reject(new Error(`ZAP socket not found at ${this.socketPath}`));
+          } else {
+            reject(err);
+          }
+        }
+      });
+
+      sock.once('close', () => {
+        if (!settled) {
+          cleanup();
+          reject(new Error(`ZAP socket closed unexpectedly (${this.socketPath})`));
+        }
       });
 
       sock.once('connect', () => {
@@ -188,10 +210,24 @@ export class ZapTransport {
           if (buf.length < 4 + frameLen) break;
           const raw = buf.subarray(0, 4 + frameLen);
           buf = buf.subarray(4 + frameLen);
+
+          if (raw.length < 15 || frameLen < 11) {
+            cleanup();
+            reject(new Error(`Invalid HIP-0069 frame header (frameLen=${frameLen})`));
+            return;
+          }
+
           const t = raw.readUInt8(4);
           const fl = raw.readUInt16LE(7);
           const tl = raw.readUInt16LE(9);
           const pl = raw.readUInt32LE(11);
+
+          if (15 + fl + tl + pl > raw.length) {
+            cleanup();
+            reject(new Error(`Invalid HIP-0069 frame framing (frameLen=${frameLen}, fl=${fl}, tl=${tl}, pl=${pl})`));
+            return;
+          }
+
           const to = raw.subarray(15 + fl, 15 + fl + tl).toString('utf8');
           const payload = raw.subarray(15 + fl + tl, 15 + fl + tl + pl);
 
@@ -199,14 +235,12 @@ export class ZapTransport {
             myId = to || myId;
             sock.write(encodeZapFrame(PROVIDERS_LIST, myId, ''));
           } else if (t === PROVIDERS) {
-            clearTimeout(timer);
-            sock.destroy();
+            cleanup();
             const all = decodeZapProviders(payload);
             resolve(all.filter((p) => p.id.startsWith('browser/')));
             return;
           } else if (t === ERROR) {
-            clearTimeout(timer);
-            sock.destroy();
+            cleanup();
             reject(new Error(payload.toString('utf8') || 'ZAP router error'));
             return;
           }
@@ -217,7 +251,6 @@ export class ZapTransport {
 
   async resolveProvider(filter?: string, clientId?: string): Promise<string | null> {
     const explicit = clientId || process.env.HANZO_ZAP_PROVIDER;
-    if (!this.isSocketPresent()) return null;
     try {
       const list = await this.listBrowsers();
       if (list.length === 0) return null;
@@ -241,23 +274,41 @@ export class ZapTransport {
     params: Record<string, unknown> = {},
     opts: { provider?: string; filter?: string; timeoutMs?: number } = {},
   ): Promise<T> {
-    if (!fs.existsSync(this.socketPath)) {
-      throw new Error(`ZAP socket not found at ${this.socketPath}`);
-    }
     const timeoutMs = opts.timeoutMs ?? 25_000;
     return new Promise((resolve, reject) => {
       const sock = net.createConnection(this.socketPath);
       let buf = Buffer.alloc(0);
       let myId = `agent/hanzo-${Math.random().toString(16).slice(2, 8)}`;
       const explicitProvider = opts.provider || process.env.HANZO_ZAP_PROVIDER || '';
-      const timer = setTimeout(() => {
+      let settled = false;
+
+      const cleanup = () => {
+        settled = true;
+        clearTimeout(timer);
         sock.destroy();
+      };
+
+      const timer = setTimeout(() => {
+        cleanup();
         reject(new Error(`ZAP request timeout (${timeoutMs}ms) on ${method}`));
       }, timeoutMs);
 
-      sock.once('error', (err) => {
-        clearTimeout(timer);
-        reject(err);
+      sock.once('error', (err: NodeJS.ErrnoException) => {
+        if (!settled) {
+          cleanup();
+          if (err.code === 'ENOENT' || err.code === 'ECONNREFUSED') {
+            reject(new Error(`ZAP socket not found at ${this.socketPath}`));
+          } else {
+            reject(err);
+          }
+        }
+      });
+
+      sock.once('close', () => {
+        if (!settled) {
+          cleanup();
+          reject(new Error(`ZAP socket closed unexpectedly during ${method} (${this.socketPath})`));
+        }
       });
 
       sock.once('connect', () => {
@@ -271,10 +322,24 @@ export class ZapTransport {
           if (buf.length < 4 + frameLen) break;
           const raw = buf.subarray(0, 4 + frameLen);
           buf = buf.subarray(4 + frameLen);
+
+          if (raw.length < 15 || frameLen < 11) {
+            cleanup();
+            reject(new Error(`Invalid HIP-0069 frame header on ${method} (frameLen=${frameLen})`));
+            return;
+          }
+
           const t = raw.readUInt8(4);
           const fl = raw.readUInt16LE(7);
           const tl = raw.readUInt16LE(9);
           const pl = raw.readUInt32LE(11);
+
+          if (15 + fl + tl + pl > raw.length) {
+            cleanup();
+            reject(new Error(`Invalid HIP-0069 frame framing on ${method} (frameLen=${frameLen}, fl=${fl}, tl=${tl}, pl=${pl})`));
+            return;
+          }
+
           const to = raw.subarray(15 + fl, 15 + fl + tl).toString('utf8');
           const payload = raw.subarray(15 + fl + tl, 15 + fl + tl + pl);
 
@@ -291,15 +356,13 @@ export class ZapTransport {
               ? browsers.find((b) => b.name.toLowerCase().includes(opts.filter!.toLowerCase()) || b.id.toLowerCase().includes(opts.filter!.toLowerCase()))
               : browsers[0];
             if (!chosen) {
-              clearTimeout(timer);
-              sock.destroy();
+              cleanup();
               reject(new Error('No browser extension connected on ZAP router'));
               return;
             }
             sock.write(encodeZapFrame(ROUTE, myId, chosen.id, encodeZapCmd(method, params)));
           } else if (t === RESPONSE) {
-            clearTimeout(timer);
-            sock.destroy();
+            cleanup();
             const text = payload.toString('utf8');
             if (text.startsWith('ERR:')) {
               reject(new Error(text.slice(4)));
@@ -317,8 +380,7 @@ export class ZapTransport {
             }
             return;
           } else if (t === ERROR) {
-            clearTimeout(timer);
-            sock.destroy();
+            cleanup();
             reject(new Error(payload.toString('utf8') || `ZAP error on ${method}`));
             return;
           }
