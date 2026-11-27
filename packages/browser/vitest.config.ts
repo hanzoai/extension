@@ -19,7 +19,8 @@ export default defineConfig({
     ],
   },
   test: {
-    testTimeout: 30_000,
+    testTimeout: 60_000,
+    maxWorkers: process.env.CI ? 2 : undefined,
     exclude: ['e2e/**', 'node_modules/**'],
     setupFiles: ['./tests/vitest.setup.ts'],
     // The bundle suites need a built dist/. Once, here, before the files run in

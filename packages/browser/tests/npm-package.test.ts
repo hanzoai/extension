@@ -25,9 +25,19 @@ describe('the npm package', () => {
   });
 
   it('ships Chrome and Firefox, each manifest at the version the tree declares', () => {
-    const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const env = {
+      ...process.env,
+      npm_config_update_notifier: 'false',
+      npm_config_audit: 'false',
+      npm_config_fund: 'false',
+    };
     const [packed] = JSON.parse(
-      execFileSync(npmBin, ['pack', '--dry-run', '--json', `"${published}"`], { encoding: 'utf8', shell: true }),
+      process.platform === 'win32'
+        ? execFileSync('cmd.exe', ['/d', '/s', '/c', 'npm.cmd', 'pack', '--dry-run', '--json', published], {
+            encoding: 'utf8',
+            env,
+          })
+        : execFileSync('npm', ['pack', '--dry-run', '--json', published], { encoding: 'utf8', env }),
     );
     expect(packed.version).toBe(pkg.version);
     const manifests = packed.files
@@ -36,7 +46,7 @@ describe('the npm package', () => {
       .sort();
     expect(manifests).toEqual(['chrome/manifest.json', 'firefox/manifest.json']);
     for (const m of manifests) expect(read(path.join(published, m)).version, m).toBe(pkg.version);
-  }, 30_000); // spawns npm, whose startup alone outlasts vitest's 5s default on a CI runner
+  }, 60_000); // spawns npm, whose startup can exceed 30s on a contended CI runner
 
   it('names no entry point, because an extension has none', () => {
     const manifest = read(path.join(published, 'package.json'));

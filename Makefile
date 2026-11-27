@@ -22,9 +22,10 @@ endif
 endif
 
 # A package builds after the workspace packages it depends on ({dir}...), and
-# tests on its own.
+# tests on its own. In CI, cap workspace concurrency so Vitest forks and
+# Chromium suites do not oversubscribe the runner and starve worker startup.
 build.pnpm := $(if $(dir),--filter "{./$(dir)}...",-r)
-test.pnpm  := $(if $(dir),--filter "./$(dir)",-r)
+test.pnpm  := $(if $(dir),--filter "./$(dir)",-r$(if $(CI), --workspace-concurrency=2,))
 
 # packages/jetbrains is a Gradle build outside the pnpm workspace: it runs with
 # every package, and alone as target=jetbrains.
