@@ -58,6 +58,7 @@ function playwrightChromium(): string | null {
     process.env.PLAYWRIGHT_BROWSERS_PATH,
     path.join(os.homedir(), '.cache', 'ms-playwright'),
     path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright'),
+    path.join(os.homedir(), 'AppData', 'Local', 'ms-playwright'),
   ].filter((r): r is string => !!r && r !== '0' && fs.existsSync(r));
   const inside = [
     'chrome-linux64/chrome',
@@ -65,6 +66,7 @@ function playwrightChromium(): string | null {
     'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
     'chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
     'chrome-mac/Chromium.app/Contents/MacOS/Chromium',
+    'chrome-win64/chrome.exe',
   ];
   for (const root of roots) {
     const revisions = fs.readdirSync(root)
