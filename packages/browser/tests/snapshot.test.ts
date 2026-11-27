@@ -574,3 +574,36 @@ hanzo login</pre>
     expect(read({ outline: true }).markdown).toBe('# Install\n## Use');
   });
 });
+
+describe('verified fill and drag', () => {
+  it('fill verifies read-back, redacts passwords, and flags outcomeUnknown when page clears value', () => {
+    page(`<input id="pw" type="password" aria-label="Password"><input id="rej" aria-label="Rejected">`);
+    const pw = act({ op: 'fill', selector: '#pw', text: 's3cr3t!' });
+    expect(pw.readBackVerified).toBe(true);
+    expect(pw.outcomeUnknown).toBeUndefined();
+    expect(String(pw.value)).not.toContain('s3cr3t!');
+
+    $('#rej').addEventListener('input', (e) => { (e.target as HTMLInputElement).value = ''; });
+    const rej = act({ op: 'fill', selector: '#rej', text: 'hello' });
+    expect(rej.readBackVerified).toBe(false);
+    expect(rej.outcomeUnknown).toBe(true);
+  });
+
+  it('drag dispatches stepped pointer/mouse events and always releases pointerup', () => {
+    page(`<div id="src">A</div><div id="dst">B</div>`);
+    layout([
+      [$('body'), { x: 0, y: 0, w: 800, h: 600 }],
+      [$('#src'), { x: 10, y: 10, w: 40, h: 40 }],
+      [$('#dst'), { x: 210, y: 110, w: 40, h: 40 }],
+    ]);
+    const events: string[] = [];
+    document.addEventListener('mousedown', () => events.push('down'));
+    document.addEventListener('mousemove', (e) => { if ((e as MouseEvent).buttons === 1) events.push('move'); });
+    document.addEventListener('mouseup', () => events.push('up'));
+    const out = act({ op: 'drag', selector: '#src', targetSelector: '#dst', steps: 4 });
+    expect(out).toMatchObject({ dragged: true, from: [30, 30], to: [230, 130], steps: 4 });
+    expect(events[0]).toBe('down');
+    expect(events.filter((e) => e === 'move').length).toBe(4);
+    expect(events[events.length - 1]).toBe('up');
+  });
+});

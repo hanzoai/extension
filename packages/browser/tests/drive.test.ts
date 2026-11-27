@@ -88,6 +88,28 @@ describe('drive', () => {
     expect(engine).toHaveBeenCalledWith({ op: 'scroll', text: '', dx: 0, dy: 400 });
   });
 
+  it('passes drag params typed and updates readBackVerified from MAIN-world sync', async () => {
+    const engine = vi.fn((req: any) =>
+      req.op === 'drag'
+        ? { ok: true, dragged: true, from: [10, 20], to: [100, 200], steps: 5 }
+        : { ok: true, filled: '#x', value: 'hi', readBackVerified: true, _sync: 'hz-1' },
+    );
+    const api = fakeApi(engine);
+    g.__hanzoPage = engine;
+    const dragged = await drive(api, 7, 'hanzo.act', {
+      op: 'drag', start_x: '10', start_y: '20', end_x: '100', end_y: '200', steps: '5',
+    });
+    expect(dragged).toMatchObject({ dragged: true, steps: 5 });
+    expect(engine).toHaveBeenCalledWith({ op: 'drag', startX: 10, startY: 20, endX: 100, endY: 200, steps: 5 });
+
+    // Simulate MAIN-world sync reporting a framework reset (verified: false)
+    api.scripting.executeScript.mockImplementationOnce(async () => [{ result: { ok: true, filled: '#x', value: 'hi', readBackVerified: true, _sync: 'hz-1' } }])
+      .mockImplementationOnce(async () => [{ result: { synced: true, verified: false } }]);
+    const filled = await drive(api, 7, 'hanzo.act', { op: 'fill', selector: '#x', text: 'hi' });
+    expect(filled).toMatchObject({ readBackVerified: false, outcomeUnknown: true });
+    expect(filled).not.toHaveProperty('_sync');
+  });
+
   it('navigate resolves after the load completes', async () => {
     const api = fakeApi(() => ({ ok: true }));
     const out = await drive(api, 7, 'hanzo.navigate', { url: 'https://b.test/' });

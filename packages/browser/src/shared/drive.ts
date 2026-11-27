@@ -68,12 +68,31 @@ export async function drive(api: any, tabId: number, method: string, p: Params):
       return webmcp ? { ...out, webmcp } : out;
     }
     case 'hanzo.act': {
+      const op = str(p.op);
+      const text = p.text === undefined ? undefined : String(p.text);
       const { _sync, ...out } = await page(api, tabId, {
-        op: str(p.op), selector: str(p.selector), text: p.text === undefined ? undefined : String(p.text),
-        key: str(p.key), value: str(p.value), attribute: str(p.attribute), dx: num(p.dx), dy: num(p.dy),
+        op,
+        selector: str(p.selector),
+        targetSelector: str(p.targetSelector ?? p.target_selector),
+        text,
+        key: str(p.key),
+        value: str(p.value),
+        attribute: str(p.attribute),
+        dx: num(p.dx),
+        dy: num(p.dy),
+        startX: num(p.startX ?? p.start_x),
+        startY: num(p.startY ?? p.start_y),
+        endX: num(p.endX ?? p.end_x),
+        endY: num(p.endY ?? p.end_y),
+        steps: num(p.steps),
       });
       if (typeof _sync === 'string' && _sync) {
-        await syncMainWorldInput(api, tabId, _sync);
+        const synced = await syncMainWorldInput(api, tabId, _sync, op === 'fill' || op === 'type' ? text : undefined, op === 'fill');
+        if (synced && typeof synced.verified === 'boolean') {
+          out.readBackVerified = synced.verified;
+          if (!synced.verified) out.outcomeUnknown = true;
+          else delete out.outcomeUnknown;
+        }
       }
       return out;
     }
@@ -104,13 +123,19 @@ async function settle(api: any, tabId: number, ms = 5000): Promise<void> {
  * `page.js` (ISOLATED world) sets an input's DOM value. Uses a CSP-safe function
  * reference (`world: 'MAIN'`, no eval) and never returns the field value.
  */
-async function syncMainWorldInput(api: any, tabId: number, token: string): Promise<void> {
+async function syncMainWorldInput(
+  api: any,
+  tabId: number,
+  token: string,
+  expected?: string,
+  exact = true,
+): Promise<{ synced: boolean; verified?: boolean } | null> {
   try {
-    await api.scripting.executeScript({
+    const [res] = await api.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
-      args: [token],
-      func: (syncToken: string) => {
+      args: [token, expected ?? null, exact],
+      func: (syncToken: string, want: string | null, isExact: boolean) => {
         const findStamped = (root: Document | ShadowRoot): HTMLInputElement | HTMLTextAreaElement | null => {
           const direct = root.querySelector(`[data-hanzo-sync="${syncToken}"]`) as HTMLInputElement | HTMLTextAreaElement | null;
           if (direct) return direct;
@@ -135,11 +160,15 @@ async function syncMainWorldInput(api: any, tabId: number, token: string): Promi
         if (setter) setter.call(el, val);
         el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertReplacementText' }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-        return { synced: true };
+        // Verify post-framework-handler value without ever returning field text (safe for passwords).
+        const verified = want === null ? undefined : (isExact ? el.value === want : el.value.includes(want));
+        return { synced: true, verified };
       },
     });
+    return res?.result ?? null;
   } catch {
     // Best-effort MAIN world sync (e.g. non-MAIN fake harness in unit tests)
+    return null;
   }
 }
 

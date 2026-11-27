@@ -36,12 +36,18 @@ export interface SnapshotOptions {
 export interface ActRequest {
   op: string;
   selector?: string;
+  targetSelector?: string;
   text?: string;
   key?: string;
   value?: string;
   attribute?: string;
   dx?: number;
   dy?: number;
+  startX?: number;
+  startY?: number;
+  endX?: number;
+  endY?: number;
+  steps?: number;
 }
 
 interface Item {
@@ -1023,6 +1029,54 @@ function stampMainWorldSync(el: Element): string | undefined {
   return token;
 }
 
+const rawVal = (el: Element, kind: 'field' | 'rich') =>
+  kind === 'field' ? (el as HTMLInputElement).value : ((el as HTMLElement).innerText ?? el.textContent ?? '');
+
+function drag(req: ActRequest): Record<string, unknown> {
+  const doc = document;
+  let sx: number, sy: number, ex: number, ey: number, hit: Element, src: string | undefined, dst: string | undefined;
+  if (req.selector) {
+    const el = resolve(req.selector);
+    if (disabled(el)) throw new Error(`${describe(el)} is disabled.`);
+    ({ x: sx, y: sy, hit } = aim(el));
+    src = describe(el);
+  } else if (req.startX !== undefined && req.startY !== undefined) {
+    sx = req.startX; sy = req.startY;
+    hit = deepHit(doc, sx, sy) ?? doc.body ?? doc.documentElement;
+  } else throw new Error('drag needs selector or startX/startY');
+
+  if (req.targetSelector) {
+    const el = resolve(req.targetSelector);
+    ({ x: ex, y: ey } = aim(el));
+    dst = describe(el);
+  } else if (req.endX !== undefined && req.endY !== undefined) {
+    ex = req.endX; ey = req.endY;
+  } else if (req.dx !== undefined || req.dy !== undefined) {
+    ex = sx + (req.dx ?? 0); ey = sy + (req.dy ?? 0);
+  } else throw new Error('drag needs targetSelector, endX/endY or dx/dy');
+
+  const d = hit.ownerDocument, steps = Math.max(1, Math.min(30, Math.round(req.steps ?? 10)));
+  fire(hit, 'pointerdown', sx, sy, { buttons: 1 });
+  if (fire(hit, 'mousedown', sx, sy, { buttons: 1, detail: 1 })) focusFrom(hit);
+  try {
+    for (let i = 1; i <= steps; i++) {
+      const cx = sx + ((ex - sx) * i) / steps, cy = sy + ((ey - sy) * i) / steps;
+      const h = deepHit(d, cx, cy) ?? hit;
+      fire(h, 'pointermove', cx, cy, { buttons: 1 });
+      fire(h, 'mousemove', cx, cy, { buttons: 1 });
+    }
+  } finally {
+    const h = deepHit(d, ex, ey) ?? hit;
+    fire(h, 'pointerup', ex, ey);
+    fire(h, 'mouseup', ex, ey, { detail: 1 });
+  }
+  const r = Math.round;
+  return {
+    dragged: true, from: [r(sx), r(sy)], to: [r(ex), r(ey)], steps,
+    ...(src ? { source: src } : {}), ...(dst ? { target: dst } : {}),
+  };
+}
+
 /** Perform one action on a ref or CSS selector. Throws with a message an agent can act on. */
 export function act(req: ActRequest): Record<string, unknown> {
   const op = req.op;
@@ -1034,6 +1088,8 @@ export function act(req: ActRequest): Record<string, unknown> {
       pointer(el, op);
       return { [op === 'hover' ? 'hovered' : 'clicked']: describe(el) };
     }
+    case 'drag':
+      return drag(req);
     case 'fill': {
       const el = resolve(req.selector);
       const kind = writable(el);
@@ -1049,27 +1105,30 @@ export function act(req: ActRequest): Record<string, unknown> {
         emit(el, 'change');
         _sync = stampMainWorldSync(el);
       }
+      const ok = rawVal(el, kind) === text;
       return {
-        filled: describe(el),
-        value: kind === 'rich' ? text : textValue(el),
-        ...(_sync ? { _sync } : {}),
+        filled: describe(el), value: textValue(el), readBackVerified: ok,
+        ...(ok ? {} : { outcomeUnknown: true }), ...(_sync ? { _sync } : {}),
       };
     }
     case 'type': {
       const el = req.selector ? resolve(req.selector) : focused();
-      writable(el);
+      const kind = writable(el);
+      const text = req.text ?? '';
+      const before = rawVal(el, kind);
       if (req.selector) enter(el);
-      for (const ch of req.text ?? '') {
+      for (const ch of text) {
         key(el, 'keydown', ch, {});
         key(el, 'keypress', ch, {});
         insert(el, ch);
         key(el, 'keyup', ch, {});
       }
+      const after = rawVal(el, kind);
+      const ok = !text || (after !== before && after.includes(text));
       const _sync = stampMainWorldSync(el);
       return {
-        typed: describe(el),
-        value: textValue(el),
-        ...(_sync ? { _sync } : {}),
+        typed: describe(el), value: textValue(el), readBackVerified: ok,
+        ...(ok ? {} : { outcomeUnknown: true }), ...(_sync ? { _sync } : {}),
       };
     }
     case 'press': {
