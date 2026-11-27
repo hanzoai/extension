@@ -25,6 +25,7 @@ export interface LaunchOptions {
   noWebmcp?: boolean;
   args?: string[];
   port?: number;
+  timeoutMs?: number;
 }
 
 export function findChromeExecutable(explicit?: string): string {
@@ -174,12 +175,13 @@ export async function launchChrome(opts: LaunchOptions = {}): Promise<LaunchedCh
   const baseTmp = process.platform !== 'win32' && fs.existsSync('/tmp') ? '/tmp' : os.tmpdir();
   const userDataDir = opts.userDataDir ?? fs.mkdtempSync(path.join(baseTmp, 'hanzo-browser-'));
   const disableWebMcp = isWebMCPDisabled(opts.noWebmcp);
+  const launchTimeoutMs = opts.timeoutMs ?? 30_000;
 
   if (engine === 'lightpanda') {
     const port = opts.port || 9222;
     const lpArgs = ['serve', '--host', '127.0.0.1', '--port', String(port), ...(opts.args || [])];
     const child = spawn(bin, lpArgs, { stdio: ['ignore', 'ignore', 'pipe'] });
-    const deadline = Date.now() + 12_000;
+    const deadline = Date.now() + launchTimeoutMs;
     let wsEndpoint = '';
     while (Date.now() < deadline) {
       const ver = await getCdpVersion(`http://127.0.0.1:${port}`, 800);
@@ -258,7 +260,7 @@ export async function launchChrome(opts: LaunchOptions = {}): Promise<LaunchedCh
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error(`Timed out waiting for Chrome DevTools endpoint. Stderr:\n${stderrBuf}`));
-    }, 15_000);
+    }, launchTimeoutMs);
 
     child.once('error', (err) => {
       clearTimeout(timer);

@@ -37,6 +37,7 @@ export interface EngineLaunchOptions {
   detached?: boolean;
   logFile?: string;
   env?: Record<string, string | undefined>;
+  timeoutMs?: number;
 }
 
 function whichBinary(names: string[]): string | null {
@@ -287,7 +288,7 @@ export async function launchEngine(opts: EngineLaunchOptions = {}): Promise<Spaw
   }
 
   const baseUrl = `http://127.0.0.1:${port}`;
-  const deadline = Date.now() + 12_000;
+  const deadline = Date.now() + (opts.timeoutMs ?? 30_000);
   let wsUrl = '';
   let exitErr: string | null = null;
   child.once('exit', (code, sig) => {
