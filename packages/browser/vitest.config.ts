@@ -5,8 +5,10 @@ import { defineConfig } from 'vitest/config';
  * The answer surface mounts REAL @hanzo/ui (on @hanzo/gui), so the runner needs
  * the same web resolution the build uses — react-native → react-native-web,
  * react-native-svg stubbed (its CommonJS re-requires ESM, which Node refuses),
- * and the @hanzogui/* family inlined so the provider and the components share
- * ONE theme module instance. Same recipe as @hanzo/ui's own render suites.
+ * and the @hanzogui/* family plus @hanzo/composer inlined so the provider and
+ * components share ONE theme module instance and react-native is rewritten by
+ * the alias above instead of Node loading its Flow-typed entrypoint. Same
+ * recipe as @hanzo/ui's own render suites.
  */
 export default defineConfig({
   css: { postcss: { plugins: [] } },
@@ -24,6 +26,6 @@ export default defineConfig({
     // parallel — two of them used to build it themselves and raced. See
     // tests/built-dist.ts.
     globalSetup: ['./tests/built-dist.ts'],
-    server: { deps: { inline: [/@hanzogui\//, /@hanzo\/gui/, /@hanzo\/ui/, /react-native/] } },
+    server: { deps: { inline: [/@hanzogui\//, /@hanzo\/gui/, /@hanzo\/ui/, /@hanzo\/composer/, /react-native/] } },
   },
 });
