@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,8 +16,8 @@ if (fs.existsSync(extPageJs)) {
 
 fs.rmSync(distDir, { recursive: true, force: true });
 
-const tscBin = path.join(pkgDir, 'node_modules', '.bin', 'tsc');
-execFileSync(fs.existsSync(tscBin) ? tscBin : 'tsc', ['-p', path.join(pkgDir, 'tsconfig.json')], {
+const tscBin = createRequire(import.meta.url).resolve('typescript/bin/tsc');
+execFileSync(process.execPath, [tscBin, '-p', path.join(pkgDir, 'tsconfig.json')], {
   cwd: pkgDir,
   stdio: 'inherit',
 });
