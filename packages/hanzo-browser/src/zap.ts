@@ -24,6 +24,16 @@ export const RESPONSE = 17;
 export const ROLE_PROVIDER = 1;
 export const ROLE_CONSUMER = 2;
 
+/** Maximum allowed HIP-0069 frame payload length in bytes (32 MiB) to prevent unbounded memory buffering. */
+export const MAX_FRAME_LEN = 32 * 1024 * 1024;
+
+export function normalizeSocketPath(socketPath: string): string {
+  if (socketPath.startsWith('//./pipe/')) {
+    return `\\\\.\\pipe\\${socketPath.slice(9)}`;
+  }
+  return socketPath;
+}
+
 export interface ZapBrowserEntry {
   id: string;
   name: string;
@@ -36,6 +46,19 @@ export interface ZapBrowserEntry {
 export function defaultZapSocketPath(): string {
   if (process.env.ZAP_SOCK) return process.env.ZAP_SOCK;
   if (process.env.HANZO_ZAP_SOCK) return process.env.HANZO_ZAP_SOCK;
+  if (process.platform === 'win32') {
+    if (process.env.ZAP_PIPE) return process.env.ZAP_PIPE;
+    if (process.env.HANZO_ZAP_PIPE) return process.env.HANZO_ZAP_PIPE;
+    let username = process.env.USERNAME || process.env.USER || '';
+    if (!username) {
+      try {
+        username = os.userInfo().username;
+      } catch {
+        username = '';
+      }
+    }
+    return username ? `\\\\.\\pipe\\zapd-${username}` : '\\\\.\\pipe\\zapd';
+  }
   const uid = typeof process.getuid === 'function' ? process.getuid() : 1000;
   const xdg = process.env.XDG_RUNTIME_DIR || `/run/user/${uid}`;
   const runSock = path.join(xdg, 'zap', 'zapd.sock');
@@ -132,33 +155,90 @@ export function decodeZapProviders(payload: Buffer): ZapBrowserEntry[] {
   return out;
 }
 
+export interface ZapFrame {
+  type: number;
+  from: string;
+  to: string;
+  payload: Buffer;
+}
+
+interface ZapExchangeContext<T> {
+  myId: string;
+  send: (type: number, to: string, payload?: Buffer) => void;
+  finish: (value: T) => void;
+  fail: (err: Error) => void;
+}
+
 export class ZapTransport {
   public readonly socketPath: string;
 
   constructor(socketPath = defaultZapSocketPath()) {
-    this.socketPath = socketPath;
+    this.socketPath = normalizeSocketPath(socketPath);
   }
 
   isSocketPresent(): boolean {
-    return fs.existsSync(this.socketPath);
+    try {
+      const p = normalizeSocketPath(this.socketPath);
+      if (process.platform === 'win32' && p.startsWith('\\\\.\\pipe\\')) {
+        const pipeName = p.slice(9).toLowerCase();
+        try {
+          const pipes = fs.readdirSync('\\\\.\\pipe');
+          return pipes.some((entry) => {
+            const lower = entry.toLowerCase();
+            return lower === pipeName || lower.endsWith(`\\${pipeName}`);
+          });
+        } catch {
+          return false;
+        }
+      }
+      const stat = fs.statSync(p);
+      return stat.isSocket();
+    } catch {
+      return false;
+    }
   }
 
-  async listBrowsers(timeoutMs = 5000): Promise<ZapBrowserEntry[]> {
-    if (!fs.existsSync(this.socketPath)) {
-      throw new Error(`ZAP socket not found at ${this.socketPath}`);
-    }
+  private async execute<T>(
+    timeoutMs: number,
+    operationName: string,
+    onFrame: (frame: ZapFrame, ctx: ZapExchangeContext<T>) => void,
+  ): Promise<T> {
+    const normalizedPath = normalizeSocketPath(this.socketPath);
     return new Promise((resolve, reject) => {
-      const sock = net.createConnection(this.socketPath);
+      const sock = net.createConnection(normalizedPath);
       let buf = Buffer.alloc(0);
       let myId = `agent/hanzo-${Math.random().toString(16).slice(2, 8)}`;
-      const timer = setTimeout(() => {
+      let settled = false;
+
+      const cleanup = () => {
+        settled = true;
+        clearTimeout(timer);
         sock.destroy();
-        reject(new Error(`ZAP listBrowsers timeout (${timeoutMs}ms)`));
+      };
+
+      const timer = setTimeout(() => {
+        if (!settled) {
+          cleanup();
+          reject(new Error(`ZAP ${operationName} timeout (${timeoutMs}ms)`));
+        }
       }, timeoutMs);
 
-      sock.once('error', (err) => {
-        clearTimeout(timer);
-        reject(err);
+      sock.on('error', (err: NodeJS.ErrnoException) => {
+        if (!settled) {
+          cleanup();
+          if (err.code === 'ENOENT' || err.code === 'ECONNREFUSED') {
+            reject(new Error(`ZAP socket not found at ${this.socketPath}`));
+          } else {
+            reject(err);
+          }
+        }
+      });
+
+      sock.once('close', () => {
+        if (!settled) {
+          cleanup();
+          reject(new Error(`ZAP socket closed unexpectedly during ${operationName} (${this.socketPath})`));
+        }
       });
 
       sock.once('connect', () => {
@@ -169,39 +249,79 @@ export class ZapTransport {
         buf = Buffer.concat([buf, chunk]);
         while (buf.length >= 4) {
           const frameLen = buf.readUInt32LE(0);
+          if (frameLen > MAX_FRAME_LEN) {
+            cleanup();
+            reject(new Error(`HIP-0069 frame exceeds maximum allowed size (${frameLen} > ${MAX_FRAME_LEN}) on ${operationName}`));
+            return;
+          }
           if (buf.length < 4 + frameLen) break;
           const raw = buf.subarray(0, 4 + frameLen);
           buf = buf.subarray(4 + frameLen);
+
+          if (raw.length < 15 || frameLen < 11) {
+            cleanup();
+            reject(new Error(`Invalid HIP-0069 frame header on ${operationName} (frameLen=${frameLen})`));
+            return;
+          }
+
           const t = raw.readUInt8(4);
           const fl = raw.readUInt16LE(7);
           const tl = raw.readUInt16LE(9);
           const pl = raw.readUInt32LE(11);
+
+          if (15 + fl + tl + pl > raw.length) {
+            cleanup();
+            reject(new Error(`Invalid HIP-0069 frame framing on ${operationName} (frameLen=${frameLen}, fl=${fl}, tl=${tl}, pl=${pl})`));
+            return;
+          }
+
+          const from = raw.subarray(15, 15 + fl).toString('utf8');
           const to = raw.subarray(15 + fl, 15 + fl + tl).toString('utf8');
           const payload = raw.subarray(15 + fl + tl, 15 + fl + tl + pl);
 
           if (t === WELCOME) {
             myId = to || myId;
-            sock.write(encodeZapFrame(PROVIDERS_LIST, myId, ''));
-          } else if (t === PROVIDERS) {
-            clearTimeout(timer);
-            sock.destroy();
-            const all = decodeZapProviders(payload);
-            resolve(all.filter((p) => p.id.startsWith('browser/')));
-            return;
           } else if (t === ERROR) {
-            clearTimeout(timer);
-            sock.destroy();
-            reject(new Error(payload.toString('utf8') || 'ZAP router error'));
+            cleanup();
+            reject(new Error(payload.toString('utf8') || `ZAP error on ${operationName}`));
             return;
           }
+
+          onFrame(
+            { type: t, from, to, payload },
+            {
+              myId,
+              send: (type, target, p = Buffer.alloc(0)) => {
+                if (!settled) sock.write(encodeZapFrame(type, myId, target, p));
+              },
+              finish: (val: T) => {
+                cleanup();
+                resolve(val);
+              },
+              fail: (err: Error) => {
+                cleanup();
+                reject(err);
+              },
+            },
+          );
         }
       });
     });
   }
 
+  async listBrowsers(timeoutMs = 5000): Promise<ZapBrowserEntry[]> {
+    return this.execute<ZapBrowserEntry[]>(timeoutMs, 'listBrowsers', (frame, ctx) => {
+      if (frame.type === WELCOME) {
+        ctx.send(PROVIDERS_LIST, '');
+      } else if (frame.type === PROVIDERS) {
+        const all = decodeZapProviders(frame.payload);
+        ctx.finish(all.filter((p) => p.id.startsWith('browser/')));
+      }
+    });
+  }
+
   async resolveProvider(filter?: string, clientId?: string): Promise<string | null> {
     const explicit = clientId || process.env.HANZO_ZAP_PROVIDER;
-    if (!this.isSocketPresent()) return null;
     try {
       const list = await this.listBrowsers();
       if (list.length === 0) return null;
@@ -225,89 +345,43 @@ export class ZapTransport {
     params: Record<string, unknown> = {},
     opts: { provider?: string; filter?: string; timeoutMs?: number } = {},
   ): Promise<T> {
-    if (!fs.existsSync(this.socketPath)) {
-      throw new Error(`ZAP socket not found at ${this.socketPath}`);
-    }
     const timeoutMs = opts.timeoutMs ?? 25_000;
-    return new Promise((resolve, reject) => {
-      const sock = net.createConnection(this.socketPath);
-      let buf = Buffer.alloc(0);
-      let myId = `agent/hanzo-${Math.random().toString(16).slice(2, 8)}`;
-      const explicitProvider = opts.provider || process.env.HANZO_ZAP_PROVIDER || '';
-      const timer = setTimeout(() => {
-        sock.destroy();
-        reject(new Error(`ZAP request timeout (${timeoutMs}ms) on ${method}`));
-      }, timeoutMs);
+    const explicitProvider = opts.provider || process.env.HANZO_ZAP_PROVIDER || '';
 
-      sock.once('error', (err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-
-      sock.once('connect', () => {
-        sock.write(encodeZapFrame(HELLO, myId, '', encodeZapHello(ROLE_CONSUMER, 'hanzo-browser', [])));
-      });
-
-      sock.on('data', (chunk: Buffer) => {
-        buf = Buffer.concat([buf, chunk]);
-        while (buf.length >= 4) {
-          const frameLen = buf.readUInt32LE(0);
-          if (buf.length < 4 + frameLen) break;
-          const raw = buf.subarray(0, 4 + frameLen);
-          buf = buf.subarray(4 + frameLen);
-          const t = raw.readUInt8(4);
-          const fl = raw.readUInt16LE(7);
-          const tl = raw.readUInt16LE(9);
-          const pl = raw.readUInt32LE(11);
-          const to = raw.subarray(15 + fl, 15 + fl + tl).toString('utf8');
-          const payload = raw.subarray(15 + fl + tl, 15 + fl + tl + pl);
-
-          if (t === WELCOME) {
-            myId = to || myId;
-            if (explicitProvider) {
-              sock.write(encodeZapFrame(ROUTE, myId, explicitProvider, encodeZapCmd(method, params)));
-            } else {
-              sock.write(encodeZapFrame(PROVIDERS_LIST, myId, ''));
-            }
-          } else if (t === PROVIDERS) {
-            const browsers = decodeZapProviders(payload).filter((p) => p.id.startsWith('browser/'));
-            const chosen = opts.filter
-              ? browsers.find((b) => b.name.toLowerCase().includes(opts.filter!.toLowerCase()) || b.id.toLowerCase().includes(opts.filter!.toLowerCase()))
-              : browsers[0];
-            if (!chosen) {
-              clearTimeout(timer);
-              sock.destroy();
-              reject(new Error('No browser extension connected on ZAP router'));
-              return;
-            }
-            sock.write(encodeZapFrame(ROUTE, myId, chosen.id, encodeZapCmd(method, params)));
-          } else if (t === RESPONSE) {
-            clearTimeout(timer);
-            sock.destroy();
-            const text = payload.toString('utf8');
-            if (text.startsWith('ERR:')) {
-              reject(new Error(text.slice(4)));
-              return;
-            }
-            try {
-              const parsed = JSON.parse(text);
-              if (parsed && typeof parsed === 'object' && parsed.ok === false && typeof parsed.error === 'string') {
-                reject(new Error(parsed.error));
-                return;
-              }
-              resolve((parsed?.result !== undefined && parsed?.ok === true ? parsed.result : parsed) as T);
-            } catch {
-              resolve(text as unknown as T);
-            }
-            return;
-          } else if (t === ERROR) {
-            clearTimeout(timer);
-            sock.destroy();
-            reject(new Error(payload.toString('utf8') || `ZAP error on ${method}`));
+    return this.execute<T>(timeoutMs, method, (frame, ctx) => {
+      if (frame.type === WELCOME) {
+        if (explicitProvider) {
+          ctx.send(ROUTE, explicitProvider, encodeZapCmd(method, params));
+        } else {
+          ctx.send(PROVIDERS_LIST, '');
+        }
+      } else if (frame.type === PROVIDERS) {
+        const browsers = decodeZapProviders(frame.payload).filter((p) => p.id.startsWith('browser/'));
+        const chosen = opts.filter
+          ? browsers.find((b) => b.name.toLowerCase().includes(opts.filter!.toLowerCase()) || b.id.toLowerCase().includes(opts.filter!.toLowerCase()))
+          : browsers[0];
+        if (!chosen) {
+          ctx.fail(new Error('No browser extension connected on ZAP router'));
+          return;
+        }
+        ctx.send(ROUTE, chosen.id, encodeZapCmd(method, params));
+      } else if (frame.type === RESPONSE) {
+        const text = frame.payload.toString('utf8');
+        if (text.startsWith('ERR:')) {
+          ctx.fail(new Error(text.slice(4)));
+          return;
+        }
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed && typeof parsed === 'object' && parsed.ok === false && typeof parsed.error === 'string') {
+            ctx.fail(new Error(parsed.error));
             return;
           }
+          ctx.finish((parsed?.result !== undefined && parsed?.ok === true ? parsed.result : parsed) as T);
+        } catch {
+          ctx.finish(text as unknown as T);
         }
-      });
+      }
     });
   }
 }

@@ -12,9 +12,12 @@ import {
   buildEngineArgs,
   buildWebMcpSummary,
   createBrowser,
+  defaultZapSocketPath,
   delimitUntrusted,
   encodeZapFrame,
   getSessionsViaZap,
+  MAX_FRAME_LEN,
+  normalizeSocketPath,
   PROVIDERS,
   PROVIDERS_LIST,
   RESPONSE,
@@ -151,9 +154,56 @@ describe('@hanzo/browser WebMCP, Shadow-DOM SVG, ZAP router & headless native CD
     expect(parsed.flags.json).toBe(true);
   });
 
+  it('resolves platform-appropriate ZAP socket or named pipe paths and respects env overrides', () => {
+    const origZapSock = process.env.ZAP_SOCK;
+    const origHanzoZapSock = process.env.HANZO_ZAP_SOCK;
+    const origZapPipe = process.env.ZAP_PIPE;
+    const origHanzoZapPipe = process.env.HANZO_ZAP_PIPE;
+    try {
+      delete process.env.ZAP_SOCK;
+      delete process.env.HANZO_ZAP_SOCK;
+      delete process.env.ZAP_PIPE;
+      delete process.env.HANZO_ZAP_PIPE;
+
+      const p = defaultZapSocketPath();
+      if (process.platform === 'win32') {
+        expect(p).toMatch(/^\\\\\.\\pipe\\zapd/);
+      } else {
+        expect(p).toContain('zapd.sock');
+      }
+
+      process.env.ZAP_SOCK = '/custom/test.sock';
+      expect(defaultZapSocketPath()).toBe('/custom/test.sock');
+
+      delete process.env.ZAP_SOCK;
+      process.env.HANZO_ZAP_SOCK = '/custom/hanzo.sock';
+      expect(defaultZapSocketPath()).toBe('/custom/hanzo.sock');
+
+      if (process.platform === 'win32') {
+        delete process.env.HANZO_ZAP_SOCK;
+        process.env.ZAP_PIPE = '\\\\.\\pipe\\custom-zap';
+        expect(defaultZapSocketPath()).toBe('\\\\.\\pipe\\custom-zap');
+      }
+    } finally {
+      if (origZapSock !== undefined) process.env.ZAP_SOCK = origZapSock; else delete process.env.ZAP_SOCK;
+      if (origHanzoZapSock !== undefined) process.env.HANZO_ZAP_SOCK = origHanzoZapSock; else delete process.env.HANZO_ZAP_SOCK;
+      if (origZapPipe !== undefined) process.env.ZAP_PIPE = origZapPipe; else delete process.env.ZAP_PIPE;
+      if (origHanzoZapPipe !== undefined) process.env.HANZO_ZAP_PIPE = origHanzoZapPipe; else delete process.env.HANZO_ZAP_PIPE;
+    }
+  });
+
+  it('normalizes Windows named pipe paths correctly including //./pipe/ syntax', () => {
+    expect(normalizeSocketPath('//./pipe/zapd-alice')).toBe('\\\\.\\pipe\\zapd-alice');
+    expect(normalizeSocketPath('//./pipe/zapd')).toBe('\\\\.\\pipe\\zapd');
+    expect(normalizeSocketPath('\\\\.\\pipe\\zapd-bob')).toBe('\\\\.\\pipe\\zapd-bob');
+    expect(normalizeSocketPath('/run/user/1000/zap/zapd.sock')).toBe('/run/user/1000/zap/zapd.sock');
+  });
+
   it('speaks HIP-0069 ZAP router wire protocol and falls back to hanzo.getCookies without leaking values', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hanzo-zap-test-'));
-    const sockPath = path.join(tmpDir, 'zapd.sock');
+    const sockPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\hanzo-zap-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      : path.join(tmpDir, 'zapd.sock');
     const seenMethods: string[] = [];
 
     const encStr16 = (s: string) => {
@@ -249,6 +299,159 @@ describe('@hanzo/browser WebMCP, Shadow-DOM SVG, ZAP router & headless native CD
       expect(lpStatus.vaultLoggedIn).toBe(true);
       expect(seenMethods).toContain('lastpass.status');
       await browser.close();
+    } finally {
+      for (const c of conns) c.destroy();
+      await new Promise<void>((resolve) => zapServer.close(() => resolve()));
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('handles pipe/socket absence gracefully and never falsely reports healthy server', async () => {
+    const absentPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\hanzo-zap-absent-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      : path.join(os.tmpdir(), `hanzo-zap-absent-${Date.now()}.sock`);
+
+    const zap = new ZapTransport(absentPath);
+    expect(zap.isSocketPresent()).toBe(false);
+
+    const provider = await zap.resolveProvider();
+    expect(provider).toBeNull();
+
+    await expect(zap.listBrowsers()).rejects.toThrow(/ZAP socket not found/);
+    await expect(zap.call('test.ping')).rejects.toThrow(/ZAP socket not found/);
+  });
+
+  it('handles HIP-0069 framing, chunking, reconnect and cleanup across multiple client calls', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hanzo-zap-framing-'));
+    const sockPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\hanzo-zap-framing-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      : path.join(tmpDir, 'zapd.sock');
+
+    const encStr16 = (s: string) => {
+      const b = Buffer.from(s, 'utf8');
+      const l = Buffer.alloc(2);
+      l.writeUInt16LE(b.length, 0);
+      return Buffer.concat([l, b]);
+    };
+    const encU16 = (n: number) => {
+      const b = Buffer.alloc(2);
+      b.writeUInt16LE(n, 0);
+      return b;
+    };
+
+    const providersPayload = Buffer.concat([
+      encU16(1),
+      encStr16('browser/chrome-reconnect'),
+      Buffer.from([1]),
+      encStr16('chrome'),
+      encU16(1),
+      encStr16('browser'),
+      encU16(0),
+    ]);
+
+    let closeImmediately = false;
+    let sendMalformedFrame = false;
+    let sendOversizedFrame = false;
+    let splitChunks = false;
+
+    const conns = new Set<net.Socket>();
+    const zapServer = net.createServer((conn) => {
+      conns.add(conn);
+      conn.on('close', () => conns.delete(conn));
+      let buf = Buffer.alloc(0);
+
+      conn.on('data', (chunk) => {
+        if (closeImmediately) {
+          conn.destroy();
+          return;
+        }
+
+        buf = Buffer.concat([buf, chunk]);
+        while (buf.length >= 4) {
+          const len = buf.readUInt32LE(0);
+          if (buf.length < 4 + len) break;
+          const raw = buf.subarray(0, 4 + len);
+          buf = buf.subarray(4 + len);
+          const t = raw.readUInt8(4);
+          const fl = raw.readUInt16LE(7);
+          const from = raw.subarray(15, 15 + fl).toString('utf8');
+
+          if (t === HELLO) {
+            conn.write(encodeZapFrame(WELCOME, 'router', from));
+          } else if (t === PROVIDERS_LIST) {
+            conn.write(encodeZapFrame(PROVIDERS, 'router', from, providersPayload));
+          } else if (t === ROUTE) {
+            if (sendMalformedFrame) {
+              const badFrame = Buffer.alloc(8);
+              badFrame.writeUInt32LE(2, 0);
+              badFrame.writeUInt8(RESPONSE, 4);
+              conn.write(badFrame);
+              return;
+            }
+
+            if (sendOversizedFrame) {
+              const bigFrame = Buffer.alloc(8);
+              bigFrame.writeUInt32LE(MAX_FRAME_LEN + 1024, 0);
+              bigFrame.writeUInt8(RESPONSE, 4);
+              conn.write(bigFrame);
+              return;
+            }
+
+            const responsePayload = Buffer.from(JSON.stringify({ ok: true, result: 'echo-ok' }));
+            const fullFrame = encodeZapFrame(RESPONSE, 'browser/chrome-reconnect', from, responsePayload);
+
+            if (splitChunks) {
+              const half = Math.floor(fullFrame.length / 2);
+              conn.write(fullFrame.subarray(0, half));
+              setTimeout(() => {
+                conn.write(fullFrame.subarray(half));
+              }, 20);
+            } else {
+              conn.write(fullFrame);
+            }
+          }
+        }
+      });
+    });
+
+    await new Promise<void>((resolve) => zapServer.listen(sockPath, () => resolve()));
+
+    try {
+      const zap = new ZapTransport(sockPath);
+      expect(zap.isSocketPresent()).toBe(true);
+
+      const browsers = await zap.listBrowsers();
+      expect(browsers.length).toBe(1);
+      expect(browsers[0].id).toBe('browser/chrome-reconnect');
+
+      const resolved = await zap.resolveProvider();
+      expect(resolved).toBe('browser/chrome-reconnect');
+
+      const res1 = await zap.call<string>('ping');
+      expect(res1).toBe('echo-ok');
+
+      const res2 = await zap.call<string>('ping2');
+      expect(res2).toBe('echo-ok');
+
+      splitChunks = true;
+      const resChunked = await zap.call<string>('ping-chunked');
+      expect(resChunked).toBe('echo-ok');
+      splitChunks = false;
+
+      sendMalformedFrame = true;
+      await expect(zap.call('ping-bad-frame')).rejects.toThrow(/Invalid HIP-0069 frame header/);
+      sendMalformedFrame = false;
+
+      sendOversizedFrame = true;
+      await expect(zap.call('ping-oversized-frame')).rejects.toThrow(/exceeds maximum allowed size/);
+      sendOversizedFrame = false;
+
+      closeImmediately = true;
+      await expect(zap.call('ping-disconnect')).rejects.toThrow(/ZAP socket closed unexpectedly/);
+      closeImmediately = false;
+
+      const resRecovered = await zap.call<string>('ping-recovered');
+      expect(resRecovered).toBe('echo-ok');
     } finally {
       for (const c of conns) c.destroy();
       await new Promise<void>((resolve) => zapServer.close(() => resolve()));
