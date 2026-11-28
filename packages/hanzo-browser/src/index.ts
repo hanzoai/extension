@@ -41,6 +41,8 @@ import {
   getSessionsViaZap,
   HELLO,
   matchSocialSessionsFromCookies,
+  MAX_FRAME_LEN,
+  normalizeSocketPath,
   PROVIDERS,
   PROVIDERS_LIST,
   RESPONSE,
@@ -52,6 +54,7 @@ import {
   type DetectedSession,
   type SocialCookieRule,
   type ZapBrowserEntry,
+  type ZapFrame,
 } from './zap.js';
 import { RawWebSocket } from './ws.js';
 import {
@@ -130,6 +133,8 @@ export {
   launchEngine,
   makeProvenanceNonce,
   matchSocialSessionsFromCookies,
+  MAX_FRAME_LEN,
+  normalizeSocketPath,
   sandboxResume,
   sandboxStart,
   sandboxStatus,

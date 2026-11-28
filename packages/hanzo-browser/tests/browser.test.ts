@@ -16,13 +16,14 @@ import {
   delimitUntrusted,
   encodeZapFrame,
   getSessionsViaZap,
+  MAX_FRAME_LEN,
+  normalizeSocketPath,
   PROVIDERS,
   PROVIDERS_LIST,
   RESPONSE,
   ROUTE,
   HELLO,
   WELCOME,
-  ERROR,
   truncateUtf8Description,
   utf8ByteLength,
 } from '../src/index.js';
@@ -154,7 +155,10 @@ describe('@hanzo/browser WebMCP, Shadow-DOM SVG, ZAP router & headless native CD
   });
 
   it('resolves platform-appropriate ZAP socket or named pipe paths and respects env overrides', () => {
-    const saved = { ...process.env };
+    const origZapSock = process.env.ZAP_SOCK;
+    const origHanzoZapSock = process.env.HANZO_ZAP_SOCK;
+    const origZapPipe = process.env.ZAP_PIPE;
+    const origHanzoZapPipe = process.env.HANZO_ZAP_PIPE;
     try {
       delete process.env.ZAP_SOCK;
       delete process.env.HANZO_ZAP_SOCK;
@@ -181,8 +185,18 @@ describe('@hanzo/browser WebMCP, Shadow-DOM SVG, ZAP router & headless native CD
         expect(defaultZapSocketPath()).toBe('\\\\.\\pipe\\custom-zap');
       }
     } finally {
-      process.env = { ...saved };
+      if (origZapSock !== undefined) process.env.ZAP_SOCK = origZapSock; else delete process.env.ZAP_SOCK;
+      if (origHanzoZapSock !== undefined) process.env.HANZO_ZAP_SOCK = origHanzoZapSock; else delete process.env.HANZO_ZAP_SOCK;
+      if (origZapPipe !== undefined) process.env.ZAP_PIPE = origZapPipe; else delete process.env.ZAP_PIPE;
+      if (origHanzoZapPipe !== undefined) process.env.HANZO_ZAP_PIPE = origHanzoZapPipe; else delete process.env.HANZO_ZAP_PIPE;
     }
+  });
+
+  it('normalizes Windows named pipe paths correctly including //./pipe/ syntax', () => {
+    expect(normalizeSocketPath('//./pipe/zapd-alice')).toBe('\\\\.\\pipe\\zapd-alice');
+    expect(normalizeSocketPath('//./pipe/zapd')).toBe('\\\\.\\pipe\\zapd');
+    expect(normalizeSocketPath('\\\\.\\pipe\\zapd-bob')).toBe('\\\\.\\pipe\\zapd-bob');
+    expect(normalizeSocketPath('/run/user/1000/zap/zapd.sock')).toBe('/run/user/1000/zap/zapd.sock');
   });
 
   it('speaks HIP-0069 ZAP router wire protocol and falls back to hanzo.getCookies without leaking values', async () => {
@@ -337,6 +351,7 @@ describe('@hanzo/browser WebMCP, Shadow-DOM SVG, ZAP router & headless native CD
 
     let closeImmediately = false;
     let sendMalformedFrame = false;
+    let sendOversizedFrame = false;
     let splitChunks = false;
 
     const conns = new Set<net.Socket>();
@@ -374,6 +389,14 @@ describe('@hanzo/browser WebMCP, Shadow-DOM SVG, ZAP router & headless native CD
               return;
             }
 
+            if (sendOversizedFrame) {
+              const bigFrame = Buffer.alloc(8);
+              bigFrame.writeUInt32LE(MAX_FRAME_LEN + 1024, 0);
+              bigFrame.writeUInt8(RESPONSE, 4);
+              conn.write(bigFrame);
+              return;
+            }
+
             const responsePayload = Buffer.from(JSON.stringify({ ok: true, result: 'echo-ok' }));
             const fullFrame = encodeZapFrame(RESPONSE, 'browser/chrome-reconnect', from, responsePayload);
 
@@ -404,14 +427,14 @@ describe('@hanzo/browser WebMCP, Shadow-DOM SVG, ZAP router & headless native CD
       const resolved = await zap.resolveProvider();
       expect(resolved).toBe('browser/chrome-reconnect');
 
-      const res1 = await zap.call<{ result: string }>('ping');
+      const res1 = await zap.call<string>('ping');
       expect(res1).toBe('echo-ok');
 
-      const res2 = await zap.call<{ result: string }>('ping2');
+      const res2 = await zap.call<string>('ping2');
       expect(res2).toBe('echo-ok');
 
       splitChunks = true;
-      const resChunked = await zap.call<{ result: string }>('ping-chunked');
+      const resChunked = await zap.call<string>('ping-chunked');
       expect(resChunked).toBe('echo-ok');
       splitChunks = false;
 
@@ -419,11 +442,15 @@ describe('@hanzo/browser WebMCP, Shadow-DOM SVG, ZAP router & headless native CD
       await expect(zap.call('ping-bad-frame')).rejects.toThrow(/Invalid HIP-0069 frame header/);
       sendMalformedFrame = false;
 
+      sendOversizedFrame = true;
+      await expect(zap.call('ping-oversized-frame')).rejects.toThrow(/exceeds maximum allowed size/);
+      sendOversizedFrame = false;
+
       closeImmediately = true;
       await expect(zap.call('ping-disconnect')).rejects.toThrow(/ZAP socket closed unexpectedly/);
       closeImmediately = false;
 
-      const resRecovered = await zap.call<{ result: string }>('ping-recovered');
+      const resRecovered = await zap.call<string>('ping-recovered');
       expect(resRecovered).toBe('echo-ok');
     } finally {
       for (const c of conns) c.destroy();
