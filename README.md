@@ -40,6 +40,16 @@ make check                  # the CI gate: build, test, bundle budget, e2e
 Each lives at `packages/<name>` with its own README; its build is linked at
 `dist/<name>`.
 
+### Cross-Platform `pnpm` Targets (Windows / macOS / Linux)
+
+```bash
+pnpm install --frozen-lockfile
+pnpm --filter @hanzo/browser-extension build   # writes dist/chrome & dist/firefox
+pnpm --filter hanzo-ide run vscode:prepublish   # compiles extension + bundled mcp-server
+pnpm --filter hanzo-ide run build               # writes packages/vscode/dist/hanzo-ide.vsix
+code --install-extension packages/vscode/dist/hanzo-ide.vsix
+```
+
 ## Release
 
 Bump `packages/browser/package.json` (patch only) and merge to `main`. The

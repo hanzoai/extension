@@ -97,16 +97,28 @@ function encodeHello(role: number, brand: string, caps: string[]): Uint8Array {
 export function decodeCmd(p: Uint8Array): { method: string; params: Record<string, string> } {
   const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
   let o = 0;
+  if (o + 2 > p.length) throw new Error('truncated ZAP command method length');
   const ml = dv.getUint16(o, true); o += 2;
+  if (o + ml + 2 > p.length) throw new Error('truncated ZAP command header');
   const method = dec.decode(p.subarray(o, o + ml)); o += ml;
   const n = dv.getUint16(o, true); o += 2;
   const params: Record<string, string> = {};
   for (let i = 0; i < n; i++) {
+    if (o + 2 > p.length) throw new Error('truncated ZAP command param key length');
     const kl = dv.getUint16(o, true); o += 2;
+    if (o + kl + 4 > p.length) throw new Error('truncated ZAP command param entry');
     const k = dec.decode(p.subarray(o, o + kl)); o += kl;
     const vl = dv.getUint32(o, true); o += 4;
-    params[k] = dec.decode(p.subarray(o, o + vl)); o += vl;
+    if (o + vl > p.length) throw new Error('truncated ZAP command param value');
+    const val = dec.decode(p.subarray(o, o + vl)); o += vl;
+    Object.defineProperty(params, k, {
+      value: val,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
   }
+  if (o !== p.length) throw new Error('trailing bytes in ZAP command payload');
   return { method, params };
 }
 

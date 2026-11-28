@@ -18,7 +18,7 @@
   "scripts": {
     "build": "npm run build:lib && npm run build:cli",
     "build:lib": "esbuild src/index.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/index.js --external:@modelcontextprotocol/sdk --external:glob --external:commander --external:zod --external:zod-to-json-schema --external:@lancedb/lancedb --external:@xenova/transformers --external:jsautogui --external:path --external:fs --external:fs/promises --external:os --external:url",
-    "build:cli": "esbuild src/cli.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/cli.js --external:@modelcontextprotocol/sdk --external:glob --external:commander --external:zod --external:zod-to-json-schema --external:@lancedb/lancedb --external:@xenova/transformers --external:jsautogui --external:path --external:fs --external:fs/promises --external:os --external:url && chmod +x dist/cli.js",
+    "build:cli": "esbuild src/cli.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/cli.js --external:@modelcontextprotocol/sdk --external:glob --external:commander --external:zod --external:zod-to-json-schema --external:@lancedb/lancedb --external:@xenova/transformers --external:jsautogui --external:path --external:fs --external:fs/promises --external:os --external:url && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\"",
     "dev": "tsc --watch",
     "lint": "echo 'No linter configured'",
     "test": "vitest run",
